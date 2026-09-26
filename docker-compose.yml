@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  hotbot-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hotbot-saas
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - hotbot_data:/app/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/hotbot.db
+      - ENVIRONMENT=production
+
+volumes:
+  hotbot_data:

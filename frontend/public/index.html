@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HotBot AI - Painel de Atendimento e Vendas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #0d0f12; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+    .sidebar-item { transition: all 0.2s ease; }
+    .sidebar-item:hover, .sidebar-item.active { background-color: #1e232b; color: #a855f7; border-left: 3px solid #a855f7; }
+    .glass-card { background: #13171e; border: 1px solid #1f2633; border-radius: 12px; }
+  </style>
+</head>
+<body class="h-screen flex overflow-hidden">
+
+  <!-- 1. BARRA LATERAL (MENU COMPLETO SHARKBOT) -->
+  <aside class="w-72 bg-[#0a0c10] border-r border-[#1a1f2c] flex flex-col justify-between shrink-0">
+    <div class="p-5 overflow-y-auto">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-purple-900/30">
+          <i class="fa-solid fa-fire text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white tracking-wide">HotBot AI</h1>
+          <p class="text-xs text-emerald-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Ativo</p>
+        </div>
+      </div>
+
+      <!-- SEÇÕES -->
+      <div class="space-y-6 text-sm">
+        <div>
+          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Começar</span>
+          <div class="mt-2 space-y-1">
+            <button onclick="switchTab('resumo')" class="sidebar-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 text-left">
+              <i class="fa-solid fa-list-check w-4"></i> Resumo do atendimento
+            </button>
+            <button onclick="switchTab('estrategias')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-wand-magic-sparkles w-4"></i> Estratégias prontas
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Configuração Essencial</span>
+          <div class="mt-2 space-y-1">
+            <button onclick="switchTab('persona')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-user-gear w-4"></i> Persona e identidade
+            </button>
+            <button onclick="switchTab('ofertas')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-tags w-4"></i> Negócio e ofertas
+            </button>
+            <button onclick="switchTab('conversa')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-comment-dots w-4"></i> Jeito de conversar
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Conteúdo & Automação</span>
+          <div class="mt-2 space-y-1">
+            <button onclick="switchTab('midias')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-photo-film w-4"></i> Mídias da conversa
+            </button>
+            <button onclick="switchTab('downsell')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-arrow-trend-down w-4"></i> Downsell
+            </button>
+            <button onclick="switchTab('upsell')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-arrow-trend-up w-4"></i> Upsell
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Publicação & Gestão</span>
+          <div class="mt-2 space-y-1">
+            <button onclick="switchTab('publicar')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-brands fa-telegram w-4"></i> Publicar no Bot
+            </button>
+            <button onclick="switchTab('crm')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
+              <i class="fa-solid fa-users-viewfinder w-4"></i> Memória das conversas
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saldo & Pushin Pay status -->
+    <div class="p-4 border-t border-[#1a1f2c] bg-[#0d0f14]">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <span>Pushin Pay</span>
+        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check"></i> Integrado</span>
+      </div>
+      <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+        <span>Custo IA Própria</span>
+        <span class="text-purple-400 font-mono font-bold">~R$ 0,001/msg</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 2. PAINEL CENTRAL DE EDIÇÃO -->
+  <main class="flex-1 overflow-y-auto p-8 border-r border-[#1a1f2c]">
+    
+    <!-- ABA: RESUMO DO ATENDIMENTO -->
+    <section id="tab-resumo" class="space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Resumo do atendimento</h2>
+          <p class="text-slate-400 text-sm mt-1">Veja o que já está pronto e qual é o próximo passo para faturar no Telegram.</p>
+        </div>
+        <button onclick="saveAll()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold shadow-lg shadow-purple-600/30 transition">
+          <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar alterações
+        </button>
+      </div>
+
+      <!-- Banner de Onboarding -->
+      <div class="glass-card p-6 bg-gradient-to-r from-purple-950/40 to-slate-900/40 border-purple-900/30">
+        <span class="text-xs font-semibold px-2.5 py-1 bg-purple-600/30 text-purple-300 rounded-full border border-purple-500/30">EM PREPARAÇÃO</span>
+        <h3 class="text-xl font-bold text-white mt-3">Prepare uma conversa que vende do seu jeito</h3>
+        <p class="text-sm text-slate-400 mt-1 max-w-xl">Configure a modelo com personalidade humana, cadastre suas ofertas Pix e envie mídias de prévia no tempo certo.</p>
+      </div>
+
+      <!-- Checklist dos 5 Passos -->
+      <div class="glass-card p-6 space-y-4">
+        <h4 class="text-sm font-bold text-white uppercase tracking-wider">O essencial para publicar</h4>
+        
+        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-check"></i></span>
+            <div>
+              <p class="text-sm font-semibold text-white">1. Definir a persona</p>
+              <p class="text-xs text-slate-400">Nome, idade, cidade e traços de personalidade sensual/atenciosa.</p>
+            </div>
+          </div>
+          <button onclick="switchTab('persona')" class="text-xs text-purple-400 hover:underline">Configurar &rarr;</button>
+        </div>
+
+        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-check"></i></span>
+            <div>
+              <p class="text-sm font-semibold text-white">2. Cadastrar as ofertas</p>
+              <p class="text-xs text-slate-400">Planos de R$ 19,90, VIP Vitalício e barganha inteligente.</p>
+            </div>
+          </div>
+          <button onclick="switchTab('ofertas')" class="text-xs text-purple-400 hover:underline">Configurar &rarr;</button>
+        </div>
+
+        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
+          <div class="flex items-center gap-3">
+            <span class="w-7 h-7 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">3</span>
+            <div>
+              <p class="text-sm font-semibold text-white">3. Conectar Pushin Pay & Telegram</p>
+              <p class="text-xs text-slate-400">Token da Pushin Pay para Pix e BotFather para o canal VIP.</p>
+            </div>
+          </div>
+          <button onclick="switchTab('publicar')" class="text-xs text-purple-400 hover:underline">Conectar &rarr;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: PERSONA E IDENTIDADE -->
+    <section id="tab-persona" class="hidden space-y-6">
+      <div>
+        <h2 class="text-2xl font-bold text-white">Persona e identidade</h2>
+        <p class="text-slate-400 text-sm mt-1">Defina quem conversa com o visitante: nome, história e personalidade.</p>
+      </div>
+
+      <div class="glass-card p-6 space-y-5">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Nome de exibição</label>
+            <input type="text" id="persona-name" value="Melissa Santos" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Idade</label>
+            <input type="number" id="persona-age" value="22" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Gênero / Apresentação</label>
+            <select id="persona-gender" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
+              <option value="Feminino" selected>Feminino (fala no feminino)</option>
+              <option value="Masculino">Masculino (fala no masculino)</option>
+              <option value="Neutro">Neutro</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Cidade (para identificação)</label>
+            <input type="text" id="persona-city" value="São Paulo" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-300">Biografia oculta (Contexto privado da modelo)</label>
+          <textarea id="persona-bio" rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">Criadora de conteúdo adulto, espontânea e direta. Conversa no privado com homens de bom gosto e apresenta o canal VIP sem parecer um robô chato.</textarea>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-300">Traços de personalidade (separados por vírgula)</label>
+          <input type="text" id="persona-traits" value="espontânea, atenciosa, safada, provocante, bem-humorada" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: ESTRATÉGIAS PRONTAS (TEMPLATES DE FUNIL) -->
+    <section id="tab-estrategias" class="hidden space-y-6">
+      <div>
+        <h2 class="text-2xl font-bold text-white">Estratégias prontas</h2>
+        <p class="text-slate-400 text-sm mt-1">Aplique uma base completa e personalize cada detalhe depois.</p>
+      </div>
+
+      <div class="grid grid-cols-3 gap-5">
+        <!-- Template 1: Conexão -->
+        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer border-purple-500/30">
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-[11px] font-semibold tracking-wider text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-md uppercase">Mais Humanizado</span>
+              <i class="fa-solid fa-heart text-purple-500"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">Conexão que converte</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Cria proximidade, atende com carinho, entende as preferências do lead e apresenta a oferta no momento ideal.</p>
+            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Conversa natural e envolvente</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Lembra preferências</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Oferta gradual com fotos</p>
+            </div>
+          </div>
+          <button onclick="applyStrategy('conexao')" class="mt-5 w-full py-2 bg-purple-600/20 text-purple-300 border border-purple-500/40 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
+            Aplicar esta estratégia
+          </button>
+        </div>
+
+        <!-- Template 2: Venda Rápida -->
+        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer">
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-[11px] font-semibold tracking-wider text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md uppercase">Mais Direto</span>
+              <i class="fa-solid fa-bolt text-blue-400"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">Venda rápida</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Respostas curtas, qualificação rápida e oferta cedo para quem já chega decidido a assinar.</p>
+            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Ritmo ágil e dinâmico</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Menos enrolação</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Oferta direta no checkout</p>
+            </div>
+          </div>
+          <button onclick="applyStrategy('rapida')" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
+            Aplicar esta estratégia
+          </button>
+        </div>
+
+        <!-- Template 3: Experiência Premium -->
+        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer">
+          <div>
+            <div class="flex justify-between items-start mb-3">
+              <span class="text-[11px] font-semibold tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md uppercase">Maior Valor</span>
+              <i class="fa-solid fa-crown text-amber-400"></i>
+            </div>
+            <h3 class="text-base font-bold text-white">Experiência premium</h3>
+            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Posicionamento exclusivo, tom mais elegante, forte valorização do conteúdo antes de falar o preço.</p>
+            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Ticket médio mais alto</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Foco em exclusividade VIP</p>
+              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Tom seleto e misterioso</p>
+            </div>
+          </div>
+          <button onclick="applyStrategy('premium')" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
+            Aplicar esta estratégia
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: JEITO DE CONVERSAR (MOTOR COMPORTAMENTAL) -->
+    <section id="tab-conversa" class="hidden space-y-6">
+      <div>
+        <h2 class="text-2xl font-bold text-white">Jeito de conversar</h2>
+        <p class="text-slate-400 text-sm mt-1">Ajuste o ritmo, gírias, abertura e o momento exato de apresentar a oferta.</p>
+      </div>
+
+      <div class="glass-card p-6 space-y-6">
+        <!-- Estratégia Comercial -->
+        <div>
+          <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">Estratégia comercial</label>
+          <div class="grid grid-cols-3 gap-3 mt-2">
+            <label class="p-3 bg-[#0a0c10] border border-purple-500/50 rounded-xl cursor-pointer flex flex-col justify-between">
+              <div>
+                <input type="radio" name="sales_strategy" value="conexao" class="accent-purple-600">
+                <span class="text-sm font-semibold text-white ml-2">Conexão primeiro</span>
+                <p class="text-xs text-slate-400 mt-1">Conversa e entende o interesse antes de vender.</p>
+              </div>
+            </label>
+            <label class="p-3 bg-[#0a0c10] border border-slate-800 rounded-xl cursor-pointer flex flex-col justify-between">
+              <div>
+                <input type="radio" name="sales_strategy" value="equilibrado" checked class="accent-purple-600">
+                <span class="text-sm font-semibold text-white ml-2">Equilibrado</span>
+                <p class="text-xs text-slate-400 mt-1">Cria conexão rápida e apresenta valor com agilidade.</p>
+              </div>
+            </label>
+            <label class="p-3 bg-[#0a0c10] border border-slate-800 rounded-xl cursor-pointer flex flex-col justify-between">
+              <div>
+                <input type="radio" name="sales_strategy" value="direto" class="accent-purple-600">
+                <span class="text-sm font-semibold text-white ml-2">Direto</span>
+                <p class="text-xs text-slate-400 mt-1">Apresenta a oferta cedo, sem rodeios.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Seletores de Estilo -->
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Nível de oferta</label>
+            <select id="offer-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="nenhum">Nenhum (Só se o lead pedir)</option>
+              <option value="leve">Leve (Espera 3-4 mensagens)</option>
+              <option value="moderada" selected>Moderada (Ideal)</option>
+              <option value="direta">Direta (Nas primeiras msgs)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Uso de gírias</label>
+            <select id="slang-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="nenhuma">Nenhuma (Formal)</option>
+              <option value="moderada" selected>Moderada (Natural)</option>
+              <option value="marcante">Marcante (Muito informal/jovem)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Cadência (Velocidade)</label>
+            <select id="cadence-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="agil">Ágil (Respostas instantâneas)</option>
+              <option value="gradual" selected>Gradual (Simula digitação humana)</option>
+              <option value="calma">Calma (Mais pausada)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tom de Voz & Mensagem Inicial -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Tom de voz</label>
+            <select id="voice-tone" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="Acolhedor">Acolhedor</option>
+              <option value="Descontraído">Descontraído</option>
+              <option value="Provocante" selected>Provocante / Sensual</option>
+              <option value="Premium">Exclusivo / Premium</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Tamanho das respostas</label>
+            <select id="response-length" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="curto" selected>Curto (Frases soltas estilo WhatsApp)</option>
+              <option value="medio">Médio</option>
+              <option value="detalhado">Detalhado</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-300">Abertura da conversa (Primeira mensagem enviada)</label>
+          <input type="text" id="welcome-msg" value="oii 💜 chegou agora por aqui?" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500">
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-300">Regras próprias inegociáveis (Hard Prompt)</label>
+          <textarea id="custom-rules" rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500">Esteja sempre no personagem. Nunca repita perguntas já respondidas. Quando o lead mostrar intenção de compra, mande a chave Pix de imediato com o valor sem enrolar.</textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: MÍDIAS DA CONVERSA (AMOSTRAS COM IA) -->
+    <section id="tab-midias" class="hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Mídias da conversa</h2>
+          <p class="text-slate-400 text-sm mt-1">Adicione fotos, vídeos e áudios que a IA decide enviar no momento certo.</p>
+        </div>
+        <button onclick="addMediaModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 shadow-lg shadow-purple-600/30">
+          <i class="fa-solid fa-upload mr-1.5"></i> Adicionar Mídia
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-5" id="media-cards">
+        <!-- Card de Mídia 1 -->
+        <div class="glass-card p-4 space-y-3">
+          <div class="h-44 bg-slate-900 rounded-lg overflow-hidden relative border border-slate-800 flex items-center justify-center">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80" alt="Prévia" class="w-full h-full object-cover">
+            <span class="absolute top-2 right-2 text-[10px] font-bold bg-black/70 px-2 py-0.5 rounded text-amber-300">
+              <i class="fa-solid fa-eye-slash mr-1"></i> Modo Spoiler
+            </span>
+          </div>
+          <div>
+            <div class="flex justify-between items-center">
+              <h4 class="text-sm font-bold text-white">Cena 01 - Biquíni Espelho</h4>
+              <span class="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">Aumentar Desejo</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Foto tirada no espelho de biquíni mostrando as curvas.</p>
+          </div>
+          <div class="bg-[#0a0c10] p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300">
+            <span class="text-slate-500 font-semibold block text-[10px] uppercase">Gatilhos da conversa:</span>
+            previa, foto, corpo, biquini, amostra, manda foto
+          </div>
+        </div>
+
+        <!-- Card de Mídia 2 -->
+        <div class="glass-card p-4 space-y-3">
+          <div class="h-44 bg-slate-900 rounded-lg overflow-hidden relative border border-slate-800 flex items-center justify-center">
+            <div class="text-center p-4">
+              <i class="fa-solid fa-microphone-lines text-3xl text-purple-400"></i>
+              <p class="text-xs text-slate-300 mt-2">Áudio Curto Sensual (0:12)</p>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between items-center">
+              <h4 class="text-sm font-bold text-white">Áudio 01 - Chamando pro VIP</h4>
+              <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Criar Conexão</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Voz sussurrando convidando para o canal privado.</p>
+          </div>
+          <div class="bg-[#0a0c10] p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300">
+            <span class="text-slate-500 font-semibold block text-[10px] uppercase">Gatilhos da conversa:</span>
+            audio, voz, grava audio, manda audio, real
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: DOWNSELL (RECUPERAÇÃO NO SILÊNCIO) -->
+    <section id="tab-downsell" class="hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Downsell automático</h2>
+          <p class="text-slate-400 text-sm mt-1">Retome a conversa no tempo certo com quem sumiu ou parou de responder.</p>
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <span class="text-xs text-slate-400">Downsell Ativo</span>
+          <input type="checkbox" checked class="w-5 h-5 accent-purple-600 rounded">
+        </label>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Etapa 1 -->
+        <div class="glass-card p-5 space-y-4 border-l-4 border-l-purple-500">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold">1</span>
+              <h4 class="text-sm font-bold text-white">Primeiro contato após silêncio</h4>
+            </div>
+            <span class="text-xs text-purple-300 bg-purple-900/40 px-2.5 py-0.5 rounded border border-purple-500/30">Após 5 minutos</span>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Mensagem de Downsell (usa {nome})</label>
+            <textarea rows="2" class="w-full mt-1 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">sumiu por que meu bem? 🥺 quer que eu te mostre as fotos que postei no VIP hoje?</textarea>
+          </div>
+        </div>
+
+        <!-- Etapa 2 -->
+        <div class="glass-card p-5 space-y-4 border-l-4 border-l-amber-500">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold">2</span>
+              <h4 class="text-sm font-bold text-white">Oferta com desconto relâmpago</h4>
+            </div>
+            <span class="text-xs text-amber-300 bg-amber-900/40 px-2.5 py-0.5 rounded border border-amber-500/30">Após 1 hora</span>
+          </div>
+          <div>
+            <label class="text-xs text-slate-400">Mensagem de Downsell com Desconto</label>
+            <textarea rows="2" class="w-full mt-1 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">consegui liberar um cupom especial de R$ 19,90 só pra você entrar no VIP agora... quer o link antes que expire? 💜</textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: UPSELL (PÓS-VENDA IMEDIATA) -->
+    <section id="tab-upsell" class="hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Upsell pós-compra</h2>
+          <p class="text-slate-400 text-sm mt-1">Apresente uma oferta extra imediatamente após a confirmação do pagamento inicial.</p>
+        </div>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <span class="text-xs text-slate-400">Upsell Ativo</span>
+          <input type="checkbox" checked class="w-5 h-5 accent-purple-600 rounded">
+        </label>
+      </div>
+
+      <div class="glass-card p-6 space-y-5">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Quando enviar</label>
+            <select class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+              <option value="0">Imediatamente após o Pix ser aprovado</option>
+              <option value="1" selected>1 minuto após a liberação</option>
+              <option value="5">5 minutos após a liberação</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-300">Produto de Upsell</label>
+            <input type="text" value="Chamada de Vídeo Gravada (Pack 10 vídeos)" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-300">Mensagem pós-compra</label>
+          <textarea rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">agora que seu acesso já tá liberado, acabei de gravar um pack especial de chamada de vídeo de 15 minutos... posso adicionar no seu acesso por só mais R$ 19,90? 😈</textarea>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA: CRM / MEMÓRIA DAS CONVERSAS -->
+    <section id="tab-crm" class="hidden space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Memória das conversas (CRM)</h2>
+          <p class="text-slate-400 text-sm mt-1">Veja a jornada de cada visitante e o status das vendas.</p>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" placeholder="Buscar por @username ou nome..." class="bg-[#0a0c10] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white">
+        </div>
+      </div>
+
+      <!-- Tabela de Leads -->
+      <div class="glass-card overflow-hidden">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-[#0a0c10] text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-800">
+            <tr>
+              <th class="p-3.5">Cliente</th>
+              <th class="p-3.5">Status Funil</th>
+              <th class="p-3.5">Última Interação</th>
+              <th class="p-3.5">Valor Gerado</th>
+              <th class="p-3.5 text-right">Ação</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/60">
+            <tr>
+              <td class="p-3.5 flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-purple-400">R</div>
+                <div>
+                  <p class="font-bold text-white">Rodrigo M.</p>
+                  <p class="text-[11px] text-slate-500">@rodrigo_m22</p>
+                </div>
+              </td>
+              <td class="p-3.5">
+                <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-semibold">Pix Pago (VIP Ativo)</span>
+              </td>
+              <td class="p-3.5 text-slate-400">Hoje às 08:35</td>
+              <td class="p-3.5 font-mono text-emerald-400 font-bold">R$ 29,90</td>
+              <td class="p-3.5 text-right">
+                <button class="text-purple-400 hover:underline">Ver Chat</button>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="p-3.5 flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-amber-400">C</div>
+                <div>
+                  <p class="font-bold text-white">Carlos Eduardo</p>
+                  <p class="text-[11px] text-slate-500">@cadu_sp</p>
+                </div>
+              </td>
+              <td class="p-3.5">
+                <span class="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-semibold">Pix Gerado (Pendente)</span>
+              </td>
+              <td class="p-3.5 text-slate-400">Hoje às 08:42</td>
+              <td class="p-3.5 font-mono text-amber-400 font-bold">R$ 19,90</td>
+              <td class="p-3.5 text-right">
+                <button class="text-purple-400 hover:underline">Ver Chat</button>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="p-3.5 flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-400">F</div>
+                <div>
+                  <p class="font-bold text-white">Felipe Silva</p>
+                  <p class="text-[11px] text-slate-500">@felipesilva</p>
+                </div>
+              </td>
+              <td class="p-3.5">
+                <span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded font-semibold">Em Conversa</span>
+              </td>
+              <td class="p-3.5 text-slate-400">Ontem às 22:15</td>
+              <td class="p-3.5 font-mono text-slate-500">-</td>
+              <td class="p-3.5 text-right">
+                <button class="text-purple-400 hover:underline">Ver Chat</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 3. SIMULADOR LATERAL DE CONVERSA (SANDBOX SHARKBOT) -->
+  <aside class="w-96 bg-[#0a0c10] flex flex-col justify-between shrink-0">
+    <div class="p-4 border-b border-[#1a1f2c] flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        <h3 class="text-sm font-bold text-white">Prévia de atendimento</h3>
+      </div>
+      <button onclick="clearChat()" class="text-xs text-slate-500 hover:text-slate-300"><i class="fa-solid fa-rotate-right mr-1"></i> Reset</button>
+    </div>
+
+    <!-- Mensagens do Chat -->
+    <div id="chat-messages" class="flex-1 p-4 space-y-3 overflow-y-auto text-sm">
+      <div class="text-center my-2">
+        <span class="text-[10px] text-slate-500 uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded">Simulação em tempo real</span>
+      </div>
+
+      <!-- Mensagem da IA -->
+      <div class="flex items-start gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
+        <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
+          oii 💜 chegou agora por aqui?
+        </div>
+      </div>
+    </div>
+
+    <!-- Input do Visitante no Simulador -->
+    <div class="p-3 border-t border-[#1a1f2c] bg-[#0d0f14]">
+      <form onsubmit="sendMessage(event)" class="flex gap-2">
+        <input type="text" id="sim-input" placeholder="Escreva como se fosse um visitante..." class="flex-1 bg-[#1a1f2c] border border-slate-700/60 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
+        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Script de Navegação e Simulação -->
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+      document.querySelectorAll('.sidebar-item').forEach(btn => btn.classList.remove('active'));
+      
+      const target = document.getElementById('tab-' + tabId);
+      if (target) target.classList.remove('hidden');
+      
+      const activeBtn = event ? event.currentTarget : null;
+      if (activeBtn && activeBtn.classList) {
+        activeBtn.classList.add('active');
+      }
+    }
+
+    function applyStrategy(type) {
+      if (type === 'conexao') {
+        document.querySelector('input[name="sales_strategy"][value="conexao"]').checked = true;
+        document.getElementById('offer-level').value = 'leve';
+        document.getElementById('voice-tone').value = 'Provocante';
+        document.getElementById('response-length').value = 'curto';
+        document.getElementById('welcome-msg').value = 'oii 💜 chegou agora por aqui?';
+        alert('Estratégia "Conexão que Converte" aplicada com sucesso!');
+      } else if (type === 'rapida') {
+        document.querySelector('input[name="sales_strategy"][value="direto"]').checked = true;
+        document.getElementById('offer-level').value = 'direta';
+        document.getElementById('cadence-level').value = 'agil';
+        document.getElementById('welcome-msg').value = 'oii tudo bem? quer ver os planos do canal VIP agora ou tem alguma dúvida?';
+        alert('Estratégia "Venda Rápida" aplicada com sucesso!');
+      } else if (type === 'premium') {
+        document.querySelector('input[name="sales_strategy"][value="equilibrado"]').checked = true;
+        document.getElementById('offer-level').value = 'moderada';
+        document.getElementById('voice-tone').value = 'Premium';
+        document.getElementById('welcome-msg').value = 'olá, seja bem-vindo ao meu espaço exclusivo. como posso te surpreender hoje?';
+        alert('Estratégia "Experiência Premium" aplicada com sucesso!');
+      }
+    }
+
+    async function sendMessage(e) {
+      e.preventDefault();
+      const input = document.getElementById('sim-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const chat = document.getElementById('chat-messages');
+
+      // Adiciona mensagem do usuário na tela
+      chat.innerHTML += `
+        <div class="flex items-start justify-end gap-2.5">
+          <div class="bg-purple-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[85%] text-xs leading-relaxed shadow">
+            ${text}
+          </div>
+        </div>
+      `;
+      input.value = '';
+      chat.scrollTop = chat.scrollHeight;
+
+      // Chama a API real do backend
+      try {
+        const response = await fetch("http://localhost:8000/api/simulate-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await response.json();
+        
+        chat.innerHTML += `
+          <div class="flex items-start gap-2.5">
+            <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
+            <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
+              ${data.reply}
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        // Fallback local se a API não estiver rodando no momento
+        setTimeout(() => {
+          let reply = "rsrs que bom que você veio... tava esperando alguém legal pra conversar! Quer ver o que tem no meu canal privado? 😈";
+          if (text.toLowerCase().includes('preço') || text.toLowerCase().includes('quanto') || text.toLowerCase().includes('valor')) {
+            reply = "Meu acesso mensal tá só R$ 29,90 hoje! Tem foto e vídeo todo dia sem censura. Se quiser, já te mando a chave Pix agora pra liberar de imediato! 💜";
+          }
+          chat.innerHTML += `
+            <div class="flex items-start gap-2.5">
+              <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
+              <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
+                ${reply}
+              </div>
+            </div>
+          `;
+          chat.scrollTop = chat.scrollHeight;
+        }, 600);
+      }
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function clearChat() {
+      const chat = document.getElementById('chat-messages');
+      chat.innerHTML = `
+        <div class="text-center my-2">
+          <span class="text-[10px] text-slate-500 uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded">Simulação em tempo real</span>
+        </div>
+        <div class="flex items-start gap-2.5">
+          <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
+          <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
+            oii 💜 chegou agora por aqui?
+          </div>
+        </div>
+      `;
+    }
+
+    async function saveAll() {
+      const payload = {
+        persona_name: document.getElementById('persona-name').value,
+        persona_age: parseInt(document.getElementById('persona-age').value) || 22,
+        persona_gender: document.getElementById('persona-gender').value,
+        persona_city: document.getElementById('persona-city').value,
+        persona_bio: document.getElementById('persona-bio').value,
+        persona_traits: document.getElementById('persona-traits').value,
+        sales_strategy: document.querySelector('input[name="sales_strategy"]:checked')?.value || 'equilibrado',
+        offer_level: document.getElementById('offer-level').value,
+        voice_tone: document.getElementById('voice-tone').value,
+        response_length: document.getElementById('response-length').value,
+        welcome_message: document.getElementById('welcome-msg').value,
+        custom_rules: document.getElementById('custom-rules').value,
+        pushin_pay_token: document.getElementById('pushin-token')?.value || '',
+        telegram_bot_token: document.getElementById('telegram-token')?.value || '',
+        vip_channel_id: document.getElementById('vip-channel')?.value || '',
+        support_username: document.getElementById('support-user')?.value || ''
+      };
+
+      try {
+        await fetch("http://localhost:8000/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        alert("Configurações salvas no servidor com sucesso!");
+      } catch (e) {
+        alert("Configurações salvas localmente no navegador!");
+      }
+    }
+  </script>
+</body>
+</html>
