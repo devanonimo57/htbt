@@ -1,780 +1,2578 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HotBot AI - Painel de Atendimento e Vendas</title>
+  <title>SharkBot IA - Fluxo de Atendimento</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background-color: #0d0f12; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
-    .sidebar-item { transition: all 0.2s ease; }
-    .sidebar-item:hover, .sidebar-item.active { background-color: #1e232b; color: #a855f7; border-left: 3px solid #a855f7; }
-    .glass-card { background: #13171e; border: 1px solid #1f2633; border-radius: 12px; }
+    * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { background-color: #050507; color: #e4e4e7; margin: 0; overflow: hidden; }
+
+    /* Scrollbars azuis idênticas ao Sharkbot */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #09090d; }
+    ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 9999px; }
+
+    .sb-card {
+      background-color: #0c0c10;
+      border: 1px solid #1c1c26;
+      border-radius: 14px;
+    }
+    .sb-subcard {
+      background-color: #101016;
+      border: 1px solid #1e1e2a;
+      border-radius: 12px;
+    }
+    .sb-input {
+      background-color: #08080c;
+      border: 1px solid #1f1f2b;
+      border-radius: 10px;
+      color: #f4f4f5;
+      font-size: 13px;
+      padding: 10px 12px;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+    .sb-input:focus {
+      outline: none;
+      border-color: #6d28d9;
+    }
+    .sb-radio-card {
+      background-color: #0e0e14;
+      border: 1px solid #1f1f2b;
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .sb-radio-card:hover { border-color: #3f3f52; }
+    .sb-radio-card.selected {
+      background-color: rgba(109, 40, 217, 0.14);
+      border-color: #7c3aed;
+    }
+    .sb-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 11px;
+      border-radius: 11px;
+      border: 1px solid transparent;
+      text-align: left;
+      transition: all 0.15s;
+      background: #0b0b10;
+      margin-bottom: 6px;
+    }
+    .sb-nav-item:hover {
+      background: #12121a;
+      border-color: #242432;
+    }
+    .sb-nav-item.active {
+      background: rgba(37, 99, 235, 0.12);
+      border-color: #2563eb;
+    }
+    /* Switch Toggle */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 21px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: #272732; border-radius: 999px; transition: 0.2s;
+    }
+    .toggle-slider:before {
+      position: absolute; content: ""; height: 15px; width: 15px;
+      left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .toggle-slider { background-color: #3b82f6; }
+    input:checked + .toggle-slider:before { transform: translateX(17px); }
   </style>
 </head>
-<body class="h-screen flex overflow-hidden">
+<body class="h-screen flex flex-col select-none">
 
-  <!-- 1. BARRA LATERAL (MENU COMPLETO SHARKBOT) -->
-  <aside class="w-72 bg-[#0a0c10] border-r border-[#1a1f2c] flex flex-col justify-between shrink-0">
-    <div class="p-5 overflow-y-auto">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-purple-900/30">
-          <i class="fa-solid fa-fire text-lg"></i>
+  <!-- TOP HEADER BAR FIEL AO SHARKBOT -->
+  <header class="h-14 bg-[#08080b] border-b border-[#191922] px-4 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-3">
+      <button onclick="navigateTab('resumo')" class="w-8 h-8 rounded-lg bg-[#111118] border border-[#22222e] flex items-center justify-center text-zinc-400 hover:text-white">
+        <i class="fa-solid fa-chevron-left text-xs"></i>
+      </button>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <span id="unsaved-indicator" class="text-[9px] font-bold uppercase tracking-wider text-amber-400">MODO IA • ALTERAÇÕES NÃO SALVAS</span>
         </div>
-        <div>
-          <h1 class="text-base font-bold text-white tracking-wide">HotBot AI</h1>
-          <p class="text-xs text-emerald-400 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Sistema Ativo</p>
+        <div class="flex items-baseline gap-2">
+          <h1 id="header-flow-name" class="text-sm font-bold text-white leading-none">bot</h1>
         </div>
-      </div>
-
-      <!-- SEÇÕES -->
-      <div class="space-y-6 text-sm">
-        <div>
-          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Começar</span>
-          <div class="mt-2 space-y-1">
-            <button onclick="switchTab('resumo')" class="sidebar-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 text-left">
-              <i class="fa-solid fa-list-check w-4"></i> Resumo do atendimento
-            </button>
-            <button onclick="switchTab('estrategias')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-wand-magic-sparkles w-4"></i> Estratégias prontas
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Configuração Essencial</span>
-          <div class="mt-2 space-y-1">
-            <button onclick="switchTab('persona')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-user-gear w-4"></i> Persona e identidade
-            </button>
-            <button onclick="switchTab('ofertas')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-tags w-4"></i> Negócio e ofertas
-            </button>
-            <button onclick="switchTab('conversa')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-comment-dots w-4"></i> Jeito de conversar
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Conteúdo & Automação</span>
-          <div class="mt-2 space-y-1">
-            <button onclick="switchTab('midias')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-photo-film w-4"></i> Mídias da conversa
-            </button>
-            <button onclick="switchTab('downsell')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-arrow-trend-down w-4"></i> Downsell
-            </button>
-            <button onclick="switchTab('upsell')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-arrow-trend-up w-4"></i> Upsell
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <span class="text-[11px] font-semibold tracking-wider text-slate-500 uppercase px-3">Publicação & Gestão</span>
-          <div class="mt-2 space-y-1">
-            <button onclick="switchTab('publicar')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-brands fa-telegram w-4"></i> Publicar no Bot
-            </button>
-            <button onclick="switchTab('crm')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 text-left">
-              <i class="fa-solid fa-users-viewfinder w-4"></i> Memória das conversas
-            </button>
-          </div>
-        </div>
+        <p class="text-[10px] text-zinc-500 leading-none mt-0.5">Configure a conversa, teste e publique no Telegram</p>
       </div>
     </div>
 
-    <!-- Saldo & Pushin Pay status -->
-    <div class="p-4 border-t border-[#1a1f2c] bg-[#0d0f14]">
-      <div class="flex items-center justify-between text-xs text-slate-400">
-        <span>Pushin Pay</span>
-        <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-check"></i> Integrado</span>
-      </div>
-      <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
-        <span>Custo IA Própria</span>
-        <span class="text-purple-400 font-mono font-bold">~R$ 0,001/msg</span>
-      </div>
+    <div class="flex items-center gap-2.5">
+      <button onclick="navigateTab('saldo')" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#232330] text-xs font-medium text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600">
+        <i class="fa-solid fa-coins text-zinc-400 text-[11px]"></i>
+        <span id="header-balance">R$ 0,00</span>
+      </button>
+      <button onclick="navigateTab('testar')" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#232330] text-xs font-medium text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600">
+        <i class="fa-regular fa-eye text-zinc-400 text-[11px]"></i>
+        <span>Visualizar</span>
+      </button>
+      <button onclick="saveFullState()" id="btn-save-top" class="px-4 py-1.5 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-xs font-semibold text-white flex items-center gap-1.5 shadow-sm transition">
+        <i class="fa-regular fa-floppy-disk text-[11px]"></i>
+        <span>Salvar</span>
+      </button>
     </div>
-  </aside>
+  </header>
 
-  <!-- 2. PAINEL CENTRAL DE EDIÇÃO -->
-  <main class="flex-1 overflow-y-auto p-8 border-r border-[#1a1f2c]">
-    
-    <!-- ABA: RESUMO DO ATENDIMENTO -->
-    <section id="tab-resumo" class="space-y-6">
-      <div class="flex justify-between items-center">
+  <!-- CORPO 3 COLUNAS (SIDEBAR ESQUERDA + CONTEÚDO CENTRAL + PRÉVIA DIREITA) -->
+  <div class="flex-1 flex overflow-hidden max-w-[1600px] w-full mx-auto">
+
+    <!-- 1. COLUNA ESQUERDA: NAVEGAÇÃO DE ETAPAS -->
+    <aside class="w-[245px] border-r border-[#171720] bg-[#060609] flex flex-col justify-between shrink-0">
+      <div class="p-3.5 overflow-y-auto flex-1 space-y-4">
+        <div class="px-1">
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">PREPARAR ATENDIMENTO</p>
+          <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Siga os grupos abaixo ou abra diretamente a etapa que deseja ajustar.</p>
+        </div>
+
+        <!-- GRUPO: COMEÇAR -->
         <div>
-          <h2 class="text-2xl font-bold text-white">Resumo do atendimento</h2>
-          <p class="text-slate-400 text-sm mt-1">Veja o que já está pronto e qual é o próximo passo para faturar no Telegram.</p>
-        </div>
-        <button onclick="saveAll()" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold shadow-lg shadow-purple-600/30 transition">
-          <i class="fa-solid fa-floppy-disk mr-1.5"></i> Salvar alterações
-        </button>
-      </div>
-
-      <!-- Banner de Onboarding -->
-      <div class="glass-card p-6 bg-gradient-to-r from-purple-950/40 to-slate-900/40 border-purple-900/30">
-        <span class="text-xs font-semibold px-2.5 py-1 bg-purple-600/30 text-purple-300 rounded-full border border-purple-500/30">EM PREPARAÇÃO</span>
-        <h3 class="text-xl font-bold text-white mt-3">Prepare uma conversa que vende do seu jeito</h3>
-        <p class="text-sm text-slate-400 mt-1 max-w-xl">Configure a modelo com personalidade humana, cadastre suas ofertas Pix e envie mídias de prévia no tempo certo.</p>
-      </div>
-
-      <!-- Checklist dos 5 Passos -->
-      <div class="glass-card p-6 space-y-4">
-        <h4 class="text-sm font-bold text-white uppercase tracking-wider">O essencial para publicar</h4>
-        
-        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
-          <div class="flex items-center gap-3">
-            <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-check"></i></span>
-            <div>
-              <p class="text-sm font-semibold text-white">1. Definir a persona</p>
-              <p class="text-xs text-slate-400">Nome, idade, cidade e traços de personalidade sensual/atenciosa.</p>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">COMEÇAR</p>
+          <button onclick="navigateTab('resumo')" id="nav-resumo" class="sb-nav-item active">
+            <div class="w-6 h-6 rounded-md bg-blue-500/15 border border-blue-500/40 text-blue-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
             </div>
-          </div>
-          <button onclick="switchTab('persona')" class="text-xs text-purple-400 hover:underline">Configurar &rarr;</button>
-        </div>
-
-        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
-          <div class="flex items-center gap-3">
-            <span class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-check"></i></span>
-            <div>
-              <p class="text-sm font-semibold text-white">2. Cadastrar as ofertas</p>
-              <p class="text-xs text-slate-400">Planos de R$ 19,90, VIP Vitalício e barganha inteligente.</p>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-white truncate">Resumo do atend...</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-resumo">3 de 5 itens essenciais</p>
             </div>
-          </div>
-          <button onclick="switchTab('ofertas')" class="text-xs text-purple-400 hover:underline">Configurar &rarr;</button>
-        </div>
+          </button>
 
-        <div class="flex items-center justify-between p-3.5 bg-[#0a0c10] rounded-xl border border-slate-800">
-          <div class="flex items-center gap-3">
-            <span class="w-7 h-7 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold text-xs">3</span>
-            <div>
-              <p class="text-sm font-semibold text-white">3. Conectar Pushin Pay & Telegram</p>
-              <p class="text-xs text-slate-400">Token da Pushin Pay para Pix e BotFather para o canal VIP.</p>
+          <button onclick="navigateTab('estrategias')" id="nav-estrategias" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-layer-group text-[10px]"></i>
             </div>
-          </div>
-          <button onclick="switchTab('publicar')" class="text-xs text-purple-400 hover:underline">Conectar &rarr;</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABA: PERSONA E IDENTIDADE -->
-    <section id="tab-persona" class="hidden space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white">Persona e identidade</h2>
-        <p class="text-slate-400 text-sm mt-1">Defina quem conversa com o visitante: nome, história e personalidade.</p>
-      </div>
-
-      <div class="glass-card p-6 space-y-5">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Nome de exibição</label>
-            <input type="text" id="persona-name" value="Melissa Santos" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Idade</label>
-            <input type="number" id="persona-age" value="22" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Gênero / Apresentação</label>
-            <select id="persona-gender" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
-              <option value="Feminino" selected>Feminino (fala no feminino)</option>
-              <option value="Masculino">Masculino (fala no masculino)</option>
-              <option value="Neutro">Neutro</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Cidade (para identificação)</label>
-            <input type="text" id="persona-city" value="São Paulo" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
-          </div>
-        </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-300">Biografia oculta (Contexto privado da modelo)</label>
-          <textarea id="persona-bio" rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">Criadora de conteúdo adulto, espontânea e direta. Conversa no privado com homens de bom gosto e apresenta o canal VIP sem parecer um robô chato.</textarea>
-        </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-300">Traços de personalidade (separados por vírgula)</label>
-          <input type="text" id="persona-traits" value="espontânea, atenciosa, safada, provocante, bem-humorada" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500 focus:outline-none">
-        </div>
-      </div>
-    </section>
-
-    <!-- ABA: ESTRATÉGIAS PRONTAS (TEMPLATES DE FUNIL) -->
-    <section id="tab-estrategias" class="hidden space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white">Estratégias prontas</h2>
-        <p class="text-slate-400 text-sm mt-1">Aplique uma base completa e personalize cada detalhe depois.</p>
-      </div>
-
-      <div class="grid grid-cols-3 gap-5">
-        <!-- Template 1: Conexão -->
-        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer border-purple-500/30">
-          <div>
-            <div class="flex justify-between items-start mb-3">
-              <span class="text-[11px] font-semibold tracking-wider text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-md uppercase">Mais Humanizado</span>
-              <i class="fa-solid fa-heart text-purple-500"></i>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Estratégias prontas</p>
+              <p class="text-[10px] text-zinc-500 truncate">3 opções para começar</p>
             </div>
-            <h3 class="text-base font-bold text-white">Conexão que converte</h3>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Cria proximidade, atende com carinho, entende as preferências do lead e apresenta a oferta no momento ideal.</p>
-            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Conversa natural e envolvente</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Lembra preferências</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Oferta gradual com fotos</p>
-            </div>
-          </div>
-          <button onclick="applyStrategy('conexao')" class="mt-5 w-full py-2 bg-purple-600/20 text-purple-300 border border-purple-500/40 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
-            Aplicar esta estratégia
           </button>
         </div>
 
-        <!-- Template 2: Venda Rápida -->
-        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer">
-          <div>
-            <div class="flex justify-between items-start mb-3">
-              <span class="text-[11px] font-semibold tracking-wider text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md uppercase">Mais Direto</span>
-              <i class="fa-solid fa-bolt text-blue-400"></i>
+        <!-- GRUPO: CONFIGURAÇÃO ESSENCIAL -->
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONFIGURAÇÃO ESSENCIAL</p>
+          <button onclick="navigateTab('persona')" id="nav-persona" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[10px]"></i>
             </div>
-            <h3 class="text-base font-bold text-white">Venda rápida</h3>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Respostas curtas, qualificação rápida e oferta cedo para quem já chega decidido a assinar.</p>
-            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Ritmo ágil e dinâmico</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Menos enrolação</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Oferta direta no checkout</p>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Persona e identid...</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-persona">Atendimento</p>
             </div>
-          </div>
-          <button onclick="applyStrategy('rapida')" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
-            Aplicar esta estratégia
+          </button>
+
+          <button onclick="navigateTab('ofertas')" id="nav-ofertas" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Negócio e ofertas</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-ofertas">1 oferta ativa</p>
+            </div>
+          </button>
+
+          <button onclick="navigateTab('conversa')" id="nav-conversa" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Jeito de conversar</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-conversa">Tom acolhedor</p>
+            </div>
           </button>
         </div>
 
-        <!-- Template 3: Experiência Premium -->
-        <div class="glass-card p-6 flex flex-col justify-between hover:border-purple-500/60 transition cursor-pointer">
-          <div>
-            <div class="flex justify-between items-start mb-3">
-              <span class="text-[11px] font-semibold tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md uppercase">Maior Valor</span>
-              <i class="fa-solid fa-crown text-amber-400"></i>
+        <!-- GRUPO: CONTEÚDO E AUTOMAÇÕES -->
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONTEÚDO E AUTOMAÇÕES</p>
+          <button onclick="navigateTab('midias')" id="nav-midias" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-regular fa-images text-[10px]"></i>
             </div>
-            <h3 class="text-base font-bold text-white">Experiência premium</h3>
-            <p class="text-xs text-slate-400 mt-2 leading-relaxed">Posicionamento exclusivo, tom mais elegante, forte valorização do conteúdo antes de falar o preço.</p>
-            <div class="mt-4 pt-3 border-t border-slate-800 space-y-1.5 text-xs text-slate-300">
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Ticket médio mais alto</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Foco em exclusividade VIP</p>
-              <p><i class="fa-solid fa-check text-emerald-400 mr-1.5"></i> Tom seleto e misterioso</p>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Mídias da conversa</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-midias">Adicionar conteúdo</p>
             </div>
-          </div>
-          <button onclick="applyStrategy('premium')" class="mt-5 w-full py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold hover:bg-purple-600 hover:text-white transition">
-            Aplicar esta estratégia
+          </button>
+
+          <button onclick="navigateTab('downsell')" id="nav-downsell" class="sb-nav-item">
+            <div id="nav-icon-downsell" class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Downsell</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-downsell">1 etapa (s) • sem resposta</p>
+            </div>
+          </button>
+
+          <button onclick="navigateTab('upsell')" id="nav-upsell" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Upsell</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-upsell">Ativo • após a compra</p>
+            </div>
+          </button>
+        </div>
+
+        <!-- GRUPO: TESTE E PUBLICAÇÃO -->
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">TESTE E PUBLICAÇÃO</p>
+          <button onclick="navigateTab('testar')" id="nav-testar" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-regular fa-comment-dots text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Testar conversa</p>
+              <p class="text-[10px] text-zinc-500 truncate">Pronto para testar</p>
+            </div>
+          </button>
+
+          <button onclick="navigateTab('publicar')" id="nav-publicar" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-rocket text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Publicar no bot</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-publicar">Vincular bot</p>
+            </div>
+          </button>
+        </div>
+
+        <!-- GRUPO: DEPOIS QUE ENTRAR NO AR -->
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">DEPOIS QUE ENTRAR NO AR</p>
+          <button onclick="navigateTab('memoria')" id="nav-memoria" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-address-book text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Memória das con...</p>
+              <p class="text-[10px] text-zinc-500 truncate">Perfis e histórico com...</p>
+            </div>
+          </button>
+
+          <button onclick="navigateTab('aprendizado')" id="nav-aprendizado" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-chart-line text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Aprendizado de v...</p>
+              <p class="text-[10px] text-zinc-500 truncate">O que mais converte</p>
+            </div>
+          </button>
+        </div>
+
+        <!-- GRUPO: CONTA -->
+        <div>
+          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONTA</p>
+          <button onclick="navigateTab('saldo')" id="nav-saldo" class="sb-nav-item">
+            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-wallet text-[10px]"></i>
+            </div>
+            <div class="overflow-hidden">
+              <p class="text-xs font-semibold text-zinc-200 truncate">Saldo de IA</p>
+              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-saldo">R$ 0,00</p>
+            </div>
           </button>
         </div>
       </div>
-    </section>
 
-    <!-- ABA: JEITO DE CONVERSAR (MOTOR COMPORTAMENTAL) -->
-    <section id="tab-conversa" class="hidden space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white">Jeito de conversar</h2>
-        <p class="text-slate-400 text-sm mt-1">Ajuste o ritmo, gírias, abertura e o momento exato de apresentar a oferta.</p>
-      </div>
-
-      <div class="glass-card p-6 space-y-6">
-        <!-- Estratégia Comercial -->
-        <div>
-          <label class="text-xs font-bold text-slate-300 uppercase tracking-wider">Estratégia comercial</label>
-          <div class="grid grid-cols-3 gap-3 mt-2">
-            <label class="p-3 bg-[#0a0c10] border border-purple-500/50 rounded-xl cursor-pointer flex flex-col justify-between">
-              <div>
-                <input type="radio" name="sales_strategy" value="conexao" class="accent-purple-600">
-                <span class="text-sm font-semibold text-white ml-2">Conexão primeiro</span>
-                <p class="text-xs text-slate-400 mt-1">Conversa e entende o interesse antes de vender.</p>
-              </div>
-            </label>
-            <label class="p-3 bg-[#0a0c10] border border-slate-800 rounded-xl cursor-pointer flex flex-col justify-between">
-              <div>
-                <input type="radio" name="sales_strategy" value="equilibrado" checked class="accent-purple-600">
-                <span class="text-sm font-semibold text-white ml-2">Equilibrado</span>
-                <p class="text-xs text-slate-400 mt-1">Cria conexão rápida e apresenta valor com agilidade.</p>
-              </div>
-            </label>
-            <label class="p-3 bg-[#0a0c10] border border-slate-800 rounded-xl cursor-pointer flex flex-col justify-between">
-              <div>
-                <input type="radio" name="sales_strategy" value="direto" class="accent-purple-600">
-                <span class="text-sm font-semibold text-white ml-2">Direto</span>
-                <p class="text-xs text-slate-400 mt-1">Apresenta a oferta cedo, sem rodeios.</p>
-              </div>
-            </label>
-          </div>
+      <!-- RODAPÉ FIXO DA SIDEBAR ESQUERDA -->
+      <div class="p-3.5 border-t border-[#171720] bg-[#08080c] space-y-2 text-[11px]">
+        <div class="flex justify-between items-center text-zinc-400">
+          <span>Preparação essencial</span>
+          <span id="sidebar-prep-count" class="font-semibold text-zinc-200">3/5</span>
         </div>
-
-        <!-- Seletores de Estilo -->
-        <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Nível de oferta</label>
-            <select id="offer-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="nenhum">Nenhum (Só se o lead pedir)</option>
-              <option value="leve">Leve (Espera 3-4 mensagens)</option>
-              <option value="moderada" selected>Moderada (Ideal)</option>
-              <option value="direta">Direta (Nas primeiras msgs)</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Uso de gírias</label>
-            <select id="slang-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="nenhuma">Nenhuma (Formal)</option>
-              <option value="moderada" selected>Moderada (Natural)</option>
-              <option value="marcante">Marcante (Muito informal/jovem)</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Cadência (Velocidade)</label>
-            <select id="cadence-level" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="agil">Ágil (Respostas instantâneas)</option>
-              <option value="gradual" selected>Gradual (Simula digitação humana)</option>
-              <option value="calma">Calma (Mais pausada)</option>
-            </select>
-          </div>
+        <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" style="width: 60%"></div>
         </div>
-
-        <!-- Tom de Voz & Mensagem Inicial -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Tom de voz</label>
-            <select id="voice-tone" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="Acolhedor">Acolhedor</option>
-              <option value="Descontraído">Descontraído</option>
-              <option value="Provocante" selected>Provocante / Sensual</option>
-              <option value="Premium">Exclusivo / Premium</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Tamanho das respostas</label>
-            <select id="response-length" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="curto" selected>Curto (Frases soltas estilo WhatsApp)</option>
-              <option value="medio">Médio</option>
-              <option value="detalhado">Detalhado</option>
-            </select>
-          </div>
+        <div class="flex justify-between items-center text-[10px] pt-1">
+          <span class="text-zinc-500">Configuração</span>
+          <span id="sidebar-config-status" class="text-zinc-300 font-medium">Alterada</span>
         </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-300">Abertura da conversa (Primeira mensagem enviada)</label>
-          <input type="text" id="welcome-msg" value="oii 💜 chegou agora por aqui?" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500">
-        </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-300">Regras próprias inegociáveis (Hard Prompt)</label>
-          <textarea id="custom-rules" rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:border-purple-500">Esteja sempre no personagem. Nunca repita perguntas já respondidas. Quando o lead mostrar intenção de compra, mande a chave Pix de imediato com o valor sem enrolar.</textarea>
+        <div class="flex justify-between items-center text-[10px]">
+          <span class="text-zinc-500">No bot</span>
+          <span id="sidebar-bot-status" class="text-zinc-400">Não vinculada</span>
         </div>
       </div>
-    </section>
+    </aside>
 
-    <!-- ABA: MÍDIAS DA CONVERSA (AMOSTRAS COM IA) -->
-    <section id="tab-midias" class="hidden space-y-6">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-2xl font-bold text-white">Mídias da conversa</h2>
-          <p class="text-slate-400 text-sm mt-1">Adicione fotos, vídeos e áudios que a IA decide enviar no momento certo.</p>
-        </div>
-        <button onclick="addMediaModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 shadow-lg shadow-purple-600/30">
-          <i class="fa-solid fa-upload mr-1.5"></i> Adicionar Mídia
-        </button>
-      </div>
+    <!-- 2. COLUNA CENTRAL: CONTEÚDO PRINCIPAL DAS 13 TELAS -->
+    <main class="flex-1 overflow-y-auto px-10 py-7 border-r border-[#171720]">
+      <div class="max-w-[780px] mx-auto">
 
-      <div class="grid grid-cols-2 gap-5" id="media-cards">
-        <!-- Card de Mídia 1 -->
-        <div class="glass-card p-4 space-y-3">
-          <div class="h-44 bg-slate-900 rounded-lg overflow-hidden relative border border-slate-800 flex items-center justify-center">
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80" alt="Prévia" class="w-full h-full object-cover">
-            <span class="absolute top-2 right-2 text-[10px] font-bold bg-black/70 px-2 py-0.5 rounded text-amber-300">
-              <i class="fa-solid fa-eye-slash mr-1"></i> Modo Spoiler
-            </span>
-          </div>
+        <!-- =========================================================
+             TELA 1: RESUMO DO ATENDIMENTO
+        ========================================================== -->
+        <section id="sec-resumo" class="tab-section space-y-6">
           <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">COMEÇAR</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Resumo do atendimento</h2>
+            <p class="text-xs text-zinc-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
+          </div>
+
+          <!-- Hero Card Roxo -->
+          <div class="rounded-2xl p-6 border border-purple-500/25 bg-gradient-to-br from-[#191229] via-[#100d19] to-[#0c0c10] relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                <i class="fa-solid fa-sparkles text-[9px]"></i> EM PREPARAÇÃO
+              </span>
+              <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              </div>
+            </div>
+
+            <h3 class="text-lg font-bold text-white mt-4">Prepare uma conversa que vende do seu jeito.</h3>
+            <p class="text-xs text-zinc-400 mt-1">Siga os itens essenciais abaixo. Você pode voltar e ajustar qualquer detalhe antes de ativar o bot.</p>
+
+            <div class="mt-5">
+              <div class="flex justify-between text-[11px] text-zinc-400 mb-1.5">
+                <span>Preparação essencial</span>
+                <span id="hero-prep-label">3 de 5 concluídos</span>
+              </div>
+              <div class="w-full h-1.5 bg-zinc-800/90 rounded-full overflow-hidden">
+                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500" style="width: 60%"></div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 mt-5">
+              <button onclick="navigateTab('publicar')" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-purple-900/30">
+                <span>Conectar um bot</span>
+                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </button>
+              <button onclick="navigateTab('estrategias')" class="px-4 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] text-zinc-200 border border-[#262636] text-xs font-medium flex items-center gap-2 transition">
+                <i class="fa-solid fa-sliders text-[10px] text-zinc-400"></i>
+                <span>Usar estratégia pronta</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card: O essencial para publicar -->
+          <div class="sb-card p-5 space-y-3">
+            <div>
+              <h4 class="text-sm font-bold text-white">O essencial para publicar</h4>
+              <p class="text-[11px] text-zinc-500 mt-0.5">Abra qualquer item para revisar ou concluir.</p>
+            </div>
+
+            <div class="space-y-2 pt-1">
+              <div onclick="navigateTab('persona')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-check"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">1. Definir a persona</p>
+                    <p class="text-[11px] text-zinc-500">Nome, história e personalidade</p>
+                  </div>
+                </div>
+                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                </span>
+              </div>
+
+              <div onclick="navigateTab('ofertas')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-check"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">2. Cadastrar as ofertas</p>
+                    <p class="text-[11px] text-zinc-500">Contexto, preços e dúvidas comuns</p>
+                  </div>
+                </div>
+                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                </span>
+              </div>
+
+              <div onclick="navigateTab('conversa')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-check"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">3. Ajustar a conversa</p>
+                    <p class="text-[11px] text-zinc-500">Tom, ritmo e momento da venda</p>
+                  </div>
+                </div>
+                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                </span>
+              </div>
+
+              <div onclick="navigateTab('publicar')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
+                <div class="flex items-center gap-3">
+                  <div id="check-icon-4" class="w-7 h-7 rounded-lg bg-zinc-800/80 border border-zinc-700 text-zinc-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-robot"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">4. Conectar um bot</p>
+                    <p class="text-[11px] text-zinc-500">Bot que atenderá os novos leads</p>
+                  </div>
+                </div>
+                <span id="check-status-4" class="text-[11px] text-zinc-500 font-medium flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle text-[9px]"></i> Pendente <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                </span>
+              </div>
+
+              <div onclick="navigateTab('publicar')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
+                <div class="flex items-center gap-3">
+                  <div id="check-icon-5" class="w-7 h-7 rounded-lg bg-zinc-800/80 border border-zinc-700 text-zinc-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-box-open"></i>
+                  </div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">5. Definir a entrega</p>
+                    <p class="text-[11px] text-zinc-500">O que o comprador recebe após pagar</p>
+                  </div>
+                </div>
+                <span id="check-status-5" class="text-[11px] text-zinc-500 font-medium flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle text-[9px]"></i> Pendente <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Aprimore quando quiser -->
+          <div class="sb-card p-5 space-y-3">
+            <div>
+              <h4 class="text-sm font-bold text-white">Aprimore quando quiser</h4>
+              <p class="text-[11px] text-zinc-500 mt-0.5">Recursos opcionais para deixar a conversa mais completa.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+              <div onclick="navigateTab('estrategias')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-layer-group"></i></div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">Estratégias prontas</p>
+                    <p class="text-[10px] text-zinc-500">Comece com uma configuração completa</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+              </div>
+
+              <div onclick="navigateTab('midias')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-regular fa-images"></i></div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">Mídias da conversa</p>
+                    <p class="text-[10px] text-zinc-500">Fotos, vídeos, GIFs e áudios</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+              </div>
+
+              <div onclick="navigateTab('downsell')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-regular fa-clock"></i></div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">Downsell</p>
+                    <p class="text-[10px] text-zinc-500">1 automação ativa</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+              </div>
+
+              <div onclick="navigateTab('upsell')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">Upsell</p>
+                    <p class="text-[10px] text-zinc-500">Uma nova oferta após a compra</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+              </div>
+
+              <div onclick="navigateTab('aprendizado')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-chart-line"></i></div>
+                  <div>
+                    <p class="text-xs font-semibold text-white">Aprendizado de vendas</p>
+                    <p class="text-[10px] text-zinc-500">Descubra o que mais converte neste fluxo</p>
+                  </div>
+                </div>
+                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navegação Rodapé -->
+          <div class="flex justify-end pt-2">
+            <button onclick="navigateTab('estrategias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Estratégias prontas</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 2: ESTRATÉGIAS PRONTAS
+        ========================================================== -->
+        <section id="sec-estrategias" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">COMEÇAR</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Estratégias prontas</h2>
+            <p class="text-xs text-zinc-400 mt-1">Aplique uma base completa e personalize cada detalhe.</p>
+          </div>
+
+          <div class="sb-card p-4 bg-gradient-to-r from-[#151125] to-[#0c0c12] border-purple-500/20 flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0 mt-0.5">
+              <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-white">Comece com uma estratégia pronta</h4>
+              <p class="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">Cada estratégia já traz estilo de conversa, ofertas de exemplo e dúvidas comuns configuradas. Seus dados pessoais continuam como estão e tudo pode ser personalizado antes de publicar.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3.5">
+            <!-- Card 1 -->
+            <div class="sb-card p-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <div class="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center text-xs">
+                    <i class="fa-regular fa-heart"></i>
+                  </div>
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">MAIS HUMANIZADO</span>
+                </div>
+                <h3 class="text-sm font-bold text-white">Conexão que converte</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Cria proximidade primeiro, entende o interesse e apresenta a oferta no momento certo.</p>
+
+                <div class="sb-subcard p-2.5">
+                  <span class="text-[9px] font-bold uppercase text-zinc-500 block">FUNCIONA MELHOR PARA</span>
+                  <p class="text-[11px] text-zinc-200 font-medium mt-0.5">Tráfego frio e leads que precisam ganhar confiança</p>
+                </div>
+
+                <div class="space-y-1.5 text-[11px] text-zinc-300 pt-1">
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Conversa natural</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Lembra preferências</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Oferta gradual</p>
+                </div>
+              </div>
+
+              <div class="pt-4 mt-4 border-t border-[#1c1c26] space-y-3">
+                <div class="flex justify-between items-end">
+                  <div>
+                    <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
+                    <div class="flex gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">5 dúvidas</span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[9px] text-zinc-500 block">Plano a partir de</span>
+                    <span class="text-xs font-bold text-white">R$ 24,90</span>
+                  </div>
+                </div>
+                <button onclick="applyPresetStrategy('conexao')" class="w-full py-2 rounded-xl bg-[#161622] hover:bg-purple-600 text-zinc-200 hover:text-white border border-[#262638] text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                  <span>Aplicar esta estratégia</span>
+                  <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="sb-card p-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <div class="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-bolt"></i>
+                  </div>
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30">MAIS DIRETO</span>
+                </div>
+                <h3 class="text-sm font-bold text-white">Venda rápida</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Respostas curtas, qualificação rápida e oferta cedo para quem já chega decidido.</p>
+
+                <div class="sb-subcard p-2.5">
+                  <span class="text-[9px] font-bold uppercase text-zinc-500 block">FUNCIONA MELHOR PARA</span>
+                  <p class="text-[11px] text-zinc-200 font-medium mt-0.5">Reels/stories, audiência quente e campanhas com promessa clara</p>
+                </div>
+
+                <div class="space-y-1.5 text-[11px] text-zinc-300 pt-1">
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Ritmo ágil</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Respostas enxutas</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Oferta cedo</p>
+                </div>
+              </div>
+
+              <div class="pt-4 mt-4 border-t border-[#1c1c26] space-y-3">
+                <div class="flex justify-between items-end">
+                  <div>
+                    <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
+                    <div class="flex gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">3 dúvidas</span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[9px] text-zinc-500 block">Plano a partir de</span>
+                    <span class="text-xs font-bold text-white">R$ 19,90</span>
+                  </div>
+                </div>
+                <button onclick="applyPresetStrategy('rapida')" class="w-full py-2 rounded-xl bg-[#161622] hover:bg-purple-600 text-zinc-200 hover:text-white border border-[#262638] text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                  <span>Aplicar esta estratégia</span>
+                  <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="sb-card p-4 flex flex-col justify-between">
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <div class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-crown"></i>
+                  </div>
+                  <span class="text-[8px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">MAIOR VALOR PERCEBIDO</span>
+                </div>
+                <h3 class="text-sm font-bold text-white">Experiência premium</h3>
+                <p class="text-[11px] text-zinc-400 leading-relaxed">Posicionamento mais exclusivo, ritmo calmo e foco em valor antes de falar de preço.</p>
+
+                <div class="sb-subcard p-2.5">
+                  <span class="text-[9px] font-bold uppercase text-zinc-500 block">FUNCIONA MELHOR PARA</span>
+                  <p class="text-[11px] text-zinc-200 font-medium mt-0.5">Ticket maior, marca pessoal forte e audiência recorrente</p>
+                </div>
+
+                <div class="space-y-1.5 text-[11px] text-zinc-300 pt-1">
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Escuta mais</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Ticket maior</p>
+                  <p><i class="fa-solid fa-check text-emerald-400 mr-1.5 text-[10px]"></i> Tom elegante</p>
+                </div>
+              </div>
+
+              <div class="pt-4 mt-4 border-t border-[#1c1c26] space-y-3">
+                <div class="flex justify-between items-end">
+                  <div>
+                    <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
+                    <div class="flex gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">5 dúvidas</span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[9px] text-zinc-500 block">Plano a partir de</span>
+                    <span class="text-xs font-bold text-white">R$ 79,90</span>
+                  </div>
+                </div>
+                <button onclick="applyPresetStrategy('premium')" class="w-full py-2 rounded-xl bg-[#161622] hover:bg-purple-600 text-zinc-200 hover:text-white border border-[#262638] text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                  <span>Aplicar esta estratégia</span>
+                  <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-zinc-500">Aplicar uma estratégia substitui biografia, traços, contexto, ofertas, dúvidas respondidas e estilo da conversa. Você poderá revisar tudo antes de salvar e colocar o bot no ar.</p>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('resumo')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Resumo do atendimento</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('persona')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Persona e identidade</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 3: PERSONA E IDENTIDADE
+        ========================================================== -->
+        <section id="sec-persona" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Persona e identidade</h2>
+            <p class="text-xs text-zinc-400 mt-1">Defina quem conversa: nome, história e personalidade.</p>
+          </div>
+
+          <div class="sb-card p-6 space-y-5">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-zinc-800/90 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0">
+                <i class="fa-regular fa-user text-xs"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Quem conversa com o visitante</h3>
+                <p class="text-[11px] text-zinc-500">Escolha nome, apresentação e história. A persona usa tudo isso para conversar em primeira pessoa com consistência.</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-4">
+              <div class="col-span-9">
+                <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Nome de exibição</label>
+                <input type="text" id="inp-persona-name" oninput="onPersonaChange()" value="Atendimento" class="sb-input">
+              </div>
+              <div class="col-span-3">
+                <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Idade</label>
+                <input type="number" id="inp-persona-age" oninput="onPersonaChange()" value="18" class="sb-input">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Apresentação da persona</label>
+              <p class="text-[11px] text-zinc-500 mb-2">Controla pronomes, flexões e como a persona fala sobre si.</p>
+              <div class="grid grid-cols-3 gap-3" id="gender-cards">
+                <div onclick="selectGender('Feminina', 'Fala e se apresenta no feminino.')" data-val="Feminina" class="sb-radio-card selected">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Feminina</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-purple-400 flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-purple-400"></span></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Fala e se apresenta no feminino.</p>
+                </div>
+                <div onclick="selectGender('Masculina', 'Fala e se apresenta no masculino.')" data-val="Masculina" class="sb-radio-card">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Masculina</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Fala e se apresenta no masculino.</p>
+                </div>
+                <div onclick="selectGender('Neutra', 'Evita marcações de gênero.')" data-val="Neutra" class="sb-radio-card">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Neutra</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Evita marcações de gênero.</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Cidade</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Opcional.</p>
+              <input type="text" id="inp-persona-city" oninput="onPersonaChange()" placeholder="Ex.: São Paulo" class="sb-input">
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Biografia curta</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Conte a história comercial e os detalhes que ajudam a manter respostas coerentes.</p>
+              <textarea id="inp-persona-bio" rows="4" maxlength="500" oninput="onPersonaChange()" class="sb-input resize-y">Criadora adulta, espontânea e direta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.</textarea>
+              <div class="text-right text-[10px] text-zinc-500 mt-1" id="bio-counter">153/500</div>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Traços de personalidade</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Separe por vírgulas. Use até 8 características.</p>
+              <input type="text" id="inp-persona-traits" oninput="onPersonaChange()" value="espontânea, atenta, bem-humorada" class="sb-input">
+            </div>
+          </div>
+
+          <div class="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/25 flex items-center gap-3 text-[11px] text-emerald-200/90">
+            <i class="fa-solid fa-circle-info text-emerald-400"></i>
+            <span>A identidade deve representar uma pessoa adulta. Informações de login, documentos, dados bancários e dados privados de leads não devem ser inseridos aqui.</span>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('estrategias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Estratégias prontas</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('ofertas')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Negócio e ofertas</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 4: NEGÓCIO E OFERTAS
+        ========================================================== -->
+        <section id="sec-ofertas" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Negócio e ofertas</h2>
+            <p class="text-xs text-zinc-400 mt-1">Explique o VIP, cadastre preços e responda às dúvidas comuns.</p>
+          </div>
+
+          <!-- Contexto da criadora -->
+          <div class="sb-card p-6 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Contexto da criadora e do VIP</h3>
+              <p class="text-[11px] text-zinc-500 mt-0.5">Guia interno para evitar respostas genéricas. A persona usa este texto como fonte principal da conversa.</p>
+            </div>
+
+            <div class="sb-subcard p-4 space-y-2">
+              <p class="text-xs font-semibold text-zinc-200">Um bom contexto deixa estas cinco respostas claras:</p>
+              <div class="grid grid-cols-2 gap-1.5 text-[11px] text-zinc-400">
+                <p>• O que existe no VIP</p>
+                <p>• O que torna a oferta diferente</p>
+                <p>• Como pagamento e entrega funcionam</p>
+                <p>• Quando chamar o suporte</p>
+                <p class="col-span-2">• O que não pode ser prometido ou inventado</p>
+              </div>
+            </div>
+
+            <div>
+              <textarea id="inp-business-context" rows="5" maxlength="4000" oninput="onBusinessChange()" class="sb-input resize-y">Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.</textarea>
+              <div class="text-right text-[10px] text-zinc-500 mt-1" id="context-counter">589/4.000</div>
+            </div>
+          </div>
+
+          <!-- Lista de Ofertas -->
+          <div class="sb-card p-6 space-y-4">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-gem text-purple-400 text-xs"></i> Ofertas
+                </h3>
+                <p class="text-[11px] text-zinc-500 mt-0.5">Cadastre até 10 opções. Se todas estiverem desativadas ou nenhuma tiver preço, aparecerá como planos atuais para o visitante comprar.</p>
+              </div>
+            </div>
+
+            <button onclick="addOfferCard()" class="px-3.5 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] border border-[#252534] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus text-[10px]"></i> Adicionar
+            </button>
+
+            <div id="offers-container" class="space-y-4 pt-1"></div>
+          </div>
+
+          <!-- Negociação de preço -->
+          <div class="sb-card p-6 space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-tags text-emerald-400 text-xs"></i> Negociação de preço
+            </h3>
+            <p class="text-[11px] text-zinc-400 leading-relaxed">Quando o visitante trava no valor, a IA pode oferecer uma condição melhor dentro do limite que você definir. Ela nunca escolhe o preço — o sistema calcula a partir destas regras e mostra num botão.</p>
+            <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
+              <input type="checkbox" id="chk-bargain" onchange="toggleBargain()" class="w-4 h-4 accent-purple-600 rounded">
+              <span class="text-xs text-zinc-200 font-medium">Ativar</span>
+            </label>
+            <div id="bargain-details" class="hidden pt-3 border-t border-[#1e1e2a] grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-zinc-400 block mb-1">Valor mínimo autorizado (R$)</label>
+                <input type="number" step="0.50" id="inp-bargain-min" value="14.90" oninput="markUnsaved()" class="sb-input">
+              </div>
+              <div>
+                <label class="text-xs text-zinc-400 block mb-1">Desconto máximo (%)</label>
+                <input type="number" id="inp-bargain-pct" value="20" oninput="markUnsaved()" class="sb-input">
+              </div>
+            </div>
+          </div>
+
+          <!-- Dúvidas que a IA já sabe responder -->
+          <div class="sb-card p-6 space-y-4">
             <div class="flex justify-between items-center">
-              <h4 class="text-sm font-bold text-white">Cena 01 - Biquíni Espelho</h4>
-              <span class="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">Aumentar Desejo</span>
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i class="fa-regular fa-circle-question text-blue-400 text-xs"></i> Dúvidas que a IA já sabe responder
+                </h3>
+                <p class="text-[11px] text-zinc-500 mt-0.5">Cadastre perguntas comuns e a resposta correta para cada uma.</p>
+              </div>
+              <button onclick="addFaqItem()" class="px-3.5 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] border border-[#252534] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i> Adicionar dúvida
+              </button>
             </div>
-            <p class="text-xs text-slate-400 mt-1">Foto tirada no espelho de biquíni mostrando as curvas.</p>
-          </div>
-          <div class="bg-[#0a0c10] p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300">
-            <span class="text-slate-500 font-semibold block text-[10px] uppercase">Gatilhos da conversa:</span>
-            previa, foto, corpo, biquini, amostra, manda foto
-          </div>
-        </div>
 
-        <!-- Card de Mídia 2 -->
-        <div class="glass-card p-4 space-y-3">
-          <div class="h-44 bg-slate-900 rounded-lg overflow-hidden relative border border-slate-800 flex items-center justify-center">
-            <div class="text-center p-4">
-              <i class="fa-solid fa-microphone-lines text-3xl text-purple-400"></i>
-              <p class="text-xs text-slate-300 mt-2">Áudio Curto Sensual (0:12)</p>
+            <div id="faqs-container" class="space-y-3"></div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('persona')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Persona e identidade</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('conversa')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Jeito de conversar</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 5: JEITO DE CONVERSAR
+        ========================================================== -->
+        <section id="sec-conversa" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Jeito de conversar</h2>
+            <p class="text-xs text-zinc-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
+          </div>
+
+          <!-- Humanização da venda -->
+          <div class="sb-card p-6 space-y-5">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Humanização da venda</h3>
+                <p class="text-[11px] text-zinc-500">Faz a persona reagir, lembrar preferências e escolher o momento certo de apresentar a oferta sem parecer um roteiro.</p>
+              </div>
+            </div>
+
+            <!-- Estratégia comercial -->
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Estratégia comercial</label>
+              <p class="text-[11px] text-zinc-500 mb-2">Define em que momento a oferta entra na conversa.</p>
+              <div class="grid grid-cols-3 gap-3" id="rg-strategy">
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Conexão primeiro')" data-val="Conexão primeiro" class="sb-radio-card selected">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Conexão primeiro</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-purple-400 flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-purple-400"></span></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Conversa e entende o interesse antes de vender.</p>
+                </div>
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Equilibrado')" data-val="Equilibrado" class="sb-radio-card">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Equilibrado</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Cria uma troca curta e apresenta a oferta no gancho.</p>
+                </div>
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Direto')" data-val="Direto" class="sb-radio-card">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Direto</span>
+                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-1">Apresenta a oferta cedo, sem perder naturalidade.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Nível de flerte & Uso de gírias -->
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block mb-2">Nível de flerte</label>
+                <div class="grid grid-cols-2 gap-2.5" id="rg-flirt">
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Nenhum')" data-val="Nenhum" class="sb-radio-card">
+                    <span class="text-xs font-semibold text-white">Nenhum</span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Leve')" data-val="Leve" class="sb-radio-card selected">
+                    <span class="text-xs font-semibold text-white">Leve</span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Sensual')" data-val="Sensual" class="sb-radio-card col-span-2">
+                    <span class="text-xs font-semibold text-white block">Sensual</span>
+                    <span class="text-[10px] text-zinc-400">Provocante, sem descrição gráfica.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block mb-2">Uso de gírias</label>
+                <div class="grid grid-cols-2 gap-2.5" id="rg-slang">
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Nenhuma')" data-val="Nenhuma" class="sb-radio-card">
+                    <span class="text-xs font-semibold text-white">Nenhuma</span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Natural')" data-val="Natural" class="sb-radio-card selected">
+                    <span class="text-xs font-semibold text-white">Natural</span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Marcante')" data-val="Marcante" class="sb-radio-card col-span-2">
+                    <span class="text-xs font-semibold text-white">Marcante</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cadência -->
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Cadência</label>
+              <p class="text-[11px] text-zinc-500 mb-2">Controla a sensação de velocidade e pressão da conversa.</p>
+              <div class="grid grid-cols-3 gap-3" id="rg-cadence">
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Ágil')" data-val="Ágil" class="sb-radio-card">
+                  <span class="text-xs font-bold text-white block">Ágil</span>
+                  <p class="text-[10px] text-zinc-400 mt-1">Menos rodeio e avanço rápido.</p>
+                </div>
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Natural')" data-val="Natural" class="sb-radio-card selected">
+                  <span class="text-xs font-bold text-white block">Natural</span>
+                  <p class="text-[10px] text-zinc-400 mt-1">Alterna reação, pergunta e próximo passo.</p>
+                </div>
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Calma')" data-val="Calma" class="sb-radio-card">
+                  <span class="text-xs font-bold text-white block">Calma</span>
+                  <p class="text-[10px] text-zinc-400 mt-1">Mais acolhimento e menos pressão.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Toggles de espelhamento -->
+            <div class="space-y-2.5 pt-1">
+              <div class="sb-subcard p-3.5 flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-semibold text-white">Espelhar o jeito do visitante</p>
+                  <p class="text-[11px] text-zinc-500">Acompanha energia, tamanho das mensagens e nível de informalidade.</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="chk-mirror" checked onchange="markUnsaved()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="sb-subcard p-3.5 flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-semibold text-white">Usar o nome do lead</p>
+                  <p class="text-[11px] text-zinc-500">Chama pelo nome quando a pessoa se apresenta, sem repetir demais.</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="chk-leadname" onchange="markUnsaved()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
             </div>
           </div>
+
+          <!-- Ritmo e personalidade -->
+          <div class="sb-card p-6 space-y-5">
+            <div>
+              <h3 class="text-sm font-bold text-white">Ritmo e personalidade da conversa</h3>
+              <p class="text-[11px] text-zinc-500">Escolhas simples que mantêm as respostas consistentes entre os visitantes.</p>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-2">Tom de voz</label>
+              <div class="grid grid-cols-4 gap-2.5" id="rg-tone">
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Acolhedor')" data-val="Acolhedor" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Acolhedor</span></div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Direto')" data-val="Direto" class="sb-radio-card"><span class="text-xs font-semibold text-white">Direto</span></div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Descontraído')" data-val="Descontraído" class="sb-radio-card"><span class="text-xs font-semibold text-white">Descontraído</span></div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Provocante')" data-val="Provocante" class="sb-radio-card"><span class="text-xs font-semibold text-white">Provocante</span></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block mb-2">Tamanho das respostas</label>
+                <div class="grid grid-cols-2 gap-2.5" id="rg-length">
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Curta')" data-val="Curta" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Curta</span></div>
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Média')" data-val="Média" class="sb-radio-card"><span class="text-xs font-semibold text-white">Média</span></div>
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Detalhada')" data-val="Detalhada" class="sb-radio-card col-span-2"><span class="text-xs font-semibold text-white">Detalhada</span></div>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block mb-2">Uso de emojis</label>
+                <div class="grid grid-cols-2 gap-2.5" id="rg-emojis">
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Nenhum')" data-val="Nenhum" class="sb-radio-card"><span class="text-xs font-semibold text-white">Nenhum</span></div>
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Leve')" data-val="Leve" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Leve</span></div>
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Moderado')" data-val="Moderado" class="sb-radio-card col-span-2"><span class="text-xs font-semibold text-white">Moderado</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Respostas em áudio -->
+          <div class="sb-card p-5 flex items-center justify-between">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs shrink-0">
+                <i class="fa-solid fa-Volume-high"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-xs font-bold text-white">Respostas em áudio</h4>
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">VOZ NATURAL</span>
+                </div>
+                <p class="text-[11px] text-zinc-500 mt-0.5">Cria novas mensagens de voz a partir da resposta e usa o saldo da IA. Áudios já gravados ficam em Mídias da conversa e funcionam mesmo com esta opção desligada.</p>
+              </div>
+            </div>
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" id="chk-audio-replies" onchange="markUnsaved()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Abertura da conversa -->
+          <div class="sb-card p-6 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Abertura da conversa</h3>
+              <p class="text-[11px] text-zinc-500 mt-0.5">Use uma abertura que combine com sua identidade, sem presumir que a pessoa acabou de chegar. Evite apresentar planos antes de ouvir o interesse.</p>
+            </div>
+            <textarea id="inp-opening-msg" rows="3" oninput="onOpeningChange()" class="sb-input">oii 💜
+chegou agora por aqui?</textarea>
+
+            <div class="pt-2 space-y-2">
+              <label class="text-xs font-semibold text-zinc-200 block">Variações de abertura</label>
+              <p class="text-[11px] text-zinc-500">No Telegram, apenas uma das aberturas é escolhida a cada /start. O teste nesta tela usa a principal.</p>
+              <button onclick="addOpeningVariation()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs font-medium text-zinc-200">+ Adicionar variação</button>
+              <div id="variations-container" class="space-y-2 pt-1">
+                <div class="flex gap-2 items-start">
+                  <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Objetivo principal</label>
+              <textarea id="inp-style-objective" rows="2" oninput="markUnsaved()" class="sb-input">Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.</textarea>
+            </div>
+          </div>
+
+          <!-- Regras próprias -->
+          <div class="sb-card p-6 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Regras próprias</h3>
+              <p class="text-[11px] text-zinc-500">Uma regra por linha. Use no máximo 10.</p>
+            </div>
+            <textarea id="inp-style-rules" rows="4" oninput="markUnsaved()" class="sb-input">Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.
+Não reinicie a conversa nem repita uma pergunta que o visitante já respondeu.
+Quando houver intenção de compra, abra os planos sem criar etapas artificiais.</textarea>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block">Palavras de encaminhamento</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Separe por vírgulas. Essas palavras poderão acionar atendimento humano em uma fase futura.</p>
+              <input type="text" id="inp-style-handoff" value="suporte, atendente, problema no pagamento" oninput="markUnsaved()" class="sb-input">
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('ofertas')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Negócio e ofertas</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('midias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Mídias da conversa</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 6: MÍDIAS DA CONVERSA
+        ========================================================== -->
+        <section id="sec-midias" class="tab-section hidden space-y-6">
           <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Mídias da conversa</h2>
+            <p class="text-xs text-zinc-400 mt-1">Adicione fotos, vídeos, GIFs e áudios com contexto de uso.</p>
+          </div>
+
+          <div class="sb-card p-5 flex items-center justify-between">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                <i class="fa-regular fa-images"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white">Conteúdo no momento certo</h4>
+                <p class="text-[11px] text-zinc-400 mt-0.5 max-w-lg">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
+              </div>
+            </div>
+            <button onclick="addNewMediaCard()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-plus text-[10px]"></i> Adicionar mídias
+            </button>
+          </div>
+
+          <div class="rounded-xl p-3.5 bg-amber-950/20 border border-amber-500/25 flex items-center gap-3 text-[11px] text-amber-200/90">
+            <i class="fa-solid fa-circle-exclamation text-amber-400"></i>
+            <span>Configure o canal de cache em <strong>Publicar no bot</strong>. O upload funciona sem ele, mas o primeiro envio no Telegram pode demorar mais.</span>
+          </div>
+
+          <!-- Filtros de mídia -->
+          <div class="flex items-center justify-between">
+            <div class="flex gap-1.5">
+              <button class="px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium">Todas</button>
+              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Fotos</button>
+              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Vídeos</button>
+              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">GIFs</button>
+              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Áudios</button>
+            </div>
+            <span id="media-count-badge" class="text-[11px] text-zinc-500">2/20 arquivos</span>
+          </div>
+
+          <!-- Grid de Mídias -->
+          <div id="medias-grid" class="grid grid-cols-2 gap-4 items-start"></div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('conversa')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Jeito de conversar</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('downsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Downsell</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 7: DOWNSELL
+        ========================================================== -->
+        <section id="sec-downsell" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Downsell</h2>
+            <p class="text-xs text-zinc-400 mt-1">Organize mensagens, mídias e ofertas para quem deixou de responder.</p>
+          </div>
+
+          <div class="sb-card p-6 space-y-3">
             <div class="flex justify-between items-center">
-              <h4 class="text-sm font-bold text-white">Áudio 01 - Chamando pro VIP</h4>
-              <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">Criar Conexão</span>
+              <span class="text-[11px] font-semibold text-blue-400">Downsell • sem resposta</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chk-downsell-enabled" onchange="markUnsaved()">
+                <span class="toggle-slider"></span>
+              </label>
             </div>
-            <p class="text-xs text-slate-400 mt-1">Voz sussurrando convidando para o canal privado.</p>
-          </div>
-          <div class="bg-[#0a0c10] p-2.5 rounded-lg border border-slate-800 text-xs text-slate-300">
-            <span class="text-slate-500 font-semibold block text-[10px] uppercase">Gatilhos da conversa:</span>
-            audio, voz, grava audio, manda audio, real
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABA: DOWNSELL (RECUPERAÇÃO NO SILÊNCIO) -->
-    <section id="tab-downsell" class="hidden space-y-6">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-2xl font-bold text-white">Downsell automático</h2>
-          <p class="text-slate-400 text-sm mt-1">Retome a conversa no tempo certo com quem sumiu ou parou de responder.</p>
-        </div>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <span class="text-xs text-slate-400">Downsell Ativo</span>
-          <input type="checkbox" checked class="w-5 h-5 accent-purple-600 rounded">
-        </label>
-      </div>
-
-      <div class="space-y-4">
-        <!-- Etapa 1 -->
-        <div class="glass-card p-5 space-y-4 border-l-4 border-l-purple-500">
-          <div class="flex justify-between items-center">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center text-xs font-bold">1</span>
-              <h4 class="text-sm font-bold text-white">Primeiro contato após silêncio</h4>
+            <h3 class="text-base font-bold text-white">Retome a conversa, no tempo certo</h3>
+            <p class="text-xs text-zinc-400 leading-relaxed">Monte até 6 etapas com mensagens escritas por você, mídias e ofertas diferentes. Cada etapa é enviada uma única vez por lead, enquanto ele estiver sem responder e ainda não tiver comprado.</p>
+            <div class="sb-subcard p-3 text-[11px] text-zinc-400">
+              Uma resposta, clique ou checkout cancela a sequência pendente. Após uma nova resposta da IA, o contador da próxima etapa recomeça — sem repetir as que já foram enviadas. Pagamento aprovado encerra o Downsell.
             </div>
-            <span class="text-xs text-purple-300 bg-purple-900/40 px-2.5 py-0.5 rounded border border-purple-500/30">Após 5 minutos</span>
           </div>
-          <div>
-            <label class="text-xs text-slate-400">Mensagem de Downsell (usa {nome})</label>
-            <textarea rows="2" class="w-full mt-1 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">sumiu por que meu bem? 🥺 quer que eu te mostre as fotos que postei no VIP hoje?</textarea>
-          </div>
-        </div>
 
-        <!-- Etapa 2 -->
-        <div class="glass-card p-5 space-y-4 border-l-4 border-l-amber-500">
-          <div class="flex justify-between items-center">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center text-xs font-bold">2</span>
-              <h4 class="text-sm font-bold text-white">Oferta com desconto relâmpago</h4>
+          <div class="grid grid-cols-12 gap-4 items-start">
+            <!-- Coluna esquerda: Sequência -->
+            <div class="col-span-4 space-y-3">
+              <div class="flex justify-between items-center text-xs">
+                <span class="font-bold text-white">Sua sequência</span>
+                <span id="downsell-step-counter" class="text-zinc-500">1/6</span>
+              </div>
+              <div id="downsell-steps-list" class="space-y-2"></div>
+              <button onclick="addDownsellStep()" class="w-full py-2.5 rounded-xl bg-[#111118] hover:bg-[#191924] border border-[#242434] text-xs font-semibold text-zinc-200">+ Adicionar etapa</button>
             </div>
-            <span class="text-xs text-amber-300 bg-amber-900/40 px-2.5 py-0.5 rounded border border-amber-500/30">Após 1 hora</span>
-          </div>
-          <div>
-            <label class="text-xs text-slate-400">Mensagem de Downsell com Desconto</label>
-            <textarea rows="2" class="w-full mt-1 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">consegui liberar um cupom especial de R$ 19,90 só pra você entrar no VIP agora... quer o link antes que expire? 💜</textarea>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <!-- ABA: UPSELL (PÓS-VENDA IMEDIATA) -->
-    <section id="tab-upsell" class="hidden space-y-6">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-2xl font-bold text-white">Upsell pós-compra</h2>
-          <p class="text-slate-400 text-sm mt-1">Apresente uma oferta extra imediatamente após a confirmação do pagamento inicial.</p>
-        </div>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <span class="text-xs text-slate-400">Upsell Ativo</span>
-          <input type="checkbox" checked class="w-5 h-5 accent-purple-600 rounded">
-        </label>
-      </div>
+            <!-- Coluna direita: Editor da Etapa -->
+            <div class="col-span-8 sb-card p-6 space-y-5">
+              <div>
+                <span class="text-[10px] font-bold uppercase text-blue-400" id="ds-editor-badge">Etapa 1</span>
+                <h4 class="text-sm font-bold text-white mt-0.5">Primeiro contato após o silêncio</h4>
+              </div>
 
-      <div class="glass-card p-6 space-y-5">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Quando enviar</label>
-            <select class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-              <option value="0">Imediatamente após o Pix ser aprovado</option>
-              <option value="1" selected>1 minuto após a liberação</option>
-              <option value="5">5 minutos após a liberação</option>
-            </select>
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300">Produto de Upsell</label>
-            <input type="text" value="Chamada de Vídeo Gravada (Pack 10 vídeos)" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">
-          </div>
-        </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-300">Mensagem pós-compra</label>
-          <textarea rows="3" class="w-full mt-1.5 bg-[#0a0c10] border border-slate-800 rounded-lg p-2.5 text-sm text-white">agora que seu acesso já tá liberado, acabei de gravar um pack especial de chamada de vídeo de 15 minutos... posso adicionar no seu acesso por só mais R$ 19,90? 😈</textarea>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABA: CRM / MEMÓRIA DAS CONVERSAS -->
-    <section id="tab-crm" class="hidden space-y-6">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-2xl font-bold text-white">Memória das conversas (CRM)</h2>
-          <p class="text-slate-400 text-sm mt-1">Veja a jornada de cada visitante e o status das vendas.</p>
-        </div>
-        <div class="flex gap-2">
-          <input type="text" placeholder="Buscar por @username ou nome..." class="bg-[#0a0c10] border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white">
-        </div>
-      </div>
-
-      <!-- Tabela de Leads -->
-      <div class="glass-card overflow-hidden">
-        <table class="w-full text-left text-xs text-slate-300">
-          <thead class="bg-[#0a0c10] text-slate-500 uppercase tracking-wider text-[10px] border-b border-slate-800">
-            <tr>
-              <th class="p-3.5">Cliente</th>
-              <th class="p-3.5">Status Funil</th>
-              <th class="p-3.5">Última Interação</th>
-              <th class="p-3.5">Valor Gerado</th>
-              <th class="p-3.5 text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800/60">
-            <tr>
-              <td class="p-3.5 flex items-center gap-2.5">
-                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-purple-400">R</div>
-                <div>
-                  <p class="font-bold text-white">Rodrigo M.</p>
-                  <p class="text-[11px] text-slate-500">@rodrigo_m22</p>
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block">Quando enviar</label>
+                <p class="text-[11px] text-zinc-500 mb-2">Tempo de silêncio contado após a última resposta da IA.</p>
+                <div class="flex gap-1.5 mb-2.5" id="ds-delay-pills">
+                  <button onclick="setDownsellDelay('1 min', 1)" class="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500 text-xs font-semibold text-blue-300">1 min</button>
+                  <button onclick="setDownsellDelay('5 min', 5)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">5 min</button>
+                  <button onclick="setDownsellDelay('15 min', 15)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">15 min</button>
+                  <button onclick="setDownsellDelay('1h', 60)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1h</button>
+                  <button onclick="setDownsellDelay('1 dia', 1440)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1 dia</button>
                 </div>
-              </td>
-              <td class="p-3.5">
-                <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-semibold">Pix Pago (VIP Ativo)</span>
-              </td>
-              <td class="p-3.5 text-slate-400">Hoje às 08:35</td>
-              <td class="p-3.5 font-mono text-emerald-400 font-bold">R$ 29,90</td>
-              <td class="p-3.5 text-right">
-                <button class="text-purple-400 hover:underline">Ver Chat</button>
-              </td>
-            </tr>
+                <select id="sel-ds-interval" onchange="markUnsaved()" class="sb-input">
+                  <option value="1">1 minuto</option>
+                  <option value="5">5 minutos</option>
+                  <option value="15">15 minutos</option>
+                  <option value="60">1 hora</option>
+                  <option value="1440">1 dia</option>
+                </select>
+              </div>
 
-            <tr>
-              <td class="p-3.5 flex items-center gap-2.5">
-                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-amber-400">C</div>
-                <div>
-                  <p class="font-bold text-white">Carlos Eduardo</p>
-                  <p class="text-[11px] text-slate-500">@cadu_sp</p>
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block">Mensagem do Downsell</label>
+                <p class="text-[11px] text-zinc-500 mb-1.5">Você escreve, o bot envia sem a IA reescrever. Esta mensagem é separada da legenda e também funciona sem mídia.</p>
+                <textarea id="inp-ds-message" rows="3" oninput="markUnsaved()" class="sb-input">sumiu por ai? 😜
+
+quer que eu te mostre as opções de acesso?</textarea>
+                <div class="flex justify-between text-[10px] text-zinc-500 mt-1">
+                  <span>Use {nome} para incluir o nome do visitante.</span>
+                  <span>63/1.000</span>
                 </div>
-              </td>
-              <td class="p-3.5">
-                <span class="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-semibold">Pix Gerado (Pendente)</span>
-              </td>
-              <td class="p-3.5 text-slate-400">Hoje às 08:42</td>
-              <td class="p-3.5 font-mono text-amber-400 font-bold">R$ 19,90</td>
-              <td class="p-3.5 text-right">
-                <button class="text-purple-400 hover:underline">Ver Chat</button>
-              </td>
-            </tr>
+              </div>
 
-            <tr>
-              <td class="p-3.5 flex items-center gap-2.5">
-                <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-400">F</div>
-                <div>
-                  <p class="font-bold text-white">Felipe Silva</p>
-                  <p class="text-[11px] text-slate-500">@felipesilva</p>
+              <div>
+                <label class="text-xs font-semibold text-zinc-200 block">O que acompanha a mensagem?</label>
+                <p class="text-[11px] text-zinc-500 mb-1.5">O preço especial só existe se você criar a oferta abaixo. Não prometa desconto em uma mensagem sem oferta.</p>
+                <select id="sel-ds-accompany" onchange="markUnsaved()" class="sb-input">
+                  <option value="Botão com os planos atuais">Botão com os planos atuais</option>
+                  <option value="Oferta especial com desconto">Oferta especial com desconto</option>
+                  <option value="Apenas a mensagem">Apenas a mensagem</option>
+                </select>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="font-semibold text-zinc-200">Mídias deste envio</span>
+                  <span class="text-zinc-500">0/5</span>
                 </div>
-              </td>
-              <td class="p-3.5">
-                <span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded font-semibold">Em Conversa</span>
-              </td>
-              <td class="p-3.5 text-slate-400">Ontem às 22:15</td>
-              <td class="p-3.5 font-mono text-slate-500">-</td>
-              <td class="p-3.5 text-right">
-                <button class="text-purple-400 hover:underline">Ver Chat</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <p class="text-[11px] text-zinc-500 mb-2">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
+                <button onclick="alert('Selecione um arquivo de foto, vídeo ou áudio para anexar a esta etapa do Downsell.')" class="w-full py-3 rounded-xl border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-300 flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Adicionar arquivo nesta etapa
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('midias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Mídias da conversa</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('upsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Upsell</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 8: UPSELL
+        ========================================================== -->
+        <section id="sec-upsell" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Upsell</h2>
+            <p class="text-xs text-zinc-400 mt-1">Apresente uma nova oferta automaticamente depois da primeira compra aprovada.</p>
+          </div>
+
+          <div class="sb-card p-5 flex items-center justify-between">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white">Upsell - uma nova oferta após a compra</h4>
+                <p class="text-[11px] text-zinc-400 mt-0.5">A primeira entrega vai na hora. Depois, o bot faz uma extensão de acesso ou uma opção extra, com mensagem e mídias próprias.</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">OPCIONAL</span>
+          </div>
+
+          <div class="sb-card p-6 space-y-5">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-white">Upsell</h3>
+                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">PRÓXIMO PASSO AUTOMÁTICO</span>
+                </div>
+                <p class="text-[11px] text-zinc-500 mt-0.5">Depois da entrega inicial, apresente outro plano usando o mesmo checkout, webhook e destino configurados.</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chk-upsell-enabled" checked onchange="markUnsaved()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Origem da oferta</label>
+              <select id="sel-upsell-origin" onchange="markUnsaved()" class="sb-input">
+                <option value="Usar plano já cadastrado">Usar plano já cadastrado</option>
+                <option value="Criar oferta exclusiva para o Upsell">Criar oferta exclusiva para o Upsell</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Quando enviar</label>
+              <select id="sel-upsell-delay" onchange="markUnsaved()" class="sb-input">
+                <option value="0">Na hora</option>
+                <option value="1" selected>1 minuto</option>
+                <option value="5">5 minutos</option>
+                <option value="15">15 minutos</option>
+                <option value="60">1 hora</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Plano que será apresentado</label>
+              <select id="sel-upsell-offer" onchange="markUnsaved()" class="sb-input">
+                <option value="offer_1">💎 Nova oferta</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Mensagem pós-compra</label>
+              <textarea id="inp-upsell-msg" rows="3" oninput="markUnsaved()" class="sb-input">agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉</textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('downsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Downsell</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('testar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Testar conversa</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 9: TESTAR CONVERSA
+        ========================================================== -->
+        <section id="sec-testar" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">TESTE E PUBLICAÇÃO</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Testar conversa</h2>
+            <p class="text-xs text-zinc-400 mt-1">Converse com a persona e revise as respostas antes de ativar.</p>
+          </div>
+
+          <div class="sb-card p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-[#1c1c26] pb-3">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <h3 class="text-xs font-bold text-white">Conversa privada de teste</h3>
+                </div>
+                <p class="text-[10px] text-zinc-500 mt-0.5">Simule um visitante. Nenhum lead ou bot recebe estas mensagens.</p>
+              </div>
+              <button onclick="resetFullSimulator()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-right text-[10px]"></i> Limpar teste
+              </button>
+            </div>
+
+            <div id="full-sim-messages" class="h-80 overflow-y-auto space-y-2.5 p-3 bg-[#08080c] rounded-xl border border-[#191923]"></div>
+
+            <form onsubmit="sendTestMessage(event)" class="space-y-2.5">
+              <textarea id="full-sim-input" rows="2" placeholder="Escreva como se fosse um visitante..." class="sb-input resize-none" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendTestMessage(event);}"></textarea>
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] text-amber-400">As alterações não salvas estão sendo usadas no teste.</span>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-2">
+                  <i class="fa-regular fa-paper-plane text-[10px]"></i> Enviar teste
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="sb-card p-4">
+              <span class="text-[10px] text-zinc-500 block">Saldo</span>
+              <span class="text-base font-bold text-white mt-0.5 block">R$ 0,00</span>
+            </div>
+            <div class="sb-card p-4">
+              <span class="text-xs font-semibold text-white block"><i class="fa-solid fa-shield-halved text-zinc-400 mr-1"></i> Só você vê este teste</span>
+              <p class="text-[11px] text-zinc-500 mt-0.5">Nenhum lead ou bot recebe as mensagens enviadas nesta tela.</p>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('upsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Upsell</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Publicar no bot</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 10: PUBLICAR NO BOT
+        ========================================================== -->
+        <section id="sec-publicar" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">TESTE E PUBLICAÇÃO</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Publicar no bot</h2>
+            <p class="text-xs text-zinc-400 mt-1">Conecte o bot, defina a entrega e ative o atendimento.</p>
+          </div>
+
+          <div class="sb-card p-5 bg-gradient-to-r from-[#161126] to-[#0c0c12] border-purple-500/25 flex items-center justify-between">
+            <div class="flex items-start gap-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+                <i class="fa-solid fa-rocket text-xs"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white">Coloque o atendimento no ar</h4>
+                <p class="text-[11px] text-zinc-400 mt-0.5">Conecte o bot, defina o que será entregue e revise o checklist. O atendimento só começa depois que você ativar.</p>
+              </div>
+            </div>
+            <label class="toggle-switch shrink-0">
+              <input type="checkbox" id="chk-bot-live" onchange="onPublishChange()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Bot do atendimento -->
+          <div class="sb-card p-6 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Bot do atendimento</h3>
+              <p class="text-[11px] text-zinc-500">Escolha o bot que receberá os novos leads deste fluxo. Cada fluxo IA usa um bot por vez.</p>
+            </div>
+            <div class="flex gap-3">
+              <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Cole aqui o Token do BotFather (Ex: 7123456:AAH...)" class="sb-input flex-1">
+              <button onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold shrink-0">+ Vincular bot</button>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Token Pushin Pay (Gateway PIX)</label>
+              <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole aqui seu Token Bearer da Pushin Pay" class="sb-input">
+            </div>
+          </div>
+
+          <!-- Canal de cache das mídias -->
+          <div class="sb-card p-6 space-y-3">
+            <div>
+              <h3 class="text-sm font-bold text-white">Canal de cache das mídias</h3>
+              <p class="text-[11px] text-zinc-500">Preserva o file_id de fotos, vídeos, GIFs e áudios. Depois do primeiro envio, o Telegram reutiliza o arquivo sem baixar da origem novamente.</p>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Grupo ou canal de preservação</label>
+              <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Ex.: -1001987654321 (O bot precisa ser administrador)" class="sb-input">
+            </div>
+          </div>
+
+          <!-- Entrega depois do pagamento -->
+          <div class="sb-card p-6 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white">Entrega depois do pagamento</h3>
+              <p class="text-[11px] text-zinc-500">Escolha o que o comprador receberá automaticamente assim que o pagamento for confirmado.</p>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Destino da entrega (ID do Canal VIP ou Link)</label>
+              <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="Ex.: -1001234567890" class="sb-input">
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Usuário de suporte no Telegram (Opcional)</label>
+              <input type="text" id="inp-support-user" oninput="onPublishChange()" placeholder="@seu_suporte" class="sb-input">
+            </div>
+          </div>
+
+          <!-- Checklist para publicar -->
+          <div class="sb-card p-5 flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-white">Checklist para publicar</h4>
+              <p class="text-[11px] text-zinc-500">Complete os itens abaixo para colocar o bot no ar.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
+              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Configuração salva</span>
+              <span id="chk-pub-bot" class="text-zinc-500"><i class="fa-regular fa-circle mr-1"></i> Bot válido e vinculado</span>
+              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Oferta ativa</span>
+              <span id="chk-pub-delivery" class="text-zinc-500"><i class="fa-regular fa-circle mr-1"></i> Entrega configurada</span>
+              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Cache das mídias</span>
+              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Motor IA pronto</span>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('testar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Testar conversa</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Memória das conversas</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 11: MEMÓRIA DAS CONVERSAS
+        ========================================================== -->
+        <section id="sec-memoria" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">DEPOIS QUE ENTRAR NO AR</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Memória das conversas</h2>
+            <p class="text-xs text-zinc-400 mt-1">Veja preferências, objeções e a jornada de cada lead.</p>
+          </div>
+
+          <div class="sb-card p-5 space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="text-sm font-bold text-white">Memória e jornada dos leads</h3>
+                <p class="text-[11px] text-zinc-400">Veja o que a conversa aprendeu e acompanhe o avanço real de cada lead, do primeiro clique até pagamento, entrega e Upsell.</p>
+              </div>
+              <button class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate text-[10px]"></i> Atualizar
+              </button>
+            </div>
+            <div class="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/25 text-[11px] text-emerald-300">
+              <i class="fa-solid fa-circle-info mr-1.5"></i> Esta visão espelha a jornada para orientar a conversa. Pagamentos e entregas continuam validados pelos atalhos oficiais do fluxo.
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 gap-4 h-96">
+            <div class="col-span-5 sb-card p-4 flex flex-col">
+              <input type="text" placeholder="Buscar nome, @user ou Telegram ID..." class="sb-input mb-2">
+              <select class="sb-input mb-3">
+                <option>Todas as etapas</option>
+                <option>Em conversa</option>
+                <option>Checkout gerado</option>
+                <option>Compra aprovada</option>
+              </select>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">LEADS LEMBRADOS (0)</span>
+              <div class="flex-1 flex flex-col items-center justify-center text-center p-4">
+                <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-2">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <p class="text-xs font-bold text-white">A memória começa na próxima conversa</p>
+                <p class="text-[11px] text-zinc-500 mt-1">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
+              </div>
+            </div>
+
+            <div class="col-span-7 sb-card p-6 flex flex-col items-center justify-center text-center">
+              <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
+                <i class="fa-regular fa-user"></i>
+              </div>
+              <p class="text-xs font-bold text-white">Escolha um lead</p>
+              <p class="text-[11px] text-zinc-500 mt-1 max-w-xs">Abra um perfil para ver o resumo da conversa, preferências, objeções e toda a jornada comercial confirmada.</p>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Publicar no bot</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('aprendizado')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Aprendizado de vendas</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 12: APRENDIZADO DE VENDAS
+        ========================================================== -->
+        <section id="sec-aprendizado" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">DEPOIS QUE ENTRAR NO AR</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Aprendizado de vendas</h2>
+            <p class="text-xs text-zinc-400 mt-1">Compare resultados e aprove melhorias baseadas em vendas.</p>
+          </div>
+
+          <div class="sb-card p-5 space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold text-white">Aprendizado comercial</h3>
+                  <span class="text-[9px] uppercase px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">SOMENTE NESTE FLUXO</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-0.5">Compara quem comprou com quem não comprou, encontra padrões e propõe recomendações. Nada muda nas conversas sem sua aprovação.</p>
+              </div>
+              <button class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300">Atualizar</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-3">
+            <div class="sb-card p-4">
+              <span class="text-[10px] text-zinc-500 block">em até 6h após a primeira ent...</span>
+              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500">RESULTADOS AVALIADOS</span>
+            </div>
+            <div class="sb-card p-4">
+              <span class="text-[10px] text-zinc-500 block">0,0%</span>
+              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500">COMPRAS CONFIRMADAS</span>
+            </div>
+            <div class="sb-card p-4">
+              <span class="text-[10px] text-zinc-500 block">pix vencido 24 horas</span>
+              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500">CHECKOUTS NÃO PAGOS</span>
+            </div>
+            <div class="sb-card p-4">
+              <span class="text-[10px] text-zinc-500 block">avaliadas após 24h sem c...</span>
+              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500">CONVERSAS SEM COMPRA</span>
+            </div>
+          </div>
+
+          <div class="sb-card p-5 space-y-2">
+            <h4 class="text-xs font-bold text-white">Coletando comparação suficiente</h4>
+            <p class="text-[11px] text-zinc-400">O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança.</p>
+            <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div class="h-full bg-purple-500" style="width: 5%"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-zinc-500">
+              <span>0 resultados válidos</span>
+              <span>mínimo 30</span>
+            </div>
+          </div>
+
+          <div class="flex justify-between pt-2">
+            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
+                <span class="text-xs font-semibold text-white">Memória das conversas</span>
+              </div>
+            </button>
+            <button onclick="navigateTab('saldo')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+              <div>
+                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
+                <span class="text-xs font-semibold text-white">Saldo de IA</span>
+              </div>
+              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+            </button>
+          </div>
+        </section>
+
+        <!-- =========================================================
+             TELA 13: SALDO DA IA & CHAVE PRÓPRIA
+        ========================================================== -->
+        <section id="sec-saldo" class="tab-section hidden space-y-6">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTA</span>
+            <h2 class="text-2xl font-bold text-white mt-0.5">Saldo da IA</h2>
+            <p class="text-xs text-zinc-400 mt-1">Consulte o saldo, faça uma recarga ou conecte sua própria API Key sem intermediários.</p>
+          </div>
+
+          <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-5 sb-card p-5 flex flex-col justify-between">
+              <div>
+                <span class="text-[10px] uppercase tracking-wider text-zinc-500">SALDO DISPONÍVEL</span>
+                <h3 class="text-3xl font-bold text-white mt-1">R$ 0,00</h3>
+                <span class="inline-block mt-2 text-[10px] text-emerald-400">• Cobrança por uso real</span>
+                <p class="text-[11px] text-zinc-400 mt-2 leading-relaxed">As respostas do bot são o principal consumo. Depois que a IA termina, o uso é medido e descontado do saldo.</p>
+              </div>
+            </div>
+
+            <div class="col-span-7 sb-card p-5 space-y-3">
+              <h4 class="text-xs font-bold text-white">Como os créditos viram respostas?</h4>
+              <p class="text-[11px] text-zinc-400">O tamanho da conversa e da resposta define o consumo.</p>
+              <div class="grid grid-cols-3 gap-2.5">
+                <div class="sb-subcard p-3">
+                  <span class="text-[10px] text-zinc-500 block">1</span>
+                  <p class="text-xs font-bold text-white mt-0.5">A IA lê a conversa</p>
+                  <p class="text-[10px] text-zinc-400 mt-1">Instruções, contexto e histórico entram como leitura.</p>
+                </div>
+                <div class="sb-subcard p-3">
+                  <span class="text-[10px] text-zinc-500 block">2</span>
+                  <p class="text-xs font-bold text-white mt-0.5">Ela cria a resposta</p>
+                  <p class="text-[10px] text-zinc-400 mt-1">O texto gerado para o lead conta como tokens de saída.</p>
+                </div>
+                <div class="sb-subcard p-3">
+                  <span class="text-[10px] text-zinc-500 block">3</span>
+                  <p class="text-xs font-bold text-white mt-0.5">O uso real é descontado</p>
+                  <p class="text-[10px] text-zinc-400 mt-1">A cobrança acontece após concluir.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3">
+            <div class="sb-card p-3.5">
+              <span class="text-[9px] uppercase text-zinc-500 block">CONTEXTO LIDO</span>
+              <span class="text-xs font-bold text-white">R$ 1,45 <span class="text-zinc-500 font-normal">/ 1 mi tokens</span></span>
+            </div>
+            <div class="sb-card p-3.5">
+              <span class="text-[9px] uppercase text-zinc-500 block">RESPOSTA GERADA</span>
+              <span class="text-xs font-bold text-white">R$ 8,71 <span class="text-zinc-500 font-normal">/ 1 mi tokens</span></span>
+            </div>
+            <div class="sb-card p-3.5">
+              <span class="text-[9px] uppercase text-zinc-500 block">ÁUDIO GERADO</span>
+              <span class="text-xs font-bold text-white">R$ 87,08 <span class="text-zinc-500 font-normal">/ 1 mi tokens de áudio</span></span>
+            </div>
+          </div>
+
+          <!-- Vantagem do Clone: Chave API Própria -->
+          <div class="sb-card p-6 space-y-4 border-purple-500/30">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="text-sm font-bold text-white">Conexão Direta de IA (Sem Taxa de Intermediário)</h3>
+                <p class="text-[11px] text-zinc-400">Como este SaaS é seu, você pode colar sua própria API Key (OpenAI ou Groq) e usar IA ilimitada direto da fonte.</p>
+              </div>
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">MODO PROPRIETÁRIO</span>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+              <div>
+                <label class="text-xs text-zinc-400 block mb-1">Provedor</label>
+                <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input">
+                  <option value="openai">OpenAI (GPT-4o-mini)</option>
+                  <option value="groq">Groq (Llama 3.3 70B - Grátis/Rápido)</option>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label class="text-xs text-zinc-400 block mb-1">Sua Chave de API (Opcional)</label>
+                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-..." class="sb-input">
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
-    </section>
+    </main>
 
-  </main>
-
-  <!-- 3. SIMULADOR LATERAL DE CONVERSA (SANDBOX SHARKBOT) -->
-  <aside class="w-96 bg-[#0a0c10] flex flex-col justify-between shrink-0">
-    <div class="p-4 border-b border-[#1a1f2c] flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-        <h3 class="text-sm font-bold text-white">Prévia de atendimento</h3>
-      </div>
-      <button onclick="clearChat()" class="text-xs text-slate-500 hover:text-slate-300"><i class="fa-solid fa-rotate-right mr-1"></i> Reset</button>
-    </div>
-
-    <!-- Mensagens do Chat -->
-    <div id="chat-messages" class="flex-1 p-4 space-y-3 overflow-y-auto text-sm">
-      <div class="text-center my-2">
-        <span class="text-[10px] text-slate-500 uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded">Simulação em tempo real</span>
-      </div>
-
-      <!-- Mensagem da IA -->
-      <div class="flex items-start gap-2.5">
-        <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
-        <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
-          oii 💜 chegou agora por aqui?
+    <!-- 3. COLUNA DIREITA: PRÉVIA DO ATENDIMENTO SEMPRE VISÍVEL -->
+    <aside class="w-[330px] bg-[#060609] p-5 flex flex-col shrink-0">
+      <div class="flex justify-between items-start mb-3">
+        <div>
+          <h3 class="text-xs font-bold text-white">Prévia do atendimento</h3>
+          <p class="text-[10px] text-zinc-500">Rascunho local</p>
         </div>
+        <i class="fa-solid fa-circle-info text-zinc-600 text-xs"></i>
       </div>
-    </div>
 
-    <!-- Input do Visitante no Simulador -->
-    <div class="p-3 border-t border-[#1a1f2c] bg-[#0d0f14]">
-      <form onsubmit="sendMessage(event)" class="flex gap-2">
-        <input type="text" id="sim-input" placeholder="Escreva como se fosse um visitante..." class="flex-1 bg-[#1a1f2c] border border-slate-700/60 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500">
-        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition">
-          <i class="fa-solid fa-paper-plane text-xs"></i>
-        </button>
-      </form>
-    </div>
-  </aside>
+      <!-- Moldura de Celular / Chat do Sharkbot -->
+      <div class="sb-card p-4 flex-1 max-h-[540px] flex flex-col justify-between bg-[#0a0a0f]">
+        <div>
+          <!-- Topo do Chat na Prévia -->
+          <div class="flex items-center gap-2.5 pb-3 border-b border-[#191924]">
+            <div class="w-8 h-8 rounded-full bg-purple-600/25 border border-purple-500/40 flex items-center justify-center text-purple-300 text-xs">
+              <i class="fa-solid fa-rocket text-[11px]"></i>
+            </div>
+            <div>
+              <p id="preview-persona-name" class="text-xs font-bold text-white leading-tight">Atendimento</p>
+              <p class="text-[10px] text-zinc-400 flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[8px] text-purple-400"></i> Assistente (fluxo)</p>
+            </div>
+          </div>
 
-  <!-- Script de Navegação e Simulação -->
+          <!-- Mensagens da Prévia -->
+          <div id="preview-chat-bubbles" class="py-4 space-y-2 overflow-y-auto max-h-[380px]">
+            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+              oii 💜
+            </div>
+            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+              chegou agora por aqui?
+            </div>
+          </div>
+        </div>
+
+        <!-- Input rápido na prévia -->
+        <form onsubmit="sendPreviewQuickMsg(event)" class="pt-2 border-t border-[#191924] flex gap-1.5">
+          <input type="text" id="preview-quick-input" placeholder="Testar resposta rápida..." class="sb-input !py-1.5 !text-xs">
+          <button type="submit" class="px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs shrink-0">
+            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT: ESTADO COMPLETO E SINCRONIZAÇÃO EM TEMPO REAL
+  ========================================================== -->
   <script>
-    function switchTab(tabId) {
-      document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
-      document.querySelectorAll('.sidebar-item').forEach(btn => btn.classList.remove('active'));
-      
-      const target = document.getElementById('tab-' + tabId);
+    let STATE = {
+      flow_name: "bot",
+      persona: {
+        name: "Atendimento",
+        age: 18,
+        gender: "Feminina",
+        gender_desc: "Fala e se apresenta no feminino.",
+        city: "",
+        bio: "Criadora adulta, espontânea e direta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.",
+        traits: "espontânea, atenta, bem-humorada"
+      },
+      business: {
+        context: "Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.",
+        offers: [
+          { id: "offer_1", visible: true, name: "Nova oferta", price: 19, description: "", emoji: "💎", duration: 30, highlight: false }
+        ],
+        bargain: { enabled: false, min_price: 14.90, max_discount_pct: 20 },
+        faqs: [
+          { id: "faq_1", question: "", answer: "" }
+        ]
+      },
+      style: {
+        strategy: "Conexão primeiro",
+        flirt: "Leve",
+        slang: "Natural",
+        cadence: "Natural",
+        mirror_visitor: true,
+        use_lead_name: false,
+        tone: "Acolhedor",
+        length: "Curta",
+        emojis: "Leve",
+        audio_replies: false,
+        opening_messages: ["oii 💜", "chegou agora por aqui?"],
+        objective: "Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.",
+        rules: "Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.\nNão reinicie a conversa nem repita uma pergunta que o visitante já respondeu.\nQuando houver intenção de compra, abra os planos sem criar etapas artificiais.",
+        handoff_words: "suporte, atendente, problema no pagamento"
+      },
+      medias: [
+        {
+          id: "media_1",
+          name: "cena 01 replica",
+          type: "Fotos",
+          url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80",
+          active: true,
+          description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
+          objective: "Criar conexão",
+          signals: "vídeo, confiança, prévia",
+          spoiler: false,
+          expanded: true
+        },
+        {
+          id: "media_2",
+          name: "0919",
+          type: "Vídeos",
+          url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
+          active: true,
+          description: "Vídeo curto de prévia no espelho.",
+          objective: "Aumentar desejo",
+          signals: "vídeo, prévia, corpo",
+          spoiler: false,
+          expanded: false
+        }
+      ],
+      downsell: {
+        enabled: false,
+        steps: [
+          { id: "ds_1", title: "Apresentar planos", delay_label: "1 min", delay_minutes: 1, message: "sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?", accompany: "Botão com os planos atuais" }
+        ]
+      },
+      upsell: {
+        enabled: true,
+        origin: "Usar plano já cadastrado",
+        delay_minutes: 1,
+        offer_id: "offer_1",
+        message: "agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉"
+      },
+      publish: {
+        is_live: false,
+        bot_token: "",
+        pushin_pay_token: "",
+        cache_channel_id: "",
+        delivery_destination: "",
+        support_username: ""
+      },
+      account: {
+        balance: 0.00,
+        ai_provider: "openai",
+        ai_api_key: ""
+      }
+    };
+
+    let TEST_HISTORY = [];
+
+    // Navegação entre as 13 abas
+    function navigateTab(tabKey) {
+      document.querySelectorAll('.tab-section').forEach(el => el.classList.add('hidden'));
+      const target = document.getElementById('sec-' + tabKey);
       if (target) target.classList.remove('hidden');
-      
-      const activeBtn = event ? event.currentTarget : null;
-      if (activeBtn && activeBtn.classList) {
-        activeBtn.classList.add('active');
+
+      document.querySelectorAll('.sb-nav-item').forEach(btn => btn.classList.remove('active'));
+      const navBtn = document.getElementById('nav-' + tabKey);
+      if (navBtn) navBtn.classList.add('active');
+
+      if (tabKey === 'testar' && TEST_HISTORY.length === 0) {
+        resetFullSimulator();
       }
     }
 
-    function applyStrategy(type) {
+    function markUnsaved() {
+      const ind = document.getElementById('unsaved-indicator');
+      ind.textContent = "MODO IA • ALTERAÇÕES NÃO SALVAS";
+      ind.className = "text-[9px] font-bold uppercase tracking-wider text-amber-400";
+      document.getElementById('sidebar-config-status').textContent = "Alterada";
+    }
+
+    function markSaved() {
+      const ind = document.getElementById('unsaved-indicator');
+      ind.textContent = "MODO IA • CONFIGURAÇÃO SALVA";
+      ind.className = "text-[9px] font-bold uppercase tracking-wider text-emerald-400";
+      document.getElementById('sidebar-config-status').textContent = "Salva";
+    }
+
+    // Atualiza Persona e Prévia em Tempo Real
+    function onPersonaChange() {
+      STATE.persona.name = document.getElementById('inp-persona-name').value || 'Atendimento';
+      STATE.persona.age = parseInt(document.getElementById('inp-persona-age').value) || 18;
+      STATE.persona.city = document.getElementById('inp-persona-city').value;
+      STATE.persona.bio = document.getElementById('inp-persona-bio').value;
+      STATE.persona.traits = document.getElementById('inp-persona-traits').value;
+
+      document.getElementById('bio-counter').textContent = `${STATE.persona.bio.length}/500`;
+      document.getElementById('preview-persona-name').textContent = STATE.persona.name;
+      document.getElementById('nav-sub-persona').textContent = STATE.persona.name;
+      markUnsaved();
+    }
+
+    function selectGender(gender, desc) {
+      STATE.persona.gender = gender;
+      STATE.persona.gender_desc = desc;
+      document.querySelectorAll('#gender-cards .sb-radio-card').forEach(card => {
+        const isSel = card.getAttribute('data-val') === gender;
+        card.classList.toggle('selected', isSel);
+      });
+      markUnsaved();
+    }
+
+    function onBusinessChange() {
+      const ctx = document.getElementById('inp-business-context').value;
+      STATE.business.context = ctx;
+      document.getElementById('context-counter').textContent = `${ctx.length}/4.000`;
+      markUnsaved();
+    }
+
+    function toggleBargain() {
+      const enabled = document.getElementById('chk-bargain').checked;
+      STATE.business.bargain.enabled = enabled;
+      document.getElementById('bargain-details').classList.toggle('hidden', !enabled);
+      markUnsaved();
+    }
+
+    // Renderizar Lista de Ofertas (Idêntica às Fotos 4 e 5)
+    function renderOffers() {
+      const container = document.getElementById('offers-container');
+      container.innerHTML = STATE.business.offers.map((o, idx) => `
+        <div class="sb-subcard p-5 space-y-4">
+          <div class="flex justify-between items-center">
+            <label class="inline-flex items-center gap-2.5 cursor-pointer">
+              <label class="toggle-switch">
+                <input type="checkbox" ${o.visible ? 'checked' : ''} onchange="updateOfferField(${idx}, 'visible', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="text-xs font-medium text-zinc-200">Visível</span>
+            </label>
+            <button onclick="removeOfferCard(${idx})" class="text-zinc-500 hover:text-red-400 text-xs">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-12 gap-3">
+            <div class="col-span-9">
+              <input type="text" value="${o.name}" oninput="updateOfferField(${idx}, 'name', this.value)" placeholder="Nome da oferta" class="sb-input">
+            </div>
+            <div class="col-span-3 relative">
+              <span class="absolute left-3 top-2.5 text-xs text-zinc-500">R$</span>
+              <input type="number" step="0.10" value="${o.price}" oninput="updateOfferField(${idx}, 'price', parseFloat(this.value)||0)" class="sb-input !pl-8">
+            </div>
+          </div>
+
+          <div>
+            <textarea rows="2" oninput="updateOfferField(${idx}, 'description', this.value)" placeholder="O que está incluso e como funciona..." class="sb-input">${o.description || ''}</textarea>
+          </div>
+
+          <div class="grid grid-cols-12 gap-3 items-end">
+            <div class="col-span-2">
+              <label class="text-[11px] text-zinc-400 block mb-1">Emoji</label>
+              <input type="text" value="${o.emoji || '💎'}" oninput="updateOfferField(${idx}, 'emoji', this.value)" class="sb-input text-center">
+            </div>
+            <div class="col-span-7">
+              <label class="text-[11px] text-zinc-400 block">Duração de acesso</label>
+              <span class="text-[10px] text-zinc-500 block mb-1">Use 99999 para acesso vitalício</span>
+              <div class="relative">
+                <input type="number" value="${o.duration || 30}" oninput="updateOfferField(${idx}, 'duration', parseInt(this.value)||30)" class="sb-input !pr-12">
+                <span class="absolute right-3 top-2.5 text-[11px] text-zinc-500">dias</span>
+              </div>
+            </div>
+            <div class="col-span-3">
+              <div class="sb-input flex items-center justify-between !py-2">
+                <span class="text-xs text-zinc-300"><i class="fa-regular fa-star text-[10px] mr-1"></i> Destaque</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" ${o.highlight ? 'checked' : ''} onchange="updateOfferField(${idx}, 'highlight', this.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      const activeCount = STATE.business.offers.filter(x => x.visible).length;
+      document.getElementById('nav-sub-ofertas').textContent = `${activeCount} oferta${activeCount === 1 ? '' : 's'} ativa${activeCount === 1 ? '' : 's'}`;
+    }
+
+    function updateOfferField(idx, field, val) {
+      STATE.business.offers[idx][field] = val;
+      if (field === 'visible') renderOffers();
+      markUnsaved();
+    }
+
+    function addOfferCard() {
+      STATE.business.offers.push({
+        id: 'offer_' + Date.now(),
+        visible: true,
+        name: 'Nova oferta',
+        price: 29.90,
+        description: '',
+        emoji: '🔥',
+        duration: 30,
+        highlight: false
+      });
+      renderOffers();
+      markUnsaved();
+    }
+
+    function removeOfferCard(idx) {
+      if (STATE.business.offers.length <= 1) return;
+      STATE.business.offers.splice(idx, 1);
+      renderOffers();
+      markUnsaved();
+    }
+
+    // Renderizar Dúvidas Frequentes (FAQ)
+    function renderFaqs() {
+      const container = document.getElementById('faqs-container');
+      container.innerHTML = STATE.business.faqs.map((f, idx) => `
+        <div class="sb-subcard p-4 space-y-2.5">
+          <div class="flex gap-2 items-center">
+            <input type="text" value="${f.question}" oninput="STATE.business.faqs[${idx}].question=this.value; markUnsaved()" placeholder="Ex.: Quanto tempo demora para liberar?" class="sb-input flex-1">
+            <button onclick="removeFaqItem(${idx})" class="text-zinc-500 hover:text-red-400 px-2">
+              <i class="fa-regular fa-trash-can text-xs"></i>
+            </button>
+          </div>
+          <textarea rows="2" oninput="STATE.business.faqs[${idx}].answer=this.value; markUnsaved()" placeholder="Escreva a resposta correta..." class="sb-input">${f.answer}</textarea>
+        </div>
+      `).join('');
+    }
+
+    function addFaqItem() {
+      STATE.business.faqs.push({ id: 'faq_' + Date.now(), question: '', answer: '' });
+      renderFaqs();
+      markUnsaved();
+    }
+
+    function removeFaqItem(idx) {
+      STATE.business.faqs.splice(idx, 1);
+      renderFaqs();
+      markUnsaved();
+    }
+
+    // Seletores de Estilo ("Jeito de conversar")
+    function selectRadioGroup(groupId, stateField, value) {
+      STATE.style[stateField] = value;
+      document.querySelectorAll(`#${groupId} .sb-radio-card`).forEach(card => {
+        card.classList.toggle('selected', card.getAttribute('data-val') === value);
+      });
+      if (stateField === 'tone') {
+        document.getElementById('nav-sub-conversa').textContent = `Tom ${value.toLowerCase()}`;
+      }
+      markUnsaved();
+    }
+
+    function onOpeningChange() {
+      const raw = document.getElementById('inp-opening-msg').value;
+      const lines = raw.split('\n').map(x => x.trim()).filter(Boolean);
+      STATE.style.opening_messages = lines.length ? lines : ['oii 💜'];
+      renderRightPreviewBubbles();
+      markUnsaved();
+    }
+
+    function addOpeningVariation() {
+      const c = document.getElementById('variations-container');
+      const div = document.createElement('div');
+      div.className = 'flex gap-2 items-start';
+      div.innerHTML = `<textarea rows="2" placeholder="Nova variação de abertura..." class="sb-input"></textarea>`;
+      c.appendChild(div);
+      markUnsaved();
+    }
+
+    function renderRightPreviewBubbles() {
+      const box = document.getElementById('preview-chat-bubbles');
+      box.innerHTML = STATE.style.opening_messages.map(msg => `
+        <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+          ${msg}
+        </div>
+      `).join('');
+    }
+
+    // Renderizar Mídias da conversa
+    function renderMedias() {
+      const grid = document.getElementById('medias-grid');
+      document.getElementById('media-count-badge').textContent = `${STATE.medias.length}/20 arquivos`;
+      document.getElementById('nav-sub-midias').textContent = STATE.medias.length ? `${STATE.medias.length} arquivo(s)` : 'Adicionar conteúdo';
+
+      grid.innerHTML = STATE.medias.map((m, idx) => `
+        <div class="sb-card overflow-hidden">
+          <div class="h-64 bg-zinc-900 relative overflow-hidden">
+            <img src="${m.url}" alt="${m.name}" class="w-full h-full object-cover ${m.spoiler ? 'blur-md' : ''}">
+            <span class="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 rounded bg-black/70 text-zinc-200">${m.type}</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-xs font-bold text-white">${m.name}</p>
+                <p class="text-[10px] text-zinc-500">Descreva exatamente o que esta mídia mostra antes de ativá-la.</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" ${m.active ? 'checked' : ''} onchange="STATE.medias[${idx}].active=this.checked; markUnsaved()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="space-y-3 pt-2 border-t border-[#1c1c26]">
+              <div>
+                <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Nome interno</label>
+                <input type="text" value="${m.name}" oninput="STATE.medias[${idx}].name=this.value; markUnsaved()" class="sb-input">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-zinc-300 block mb-1">O que esta mídia mostra?</label>
+                <textarea rows="2" oninput="STATE.medias[${idx}].description=this.value; markUnsaved()" class="sb-input">${m.description}</textarea>
+              </div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Objetivo principal</label>
+                  <select onchange="STATE.medias[${idx}].objective=this.value; markUnsaved()" class="sb-input">
+                    <option ${m.objective==='Criar conexão'?'selected':''}>Criar conexão</option>
+                    <option ${m.objective==='Gerar confiança'?'selected':''}>Gerar confiança</option>
+                    <option ${m.objective==='Aumentar desejo'?'selected':''}>Aumentar desejo</option>
+                    <option ${m.objective==='Responder objeção'?'selected':''}>Responder objeção</option>
+                    <option ${m.objective==='Apoiar uma oferta'?'selected':''}>Apoiar uma oferta</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Sinais da conversa</label>
+                  <input type="text" value="${m.signals}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input">
+                </div>
+              </div>
+              <div class="sb-subcard p-2.5 flex items-center justify-between">
+                <div>
+                  <span class="text-xs font-medium text-white block">Modo de spoiler</span>
+                  <span class="text-[10px] text-zinc-500">O Telegram exige um toque para revelar</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" ${m.spoiler ? 'checked' : ''} onchange="STATE.medias[${idx}].spoiler=this.checked; renderMedias(); markUnsaved()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <button onclick="STATE.medias.splice(${idx},1); renderMedias(); markUnsaved()" class="text-[11px] text-red-400 hover:underline flex items-center gap-1">
+                <i class="fa-regular fa-trash-can"></i> Remover da biblioteca
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addNewMediaCard() {
+      const url = prompt("Cole a URL da foto/vídeo de prévia (ou deixe em branco para usar modelo de exemplo):", "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80");
+      if (url === null) return;
+      STATE.medias.push({
+        id: 'media_' + Date.now(),
+        name: 'nova midia ' + (STATE.medias.length + 1),
+        type: 'Fotos',
+        url: url || "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80",
+        active: true,
+        description: "Prévia exclusiva enviada durante a conversa.",
+        objective: "Aumentar desejo",
+        signals: "foto, prévia, amostra",
+        spoiler: true,
+        expanded: true
+      });
+      renderMedias();
+      markUnsaved();
+    }
+
+    // Renderizar Downsell
+    function renderDownsell() {
+      const list = document.getElementById('downsell-steps-list');
+      document.getElementById('downsell-step-counter').textContent = `${STATE.downsell.steps.length}/6`;
+      list.innerHTML = STATE.downsell.steps.map((s, idx) => `
+        <div class="sb-card p-3.5 border-blue-500/50 bg-blue-500/5 cursor-pointer flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">${idx + 1}</span>
+          <div>
+            <p class="text-xs font-bold text-white">${s.title}</p>
+            <p class="text-[10px] text-zinc-400">Espera ${s.delay_label} • 0 mídia(s)</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addDownsellStep() {
+      if (STATE.downsell.steps.length >= 6) return alert("Máximo de 6 etapas atingido.");
+      STATE.downsell.steps.push({
+        id: 'ds_' + Date.now(),
+        title: 'Retomada ' + (STATE.downsell.steps.length + 1),
+        delay_label: '15 min',
+        delay_minutes: 15,
+        message: 'ainda tá por aí? deixei seu acesso separado 💜',
+        accompany: 'Botão com os planos atuais'
+      });
+      renderDownsell();
+      markUnsaved();
+    }
+
+    function setDownsellDelay(label, mins) {
+      if (STATE.downsell.steps[0]) {
+        STATE.downsell.steps[0].delay_label = label;
+        STATE.downsell.steps[0].delay_minutes = mins;
+      }
+      document.getElementById('sel-ds-interval').value = String(mins);
+      renderDownsell();
+      markUnsaved();
+    }
+
+    // Aplicar Estratégia Pronta (Tela 2)
+    function applyPresetStrategy(type) {
       if (type === 'conexao') {
-        document.querySelector('input[name="sales_strategy"][value="conexao"]').checked = true;
-        document.getElementById('offer-level').value = 'leve';
-        document.getElementById('voice-tone').value = 'Provocante';
-        document.getElementById('response-length').value = 'curto';
-        document.getElementById('welcome-msg').value = 'oii 💜 chegou agora por aqui?';
-        alert('Estratégia "Conexão que Converte" aplicada com sucesso!');
+        STATE.persona.bio = "Criadora adulta, espontânea e carinhosa. Conversa como em um chat privado, lembra preferências e apresenta o VIP naturalmente.";
+        STATE.persona.traits = "espontânea, atenta, bem-humorada";
+        STATE.style.strategy = "Conexão primeiro";
+        STATE.style.tone = "Acolhedor";
+        STATE.business.offers = [
+          { id: "o1", visible: true, name: "Acesso Mensal VIP", price: 24.90, description: "Fotos e vídeos exclusivos sem censura por 30 dias.", emoji: "💎", duration: 30, highlight: true },
+          { id: "o2", visible: true, name: "Acesso Vitalício VIP", price: 59.90, description: "Acesso permanente + chamadas gravadas.", emoji: "👑", duration: 99999, highlight: false }
+        ];
       } else if (type === 'rapida') {
-        document.querySelector('input[name="sales_strategy"][value="direto"]').checked = true;
-        document.getElementById('offer-level').value = 'direta';
-        document.getElementById('cadence-level').value = 'agil';
-        document.getElementById('welcome-msg').value = 'oii tudo bem? quer ver os planos do canal VIP agora ou tem alguma dúvida?';
-        alert('Estratégia "Venda Rápida" aplicada com sucesso!');
+        STATE.persona.bio = "Criadora adulta direta e provocante. Vai direto ao ponto para quem já quer liberar o acesso VIP na hora.";
+        STATE.persona.traits = "direta, provocante, ágil";
+        STATE.style.strategy = "Direto";
+        STATE.style.tone = "Direto";
+        STATE.business.offers = [
+          { id: "o1", visible: true, name: "VIP Imediato 30 Dias", price: 19.90, description: "Liberação automática na hora após o PIX.", emoji: "⚡", duration: 30, highlight: true }
+        ];
       } else if (type === 'premium') {
-        document.querySelector('input[name="sales_strategy"][value="equilibrado"]').checked = true;
-        document.getElementById('offer-level').value = 'moderada';
-        document.getElementById('voice-tone').value = 'Premium';
-        document.getElementById('welcome-msg').value = 'olá, seja bem-vindo ao meu espaço exclusivo. como posso te surpreender hoje?';
-        alert('Estratégia "Experiência Premium" aplicada com sucesso!');
+        STATE.persona.bio = "Criadora exclusiva de alto padrão. Conversa envolvente e reservada para assinantes selecionados.";
+        STATE.persona.traits = "elegante, misteriosa, exclusiva";
+        STATE.style.strategy = "Equilibrado";
+        STATE.style.tone = "Provocante";
+        STATE.business.offers = [
+          { id: "o1", visible: true, name: "Passaporte Exclusive VIP", price: 79.90, description: "Experiência completa sem censura + bônus privados.", emoji: "👑", duration: 90, highlight: true }
+        ];
       }
+      syncStateToInputs();
+      markUnsaved();
+      navigateTab('persona');
     }
 
-    async function sendMessage(e) {
+    // Simulador Completo (Tela 9 e Coluna Direita)
+    function resetFullSimulator() {
+      TEST_HISTORY = [];
+      const box = document.getElementById('full-sim-messages');
+      box.innerHTML = `
+        <div class="text-center my-2">
+          <span class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">✦ SIMULAÇÃO DO ATENDIMENTO</span>
+        </div>
+        ${STATE.style.opening_messages.map(m => `
+          <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3.5 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[80%]">${m}</div>
+        `).join('')}
+      `;
+    }
+
+    async function sendTestMessage(e) {
       e.preventDefault();
-      const input = document.getElementById('sim-input');
+      const input = document.getElementById('full-sim-input');
       const text = input.value.trim();
       if (!text) return;
 
-      const chat = document.getElementById('chat-messages');
-
-      // Adiciona mensagem do usuário na tela
-      chat.innerHTML += `
-        <div class="flex items-start justify-end gap-2.5">
-          <div class="bg-purple-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[85%] text-xs leading-relaxed shadow">
-            ${text}
-          </div>
+      const box = document.getElementById('full-sim-messages');
+      box.innerHTML += `
+        <div class="flex justify-end">
+          <div class="bg-[#7c3aed] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]">${text}</div>
         </div>
       `;
       input.value = '';
-      chat.scrollTop = chat.scrollHeight;
+      box.scrollTop = box.scrollHeight;
 
-      // Chama a API real do backend
+      TEST_HISTORY.push({ role: "user", content: text });
+
       try {
-        const response = await fetch("/api/simulate-chat", {
+        const res = await fetch("/api/simulate-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({ message: text, history: TEST_HISTORY, state: STATE })
         });
-        const data = await response.json();
-        
-        chat.innerHTML += `
-          <div class="flex items-start gap-2.5">
-            <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
-            <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
-              ${data.reply}
-            </div>
-          </div>
-        `;
-      } catch (err) {
-        // Fallback local se a API não estiver rodando no momento
-        setTimeout(() => {
-          let reply = "rsrs que bom que você veio... tava esperando alguém legal pra conversar! Quer ver o que tem no meu canal privado? 😈";
-          if (text.toLowerCase().includes('preço') || text.toLowerCase().includes('quanto') || text.toLowerCase().includes('valor')) {
-            reply = "Meu acesso mensal tá só R$ 29,90 hoje! Tem foto e vídeo todo dia sem censura. Se quiser, já te mando a chave Pix agora pra liberar de imediato! 💜";
-          }
-          chat.innerHTML += `
-            <div class="flex items-start gap-2.5">
-              <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
-              <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
-                ${reply}
-              </div>
+        const data = await res.json();
+        TEST_HISTORY.push({ role: "assistant", content: data.reply });
+
+        let extraHtml = '';
+        if (data.media) {
+          extraHtml += `
+            <div class="mt-2 rounded-xl overflow-hidden border border-purple-500/30 max-w-[220px]">
+              <img src="${data.media.url}" class="w-full h-36 object-cover">
+              <div class="p-2 bg-[#12121a] text-[10px] text-purple-300">📸 Mídia enviada: ${data.media.name}</div>
             </div>
           `;
-          chat.scrollTop = chat.scrollHeight;
-        }, 600);
+        }
+        if (data.offer_card) {
+          extraHtml += `
+            <div class="mt-2">
+              <button onclick="triggerPixCheckout('${data.offer_card.name}', ${data.offer_card.price})" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2">
+                <span>${data.offer_card.emoji || '💎'} Liberar ${data.offer_card.name} — R$ ${Number(data.offer_card.price).toFixed(2)}</span>
+              </button>
+            </div>
+          `;
+        }
+
+        box.innerHTML += `
+          <div class="space-y-1">
+            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3.5 py-2.5 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[80%] whitespace-pre-line">${data.reply}</div>
+            ${extraHtml}
+          </div>
+        `;
+        box.scrollTop = box.scrollHeight;
+      } catch (err) {
+        console.error(err);
       }
-      chat.scrollTop = chat.scrollHeight;
     }
 
-    function clearChat() {
-      const chat = document.getElementById('chat-messages');
-      chat.innerHTML = `
-        <div class="text-center my-2">
-          <span class="text-[10px] text-slate-500 uppercase tracking-widest bg-slate-900/80 px-2 py-0.5 rounded">Simulação em tempo real</span>
-        </div>
-        <div class="flex items-start gap-2.5">
-          <div class="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs text-white shrink-0 font-bold">M</div>
-          <div class="bg-[#1a1f2c] text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] text-xs leading-relaxed shadow">
-            oii 💜 chegou agora por aqui?
-          </div>
+    async function sendPreviewQuickMsg(e) {
+      e.preventDefault();
+      const inp = document.getElementById('preview-quick-input');
+      const text = inp.value.trim();
+      if (!text) return;
+
+      const box = document.getElementById('preview-chat-bubbles');
+      box.innerHTML += `
+        <div class="flex justify-end">
+          <div class="bg-[#7c3aed] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${text}</div>
         </div>
       `;
-    }
-
-    async function saveAll() {
-      const payload = {
-        persona_name: document.getElementById('persona-name').value,
-        persona_age: parseInt(document.getElementById('persona-age').value) || 22,
-        persona_gender: document.getElementById('persona-gender').value,
-        persona_city: document.getElementById('persona-city').value,
-        persona_bio: document.getElementById('persona-bio').value,
-        persona_traits: document.getElementById('persona-traits').value,
-        sales_strategy: document.querySelector('input[name="sales_strategy"]:checked')?.value || 'equilibrado',
-        offer_level: document.getElementById('offer-level').value,
-        voice_tone: document.getElementById('voice-tone').value,
-        response_length: document.getElementById('response-length').value,
-        welcome_message: document.getElementById('welcome-msg').value,
-        custom_rules: document.getElementById('custom-rules').value,
-        pushin_pay_token: document.getElementById('pushin-token')?.value || '',
-        telegram_bot_token: document.getElementById('telegram-token')?.value || '',
-        vip_channel_id: document.getElementById('vip-channel')?.value || '',
-        support_username: document.getElementById('support-user')?.value || ''
-      };
+      inp.value = '';
+      box.scrollTop = box.scrollHeight;
 
       try {
-        await fetch("/api/config", {
+        const res = await fetch("/api/simulate-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ message: text, history: TEST_HISTORY, state: STATE })
         });
-        alert("Configurações salvas no servidor com sucesso!");
+        const data = await res.json();
+        box.innerHTML += `
+          <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] whitespace-pre-line">${data.reply}</div>
+        `;
+        box.scrollTop = box.scrollHeight;
+      } catch (err) {}
+    }
+
+    async function triggerPixCheckout(offerName, amount) {
+      const box = document.getElementById('full-sim-messages');
+      const res = await fetch("/api/create-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offer_name: offerName, amount: amount })
+      });
+      const data = await res.json();
+      box.innerHTML += `
+        <div class="sb-subcard p-3.5 max-w-[85%] border-emerald-500/40 space-y-2">
+          <span class="text-[10px] font-bold uppercase text-emerald-400 block">PIX COPIA E COLA GERADO (${data.real ? 'PUSHIN PAY REAL' : 'MODO TESTE'})</span>
+          <input type="text" readonly value="${data.qr_code}" class="sb-input !text-[10px] font-mono">
+          <p class="text-[10px] text-zinc-400">Assim que o pagamento é confirmado no webhook, o bot entrega o link único do VIP e agenda o Upsell!</p>
+        </div>
+      `;
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function onPublishChange() {
+      STATE.publish.is_live = document.getElementById('chk-bot-live').checked;
+      STATE.publish.bot_token = document.getElementById('inp-bot-token').value;
+      STATE.publish.pushin_pay_token = document.getElementById('inp-pushin-token').value;
+      STATE.publish.cache_channel_id = document.getElementById('inp-cache-channel').value;
+      STATE.publish.delivery_destination = document.getElementById('inp-delivery-dest').value;
+      STATE.publish.support_username = document.getElementById('inp-support-user').value;
+
+      let completed = 3;
+      if (STATE.publish.bot_token) {
+        completed++;
+        document.getElementById(' sidebar-bot-status');
+        document.getElementById('sidebar-bot-status').textContent = "Vinculada";
+        document.getElementById('chk-pub-bot').className = "text-emerald-400";
+      }
+      if (STATE.publish.delivery_destination) {
+        completed++;
+        document.getElementById('chk-pub-delivery').className = "text-emerald-400";
+      }
+      const pct = (completed / 5) * 100;
+      document.getElementById('sidebar-prep-count').textContent = `${completed}/5`;
+      document.getElementById('sidebar-prep-bar').style.width = `${pct}%`;
+      document.getElementById('hero-prep-label').textContent = `${completed} de 5 concluídos`;
+      document.getElementById('hero-prep-bar').style.width = `${pct}%`;
+      document.getElementById('nav-sub-resumo').textContent = `${completed} de 5 itens essenciais`;
+      markUnsaved();
+    }
+
+    function syncStateToInputs() {
+      document.getElementById('inp-persona-name').value = STATE.persona.name || 'Atendimento';
+      document.getElementById('inp-persona-age').value = STATE.persona.age || 18;
+      document.getElementById('inp-persona-city').value = STATE.persona.city || '';
+      document.getElementById('inp-persona-bio').value = STATE.persona.bio || '';
+      document.getElementById('inp-persona-traits').value = STATE.persona.traits || '';
+      document.getElementById('inp-business-context').value = STATE.business.context || '';
+      document.getElementById('chk-bargain').checked = !!STATE.business.bargain?.enabled;
+      toggleBargain();
+
+      document.getElementById('inp-opening-msg').value = (STATE.style.opening_messages || ['oii 💜', 'chegou agora por aqui?']).join('\n');
+      document.getElementById('inp-style-objective').value = STATE.style.objective || '';
+      document.getElementById('inp-style-rules').value = STATE.style.rules || '';
+      document.getElementById('inp-style-handoff').value = STATE.style.handoff_words || '';
+
+      document.getElementById('chk-bot-live').checked = !!STATE.publish?.is_live;
+      document.getElementById('inp-bot-token').value = STATE.publish?.bot_token || '';
+      document.getElementById('inp-pushin-token').value = STATE.publish?.pushin_pay_token || '';
+      document.getElementById('inp-cache-channel').value = STATE.publish?.cache_channel_id || '';
+      document.getElementById('inp-delivery-dest').value = STATE.publish?.delivery_destination || '';
+      document.getElementById('inp-support-user').value = STATE.publish?.support_username || '';
+
+      document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'openai';
+      document.getElementById('inp-ai-key').value = STATE.account?.ai_api_key || '';
+
+      onPersonaChange();
+      renderOffers();
+      renderFaqs();
+      renderMedias();
+      renderDownsell();
+      renderRightPreviewBubbles();
+    }
+
+    async function saveFullState() {
+      STATE.account.ai_provider = document.getElementById('sel-ai-provider').value;
+      STATE.account.ai_api_key = document.getElementById('inp-ai-key').value;
+
+      const btn = document.getElementById('btn-save-top');
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> <span>Salvando...</span>`;
+
+      try {
+        await fetch("/api/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(STATE)
+        });
+        markSaved();
       } catch (e) {
-        alert("Configurações salvas localmente no navegador!");
+        markSaved();
+      } finally {
+        btn.innerHTML = `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`;
       }
     }
+
+    async function loadInitialState() {
+      try {
+        const res = await fetch("/api/state");
+        if (res.ok) {
+          const serverState = await res.json();
+          STATE = { ...STATE, ...serverState };
+        }
+      } catch (e) {}
+      syncStateToInputs();
+      markSaved();
+    }
+
+    window.addEventListener('DOMContentLoaded', loadInitialState);
   </script>
 </body>
 </html>

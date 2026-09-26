@@ -1,14 +1,13 @@
-import json
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 class BotConfig(Base):
-    """Configurações centrais do Bot e da Persona"""
+    """Configurações centrais do Bot, Persona e Estado Completo de todas as 13 abas do Sharkbot"""
     __tablename__ = "bot_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -17,42 +16,12 @@ class BotConfig(Base):
     vip_channel_id = Column(String, default="")
     media_cache_channel_id = Column(String, default="")
     support_username = Column(String, default="")
-
-    # API Keys
     pushin_pay_token = Column(String, default="")
     ai_api_key = Column(String, default="")
-    ai_provider = Column(String, default="gemini") # gemini, openai, groq
+    ai_provider = Column(String, default="gemini")
 
-    # Persona & Identidade
-    persona_name = Column(String, default="Atendimento VIP")
-    persona_age = Column(Integer, default=21)
-    persona_gender = Column(String, default="Feminino") # Feminino, Masculino, Neutro
-    persona_city = Column(String, default="São Paulo")
-    persona_bio = Column(Text, default="Criadora de conteúdo adulto exclusiva. Conversa envolvente no chat privado.")
-    persona_traits = Column(String, default="atenciosa, sensual, provocante, bem-humorada")
-
-    # Jeito de Conversar
-    sales_strategy = Column(String, default="equilibrado") # conexao, equilibrado, direto
-    offer_level = Column(String, default="moderada") # nenhum, leve, moderada, direta
-    slang_level = Column(String, default="moderada") # nenhuma, moderada, marcante
-    cadence = Column(String, default="gradual") # agil, gradual, calma
-    use_lead_name = Column(Boolean, default=True)
-    voice_tone = Column(String, default="Provocante") # Acolhedor, Direto, Descontraido, Provocante
-    response_length = Column(String, default="curto") # curto, medio, detalhado
-    emoji_frequency = Column(String, default="leve") # nenhum, leve, moderado
-    enable_audio_answers = Column(Boolean, default=False)
-
-    # Hard rules e abertura
-    welcome_message = Column(Text, default="oii 💜 chegou agora por aqui?")
-    welcome_variations = Column(Text, default="oii tudo bem? viu meu canal hoje?|oii meu bem, quer conversar um pouquinho?")
-    sales_objective = Column(Text, default="Entender o interesse, despertar desejo e fechar o acesso ao meu VIP privado.")
-    custom_rules = Column(Text, default="Nunca repita pergunta já respondida. Quando o cliente demonstrar intenção clara de compra, envie a chave Pix imediatamente sem rodeios.")
-    handoff_keywords = Column(String, default="suporte, atendente, problema no pagamento, falar com humano")
-
-    # Negociação
-    allow_bargain = Column(Boolean, default=True)
-    min_bargain_price = Column(Float, default=14.90)
-
+    # JSON completo que armazena fielmente todas as 13 abas (Persona, Ofertas, FAQs, Mídias, Downsell, Upsell, Regras)
+    full_state_json = Column(Text, default="{}")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Offer(Base):
@@ -60,11 +29,11 @@ class Offer(Base):
     __tablename__ = "offers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False) # Ex: Mensal VIP
-    price = Column(Float, nullable=False) # Ex: 29.90
+    name = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
     description = Column(Text, default="")
     emoji = Column(String, default="💎")
-    duration_days = Column(Integer, default=30) # 9999 para vitalício
+    duration_days = Column(Integer, default=30)
     is_highlight = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
 
@@ -74,12 +43,12 @@ class MediaAsset(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     internal_name = Column(String, default="")
-    media_type = Column(String, default="photo") # photo, video, audio
+    media_type = Column(String, default="photo")
     file_path = Column(String, default="")
-    telegram_file_id = Column(String, default="") # Cache instantâneo
-    description = Column(Text, default="") # O que a mídia mostra
-    objective = Column(String, default="aumentar_desejo") # criar_conexao, gerar_confianca, aumentar_desejo, responder_objecao, apoiar_oferta
-    trigger_signals = Column(String, default="amostra, previa, foto, video, corpo")
+    telegram_file_id = Column(String, default="")
+    description = Column(Text, default="")
+    objective = Column(String, default="Criar conexão")
+    trigger_signals = Column(String, default="vídeo, confiança, prévia")
     is_spoiler = Column(Boolean, default=False)
     send_once = Column(Boolean, default=True)
     is_active = Column(Boolean, default=True)
@@ -90,8 +59,9 @@ class DownsellStep(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     step_order = Column(Integer, default=1)
-    delay_minutes = Column(Integer, default=5) # 1, 5, 15, 60, 1440
-    message = Column(Text, default="sumiu por que? 🥺 quer que eu te mostre as opções de acesso?")
+    delay_minutes = Column(Integer, default=1)
+    message = Column(Text, default="sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?")
+    accompany_type = Column(String, default="Botão com os planos atuais")
     offer_id = Column(Integer, ForeignKey("offers.id"), nullable=True)
     is_active = Column(Boolean, default=True)
 
@@ -100,9 +70,9 @@ class UpsellConfig(Base):
     __tablename__ = "upsell_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    is_active = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
     delay_minutes = Column(Integer, default=1)
-    message = Column(Text, default="agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😈")
+    message = Column(Text, default="agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉")
     offer_id = Column(Integer, ForeignKey("offers.id"), nullable=True)
 
 class Lead(Base):
@@ -113,10 +83,12 @@ class Lead(Base):
     telegram_id = Column(String, unique=True, index=True)
     first_name = Column(String, default="")
     username = Column(String, default="")
-    funnel_stage = Column(String, default="em_conversa") # em_conversa, pix_gerado, pago, abandonou
+    funnel_stage = Column(String, default="em_conversa")
     last_interaction = Column(DateTime, default=datetime.utcnow)
-    notes = Column(Text, default="")
-    media_sent_ids = Column(Text, default="[]") # JSON com IDs das mídias já enviadas
+    preferences = Column(Text, default="")
+    objections = Column(Text, default="")
+    history_json = Column(Text, default="[]")
+    media_sent_ids = Column(Text, default="[]")
 
 class Order(Base):
     """Registro de Pedidos e Pagamentos Pix"""
@@ -125,9 +97,9 @@ class Order(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     lead_id = Column(Integer, ForeignKey("leads.id"))
     offer_id = Column(Integer, ForeignKey("offers.id"))
-    transaction_id = Column(String, unique=True, index=True) # ID da Pushin Pay
+    transaction_id = Column(String, unique=True, index=True)
     amount = Column(Float, nullable=False)
-    status = Column(String, default="pending") # pending, paid, expired
+    status = Column(String, default="pending")
     pix_copy_paste = Column(Text, default="")
     qr_code_base64 = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
