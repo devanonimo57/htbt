@@ -693,7 +693,7 @@
 
       // Chama a API real do backend
       try {
-        const response = await fetch("http://localhost:8000/api/simulate-chat", {
+        const response = await fetch("/api/simulate-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text })
@@ -765,7 +765,7 @@
       };
 
       try {
-        await fetch("http://localhost:8000/api/config", {
+        await fetch("/api/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)

@@ -36,6 +36,11 @@ frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fronte
 if os.path.exists(frontend_path):
     app.mount("/dashboard", StaticFiles(directory=frontend_path, html=True), name="dashboard")
 
+@app.get("/")
+def redirect_to_dashboard():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard/")
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
