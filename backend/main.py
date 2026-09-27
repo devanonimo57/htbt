@@ -15,6 +15,7 @@ from sqlalchemy import select
 from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply
+from telegram_service import bot_manager
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./hotbot.db")
 
@@ -31,7 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Estado padrão 100% fiel às capturas de tela do Sharkbot
 DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "flow_name": "bot",
     "persona": {
@@ -173,40 +173,19 @@ if os.path.exists(frontend_path):
 def redirect_to_dashboard():
     return RedirectResponse(url="/dashboard/")
 
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async with async_session() as session:
-        result = await session.execute(select(BotConfig))
-        config = result.scalars().first()
-        if not config:
-            config = BotConfig(
-                full_state_json=json.dumps(DEFAULT_SHARKBOT_STATE, ensure_ascii=False)
-            )
-            session.add(config)
-            await session.commit()
-
-@app.on_event("startup")
-async def on_startup():
-    await init_db()
-
-@app.get("/api/state")
-async def get_full_state():
+async def _read_state_from_db() -> Dict[str, Any]:
     async with async_session() as session:
         result = await session.execute(select(BotConfig))
         config = result.scalars().first()
         if not config or not config.full_state_json or config.full_state_json == "{}":
-            return DEFAULT_SHARKBOT_STATE
+            return dict(DEFAULT_SHARKBOT_STATE)
         try:
             saved = json.loads(config.full_state_json)
-            merged = {**DEFAULT_SHARKBOT_STATE, **saved}
-            return merged
+            return {**DEFAULT_SHARKBOT_STATE, **saved}
         except Exception:
-            return DEFAULT_SHARKBOT_STATE
+            return dict(DEFAULT_SHARKBOT_STATE)
 
-@app.post("/api/state")
-async def save_full_state(state: Dict[str, Any]):
+async def _write_state_to_db(state: Dict[str, Any]) -> Dict[str, Any]:
     async with async_session() as session:
         result = await session.execute(select(BotConfig))
         config = result.scalars().first()
@@ -223,12 +202,48 @@ async def save_full_state(state: Dict[str, Any]):
         config.support_username = publish.get("support_username", "")
         config.pushin_pay_token = publish.get("pushin_pay_token", "")
         await session.commit()
-        return {"status": "success", "updated_at": datetime.utcnow().isoformat()}
+    return state
 
-# Compatibilidade com rotas legadas
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with async_session() as session:
+        result = await session.execute(select(BotConfig))
+        config = result.scalars().first()
+        if not config:
+            config = BotConfig(
+                full_state_json=json.dumps(DEFAULT_SHARKBOT_STATE, ensure_ascii=False)
+            )
+            session.add(config)
+            await session.commit()
+
+    # Se o bot estiver ativo no banco, já inicia o polling automaticamente
+    await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
+
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
+
+@app.get("/api/state")
+async def get_full_state():
+    return await _read_state_from_db()
+
+@app.post("/api/state")
+async def save_full_state(state: Dict[str, Any]):
+    await _write_state_to_db(state)
+    bot_status = await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
+    updated_state = await _read_state_from_db()
+    return {
+        "status": "success",
+        "bot_status": bot_status,
+        "state": updated_state,
+        "updated_at": datetime.utcnow().isoformat()
+    }
+
 @app.get("/api/config")
 async def get_config_compat():
-    return await get_full_state()
+    return await _read_state_from_db()
 
 @app.post("/api/config")
 async def post_config_compat(data: Dict[str, Any]):
@@ -243,7 +258,7 @@ class SimulateChatRequest(BaseModel):
 async def simulate_chat(req: SimulateChatRequest):
     state = req.state
     if not state:
-        state = await get_full_state()
+        state = await _read_state_from_db()
     result = await generate_ai_reply(state, req.history or [], req.message)
     return result
 
@@ -253,7 +268,7 @@ class CreatePixRequest(BaseModel):
 
 @app.post("/api/create-pix")
 async def create_pix_endpoint(req: CreatePixRequest):
-    state = await get_full_state()
+    state = await _read_state_from_db()
     token = state.get("publish", {}).get("pushin_pay_token", "").strip()
     cents = int(round(req.amount * 100))
 
@@ -280,7 +295,7 @@ async def create_pix_endpoint(req: CreatePixRequest):
 @app.post("/api/webhook/pushinpay")
 async def webhook_pushinpay(payload: Dict[str, Any]):
     transaction_id = str(payload.get("id"))
-    status = payload.get("status")
+    status = str(payload.get("status", "")).lower()
     if status == "paid":
         async with async_session() as session:
             result = await session.execute(select(Order).where(Order.transaction_id == transaction_id))

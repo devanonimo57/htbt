@@ -75,7 +75,6 @@
       background: rgba(37, 99, 235, 0.12);
       border-color: #2563eb;
     }
-    /* Switch Toggle */
     .toggle-switch {
       position: relative;
       display: inline-block;
@@ -96,6 +95,9 @@
   </style>
 </head>
 <body class="h-screen flex flex-col select-none">
+
+  <!-- Input oculto para upload real de arquivos de mídia -->
+  <input type="file" id="hidden-media-upload" class="hidden" accept="image/*,video/*,audio/*" onchange="handleRealFileUpload(event)">
 
   <!-- TOP HEADER BAR FIEL AO SHARKBOT -->
   <header class="h-14 bg-[#08080b] border-b border-[#191922] px-4 flex items-center justify-between shrink-0 z-20">
@@ -330,11 +332,10 @@
             <p class="text-xs text-zinc-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
           </div>
 
-          <!-- Hero Card Roxo -->
           <div class="rounded-2xl p-6 border border-purple-500/25 bg-gradient-to-br from-[#191229] via-[#100d19] to-[#0c0c10] relative overflow-hidden">
             <div class="flex justify-between items-start">
               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                <i class="fa-solid fa-sparkles text-[9px]"></i> EM PREPARAÇÃO
+                <i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> EM PREPARAÇÃO
               </span>
               <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300">
                 <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -366,7 +367,6 @@
             </div>
           </div>
 
-          <!-- Card: O essencial para publicar -->
           <div class="sb-card p-5 space-y-3">
             <div>
               <h4 class="text-sm font-bold text-white">O essencial para publicar</h4>
@@ -451,7 +451,6 @@
             </div>
           </div>
 
-          <!-- Card: Aprimore quando quiser -->
           <div class="sb-card p-5 space-y-3">
             <div>
               <h4 class="text-sm font-bold text-white">Aprimore quando quiser</h4>
@@ -516,7 +515,6 @@
             </div>
           </div>
 
-          <!-- Navegação Rodapé -->
           <div class="flex justify-end pt-2">
             <button onclick="navigateTab('estrategias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
               <div>
@@ -549,7 +547,6 @@
           </div>
 
           <div class="grid grid-cols-3 gap-3.5">
-            <!-- Card 1 -->
             <div class="sb-card p-4 flex flex-col justify-between">
               <div class="space-y-3">
                 <div class="flex justify-between items-center">
@@ -577,9 +574,9 @@
                 <div class="flex justify-between items-end">
                   <div>
                     <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
-                    <div class="flex gap-1 mt-1">
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">5 dúvidas</span>
+                    <div class="flex flex-col gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">5 dúvidas respondidas</span>
                     </div>
                   </div>
                   <div class="text-right">
@@ -594,7 +591,6 @@
               </div>
             </div>
 
-            <!-- Card 2 -->
             <div class="sb-card p-4 flex flex-col justify-between">
               <div class="space-y-3">
                 <div class="flex justify-between items-center">
@@ -622,9 +618,9 @@
                 <div class="flex justify-between items-end">
                   <div>
                     <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
-                    <div class="flex gap-1 mt-1">
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">3 dúvidas</span>
+                    <div class="flex flex-col gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">3 dúvidas respondidas</span>
                     </div>
                   </div>
                   <div class="text-right">
@@ -639,7 +635,6 @@
               </div>
             </div>
 
-            <!-- Card 3 -->
             <div class="sb-card p-4 flex flex-col justify-between">
               <div class="space-y-3">
                 <div class="flex justify-between items-center">
@@ -667,9 +662,9 @@
                 <div class="flex justify-between items-end">
                   <div>
                     <span class="text-[9px] uppercase text-zinc-500 block">CONFIGURAÇÃO PRONTA</span>
-                    <div class="flex gap-1 mt-1">
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">2 planos</span>
-                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400">5 dúvidas</span>
+                    <div class="flex flex-col gap-1 mt-1">
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">2 planos</span>
+                      <span class="text-[10px] px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-zinc-400 w-fit">5 dúvidas respondidas</span>
                     </div>
                   </div>
                   <div class="text-right">
@@ -717,8 +712,8 @@
 
           <div class="sb-card p-6 space-y-5">
             <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-zinc-800/90 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0">
-                <i class="fa-regular fa-user text-xs"></i>
+              <div class="w-8 h-8 rounded-lg bg-zinc-800/90 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0 font-bold text-xs">
+                A
               </div>
               <div>
                 <h3 class="text-sm font-bold text-white">Quem conversa com o visitante</h3>
@@ -818,7 +813,6 @@
             <p class="text-xs text-zinc-400 mt-1">Explique o VIP, cadastre preços e responda às dúvidas comuns.</p>
           </div>
 
-          <!-- Contexto da criadora -->
           <div class="sb-card p-6 space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Contexto da criadora e do VIP</h3>
@@ -842,7 +836,6 @@
             </div>
           </div>
 
-          <!-- Lista de Ofertas -->
           <div class="sb-card p-6 space-y-4">
             <div class="flex justify-between items-start">
               <div>
@@ -860,7 +853,6 @@
             <div id="offers-container" class="space-y-4 pt-1"></div>
           </div>
 
-          <!-- Negociação de preço -->
           <div class="sb-card p-6 space-y-3">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
               <i class="fa-solid fa-tags text-emerald-400 text-xs"></i> Negociação de preço
@@ -873,16 +865,15 @@
             <div id="bargain-details" class="hidden pt-3 border-t border-[#1e1e2a] grid grid-cols-2 gap-4">
               <div>
                 <label class="text-xs text-zinc-400 block mb-1">Valor mínimo autorizado (R$)</label>
-                <input type="number" step="0.50" id="inp-bargain-min" value="14.90" oninput="markUnsaved()" class="sb-input">
+                <input type="number" step="0.50" id="inp-bargain-min" value="14.90" oninput="STATE.business.bargain.min_price=parseFloat(this.value)||14.90; markUnsaved()" class="sb-input">
               </div>
               <div>
                 <label class="text-xs text-zinc-400 block mb-1">Desconto máximo (%)</label>
-                <input type="number" id="inp-bargain-pct" value="20" oninput="markUnsaved()" class="sb-input">
+                <input type="number" id="inp-bargain-pct" value="20" oninput="STATE.business.bargain.max_discount_pct=parseInt(this.value)||20; markUnsaved()" class="sb-input">
               </div>
             </div>
           </div>
 
-          <!-- Dúvidas que a IA já sabe responder -->
           <div class="sb-card p-6 space-y-4">
             <div class="flex justify-between items-center">
               <div>
@@ -927,7 +918,6 @@
             <p class="text-xs text-zinc-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
           </div>
 
-          <!-- Humanização da venda -->
           <div class="sb-card p-6 space-y-5">
             <div class="flex items-start gap-3">
               <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
@@ -939,7 +929,6 @@
               </div>
             </div>
 
-            <!-- Estratégia comercial -->
             <div>
               <label class="text-xs font-semibold text-zinc-200 block">Estratégia comercial</label>
               <p class="text-[11px] text-zinc-500 mb-2">Define em que momento a oferta entra na conversa.</p>
@@ -968,7 +957,6 @@
               </div>
             </div>
 
-            <!-- Nível de flerte & Uso de gírias -->
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="text-xs font-semibold text-zinc-200 block mb-2">Nível de flerte</label>
@@ -1002,7 +990,6 @@
               </div>
             </div>
 
-            <!-- Cadência -->
             <div>
               <label class="text-xs font-semibold text-zinc-200 block">Cadência</label>
               <p class="text-[11px] text-zinc-500 mb-2">Controla a sensação de velocidade e pressão da conversa.</p>
@@ -1022,7 +1009,6 @@
               </div>
             </div>
 
-            <!-- Toggles de espelhamento -->
             <div class="space-y-2.5 pt-1">
               <div class="sb-subcard p-3.5 flex items-center justify-between">
                 <div>
@@ -1030,7 +1016,7 @@
                   <p class="text-[11px] text-zinc-500">Acompanha energia, tamanho das mensagens e nível de informalidade.</p>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" id="chk-mirror" checked onchange="markUnsaved()">
+                  <input type="checkbox" id="chk-mirror" checked onchange="STATE.style.mirror_visitor=this.checked; markUnsaved()">
                   <span class="toggle-slider"></span>
                 </label>
               </div>
@@ -1040,14 +1026,13 @@
                   <p class="text-[11px] text-zinc-500">Chama pelo nome quando a pessoa se apresenta, sem repetir demais.</p>
                 </div>
                 <label class="toggle-switch">
-                  <input type="checkbox" id="chk-leadname" onchange="markUnsaved()">
+                  <input type="checkbox" id="chk-leadname" onchange="STATE.style.use_lead_name=this.checked; markUnsaved()">
                   <span class="toggle-slider"></span>
                 </label>
               </div>
             </div>
           </div>
 
-          <!-- Ritmo e personalidade -->
           <div class="sb-card p-6 space-y-5">
             <div>
               <h3 class="text-sm font-bold text-white">Ritmo e personalidade da conversa</h3>
@@ -1084,11 +1069,10 @@
             </div>
           </div>
 
-          <!-- Respostas em áudio -->
           <div class="sb-card p-5 flex items-center justify-between">
             <div class="flex items-start gap-3">
               <div class="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs shrink-0">
-                <i class="fa-solid fa-Volume-high"></i>
+                <i class="fa-solid fa-volume-high"></i>
               </div>
               <div>
                 <div class="flex items-center gap-2">
@@ -1099,12 +1083,11 @@
               </div>
             </div>
             <label class="toggle-switch shrink-0">
-              <input type="checkbox" id="chk-audio-replies" onchange="markUnsaved()">
+              <input type="checkbox" id="chk-audio-replies" onchange="STATE.style.audio_replies=this.checked; markUnsaved()">
               <span class="toggle-slider"></span>
             </label>
           </div>
 
-          <!-- Abertura da conversa -->
           <div class="sb-card p-6 space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Abertura da conversa</h3>
@@ -1122,28 +1105,36 @@ chegou agora por aqui?</textarea>
                   <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input"></textarea>
                 </div>
               </div>
+              <p class="text-[10px] text-zinc-500">Dica: apresente o que a pessoa encontra aqui, retome o assunto sem supor intimidade ou pergunte o que ela quer saber. Use apenas informações reais da sua oferta.</p>
             </div>
 
             <div class="pt-2">
               <label class="text-xs font-semibold text-zinc-200 block mb-1">Objetivo principal</label>
-              <textarea id="inp-style-objective" rows="2" oninput="markUnsaved()" class="sb-input">Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.</textarea>
+              <textarea id="inp-style-objective" rows="2" oninput="STATE.style.objective=this.value; markUnsaved()" class="sb-input">Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.</textarea>
             </div>
           </div>
 
-          <!-- Regras próprias -->
           <div class="sb-card p-6 space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Regras próprias</h3>
               <p class="text-[11px] text-zinc-500">Uma regra por linha. Use no máximo 10.</p>
             </div>
-            <textarea id="inp-style-rules" rows="4" oninput="markUnsaved()" class="sb-input">Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.
+            <textarea id="inp-style-rules" rows="4" oninput="STATE.style.rules=this.value; markUnsaved()" class="sb-input">Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.
 Não reinicie a conversa nem repita uma pergunta que o visitante já respondeu.
 Quando houver intenção de compra, abra os planos sem criar etapas artificiais.</textarea>
 
             <div>
               <label class="text-xs font-semibold text-zinc-200 block">Palavras de encaminhamento</label>
               <p class="text-[11px] text-zinc-500 mb-1.5">Separe por vírgulas. Essas palavras poderão acionar atendimento humano em uma fase futura.</p>
-              <input type="text" id="inp-style-handoff" value="suporte, atendente, problema no pagamento" oninput="markUnsaved()" class="sb-input">
+              <input type="text" id="inp-style-handoff" value="suporte, atendente, problema no pagamento" oninput="STATE.style.handoff_words=this.value; markUnsaved()" class="sb-input">
+            </div>
+          </div>
+
+          <div class="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/25 flex items-center gap-3 text-[11px] text-emerald-200/90">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            <div>
+              <span class="font-bold block text-emerald-300">Persona humanizada com controle</span>
+              <span>A persona conversa em primeira pessoa, acompanha o jeito do visitante e evita respostas robóticas. Pagamentos, links e entregas continuam vindos apenas das ações reais configuradas no sistema.</span>
             </div>
           </div>
 
@@ -1166,7 +1157,7 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
         </section>
 
         <!-- =========================================================
-             TELA 6: MÍDIAS DA CONVERSA
+             TELA 6: MÍDIAS DA CONVERSA (FIEL AOS PRINTS 8 E 9)
         ========================================================== -->
         <section id="sec-midias" class="tab-section hidden space-y-6">
           <div>
@@ -1185,7 +1176,7 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
                 <p class="text-[11px] text-zinc-400 mt-0.5 max-w-lg">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
               </div>
             </div>
-            <button onclick="addNewMediaCard()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-1.5 shrink-0">
+            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-lg shadow-purple-900/30">
               <i class="fa-solid fa-plus text-[10px]"></i> Adicionar mídias
             </button>
           </div>
@@ -1195,19 +1186,17 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
             <span>Configure o canal de cache em <strong>Publicar no bot</strong>. O upload funciona sem ele, mas o primeiro envio no Telegram pode demorar mais.</span>
           </div>
 
-          <!-- Filtros de mídia -->
           <div class="flex items-center justify-between">
-            <div class="flex gap-1.5">
-              <button class="px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium">Todas</button>
-              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Fotos</button>
-              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Vídeos</button>
-              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">GIFs</button>
-              <button class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">Áudios</button>
+            <div class="flex gap-1.5" id="media-filter-pills">
+              <button onclick="setMediaFilter('Todas')" data-filter="Todas" class="px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium">✦ Todas</button>
+              <button onclick="setMediaFilter('Fotos')" data-filter="Fotos" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-regular fa-image mr-1 text-[10px]"></i> Fotos</button>
+              <button onclick="setMediaFilter('Vídeos')" data-filter="Vídeos" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-solid fa-video mr-1 text-[10px]"></i> Vídeos</button>
+              <button onclick="setMediaFilter('GIFs')" data-filter="GIFs" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">GIFs</button>
+              <button onclick="setMediaFilter('Áudios')" data-filter="Áudios" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-solid fa-microphone mr-1 text-[10px]"></i> Áudios</button>
             </div>
             <span id="media-count-badge" class="text-[11px] text-zinc-500">2/20 arquivos</span>
           </div>
 
-          <!-- Grid de Mídias -->
           <div id="medias-grid" class="grid grid-cols-2 gap-4 items-start"></div>
 
           <div class="flex justify-between pt-2">
@@ -1229,7 +1218,7 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
         </section>
 
         <!-- =========================================================
-             TELA 7: DOWNSELL
+             TELA 7: DOWNSELL (FIEL AOS PRINTS 10 E 11)
         ========================================================== -->
         <section id="sec-downsell" class="tab-section hidden space-y-6">
           <div>
@@ -1242,7 +1231,7 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
             <div class="flex justify-between items-center">
               <span class="text-[11px] font-semibold text-blue-400">Downsell • sem resposta</span>
               <label class="toggle-switch">
-                <input type="checkbox" id="chk-downsell-enabled" onchange="markUnsaved()">
+                <input type="checkbox" id="chk-downsell-enabled" onchange="onDownsellToggle()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
@@ -1253,52 +1242,59 @@ Quando houver intenção de compra, abra os planos sem criar etapas artificiais.
             </div>
           </div>
 
+          <div id="downsell-disabled-banner" class="sb-card p-3.5 text-xs text-zinc-400 border-dashed">
+            Downsell desativado. Você pode preparar as etapas abaixo e ativar quando quiser.
+          </div>
+
           <div class="grid grid-cols-12 gap-4 items-start">
-            <!-- Coluna esquerda: Sequência -->
             <div class="col-span-4 space-y-3">
               <div class="flex justify-between items-center text-xs">
                 <span class="font-bold text-white">Sua sequência</span>
                 <span id="downsell-step-counter" class="text-zinc-500">1/6</span>
               </div>
               <div id="downsell-steps-list" class="space-y-2"></div>
+              <p class="text-[10px] text-zinc-500 leading-relaxed">Previsão sem novas interações. Cada espera começa após o envio anterior; etapas pausadas não entram na conta. Até 30 dias no total.</p>
               <button onclick="addDownsellStep()" class="w-full py-2.5 rounded-xl bg-[#111118] hover:bg-[#191924] border border-[#242434] text-xs font-semibold text-zinc-200">+ Adicionar etapa</button>
             </div>
 
-            <!-- Coluna direita: Editor da Etapa -->
             <div class="col-span-8 sb-card p-6 space-y-5">
               <div>
                 <span class="text-[10px] font-bold uppercase text-blue-400" id="ds-editor-badge">Etapa 1</span>
-                <h4 class="text-sm font-bold text-white mt-0.5">Primeiro contato após o silêncio</h4>
+                <h4 class="text-sm font-bold text-white mt-0.5" id="ds-editor-title">Primeiro contato após o silêncio</h4>
               </div>
 
-              <div>
+              <div class="space-y-2">
                 <label class="text-xs font-semibold text-zinc-200 block">Quando enviar</label>
-                <p class="text-[11px] text-zinc-500 mb-2">Tempo de silêncio contado após a última resposta da IA.</p>
-                <div class="flex gap-1.5 mb-2.5" id="ds-delay-pills">
+                <p class="text-[11px] text-zinc-500">Tempo de silêncio contado após a última resposta da IA.</p>
+                <div class="flex gap-1.5" id="ds-delay-pills">
                   <button onclick="setDownsellDelay('1 min', 1)" class="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500 text-xs font-semibold text-blue-300">1 min</button>
                   <button onclick="setDownsellDelay('5 min', 5)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">5 min</button>
                   <button onclick="setDownsellDelay('15 min', 15)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">15 min</button>
                   <button onclick="setDownsellDelay('1h', 60)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1h</button>
                   <button onclick="setDownsellDelay('1 dia', 1440)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1 dia</button>
                 </div>
-                <select id="sel-ds-interval" onchange="markUnsaved()" class="sb-input">
+                <label class="text-[10px] text-zinc-500 block pt-1">Todos os intervalos</label>
+                <select id="sel-ds-interval" onchange="setDownsellDelay(this.options[this.selectedIndex].text, parseInt(this.value))" class="sb-input">
                   <option value="1">1 minuto</option>
                   <option value="5">5 minutos</option>
                   <option value="15">15 minutos</option>
                   <option value="60">1 hora</option>
                   <option value="1440">1 dia</option>
                 </select>
+                <p class="text-[10px] text-zinc-500">De 30 segundos a 7 dias de espera nesta etapa.</p>
+                <p class="text-[11px] text-blue-400">Esta etapa está prevista para +1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
+                <p class="text-[11px] text-amber-400">Intervalo curto: esta mensagem pode chegar enquanto a pessoa ainda lê sua resposta. Para uma conversa mais tranquila, experimente 5 ou 15 minutos.</p>
               </div>
 
               <div>
                 <label class="text-xs font-semibold text-zinc-200 block">Mensagem do Downsell</label>
                 <p class="text-[11px] text-zinc-500 mb-1.5">Você escreve, o bot envia sem a IA reescrever. Esta mensagem é separada da legenda e também funciona sem mídia.</p>
-                <textarea id="inp-ds-message" rows="3" oninput="markUnsaved()" class="sb-input">sumiu por ai? 😜
+                <textarea id="inp-ds-message" rows="3" oninput="onDownsellMessageChange()" class="sb-input">sumiu por ai? 😜
 
 quer que eu te mostre as opções de acesso?</textarea>
                 <div class="flex justify-between text-[10px] text-zinc-500 mt-1">
                   <span>Use {nome} para incluir o nome do visitante.</span>
-                  <span>63/1.000</span>
+                  <span id="ds-msg-counter">63/1.000</span>
                 </div>
               </div>
 
@@ -1312,15 +1308,21 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </select>
               </div>
 
-              <div>
-                <div class="flex justify-between text-xs mb-1">
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs">
                   <span class="font-semibold text-zinc-200">Mídias deste envio</span>
                   <span class="text-zinc-500">0/5</span>
                 </div>
-                <p class="text-[11px] text-zinc-500 mb-2">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
-                <button onclick="alert('Selecione um arquivo de foto, vídeo ou áudio para anexar a esta etapa do Downsell.')" class="w-full py-3 rounded-xl border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-300 flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-cloud-arrow-up"></i> Adicionar arquivo nesta etapa
+                <p class="text-[11px] text-zinc-500">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
+                <button onclick="document.getElementById('hidden-media-upload').click()" class="w-full py-3 rounded-xl bg-[#111118] border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-200 flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-plus text-[10px]"></i> Adicionar arquivo nesta etapa
                 </button>
+                <p class="text-[10px] text-zinc-500">Foto, vídeo, GIF ou áudio • até 50 MB por arquivo. Salve o fluxo para aplicar os novos anexos.</p>
+                <p class="text-[11px] text-amber-400">Antes de publicar, escolha o canal de FILE_ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
+                <div class="sb-subcard p-3 text-[11px] text-zinc-400 space-y-1">
+                  <p>No Telegram, o visitante recebe a mensagem que você escreveu, com o botão para ver os planos.</p>
+                  <p class="text-zinc-500">Esses envios automáticos não consomem tokens da IA.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1344,7 +1346,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 8: UPSELL
+             TELA 8: UPSELL (FIEL AO PRINT 12)
         ========================================================== -->
         <section id="sec-upsell" class="tab-section hidden space-y-6">
           <div>
@@ -1359,7 +1361,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
               </div>
               <div>
-                <h4 class="text-xs font-bold text-white">Upsell - uma nova oferta após a compra</h4>
+                <h4 class="text-xs font-bold text-white">Upsell • uma nova oferta após a compra</h4>
                 <p class="text-[11px] text-zinc-400 mt-0.5">A primeira entrega vai na hora. Depois, o bot faz uma extensão de acesso ou uma opção extra, com mensagem e mídias próprias.</p>
               </div>
             </div>
@@ -1376,40 +1378,66 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <p class="text-[11px] text-zinc-500 mt-0.5">Depois da entrega inicial, apresente outro plano usando o mesmo checkout, webhook e destino configurados.</p>
               </div>
               <label class="toggle-switch">
-                <input type="checkbox" id="chk-upsell-enabled" checked onchange="markUnsaved()">
+                <input type="checkbox" id="chk-upsell-enabled" checked onchange="STATE.upsell.enabled=this.checked; markUnsaved()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
 
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Origem da oferta</label>
+              <label class="text-xs font-semibold text-zinc-200 block">Origem da oferta</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Use um plano existente ou crie algo que aparecerá somente depois da primeira compra.</p>
               <select id="sel-upsell-origin" onchange="markUnsaved()" class="sb-input">
                 <option value="Usar plano já cadastrado">Usar plano já cadastrado</option>
                 <option value="Criar oferta exclusiva para o Upsell">Criar oferta exclusiva para o Upsell</option>
               </select>
             </div>
 
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Quando enviar</label>
-              <select id="sel-upsell-delay" onchange="markUnsaved()" class="sb-input">
+            <div class="space-y-2">
+              <label class="text-xs font-semibold text-zinc-200 block">Quando enviar</label>
+              <div class="flex gap-1.5">
+                <button onclick="document.getElementById('sel-upsell-delay').value='0'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">Na hora</button>
+                <button onclick="document.getElementById('sel-upsell-delay').value='1'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500 text-xs font-semibold text-blue-300">1 min</button>
+                <button onclick="document.getElementById('sel-upsell-delay').value='5'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">5 min</button>
+                <button onclick="document.getElementById('sel-upsell-delay').value='15'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">15 min</button>
+                <button onclick="document.getElementById('sel-upsell-delay').value='60'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1h</button>
+                <button onclick="document.getElementById('sel-upsell-delay').value='1440'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1 dia</button>
+              </div>
+              <label class="text-[10px] text-zinc-500 block">Todos os intervalos</label>
+              <select id="sel-upsell-delay" onchange="STATE.upsell.delay_minutes=parseInt(this.value)||1; markUnsaved()" class="sb-input">
                 <option value="0">Na hora</option>
                 <option value="1" selected>1 minuto</option>
                 <option value="5">5 minutos</option>
                 <option value="15">15 minutos</option>
                 <option value="60">1 hora</option>
+                <option value="1440">1 dia</option>
               </select>
+              <p class="text-[10px] text-zinc-500">De envio imediato até 7 dias após a entrega inicial.</p>
             </div>
 
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Plano que será apresentado</label>
+              <label class="text-xs font-semibold text-zinc-200 block">Plano que será apresentado</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">Se o comprador já adquiriu a mesma oferta, ela não será enviada de novo.</p>
               <select id="sel-upsell-offer" onchange="markUnsaved()" class="sb-input">
                 <option value="offer_1">💎 Nova oferta</option>
               </select>
             </div>
 
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Mensagem pós-compra</label>
-              <textarea id="inp-upsell-msg" rows="3" oninput="markUnsaved()" class="sb-input">agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉</textarea>
+              <label class="text-xs font-semibold text-zinc-200 block">Mensagem pós-compra</label>
+              <p class="text-[11px] text-zinc-500 mb-1.5">A oferta escolhida aparece logo abaixo desta mensagem, com preço e botão de compra.</p>
+              <textarea id="inp-upsell-msg" rows="3" oninput="STATE.upsell.message=this.value; markUnsaved()" class="sb-input">agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉</textarea>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs">
+                <span class="font-semibold text-zinc-200">Mídias deste envio</span>
+                <span class="text-zinc-500">0/5</span>
+              </div>
+              <p class="text-[11px] text-zinc-500">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
+              <button onclick="document.getElementById('hidden-media-upload').click()" class="w-full py-3 rounded-xl bg-[#111118] border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-200 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-plus text-[10px]"></i> Adicionar arquivo nesta etapa
+              </button>
+              <p class="text-[11px] text-amber-400">Antes de publicar, escolha o canal de FILE_ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
             </div>
           </div>
 
@@ -1432,7 +1460,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 9: TESTAR CONVERSA
+             TELA 9: TESTAR CONVERSA (FIEL AO PRINT 13)
         ========================================================== -->
         <section id="sec-testar" class="tab-section hidden space-y-6">
           <div>
@@ -1498,7 +1526,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 10: PUBLICAR NO BOT
+             TELA 10: PUBLICAR NO BOT (FIEL AO PRINT 14)
         ========================================================== -->
         <section id="sec-publicar" class="tab-section hidden space-y-6">
           <div>
@@ -1523,23 +1551,25 @@ quer que eu te mostre as opções de acesso?</textarea>
             </label>
           </div>
 
-          <!-- Bot do atendimento -->
           <div class="sb-card p-6 space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Bot do atendimento</h3>
               <p class="text-[11px] text-zinc-500">Escolha o bot que receberá os novos leads deste fluxo. Cada fluxo IA usa um bot por vez.</p>
             </div>
             <div class="flex gap-3">
-              <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Cole aqui o Token do BotFather (Ex: 7123456:AAH...)" class="sb-input flex-1">
+              <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Cole o Token do BotFather (Ex: 7123456:AAH...)" class="sb-input flex-1">
               <button onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold shrink-0">+ Vincular bot</button>
             </div>
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Token Pushin Pay (Gateway PIX)</label>
-              <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole aqui seu Token Bearer da Pushin Pay" class="sb-input">
+            <div class="flex justify-between text-[11px] text-zinc-500">
+              <span id="bot-connected-label">Nenhum bot livre conectado ainda</span>
+              <a href="https://t.me/BotFather" target="_blank" class="text-zinc-300 hover:underline">Criar ou gerenciar bots no @BotFather ↗</a>
+            </div>
+            <div class="pt-2 border-t border-[#1c1c26]">
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Token Pushin Pay (Gateway PIX Automático)</label>
+              <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole seu Token Bearer da Pushin Pay" class="sb-input">
             </div>
           </div>
 
-          <!-- Canal de cache das mídias -->
           <div class="sb-card p-6 space-y-3">
             <div>
               <h3 class="text-sm font-bold text-white">Canal de cache das mídias</h3>
@@ -1547,19 +1577,18 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
             <div>
               <label class="text-xs font-semibold text-zinc-200 block mb-1">Grupo ou canal de preservação</label>
-              <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Ex.: -1001987654321 (O bot precisa ser administrador)" class="sb-input">
+              <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Ex.: -1001987654321 (O bot precisa ser administrador e poder publicar)" class="sb-input">
             </div>
           </div>
 
-          <!-- Entrega depois do pagamento -->
           <div class="sb-card p-6 space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Entrega depois do pagamento</h3>
               <p class="text-[11px] text-zinc-500">Escolha o que o comprador receberá automaticamente assim que o pagamento for confirmado.</p>
             </div>
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Destino da entrega (ID do Canal VIP ou Link)</label>
-              <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="Ex.: -1001234567890" class="sb-input">
+              <label class="text-xs font-semibold text-zinc-200 block mb-1">Destino da entrega (ID do Canal VIP ou Link de Acesso)</label>
+              <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="Ex.: -1001234567890 ou https://t.me/+seu_link" class="sb-input">
             </div>
             <div>
               <label class="text-xs font-semibold text-zinc-200 block mb-1">Usuário de suporte no Telegram (Opcional)</label>
@@ -1567,11 +1596,10 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
           </div>
 
-          <!-- Checklist para publicar -->
           <div class="sb-card p-5 flex items-center justify-between">
             <div>
               <h4 class="text-xs font-bold text-white">Checklist para publicar</h4>
-              <p class="text-[11px] text-zinc-500">Complete os itens abaixo para colocar o bot no ar.</p>
+              <p class="text-[11px] text-zinc-500">Complete os itens abaixo e salve para colocar no ar.</p>
             </div>
             <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
               <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Configuração salva</span>
@@ -1579,7 +1607,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Oferta ativa</span>
               <span id="chk-pub-delivery" class="text-zinc-500"><i class="fa-regular fa-circle mr-1"></i> Entrega configurada</span>
               <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Cache das mídias</span>
-              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Motor IA pronto</span>
+              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Saldo disponível</span>
             </div>
           </div>
 
@@ -1602,7 +1630,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 11: MEMÓRIA DAS CONVERSAS
+             TELA 11: MEMÓRIA DAS CONVERSAS (FIEL AO PRINT 15)
         ========================================================== -->
         <section id="sec-memoria" class="tab-section hidden space-y-6">
           <div>
@@ -1617,7 +1645,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <h3 class="text-sm font-bold text-white">Memória e jornada dos leads</h3>
                 <p class="text-[11px] text-zinc-400">Veja o que a conversa aprendeu e acompanhe o avanço real de cada lead, do primeiro clique até pagamento, entrega e Upsell.</p>
               </div>
-              <button class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300 flex items-center gap-1.5">
+              <button onclick="loadInitialState()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300 flex items-center gap-1.5">
                 <i class="fa-solid fa-rotate text-[10px]"></i> Atualizar
               </button>
             </div>
@@ -1635,17 +1663,11 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <option>Checkout gerado</option>
                 <option>Compra aprovada</option>
               </select>
-              <span class="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">LEADS LEMBRADOS (0)</span>
-              <div class="flex-1 flex flex-col items-center justify-center text-center p-4">
-                <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-2">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i>
-                </div>
-                <p class="text-xs font-bold text-white">A memória começa na próxima conversa</p>
-                <p class="text-[11px] text-zinc-500 mt-1">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
-              </div>
+              <span id="leads-count-title" class="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">LEADS LEMBRADOS (0)</span>
+              <div id="leads-list-box" class="flex-1 overflow-y-auto flex flex-col items-center justify-center text-center p-4"></div>
             </div>
 
-            <div class="col-span-7 sb-card p-6 flex flex-col items-center justify-center text-center">
+            <div id="lead-detail-box" class="col-span-7 sb-card p-6 flex flex-col items-center justify-center text-center overflow-y-auto">
               <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
                 <i class="fa-regular fa-user"></i>
               </div>
@@ -1673,7 +1695,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 12: APRENDIZADO DE VENDAS
+             TELA 12: APRENDIZADO DE VENDAS (FIEL AO PRINT 16)
         ========================================================== -->
         <section id="sec-aprendizado" class="tab-section hidden space-y-6">
           <div>
@@ -1691,29 +1713,32 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-0.5">Compara quem comprou com quem não comprou, encontra padrões e propõe recomendações. Nada muda nas conversas sem sua aprovação.</p>
               </div>
-              <button class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300">Atualizar</button>
+              <button onclick="loadInitialState()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300">Atualizar</button>
+            </div>
+            <div class="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/25 text-[11px] text-emerald-300">
+              <i class="fa-solid fa-circle-check mr-1.5"></i> Vendas são confirmadas na base oficial de pagamentos. O aprendizado guarda métricas e estratégias, não copia a conversa para outros sellers.
             </div>
           </div>
 
           <div class="grid grid-cols-4 gap-3">
             <div class="sb-card p-4">
               <span class="text-[10px] text-zinc-500 block">em até 6h após a primeira ent...</span>
-              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span id="kpi-eval" class="text-2xl font-bold text-white my-1 block">0</span>
               <span class="text-[10px] uppercase tracking-wider text-zinc-500">RESULTADOS AVALIADOS</span>
             </div>
             <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">0,0%</span>
-              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span class="text-[10px] text-zinc-500 block">conversão real</span>
+              <span id="kpi-paid" class="text-2xl font-bold text-white my-1 block">0</span>
               <span class="text-[10px] uppercase tracking-wider text-zinc-500">COMPRAS CONFIRMADAS</span>
             </div>
             <div class="sb-card p-4">
               <span class="text-[10px] text-zinc-500 block">pix vencido 24 horas</span>
-              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span id="kpi-unpaid" class="text-2xl font-bold text-white my-1 block">0</span>
               <span class="text-[10px] uppercase tracking-wider text-zinc-500">CHECKOUTS NÃO PAGOS</span>
             </div>
             <div class="sb-card p-4">
               <span class="text-[10px] text-zinc-500 block">avaliadas após 24h sem c...</span>
-              <span class="text-2xl font-bold text-white my-1 block">0</span>
+              <span id="kpi-nopurchase" class="text-2xl font-bold text-white my-1 block">0</span>
               <span class="text-[10px] uppercase tracking-wider text-zinc-500">CONVERSAS SEM COMPRA</span>
             </div>
           </div>
@@ -1727,6 +1752,32 @@ quer que eu te mostre as opções de acesso?</textarea>
             <div class="flex justify-between text-[10px] text-zinc-500">
               <span>0 resultados válidos</span>
               <span>mínimo 30</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-7 sb-card p-5 space-y-3">
+              <h4 class="text-xs font-bold text-white">Sinais deste fluxo</h4>
+              <p class="text-[11px] text-zinc-500">Leitura descritiva da janela recente, limitada a 90 dias. Estes dados não alteram o bot sozinhos.</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="sb-subcard p-3.5">
+                  <span class="text-[9px] uppercase text-zinc-500 block">OBJEÇÕES MAIS COMUNS</span>
+                  <p class="text-[11px] text-zinc-400 mt-2">Nenhuma objeção apareceu com frequência suficiente.</p>
+                </div>
+                <div class="sb-subcard p-3.5">
+                  <span class="text-[9px] uppercase text-zinc-500 block">PLANOS MAIS ESCOLHIDOS</span>
+                  <p class="text-[11px] text-zinc-400 mt-2">As primeiras compras aparecerão aqui.</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-span-5 sb-card p-5 flex flex-col justify-between">
+              <div>
+                <h4 class="text-xs font-bold text-white">Histórico</h4>
+                <p class="text-[11px] text-zinc-500">Versões aprovadas podem ser revertidas sem apagar resultados.</p>
+              </div>
+              <div class="sb-subcard p-4 text-center my-2">
+                <p class="text-[11px] text-zinc-400">A primeira versão aparecerá após uma recomendação ser aprovada.</p>
+              </div>
             </div>
           </div>
 
@@ -1749,13 +1800,13 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 13: SALDO DA IA & CHAVE PRÓPRIA
+             TELA 13: SALDO DA IA (FIEL AO PRINT 17 + API KEY PRÓPRIA)
         ========================================================== -->
         <section id="sec-saldo" class="tab-section hidden space-y-6">
           <div>
             <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTA</span>
             <h2 class="text-2xl font-bold text-white mt-0.5">Saldo da IA</h2>
-            <p class="text-xs text-zinc-400 mt-1">Consulte o saldo, faça uma recarga ou conecte sua própria API Key sem intermediários.</p>
+            <p class="text-xs text-zinc-400 mt-1">Consulte o saldo, faça uma recarga e acompanhe pagamentos.</p>
           </div>
 
           <div class="grid grid-cols-12 gap-4">
@@ -1806,26 +1857,69 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
           </div>
 
-          <!-- Vantagem do Clone: Chave API Própria -->
-          <div class="sb-card p-6 space-y-4 border-purple-500/30">
+          <!-- Recarga Pré-Paga Fiel ao Print 17 -->
+          <div class="sb-card p-6 space-y-5">
             <div class="flex justify-between items-center">
               <div>
-                <h3 class="text-sm font-bold text-white">Conexão Direta de IA (Sem Taxa de Intermediário)</h3>
-                <p class="text-[11px] text-zinc-400">Como este SaaS é seu, você pode colar sua própria API Key (OpenAI ou Groq) e usar IA ilimitada direto da fonte.</p>
+                <span class="text-[9px] font-bold uppercase text-purple-400">✦ RECARGA PRÉ-PAGA</span>
+                <h3 class="text-sm font-bold text-white">Escolha quanto saldo adicionar</h3>
+                <p class="text-[11px] text-zinc-500">Não é mensalidade. Todo o valor pago vira saldo para o Modo IA.</p>
               </div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">MODO PROPRIETÁRIO</span>
+              <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">• Liberação automática após o PIX</span>
+            </div>
+
+            <div>
+              <span class="text-[11px] font-semibold text-zinc-300 block mb-2">Valores para começar</span>
+              <div class="grid grid-cols-4 gap-2.5">
+                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 50,00</span><span class="text-[10px] text-zinc-500">~ 21,2 mil tokens</span></div>
+                <div class="sb-radio-card selected"><span class="text-xs font-bold text-white block">R$ 100,00</span><span class="text-[10px] text-zinc-400">~ 42,4 mil tokens</span></div>
+                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 250,00</span><span class="text-[10px] text-zinc-500">~ 106 mil tokens</span></div>
+                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 500,00</span><span class="text-[10px] text-zinc-500">~ 212,1 mil tokens</span></div>
+              </div>
+            </div>
+
+            <div>
+              <span class="text-[11px] font-semibold text-zinc-300 block mb-2">Para mais volume</span>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="sb-radio-card">
+                  <span class="text-[10px] text-zinc-400">Essencial</span>
+                  <p class="text-base font-bold text-white mt-0.5">R$ 1.000,00</p>
+                  <span class="text-[10px] text-zinc-500">≈ 424 mil tokens</span>
+                </div>
+                <div class="sb-radio-card">
+                  <span class="text-[10px] text-purple-400 font-semibold">Crescimento • MAIS ESCOLHIDO</span>
+                  <p class="text-base font-bold text-white mt-0.5">R$ 2.000,00</p>
+                  <span class="text-[10px] text-zinc-500">≈ 848,1 mil tokens</span>
+                </div>
+                <div class="sb-radio-card">
+                  <span class="text-[10px] text-amber-400 font-semibold">Escala • MAIOR VOLUME</span>
+                  <p class="text-base font-bold text-white mt-0.5">R$ 3.000,00</p>
+                  <span class="text-[10px] text-zinc-500">≈ 1,3 bi tokens</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conexão Direta da sua própria Chave de IA (Zero custo de recarga) -->
+          <div class="sb-card p-6 space-y-4 border-purple-500/40 bg-gradient-to-r from-[#141022] to-[#0c0c12]">
+            <div class="flex justify-between items-center">
+              <div>
+                <h3 class="text-sm font-bold text-white">Chave de API Própria (Bypass de Saldo)</h3>
+                <p class="text-[11px] text-zinc-400">Como você é o dono deste SaaS, cole sua chave OpenAI ou Groq abaixo para rodar a IA direto na fonte sem precisar pagar recarga.</p>
+              </div>
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">ADMIN</span>
             </div>
             <div class="grid grid-cols-3 gap-3">
               <div>
                 <label class="text-xs text-zinc-400 block mb-1">Provedor</label>
                 <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input">
                   <option value="openai">OpenAI (GPT-4o-mini)</option>
-                  <option value="groq">Groq (Llama 3.3 70B - Grátis/Rápido)</option>
+                  <option value="groq">Groq (Llama 3.3 70B - Grátis)</option>
                 </select>
               </div>
               <div class="col-span-2">
-                <label class="text-xs text-zinc-400 block mb-1">Sua Chave de API (Opcional)</label>
-                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-..." class="sb-input">
+                <label class="text-xs text-zinc-400 block mb-1">Sua API Key</label>
+                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-... ou gsk_..." class="sb-input">
               </div>
             </div>
           </div>
@@ -1844,10 +1938,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         <i class="fa-solid fa-circle-info text-zinc-600 text-xs"></i>
       </div>
 
-      <!-- Moldura de Celular / Chat do Sharkbot -->
       <div class="sb-card p-4 flex-1 max-h-[540px] flex flex-col justify-between bg-[#0a0a0f]">
         <div>
-          <!-- Topo do Chat na Prévia -->
           <div class="flex items-center gap-2.5 pb-3 border-b border-[#191924]">
             <div class="w-8 h-8 rounded-full bg-purple-600/25 border border-purple-500/40 flex items-center justify-center text-purple-300 text-xs">
               <i class="fa-solid fa-rocket text-[11px]"></i>
@@ -1858,7 +1950,6 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
           </div>
 
-          <!-- Mensagens da Prévia -->
           <div id="preview-chat-bubbles" class="py-4 space-y-2 overflow-y-auto max-h-[380px]">
             <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
               oii 💜
@@ -1869,9 +1960,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           </div>
         </div>
 
-        <!-- Input rápido na prévia -->
         <form onsubmit="sendPreviewQuickMsg(event)" class="pt-2 border-t border-[#191924] flex gap-1.5">
-          <input type="text" id="preview-quick-input" placeholder="Testar resposta rápida..." class="sb-input !py-1.5 !text-xs">
+          <input type="text" id="preview-quick-input" placeholder="Testar conversa..." class="sb-input !py-1.5 !text-xs">
           <button type="submit" class="px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs shrink-0">
             <i class="fa-solid fa-paper-plane text-[10px]"></i>
           </button>
@@ -1882,9 +1972,12 @@ quer que eu te mostre as opções de acesso?</textarea>
   </div>
 
   <!-- =========================================================
-       JAVASCRIPT: ESTADO COMPLETO E SINCRONIZAÇÃO EM TEMPO REAL
+       JAVASCRIPT COMPLETO
   ========================================================== -->
   <script>
+    let CURRENT_MEDIA_FILTER = "Todas";
+    let SELECTED_DOWNSELL_IDX = 0;
+
     let STATE = {
       flow_name: "bot",
       persona: {
@@ -1941,7 +2034,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           type: "Vídeos",
           url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
           active: true,
-          description: "Vídeo curto de prévia no espelho.",
+          description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
           objective: "Aumentar desejo",
           signals: "vídeo, prévia, corpo",
           spoiler: false,
@@ -1964,21 +2057,19 @@ quer que eu te mostre as opções de acesso?</textarea>
       publish: {
         is_live: false,
         bot_token: "",
+        bot_username: "",
         pushin_pay_token: "",
         cache_channel_id: "",
         delivery_destination: "",
         support_username: ""
       },
-      account: {
-        balance: 0.00,
-        ai_provider: "openai",
-        ai_api_key: ""
-      }
+      memory: { leads: [] },
+      learning: { evaluated_results: 0, confirmed_purchases: 0, unpaid_checkouts: 0, conversations_without_purchase: 0 },
+      account: { balance: 0.00, ai_provider: "openai", ai_api_key: "" }
     };
 
     let TEST_HISTORY = [];
 
-    // Navegação entre as 13 abas
     function navigateTab(tabKey) {
       document.querySelectorAll('.tab-section').forEach(el => el.classList.add('hidden'));
       const target = document.getElementById('sec-' + tabKey);
@@ -1988,9 +2079,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       const navBtn = document.getElementById('nav-' + tabKey);
       if (navBtn) navBtn.classList.add('active');
 
-      if (tabKey === 'testar' && TEST_HISTORY.length === 0) {
-        resetFullSimulator();
-      }
+      if (tabKey === 'testar' && TEST_HISTORY.length === 0) resetFullSimulator();
+      if (tabKey === 'memoria') renderMemoryLeads();
+      if (tabKey === 'aprendizado') renderLearningKpis();
     }
 
     function markUnsaved() {
@@ -2007,7 +2098,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('sidebar-config-status').textContent = "Salva";
     }
 
-    // Atualiza Persona e Prévia em Tempo Real
     function onPersonaChange() {
       STATE.persona.name = document.getElementById('inp-persona-name').value || 'Atendimento';
       STATE.persona.age = parseInt(document.getElementById('inp-persona-age').value) || 18;
@@ -2045,7 +2135,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    // Renderizar Lista de Ofertas (Idêntica às Fotos 4 e 5)
     function renderOffers() {
       const container = document.getElementById('offers-container');
       container.innerHTML = STATE.business.offers.map((o, idx) => `
@@ -2105,11 +2194,16 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const activeCount = STATE.business.offers.filter(x => x.visible).length;
       document.getElementById('nav-sub-ofertas').textContent = `${activeCount} oferta${activeCount === 1 ? '' : 's'} ativa${activeCount === 1 ? '' : 's'}`;
+
+      const upsellSelect = document.getElementById('sel-upsell-offer');
+      if (upsellSelect) {
+        upsellSelect.innerHTML = STATE.business.offers.map(o => `<option value="${o.id}">${o.emoji || '💎'} ${o.name} (R$ ${Number(o.price).toFixed(2)})</option>`).join('');
+      }
     }
 
     function updateOfferField(idx, field, val) {
       STATE.business.offers[idx][field] = val;
-      if (field === 'visible') renderOffers();
+      if (field === 'visible' || field === 'name' || field === 'price') renderOffers();
       markUnsaved();
     }
 
@@ -2120,7 +2214,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         name: 'Nova oferta',
         price: 29.90,
         description: '',
-        emoji: '🔥',
+        emoji: '💎',
         duration: 30,
         highlight: false
       });
@@ -2135,7 +2229,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    // Renderizar Dúvidas Frequentes (FAQ)
     function renderFaqs() {
       const container = document.getElementById('faqs-container');
       container.innerHTML = STATE.business.faqs.map((f, idx) => `
@@ -2163,7 +2256,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    // Seletores de Estilo ("Jeito de conversar")
     function selectRadioGroup(groupId, stateField, value) {
       STATE.style[stateField] = value;
       document.querySelectorAll(`#${groupId} .sb-radio-card`).forEach(card => {
@@ -2187,7 +2279,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       const c = document.getElementById('variations-container');
       const div = document.createElement('div');
       div.className = 'flex gap-2 items-start';
-      div.innerHTML = `<textarea rows="2" placeholder="Nova variação de abertura..." class="sb-input"></textarea>`;
+      div.innerHTML = `
+        <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input flex-1"></textarea>
+        <button onclick="this.parentElement.remove(); markUnsaved()" class="text-zinc-500 hover:text-red-400 p-2"><i class="fa-regular fa-trash-can text-xs"></i></button>
+      `;
       c.appendChild(div);
       markUnsaved();
     }
@@ -2201,38 +2296,92 @@ quer que eu te mostre as opções de acesso?</textarea>
       `).join('');
     }
 
-    // Renderizar Mídias da conversa
+    // MÍDIAS DA CONVERSA (Com filtro e upload de arquivo real)
+    function setMediaFilter(filterName) {
+      CURRENT_MEDIA_FILTER = filterName;
+      document.querySelectorAll('#media-filter-pills button').forEach(btn => {
+        const active = btn.getAttribute('data-filter') === filterName;
+        btn.className = active
+          ? "px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium"
+          : "px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs";
+      });
+      renderMedias();
+    }
+
+    function handleRealFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const isVideo = file.type.startsWith('video');
+        const isAudio = file.type.startsWith('audio');
+        STATE.medias.push({
+          id: 'media_' + Date.now(),
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          type: isVideo ? 'Vídeos' : (isAudio ? 'Áudios' : 'Fotos'),
+          url: e.target.result,
+          active: true,
+          description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
+          objective: "Criar conexão",
+          signals: "vídeo, confiança, prévia",
+          spoiler: false,
+          expanded: true
+        });
+        renderMedias();
+        markUnsaved();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function toggleMediaExpand(idx) {
+      STATE.medias[idx].expanded = !STATE.medias[idx].expanded;
+      renderMedias();
+    }
+
     function renderMedias() {
       const grid = document.getElementById('medias-grid');
       document.getElementById('media-count-badge').textContent = `${STATE.medias.length}/20 arquivos`;
       document.getElementById('nav-sub-midias').textContent = STATE.medias.length ? `${STATE.medias.length} arquivo(s)` : 'Adicionar conteúdo';
 
-      grid.innerHTML = STATE.medias.map((m, idx) => `
+      const filtered = STATE.medias.map((m, i) => ({ ...m, _idx: i })).filter(m => CURRENT_MEDIA_FILTER === 'Todas' || m.type === CURRENT_MEDIA_FILTER);
+
+      grid.innerHTML = filtered.map(m => {
+        const idx = m._idx;
+        return `
         <div class="sb-card overflow-hidden">
-          <div class="h-64 bg-zinc-900 relative overflow-hidden">
+          <div class="h-80 bg-zinc-900 relative overflow-hidden">
             <img src="${m.url}" alt="${m.name}" class="w-full h-full object-cover ${m.spoiler ? 'blur-md' : ''}">
-            <span class="absolute bottom-2 left-2 text-[10px] px-2 py-0.5 rounded bg-black/70 text-zinc-200">${m.type}</span>
+            ${m.type === 'Vídeos' ? `<div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 px-3 py-1.5 rounded-lg"><i class="fa-solid fa-play"></i> <span>0:00 / 0:11</span> <i class="fa-solid fa-volume-high"></i></div>` : ''}
           </div>
           <div class="p-4 space-y-3">
-            <div class="flex justify-between items-center">
-              <div>
-                <p class="text-xs font-bold text-white">${m.name}</p>
-                <p class="text-[10px] text-zinc-500">Descreva exatamente o que esta mídia mostra antes de ativá-la.</p>
+            <div class="flex justify-between items-start gap-2">
+              <div class="flex items-start gap-2.5">
+                <span class="w-6 h-6 rounded bg-zinc-800 border border-zinc-700 text-[10px] font-bold text-zinc-300 flex items-center justify-center shrink-0 mt-0.5">BI</span>
+                <div>
+                  <p class="text-xs font-bold text-white">${m.name}</p>
+                  <p class="text-[10px] text-zinc-500">Descreva exatamente o que esta mídia mostra antes de ativá-la.</p>
+                </div>
               </div>
-              <label class="toggle-switch">
+              <label class="toggle-switch shrink-0">
                 <input type="checkbox" ${m.active ? 'checked' : ''} onchange="STATE.medias[${idx}].active=this.checked; markUnsaved()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
 
-            <div class="space-y-3 pt-2 border-t border-[#1c1c26]">
+            <button onclick="toggleMediaExpand(${idx})" class="w-full pt-2 border-t border-[#1c1c26] flex justify-between items-center text-[11px] text-zinc-400 hover:text-white">
+              <span>${m.expanded ? 'Fechar configuração' : 'Configurar contexto'}</span>
+              <i class="fa-solid fa-chevron-${m.expanded ? 'up' : 'down'} text-[9px]"></i>
+            </button>
+
+            <div class="${m.expanded ? 'space-y-3 pt-2' : 'hidden'}">
               <div>
                 <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Nome interno</label>
                 <input type="text" value="${m.name}" oninput="STATE.medias[${idx}].name=this.value; markUnsaved()" class="sb-input">
               </div>
               <div>
-                <label class="text-[11px] font-semibold text-zinc-300 block mb-1">O que esta mídia mostra?</label>
-                <textarea rows="2" oninput="STATE.medias[${idx}].description=this.value; markUnsaved()" class="sb-input">${m.description}</textarea>
+                <label class="text-[11px] font-semibold text-zinc-300 block">O que esta mídia mostra?</label>
+                <span class="text-[10px] text-zinc-500 block mb-1">Seja literal. A IA usa esta descrição para decidir se o arquivo combina com a conversa.</span>
+                <textarea rows="3" oninput="STATE.medias[${idx}].description=this.value; markUnsaved()" class="sb-input">${m.description}</textarea>
               </div>
               <div class="grid grid-cols-2 gap-2.5">
                 <div>
@@ -2248,6 +2397,14 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div>
                   <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Sinais da conversa</label>
                   <input type="text" value="${m.signals}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input">
+                </div>
+              </div>
+              <div>
+                <span class="text-[10px] text-zinc-500 block mb-1">Usada em</span>
+                <div class="flex gap-1.5">
+                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300">Conversa</span>
+                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">Downsell</span>
+                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">Upsell</span>
                 </div>
               </div>
               <div class="sb-subcard p-2.5 flex items-center justify-between">
@@ -2266,38 +2423,49 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
-    function addNewMediaCard() {
-      const url = prompt("Cole a URL da foto/vídeo de prévia (ou deixe em branco para usar modelo de exemplo):", "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80");
-      if (url === null) return;
-      STATE.medias.push({
-        id: 'media_' + Date.now(),
-        name: 'nova midia ' + (STATE.medias.length + 1),
-        type: 'Fotos',
-        url: url || "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&q=80",
-        active: true,
-        description: "Prévia exclusiva enviada durante a conversa.",
-        objective: "Aumentar desejo",
-        signals: "foto, prévia, amostra",
-        spoiler: true,
-        expanded: true
-      });
-      renderMedias();
+    // DOWNSELL
+    function onDownsellToggle() {
+      const en = document.getElementById('chk-downsell-enabled').checked;
+      STATE.downsell.enabled = en;
+      document.getElementById('downsell-disabled-banner').classList.toggle('hidden', en);
       markUnsaved();
     }
 
-    // Renderizar Downsell
+    function selectDownsellStep(idx) {
+      SELECTED_DOWNSELL_IDX = idx;
+      const step = STATE.downsell.steps[idx];
+      if (!step) return;
+      document.getElementById('ds-editor-badge').textContent = `Etapa ${idx + 1}`;
+      document.getElementById('inp-ds-message').value = step.message || '';
+      document.getElementById('sel-ds-interval').value = String(step.delay_minutes || 1);
+      document.getElementById('sel-ds-accompany').value = step.accompany || 'Botão com os planos atuais';
+      renderDownsell();
+    }
+
+    function onDownsellMessageChange() {
+      const val = document.getElementById('inp-ds-message').value;
+      if (STATE.downsell.steps[SELECTED_DOWNSELL_IDX]) {
+        STATE.downsell.steps[SELECTED_DOWNSELL_IDX].message = val;
+      }
+      document.getElementById('ds-msg-counter').textContent = `${val.length}/1.000`;
+      markUnsaved();
+    }
+
     function renderDownsell() {
       const list = document.getElementById('downsell-steps-list');
       document.getElementById('downsell-step-counter').textContent = `${STATE.downsell.steps.length}/6`;
+      document.getElementById('nav-sub-downsell').textContent = `${STATE.downsell.steps.length} etapa (s) • sem resposta`;
+
       list.innerHTML = STATE.downsell.steps.map((s, idx) => `
-        <div class="sb-card p-3.5 border-blue-500/50 bg-blue-500/5 cursor-pointer flex items-center gap-3">
-          <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">${idx + 1}</span>
-          <div>
-            <p class="text-xs font-bold text-white">${s.title}</p>
+        <div onclick="selectDownsellStep(${idx})" class="sb-card p-3.5 ${idx === SELECTED_DOWNSELL_IDX ? 'border-blue-500 bg-blue-500/10' : ''} cursor-pointer flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+          <div class="overflow-hidden">
+            <p class="text-xs font-bold text-white truncate">${s.title}</p>
             <p class="text-[10px] text-zinc-400">Espera ${s.delay_label} • 0 mídia(s)</p>
+            <p class="text-[9px] text-zinc-500">+${s.delay_label} desde o início</p>
           </div>
         </div>
       `).join('');
@@ -2307,27 +2475,83 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (STATE.downsell.steps.length >= 6) return alert("Máximo de 6 etapas atingido.");
       STATE.downsell.steps.push({
         id: 'ds_' + Date.now(),
-        title: 'Retomada ' + (STATE.downsell.steps.length + 1),
-        delay_label: '15 min',
-        delay_minutes: 15,
-        message: 'ainda tá por aí? deixei seu acesso separado 💜',
+        title: 'Apresentar planos ' + (STATE.downsell.steps.length + 1),
+        delay_label: '5 min',
+        delay_minutes: 5,
+        message: 'sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?',
         accompany: 'Botão com os planos atuais'
       });
-      renderDownsell();
+      selectDownsellStep(STATE.downsell.steps.length - 1);
       markUnsaved();
     }
 
     function setDownsellDelay(label, mins) {
-      if (STATE.downsell.steps[0]) {
-        STATE.downsell.steps[0].delay_label = label;
-        STATE.downsell.steps[0].delay_minutes = mins;
+      if (STATE.downsell.steps[SELECTED_DOWNSELL_IDX]) {
+        STATE.downsell.steps[SELECTED_DOWNSELL_IDX].delay_label = label;
+        STATE.downsell.steps[SELECTED_DOWNSELL_IDX].delay_minutes = mins;
       }
       document.getElementById('sel-ds-interval').value = String(mins);
       renderDownsell();
       markUnsaved();
     }
 
-    // Aplicar Estratégia Pronta (Tela 2)
+    // MEMÓRIA E APRENDIZADO
+    function renderMemoryLeads() {
+      const leads = STATE.memory?.leads || [];
+      document.getElementById('leads-count-title').textContent = `LEADS LEMBRADOS (${leads.length})`;
+      const box = document.getElementById('leads-list-box');
+      if (!leads.length) {
+        box.className = "flex-1 flex flex-col items-center justify-center text-center p-4";
+        box.innerHTML = `
+          <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-2">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <p class="text-xs font-bold text-white">A memória começa na próxima conversa</p>
+          <p class="text-[11px] text-zinc-500 mt-1">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
+        `;
+        return;
+      }
+      box.className = "flex-1 overflow-y-auto space-y-2 text-left";
+      box.innerHTML = leads.map((l, i) => `
+        <div onclick="showLeadDetail(${i})" class="sb-subcard p-3 cursor-pointer hover:border-purple-500/50 flex justify-between items-center">
+          <div>
+            <p class="text-xs font-bold text-white">${l.first_name} <span class="text-zinc-500 font-normal">${l.username || ''}</span></p>
+            <span class="text-[10px] text-purple-300">${l.stage || 'Em conversa'}</span>
+          </div>
+          <span class="text-[10px] text-zinc-500">${l.last_interaction || ''}</span>
+        </div>
+      `).join('');
+    }
+
+    function showLeadDetail(idx) {
+      const lead = (STATE.memory?.leads || [])[idx];
+      if (!lead) return;
+      const box = document.getElementById('lead-detail-box');
+      box.className = "col-span-7 sb-card p-5 flex flex-col justify-between text-left overflow-y-auto";
+      const hist = (lead.history || []).map(h => `
+        <div class="${h.role==='user'?'text-right':'text-left'}">
+          <span class="inline-block px-3 py-1.5 rounded-xl text-xs ${h.role==='user'?'bg-purple-600 text-white':'bg-[#171721] text-zinc-200'}">${h.content}</span>
+        </div>
+      `).join('');
+      box.innerHTML = `
+        <div class="border-b border-[#1c1c26] pb-3 flex justify-between items-center">
+          <div>
+            <h4 class="text-sm font-bold text-white">${lead.first_name} (${lead.username})</h4>
+            <p class="text-[11px] text-zinc-400">Telegram ID: ${lead.telegram_id} • Etapa: <strong class="text-emerald-400">${lead.stage}</strong></p>
+          </div>
+        </div>
+        <div class="flex-1 py-3 space-y-2 overflow-y-auto">${hist || '<p class="text-xs text-zinc-500">Sem mensagens.</p>'}</div>
+      `;
+    }
+
+    function renderLearningKpis() {
+      const l = STATE.learning || {};
+      document.getElementById('kpi-eval').textContent = l.evaluated_results || 0;
+      document.getElementById('kpi-paid').textContent = l.confirmed_purchases || 0;
+      document.getElementById('kpi-unpaid').textContent = l.unpaid_checkouts || 0;
+      document.getElementById('kpi-nopurchase').textContent = l.conversations_without_purchase || 0;
+    }
+
     function applyPresetStrategy(type) {
       if (type === 'conexao') {
         STATE.persona.bio = "Criadora adulta, espontânea e carinhosa. Conversa como em um chat privado, lembra preferências e apresenta o VIP naturalmente.";
@@ -2360,7 +2584,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       navigateTab('persona');
     }
 
-    // Simulador Completo (Tela 9 e Coluna Direita)
     function resetFullSimulator() {
       TEST_HISTORY = [];
       const box = document.getElementById('full-sim-messages');
@@ -2472,7 +2695,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         <div class="sb-subcard p-3.5 max-w-[85%] border-emerald-500/40 space-y-2">
           <span class="text-[10px] font-bold uppercase text-emerald-400 block">PIX COPIA E COLA GERADO (${data.real ? 'PUSHIN PAY REAL' : 'MODO TESTE'})</span>
           <input type="text" readonly value="${data.qr_code}" class="sb-input !text-[10px] font-mono">
-          <p class="text-[10px] text-zinc-400">Assim que o pagamento é confirmado no webhook, o bot entrega o link único do VIP e agenda o Upsell!</p>
+          <p class="text-[10px] text-zinc-400">Assim que o pagamento é confirmado, o bot entrega o link único do VIP e agenda o Upsell!</p>
         </div>
       `;
       box.scrollTop = box.scrollHeight;
@@ -2489,13 +2712,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       let completed = 3;
       if (STATE.publish.bot_token) {
         completed++;
-        document.getElementById(' sidebar-bot-status');
-        document.getElementById('sidebar-bot-status').textContent = "Vinculada";
+        document.getElementById('sidebar-bot-status').textContent = STATE.publish.bot_username || "Vinculada";
         document.getElementById('chk-pub-bot').className = "text-emerald-400";
+        document.getElementById('chk-pub-bot').innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Bot válido e vinculado`;
       }
       if (STATE.publish.delivery_destination) {
         completed++;
         document.getElementById('chk-pub-delivery').className = "text-emerald-400";
+        document.getElementById('chk-pub-delivery').innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Entrega configurada`;
       }
       const pct = (completed / 5) * 100;
       document.getElementById('sidebar-prep-count').textContent = `${completed}/5`;
@@ -2521,6 +2745,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-style-rules').value = STATE.style.rules || '';
       document.getElementById('inp-style-handoff').value = STATE.style.handoff_words || '';
 
+      document.getElementById('chk-downsell-enabled').checked = !!STATE.downsell?.enabled;
+      onDownsellToggle();
+
       document.getElementById('chk-bot-live').checked = !!STATE.publish?.is_live;
       document.getElementById('inp-bot-token').value = STATE.publish?.bot_token || '';
       document.getElementById('inp-pushin-token').value = STATE.publish?.pushin_pay_token || '';
@@ -2528,10 +2755,15 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-delivery-dest').value = STATE.publish?.delivery_destination || '';
       document.getElementById('inp-support-user').value = STATE.publish?.support_username || '';
 
+      if (STATE.publish?.bot_username) {
+        document.getElementById('bot-connected-label').innerHTML = `Conectado em: <strong class="text-emerald-400">${STATE.publish.bot_username}</strong>`;
+      }
+
       document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'openai';
       document.getElementById('inp-ai-key').value = STATE.account?.ai_api_key || '';
 
       onPersonaChange();
+      onPublishChange();
       renderOffers();
       renderFaqs();
       renderMedias();
@@ -2547,11 +2779,16 @@ quer que eu te mostre as opções de acesso?</textarea>
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> <span>Salvando...</span>`;
 
       try {
-        await fetch("/api/state", {
+        const res = await fetch("/api/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(STATE)
         });
+        const data = await res.json();
+        if (data.state) {
+          STATE = data.state;
+          syncStateToInputs();
+        }
         markSaved();
       } catch (e) {
         markSaved();
