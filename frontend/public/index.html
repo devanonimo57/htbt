@@ -57,23 +57,25 @@
     .sb-nav-item {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 11px;
       width: 100%;
-      padding: 9px 11px;
-      border-radius: 11px;
-      border: 1px solid transparent;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #141722;
       text-align: left;
       transition: all 0.15s;
-      background: #0b0b10;
-      margin-bottom: 6px;
+      background: #0b0d13;
+      margin-bottom: 7px;
+      position: relative;
+      overflow: hidden;
     }
     .sb-nav-item:hover {
-      background: #12121a;
-      border-color: #242432;
+      background: #10131d;
+      border-color: #222738;
     }
     .sb-nav-item.active {
-      background: rgba(37, 99, 235, 0.12);
-      border-color: #2563eb;
+      background: #121a2d !important;
+      border-color: #1e3a8a !important;
     }
     .toggle-switch {
       position: relative;
@@ -149,15 +151,14 @@
         <div>
           <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">COMEÇAR</p>
           
-          <button onclick="navigateTab('resumo')" id="nav-resumo" class="sb-nav-item active !bg-[#131b2e] !border-[#2563eb] relative overflow-hidden">
-            <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs shrink-0">
+          <button onclick="navigateTab('resumo')" id="nav-resumo" class="sb-nav-item active">
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0">
               <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
             </div>
             <div class="overflow-hidden flex-1">
               <p class="text-xs font-semibold text-white truncate">Resumo do atendi...</p>
               <p class="text-[11px] text-slate-400 truncate" id="nav-sub-resumo">2 de 5 itens essenciais</p>
             </div>
-            <div class="absolute right-0 top-0 bottom-0 w-1 bg-[#3b82f6]"></div>
           </button>
 
           <button onclick="navigateTab('estrategias')" id="nav-estrategias" class="sb-nav-item">
@@ -185,7 +186,7 @@
           </button>
 
           <button onclick="navigateTab('ofertas')" id="nav-ofertas" class="sb-nav-item">
-            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+            <div id="nav-icon-ofertas" class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
               <i class="fa-solid fa-cube text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
@@ -724,188 +725,238 @@
         </section>
 
         <!-- =========================================================
-             TELA 3: PERSONA E IDENTIDADE
+             TELA 3: PERSONA E IDENTIDADE (100% FIEL AOS PRINTS)
         ========================================================== -->
         <section id="sec-persona" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Persona e identidade</h2>
-            <p class="text-xs text-zinc-400 mt-1">Defina quem conversa: nome, história e personalidade.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Persona e identidade</h1>
+            <p class="text-sm text-slate-400 mt-1">Defina quem conversa: nome, história e personalidade.</p>
           </div>
 
-          <div class="sb-card p-6 space-y-5">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-zinc-800/90 border border-zinc-700 flex items-center justify-center text-zinc-300 shrink-0 font-bold text-xs">
-                A
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0c0e16] rounded-2xl space-y-6">
+            <!-- Header do Card -->
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 shrink-0">
+                <i class="fa-regular fa-user text-sm"></i>
               </div>
               <div>
                 <h3 class="text-sm font-bold text-white">Quem conversa com o visitante</h3>
-                <p class="text-[11px] text-zinc-500">Escolha nome, apresentação e história. A persona usa tudo isso para conversar em primeira pessoa com consistência.</p>
+                <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">Escolha nome, apresentação e história. A persona usa tudo isso para conversar em primeira pessoa com consistência.</p>
               </div>
             </div>
 
+            <!-- Nome de exibição + Idade -->
             <div class="grid grid-cols-12 gap-4">
-              <div class="col-span-9">
-                <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Nome de exibição</label>
-                <input type="text" id="inp-persona-name" oninput="onPersonaChange()" value="Atendimento" class="sb-input">
+              <div class="col-span-10">
+                <label class="text-xs font-semibold text-white block mb-2">Nome de exibição</label>
+                <input type="text" id="inp-persona-name" oninput="onPersonaChange()" value="Atendimento" class="sb-input !bg-[#08090f] !border-[#191d2b] !py-3 !px-4 !text-sm !rounded-xl">
               </div>
-              <div class="col-span-3">
-                <label class="text-xs font-semibold text-zinc-200 block mb-1.5">Idade</label>
-                <input type="number" id="inp-persona-age" oninput="onPersonaChange()" value="18" class="sb-input">
+              <div class="col-span-2">
+                <label class="text-xs font-semibold text-white block mb-2">Idade</label>
+                <input type="number" id="inp-persona-age" oninput="onPersonaChange()" value="18" class="sb-input !bg-[#08090f] !border-[#191d2b] !py-3 !px-4 !text-sm !rounded-xl">
               </div>
             </div>
 
+            <!-- Apresentação da persona -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Apresentação da persona</label>
-              <p class="text-[11px] text-zinc-500 mb-2">Controla pronomes, flexões e como a persona fala sobre si.</p>
-              <div class="grid grid-cols-3 gap-3" id="gender-cards">
-                <div onclick="selectGender('Feminina', 'Fala e se apresenta no feminino.')" data-val="Feminina" class="sb-radio-card selected">
+              <label class="text-xs font-semibold text-white block">Apresentação da persona</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-3">Controla pronomes, flexões e como a persona fala sobre si.</p>
+              <div class="grid grid-cols-3 gap-3.5" id="gender-cards">
+                <div onclick="selectGender('Feminina', 'Fala e se apresenta no feminino.')" data-val="Feminina" class="sb-radio-card selected !p-4 !rounded-xl">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Feminina</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-purple-400 flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-purple-400"></span></span>
+                    <span class="gender-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center">
+                      <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                    </span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Fala e se apresenta no feminino.</p>
+                  <p class="text-xs text-slate-400 mt-2">Fala e se apresenta no feminino.</p>
                 </div>
-                <div onclick="selectGender('Masculina', 'Fala e se apresenta no masculino.')" data-val="Masculina" class="sb-radio-card">
+
+                <div onclick="selectGender('Masculina', 'Fala e se apresenta no masculino.')" data-val="Masculina" class="sb-radio-card !p-4 !rounded-xl">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Masculina</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                    <span class="gender-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center"></span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Fala e se apresenta no masculino.</p>
+                  <p class="text-xs text-slate-400 mt-2">Fala e se apresenta no masculino.</p>
                 </div>
-                <div onclick="selectGender('Neutra', 'Evita marcações de gênero.')" data-val="Neutra" class="sb-radio-card">
+
+                <div onclick="selectGender('Neutra', 'Evita marcações de gênero.')" data-val="Neutra" class="sb-radio-card !p-4 !rounded-xl">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Neutra</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                    <span class="gender-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center"></span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Evita marcações de gênero.</p>
+                  <p class="text-xs text-slate-400 mt-2">Evita marcações de gênero.</p>
                 </div>
               </div>
             </div>
 
+            <!-- Cidade -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Cidade</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Opcional.</p>
-              <input type="text" id="inp-persona-city" oninput="onPersonaChange()" placeholder="Ex.: São Paulo" class="sb-input">
+              <label class="text-xs font-semibold text-white block">Cidade</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-2.5">Opcional.</p>
+              <input type="text" id="inp-persona-city" oninput="onPersonaChange()" placeholder="Ex.: São Paulo" class="sb-input !bg-[#08090f] !border-[#191d2b] !py-3 !px-4 !text-sm !rounded-xl">
             </div>
 
+            <!-- Biografia curta -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Biografia curta</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Conte a história comercial e os detalhes que ajudam a manter respostas coerentes.</p>
-              <textarea id="inp-persona-bio" rows="4" maxlength="500" oninput="onPersonaChange()" class="sb-input resize-y">Criadora adulta, espontânea e direta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.</textarea>
-              <div class="text-right text-[10px] text-zinc-500 mt-1" id="bio-counter">153/500</div>
+              <label class="text-xs font-semibold text-white block">Biografia curta</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-2.5">Conte a história comercial e os detalhes que ajudam a manter respostas coerentes.</p>
+              <textarea id="inp-persona-bio" rows="4" maxlength="800" oninput="onPersonaChange()" class="sb-input !bg-[#08090f] !border-[#191d2b] !p-4 !text-sm !rounded-xl resize-y leading-relaxed">Criadora adulta, espontanea e atenta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o proprio VIP sem parecer atendimento.</textarea>
+              <div class="text-right text-[11px] text-slate-500 mt-1.5" id="bio-counter">151/800</div>
             </div>
 
+            <!-- Traços de personalidade -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Traços de personalidade</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Separe por vírgulas. Use até 8 características.</p>
-              <input type="text" id="inp-persona-traits" oninput="onPersonaChange()" value="espontânea, atenta, bem-humorada" class="sb-input">
+              <label class="text-xs font-semibold text-white block">Traços de personalidade</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-2.5">Separe por vírgulas. Use até 6 características.</p>
+              <input type="text" id="inp-persona-traits" oninput="onPersonaChange()" value="espontanea, atenta, bem-humorada" class="sb-input !bg-[#08090f] !border-[#191d2b] !py-3 !px-4 !text-sm !rounded-xl">
             </div>
           </div>
 
-          <div class="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/25 flex items-center gap-3 text-[11px] text-emerald-200/90">
-            <i class="fa-solid fa-circle-info text-emerald-400"></i>
-            <span>A identidade deve representar uma pessoa adulta. Informações de login, documentos, dados bancários e dados privados de leads não devem ser inseridos aqui.</span>
+          <!-- Card de Aviso de Identidade Adulta (Fiel ao Print 2) -->
+          <div class="sb-card p-5 border border-[#181c28] bg-[#0b0d13] rounded-2xl flex items-center gap-3.5">
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-sm shrink-0"></i>
+            <span class="text-xs text-slate-300 leading-relaxed">A identidade deve representar uma pessoa adulta. Informações de login, documentos, dados bancários e dados privados de leads não devem ser inseridos aqui.</span>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('estrategias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- Botões de Navegação ANTERIOR / PRÓXIMA (2 Colunas Iguais Fiéis ao Print 2) -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('estrategias')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Estratégias prontas</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ANTERIOR</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Estratégias prontas</span>
               </div>
             </button>
-            <button onclick="navigateTab('ofertas')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+
+            <button onclick="navigateTab('ofertas')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Negócio e ofertas</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Negócio e ofertas</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
 
         <!-- =========================================================
-             TELA 4: NEGÓCIO E OFERTAS
+             TELA 4: NEGÓCIO E OFERTAS (100% FIEL AOS 5 PRINTS)
         ========================================================== -->
         <section id="sec-ofertas" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Negócio e ofertas</h2>
-            <p class="text-xs text-zinc-400 mt-1">Explique o VIP, cadastre preços e responda às dúvidas comuns.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Negócio e ofertas</h1>
+            <p class="text-sm text-slate-400 mt-1">Explique o VIP, cadastre preços e responda dúvidas comuns.</p>
           </div>
 
-          <div class="sb-card p-6 space-y-4">
+          <!-- CARD 1: CONTEXTO DA CRIADORA E DO VIP -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div>
               <h3 class="text-sm font-bold text-white">Contexto da criadora e do VIP</h3>
-              <p class="text-[11px] text-zinc-500 mt-0.5">Guia interno para evitar respostas genéricas. A persona usa este texto como fonte principal da conversa.</p>
+              <p class="text-xs text-slate-400 mt-0.5">Detalhes concretos evitam respostas genéricas. A persona usa este texto como fonte principal da conversa.</p>
             </div>
 
-            <div class="sb-subcard p-4 space-y-2">
-              <p class="text-xs font-semibold text-zinc-200">Um bom contexto deixa estas cinco respostas claras:</p>
-              <div class="grid grid-cols-2 gap-1.5 text-[11px] text-zinc-400">
+            <div class="rounded-xl p-4 bg-[#10131c] border border-[#1b2030] space-y-2">
+              <p class="text-xs font-bold text-slate-200">Um bom contexto deixa estas cinco respostas claras:</p>
+              <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-slate-400">
                 <p>• O que existe no VIP</p>
                 <p>• O que torna a oferta diferente</p>
                 <p>• Como pagamento e entrega funcionam</p>
                 <p>• Quando chamar o suporte</p>
-                <p class="col-span-2">• O que não pode ser prometido ou inventado</p>
+                <p class="col-span-2">• O que nunca pode ser prometido ou inventado</p>
               </div>
             </div>
 
             <div>
-              <textarea id="inp-business-context" rows="5" maxlength="4000" oninput="onBusinessChange()" class="sb-input resize-y">Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.</textarea>
-              <div class="text-right text-[10px] text-zinc-500 mt-1" id="context-counter">589/4.000</div>
+              <textarea id="inp-business-context" rows="6" maxlength="4000" oninput="onBusinessChange()" placeholder="Oferta: meu VIP privado no Telegram.&#10;Conteúdo: fotos, vídeos e diferenciais reais.&#10;Público: como os visitantes costumam chegar e o que procuram.&#10;Pagamento e entrega: quando o acesso é liberado.&#10;Suporte: quem ajuda se algo falhar.&#10;Limites: o que a persona nunca deve prometer." class="sb-input resize-y !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] leading-relaxed">Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.</textarea>
+              <div class="text-right text-[11px] text-slate-500 mt-1.5" id="context-counter">589/4.000</div>
             </div>
           </div>
 
-          <div class="sb-card p-6 space-y-4">
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                  <i class="fa-solid fa-gem text-purple-400 text-xs"></i> Ofertas
-                </h3>
-                <p class="text-[11px] text-zinc-500 mt-0.5">Cadastre até 10 opções. Se todas estiverem desativadas ou nenhuma tiver preço, aparecerá como planos atuais para o visitante comprar.</p>
-              </div>
+          <!-- CARD 2: OFERTAS -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-cube text-[#a855f7] text-xs"></i> Ofertas
+              </h3>
+              <p class="text-xs text-slate-400 mt-1">Cadastre até 10 opções. No teste elas orientam a conversa; com o bot ativo, aparecem como planos reais para o visitante comprar.</p>
             </div>
 
-            <button onclick="addOfferCard()" class="px-3.5 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] border border-[#252534] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
-              <i class="fa-solid fa-plus text-[10px]"></i> Adicionar
-            </button>
+            <div>
+              <button onclick="addOfferCard()" class="px-4 py-2 rounded-xl bg-[#10131c] hover:bg-[#161b28] border border-[#222738] text-xs font-semibold text-white flex items-center gap-2 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i> Adicionar
+              </button>
+            </div>
 
             <div id="offers-container" class="space-y-4 pt-1"></div>
           </div>
 
-          <div class="sb-card p-6 space-y-3">
+          <!-- CARD 3: NEGOCIAÇÃO DE PREÇO -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-3.5">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-tags text-emerald-400 text-xs"></i> Negociação de preço
+              <i class="fa-solid fa-cube text-emerald-400 text-xs"></i> Negociação de preço
             </h3>
-            <p class="text-[11px] text-zinc-400 leading-relaxed">Quando o visitante trava no valor, a IA pode oferecer uma condição melhor dentro do limite que você definir. Ela nunca escolhe o preço — o sistema calcula a partir destas regras e mostra num botão.</p>
-            <label class="inline-flex items-center gap-2 cursor-pointer pt-1">
-              <input type="checkbox" id="chk-bargain" onchange="toggleBargain()" class="w-4 h-4 accent-purple-600 rounded">
-              <span class="text-xs text-zinc-200 font-medium">Ativar</span>
-            </label>
-            <div id="bargain-details" class="hidden pt-3 border-t border-[#1e1e2a] grid grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs text-zinc-400 block mb-1">Valor mínimo autorizado (R$)</label>
-                <input type="number" step="0.50" id="inp-bargain-min" value="14.90" oninput="STATE.business.bargain.min_price=parseFloat(this.value)||14.90; markUnsaved()" class="sb-input">
+            <p class="text-xs text-slate-400 leading-relaxed">Quando o visitante trava no valor, a IA pode oferecer uma condição melhor dentro do limite que você definir. Ela nunca escolhe o preço — o sistema calcula a partir destas regras e mostra num botão.</p>
+
+            <div>
+              <label class="inline-flex items-center gap-2.5 cursor-pointer pt-0.5">
+                <input type="checkbox" id="chk-bargain" onchange="toggleBargain()" class="w-4 h-4 accent-emerald-500 rounded">
+                <span class="text-xs text-slate-200 font-medium">Ativar</span>
+              </label>
+            </div>
+
+            <!-- ESTADO EXPANDIDO QUANDO "ATIVAR" ESTÁ MARCADO (PRINT 5) -->
+            <div id="bargain-details" class="hidden pt-3 space-y-5">
+              <div class="grid grid-cols-2 gap-6">
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">DESCONTO MÁXIMO</label>
+                  <div class="flex items-center gap-2">
+                    <input type="number" id="inp-bargain-pct" value="40" oninput="STATE.business.bargain.max_discount_pct=parseInt(this.value)||40; markUnsaved()" class="sb-input !w-24 !bg-[#090b10] !border-[#1b2030] text-center font-semibold">
+                    <span class="text-xs text-slate-400">%</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1.5">Teto sobre o preço de cada oferta.</p>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">NUNCA ABAIXO DE</label>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400">R$</span>
+                    <input type="text" id="inp-bargain-min" value="0,00" oninput="STATE.business.bargain.min_price=parseFloat(this.value.replace(',','.'))||0; markUnsaved()" class="sb-input !w-28 !bg-[#090b10] !border-[#1b2030]">
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-1.5">Piso absoluto. Vale a regra mais restritiva entre as duas.</p>
+                </div>
               </div>
+
               <div>
-                <label class="text-xs text-zinc-400 block mb-1">Desconto máximo (%)</label>
-                <input type="number" id="inp-bargain-pct" value="20" oninput="STATE.business.bargain.max_discount_pct=parseInt(this.value)||20; markUnsaved()" class="sb-input">
+                <label class="inline-flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox" id="chk-bargain-once" onchange="STATE.business.bargain.once_per_visitor=this.checked; markUnsaved()" class="w-4 h-4 accent-emerald-500 rounded">
+                  <span class="text-xs text-slate-200 font-medium">Só uma vez por visitante</span>
+                </label>
+                <p class="text-[11px] text-slate-500 mt-1 pl-6">Sem isto, quem insistir chega ao piso repetindo que não tem dinheiro.</p>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">VALIDADE DA OFERTA</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="inp-bargain-validity" value="30" oninput="STATE.business.bargain.validity_minutes=parseInt(this.value)||30; markUnsaved()" class="sb-input !w-24 !bg-[#090b10] !border-[#1b2030] text-center font-semibold">
+                  <span class="text-xs text-slate-400">minutos</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1.5">O botão fica no histórico do Telegram para sempre; sem prazo, a condição vira o preço real da oferta.</p>
               </div>
             </div>
           </div>
 
-          <div class="sb-card p-6 space-y-4">
+          <!-- CARD 4: DÚVIDAS QUE A IA JÁ SABE RESPONDER -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div class="flex justify-between items-center">
               <div>
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                  <i class="fa-regular fa-circle-question text-blue-400 text-xs"></i> Dúvidas que a IA já sabe responder
+                  <i class="fa-regular fa-circle-question text-[#38bdf8] text-xs"></i> Dúvidas que a IA já sabe responder
                 </h3>
-                <p class="text-[11px] text-zinc-500 mt-0.5">Cadastre perguntas comuns e a resposta correta para cada uma.</p>
+                <p class="text-xs text-slate-400 mt-1">Cadastre perguntas comuns e a resposta correta para cada uma.</p>
               </div>
-              <button onclick="addFaqItem()" class="px-3.5 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] border border-[#252534] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+              <button onclick="addFaqItem()" class="px-4 py-2 rounded-xl bg-[#10131c] hover:bg-[#161b28] border border-[#222738] text-xs font-semibold text-white flex items-center gap-2 transition">
                 <i class="fa-solid fa-plus text-[10px]"></i> Adicionar dúvida
               </button>
             </div>
@@ -913,142 +964,175 @@
             <div id="faqs-container" class="space-y-3"></div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('persona')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR: 2 CARDS LADO A LADO -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('persona')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Persona e identidade</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ANTERIOR</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Persona e identidade</span>
               </div>
             </button>
-            <button onclick="navigateTab('conversa')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+
+            <button onclick="navigateTab('conversa')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Jeito de conversar</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Jeito de conversar</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
 
         <!-- =========================================================
-             TELA 5: JEITO DE CONVERSAR
+             TELA 5: JEITO DE CONVERSAR (100% FIEL AOS 5 PRINTS)
         ========================================================== -->
         <section id="sec-conversa" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONFIGURAÇÃO ESSENCIAL</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Jeito de conversar</h2>
-            <p class="text-xs text-zinc-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Jeito de conversar</h1>
+            <p class="text-sm text-slate-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
           </div>
 
-          <div class="sb-card p-6 space-y-5">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+          <!-- CARD 1: HUMANIZAÇÃO DA VENDA -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
+                <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
               <div>
                 <h3 class="text-sm font-bold text-white">Humanização da venda</h3>
-                <p class="text-[11px] text-zinc-500">Faz a persona reagir, lembrar preferências e escolher o momento certo de apresentar a oferta sem parecer um roteiro.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Faz a persona reagir, lembrar preferências e escolher o momento certo de apresentar a oferta sem parecer um roteiro.</p>
               </div>
             </div>
 
+            <!-- Estratégia comercial -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Estratégia comercial</label>
-              <p class="text-[11px] text-zinc-500 mb-2">Define em que momento a oferta entra na conversa.</p>
+              <label class="text-xs font-bold text-white block">Estratégia comercial</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-3">Define em que momento a oferta entra na conversa.</p>
               <div class="grid grid-cols-3 gap-3" id="rg-strategy">
-                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Conexão primeiro')" data-val="Conexão primeiro" class="sb-radio-card selected">
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Conexão primeiro')" data-val="Conexão primeiro" class="sb-radio-card selected !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Conexão primeiro</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-purple-400 flex items-center justify-center"><span class="w-2 h-2 rounded-full bg-purple-400"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Conversa e entende o interesse antes de vender.</p>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Conversa e entende o interesse antes de vender.</p>
                 </div>
-                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Equilibrado')" data-val="Equilibrado" class="sb-radio-card">
+
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Equilibrado')" data-val="Equilibrado" class="sb-radio-card !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Equilibrado</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Cria uma troca curta e apresenta a oferta no gancho.</p>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Cria uma troca curta e aproveita o primeiro gancho.</p>
                 </div>
-                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Direto')" data-val="Direto" class="sb-radio-card">
+
+                <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Direto')" data-val="Direto" class="sb-radio-card !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Direto</span>
-                    <span class="w-3.5 h-3.5 rounded-full border border-zinc-600"></span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                   </div>
-                  <p class="text-[11px] text-zinc-400 mt-1">Apresenta a oferta cedo, sem perder naturalidade.</p>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Apresenta a oferta cedo, sem perder naturalidade.</p>
                 </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <!-- Nível de flerte + Uso de gírias -->
+            <div class="grid grid-cols-2 gap-6">
               <div>
-                <label class="text-xs font-semibold text-zinc-200 block mb-2">Nível de flerte</label>
-                <div class="grid grid-cols-2 gap-2.5" id="rg-flirt">
-                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Nenhum')" data-val="Nenhum" class="sb-radio-card">
-                    <span class="text-xs font-semibold text-white">Nenhum</span>
+                <label class="text-xs font-bold text-white block mb-3">Nível de flerte</label>
+                <div class="grid grid-cols-2 gap-3" id="rg-flirt">
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Nenhum')" data-val="Nenhum" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Nenhum</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                   </div>
-                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Leve')" data-val="Leve" class="sb-radio-card selected">
-                    <span class="text-xs font-semibold text-white">Leve</span>
+
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Leve</span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
-                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Sensual')" data-val="Sensual" class="sb-radio-card col-span-2">
-                    <span class="text-xs font-semibold text-white block">Sensual</span>
-                    <span class="text-[10px] text-zinc-400">Provocante, sem descrição gráfica.</span>
+
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Sensual')" data-val="Sensual" class="sb-radio-card !p-4">
+                    <div class="flex justify-between items-center">
+                      <span class="text-xs font-bold text-white">Sensual</span>
+                      <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Provocante, sem descrição gráfica.</p>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label class="text-xs font-semibold text-zinc-200 block mb-2">Uso de gírias</label>
-                <div class="grid grid-cols-2 gap-2.5" id="rg-slang">
-                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Nenhuma')" data-val="Nenhuma" class="sb-radio-card">
-                    <span class="text-xs font-semibold text-white">Nenhuma</span>
+                <label class="text-xs font-bold text-white block mb-3">Uso de gírias</label>
+                <div class="grid grid-cols-2 gap-3" id="rg-slang">
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Nenhuma')" data-val="Nenhuma" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Nenhuma</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                   </div>
-                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Natural')" data-val="Natural" class="sb-radio-card selected">
-                    <span class="text-xs font-semibold text-white">Natural</span>
+
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Natural</span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
-                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Marcante')" data-val="Marcante" class="sb-radio-card col-span-2">
-                    <span class="text-xs font-semibold text-white">Marcante</span>
+
+                  <div onclick="selectRadioGroup('rg-slang', 'slang', 'Marcante')" data-val="Marcante" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Marcante</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                   </div>
                 </div>
               </div>
             </div>
 
+            <!-- Cadência -->
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Cadência</label>
-              <p class="text-[11px] text-zinc-500 mb-2">Controla a sensação de velocidade e pressão da conversa.</p>
+              <label class="text-xs font-bold text-white block">Cadência</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-3">Controla a sensação de velocidade e pressão na conversa.</p>
               <div class="grid grid-cols-3 gap-3" id="rg-cadence">
-                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Ágil')" data-val="Ágil" class="sb-radio-card">
-                  <span class="text-xs font-bold text-white block">Ágil</span>
-                  <p class="text-[10px] text-zinc-400 mt-1">Menos rodeio e avanço rápido.</p>
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Ágil')" data-val="Ágil" class="sb-radio-card !p-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Ágil</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Balões curtos e avanço rápido.</p>
                 </div>
-                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Natural')" data-val="Natural" class="sb-radio-card selected">
-                  <span class="text-xs font-bold text-white block">Natural</span>
-                  <p class="text-[10px] text-zinc-400 mt-1">Alterna reação, pergunta e próximo passo.</p>
+
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Natural</span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Alterna reação, pergunta e próximo passo.</p>
                 </div>
-                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Calma')" data-val="Calma" class="sb-radio-card">
-                  <span class="text-xs font-bold text-white block">Calma</span>
-                  <p class="text-[10px] text-zinc-400 mt-1">Mais acolhimento e menos pressão.</p>
+
+                <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Calmo')" data-val="Calmo" class="sb-radio-card !p-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Calmo</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-2 leading-relaxed">Mais acolhimento e menos pressão.</p>
                 </div>
               </div>
             </div>
 
-            <div class="space-y-2.5 pt-1">
-              <div class="sb-subcard p-3.5 flex items-center justify-between">
+            <!-- Container único com divisória para os 2 switches -->
+            <div class="rounded-xl border border-[#1b2030] bg-[#0e111a] divide-y divide-[#1b2030]">
+              <div class="p-4 flex items-center justify-between gap-4">
                 <div>
-                  <p class="text-xs font-semibold text-white">Espelhar o jeito do visitante</p>
-                  <p class="text-[11px] text-zinc-500">Acompanha energia, tamanho das mensagens e nível de informalidade.</p>
+                  <p class="text-xs font-bold text-white">Espelhar o jeito do visitante</p>
+                  <p class="text-xs text-slate-400 mt-0.5">Acompanha energia, tamanho das mensagens e nível de informalidade.</p>
                 </div>
-                <label class="toggle-switch">
+                <label class="toggle-switch shrink-0">
                   <input type="checkbox" id="chk-mirror" checked onchange="STATE.style.mirror_visitor=this.checked; markUnsaved()">
                   <span class="toggle-slider"></span>
                 </label>
               </div>
-              <div class="sb-subcard p-3.5 flex items-center justify-between">
+
+              <div class="p-4 flex items-center justify-between gap-4">
                 <div>
-                  <p class="text-xs font-semibold text-white">Usar o nome do lead</p>
-                  <p class="text-[11px] text-zinc-500">Chama pelo nome quando a pessoa se apresenta, sem repetir demais.</p>
+                  <p class="text-xs font-bold text-white">Usar o nome do lead</p>
+                  <p class="text-xs text-slate-400 mt-0.5">Memoriza depois que a pessoa se apresenta, sem repetir demais.</p>
                 </div>
-                <label class="toggle-switch">
+                <label class="toggle-switch shrink-0">
                   <input type="checkbox" id="chk-leadname" onchange="STATE.style.use_lead_name=this.checked; markUnsaved()">
                   <span class="toggle-slider"></span>
                 </label>
@@ -1056,53 +1140,93 @@
             </div>
           </div>
 
-          <div class="sb-card p-6 space-y-5">
-            <div>
-              <h3 class="text-sm font-bold text-white">Ritmo e personalidade da conversa</h3>
-              <p class="text-[11px] text-zinc-500">Escolhas simples que mantêm as respostas consistentes entre os visitantes.</p>
-            </div>
-
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-2">Tom de voz</label>
-              <div class="grid grid-cols-4 gap-2.5" id="rg-tone">
-                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Acolhedor')" data-val="Acolhedor" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Acolhedor</span></div>
-                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Direto')" data-val="Direto" class="sb-radio-card"><span class="text-xs font-semibold text-white">Direto</span></div>
-                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Descontraído')" data-val="Descontraído" class="sb-radio-card"><span class="text-xs font-semibold text-white">Descontraído</span></div>
-                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Provocante')" data-val="Provocante" class="sb-radio-card"><span class="text-xs font-semibold text-white">Provocante</span></div>
+          <!-- CARD 2: RITMO E PERSONALIDADE DA CONVERSA -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-slate-300 shrink-0">
+                <i class="fa-regular fa-message text-sm"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Ritmo e personalidade da conversa</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Escolhas simples que mantêm as respostas consistentes entre os visitantes.</p>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs font-semibold text-zinc-200 block mb-2">Tamanho das respostas</label>
-                <div class="grid grid-cols-2 gap-2.5" id="rg-length">
-                  <div onclick="selectRadioGroup('rg-length', 'length', 'Curta')" data-val="Curta" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Curta</span></div>
-                  <div onclick="selectRadioGroup('rg-length', 'length', 'Média')" data-val="Média" class="sb-radio-card"><span class="text-xs font-semibold text-white">Média</span></div>
-                  <div onclick="selectRadioGroup('rg-length', 'length', 'Detalhada')" data-val="Detalhada" class="sb-radio-card col-span-2"><span class="text-xs font-semibold text-white">Detalhada</span></div>
+            <!-- Tom de voz -->
+            <div>
+              <label class="text-xs font-bold text-white block mb-3">Tom de voz</label>
+              <div class="grid grid-cols-4 gap-3" id="rg-tone">
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Acolhedor')" data-val="Acolhedor" class="sb-radio-card selected !p-4 flex justify-between items-center">
+                  <span class="text-xs font-bold text-white">Acolhedor</span>
+                  <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                </div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Direto')" data-val="Direto" class="sb-radio-card !p-4 flex justify-between items-center">
+                  <span class="text-xs font-bold text-white">Direto</span>
+                  <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                </div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Descontraído')" data-val="Descontraído" class="sb-radio-card !p-4 flex justify-between items-center">
+                  <span class="text-xs font-bold text-white">Descontraído</span>
+                  <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                </div>
+                <div onclick="selectRadioGroup('rg-tone', 'tone', 'Premium')" data-val="Premium" class="sb-radio-card !p-4 flex justify-between items-center">
+                  <span class="text-xs font-bold text-white">Premium</span>
+                  <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                 </div>
               </div>
+            </div>
+
+            <!-- Tamanho das respostas + Uso de emojis -->
+            <div class="grid grid-cols-2 gap-6">
               <div>
-                <label class="text-xs font-semibold text-zinc-200 block mb-2">Uso de emojis</label>
-                <div class="grid grid-cols-2 gap-2.5" id="rg-emojis">
-                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Nenhum')" data-val="Nenhum" class="sb-radio-card"><span class="text-xs font-semibold text-white">Nenhum</span></div>
-                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Leve')" data-val="Leve" class="sb-radio-card selected"><span class="text-xs font-semibold text-white">Leve</span></div>
-                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Moderado')" data-val="Moderado" class="sb-radio-card col-span-2"><span class="text-xs font-semibold text-white">Moderado</span></div>
+                <label class="text-xs font-bold text-white block mb-3">Tamanho das respostas</label>
+                <div class="grid grid-cols-2 gap-3" id="rg-length">
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Curta')" data-val="Curta" class="sb-radio-card selected !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Curta</span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Média')" data-val="Média" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Média</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-length', 'length', 'Detalhada')" data-val="Detalhada" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Detalhada</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-bold text-white block mb-3">Uso de emojis</label>
+                <div class="grid grid-cols-2 gap-3" id="rg-emojis">
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Nenhum')" data-val="Nenhum" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Nenhum</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Leve</span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                  </div>
+                  <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Moderado')" data-val="Moderado" class="sb-radio-card !p-4 flex justify-between items-center">
+                    <span class="text-xs font-bold text-white">Moderado</span>
+                    <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="sb-card p-5 flex items-center justify-between">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs shrink-0">
-                <i class="fa-solid fa-volume-high"></i>
+          <!-- CARD 3: RESPOSTAS EM ÁUDIO -->
+          <div class="sb-card p-5 border border-[#181c28] bg-[#0b0d14] rounded-2xl flex items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#1c1610] border border-[#332617] text-amber-400 flex items-center justify-center text-xs shrink-0">
+                <i class="fa-solid fa-wave-square"></i>
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <h4 class="text-xs font-bold text-white">Respostas em áudio</h4>
-                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">VOZ NATURAL</span>
+                  <h4 class="text-sm font-bold text-white">Respostas em áudio</h4>
+                  <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-[#1c1610] border border-[#332617] text-amber-300">VOZ NATURAL</span>
                 </div>
-                <p class="text-[11px] text-zinc-500 mt-0.5">Cria novas mensagens de voz a partir da resposta e usa o saldo da IA. Áudios já gravados ficam em Mídias da conversa e funcionam mesmo com esta opção desligada.</p>
+                <p class="text-xs text-slate-400 mt-1 leading-relaxed">Cria novas mensagens de voz a partir da resposta e usa o saldo da IA. Áudios já gravados ficam em Mídias da conversa e funcionam mesmo com esta opção desligada.</p>
               </div>
             </div>
             <label class="toggle-switch shrink-0">
@@ -1111,70 +1235,78 @@
             </label>
           </div>
 
-          <div class="sb-card p-6 space-y-4">
+          <!-- CARD 4: ABERTURA DA CONVERSA, VARIAÇÕES E OBJETIVO PRINCIPAL -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-5">
             <div>
               <h3 class="text-sm font-bold text-white">Abertura da conversa</h3>
-              <p class="text-[11px] text-zinc-500 mt-0.5">Use uma abertura que combine com sua identidade, sem presumir que a pessoa acabou de chegar. Evite apresentar planos antes de ouvir o interesse.</p>
-            </div>
-            <textarea id="inp-opening-msg" rows="3" oninput="onOpeningChange()" class="sb-input">oii 💜
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">Use uma abertura que combine com sua identidade, sem presumir que a pessoa acabou de chegar. Evite apresentar planos antes de ouvir o interesse.</p>
+              <textarea id="inp-opening-msg" rows="4" oninput="onOpeningChange()" class="sb-input mt-3 !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">oii 💜
+
 chegou agora por aqui?</textarea>
-
-            <div class="pt-2 space-y-2">
-              <label class="text-xs font-semibold text-zinc-200 block">Variações de abertura</label>
-              <p class="text-[11px] text-zinc-500">No Telegram, apenas uma das aberturas é escolhida a cada /start. O teste nesta tela usa a principal.</p>
-              <button onclick="addOpeningVariation()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs font-medium text-zinc-200">+ Adicionar variação</button>
-              <div id="variations-container" class="space-y-2 pt-1">
-                <div class="flex gap-2 items-start">
-                  <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input"></textarea>
-                </div>
-              </div>
-              <p class="text-[10px] text-zinc-500">Dica: apresente o que a pessoa encontra aqui, retome o assunto sem supor intimidade ou pergunte o que ela quer saber. Use apenas informações reais da sua oferta.</p>
             </div>
 
-            <div class="pt-2">
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Objetivo principal</label>
-              <textarea id="inp-style-objective" rows="2" oninput="STATE.style.objective=this.value; markUnsaved()" class="sb-input">Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.</textarea>
+            <div class="space-y-2.5">
+              <div>
+                <label class="text-xs font-bold text-white block">Variações de abertura</label>
+                <p class="text-xs text-slate-400 mt-0.5">No Telegram, apenas uma das aberturas é escolhida a cada /start. O teste nesta tela usa a principal.</p>
+              </div>
+              <div>
+                <button onclick="addOpeningVariation()" class="px-4 py-2.5 rounded-xl bg-[#10131c] hover:bg-[#161b28] border border-[#222738] text-xs font-semibold text-white inline-flex items-center gap-2 transition">
+                  <i class="fa-solid fa-plus text-[10px]"></i> Adicionar variação
+                </button>
+              </div>
+              <div id="variations-container" class="space-y-2"></div>
+              <p class="text-[11px] text-slate-500 leading-relaxed">Ideias: apresente o que a pessoa encontra aqui, retome o assunto sem supor intimidade ou pergunte o que ela quer saber. Use apenas informações reais da sua oferta.</p>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-white block mb-2">Objetivo principal</label>
+              <textarea id="inp-style-objective" rows="3" oninput="STATE.style.objective=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">Entender a intencao, lembrar preferencias e conduzir naturalmente para o acesso mais adequado.</textarea>
             </div>
           </div>
 
-          <div class="sb-card p-6 space-y-4">
+          <!-- CARD 5: REGRAS PRÓPRIAS E PALAVRAS DE ENCAMINHAMENTO -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-5">
             <div>
               <h3 class="text-sm font-bold text-white">Regras próprias</h3>
-              <p class="text-[11px] text-zinc-500">Uma regra por linha. Use no máximo 10.</p>
+              <p class="text-xs text-slate-400 mt-0.5 mb-3">Uma regra por linha. Use no máximo 10.</p>
+              <textarea id="inp-style-rules" rows="4" oninput="STATE.style.rules=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y leading-relaxed">Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.
+Nao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.
+Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</textarea>
             </div>
-            <textarea id="inp-style-rules" rows="4" oninput="STATE.style.rules=this.value; markUnsaved()" class="sb-input">Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.
-Não reinicie a conversa nem repita uma pergunta que o visitante já respondeu.
-Quando houver intenção de compra, abra os planos sem criar etapas artificiais.</textarea>
 
             <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Palavras de encaminhamento</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Separe por vírgulas. Essas palavras poderão acionar atendimento humano em uma fase futura.</p>
-              <input type="text" id="inp-style-handoff" value="suporte, atendente, problema no pagamento" oninput="STATE.style.handoff_words=this.value; markUnsaved()" class="sb-input">
+              <label class="text-xs font-bold text-white block">Palavras de encaminhamento</label>
+              <p class="text-xs text-slate-400 mt-0.5 mb-2">Separe por vírgulas. Essas palavras poderão acionar atendimento humano em uma fase futura.</p>
+              <input type="text" id="inp-style-handoff" value="suporte, atendente, problema no pagamento" oninput="STATE.style.handoff_words=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
             </div>
           </div>
 
-          <div class="rounded-xl p-3.5 bg-emerald-950/20 border border-emerald-500/25 flex items-center gap-3 text-[11px] text-emerald-200/90">
-            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+          <!-- CARD 6: ESCUDO VERDE (PERSONA HUMANIZADA COM CONTROLE) -->
+          <div class="rounded-2xl p-5 bg-[#091512] border border-[#132e25] flex items-start gap-3.5">
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-sm mt-0.5"></i>
             <div>
-              <span class="font-bold block text-emerald-300">Persona humanizada com controle</span>
-              <span>A persona conversa em primeira pessoa, acompanha o jeito do visitante e evita respostas robóticas. Pagamentos, links e entregas continuam vindos apenas das ações reais configuradas no sistema.</span>
+              <span class="text-xs font-bold text-white block">Persona humanizada com controle</span>
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">A persona conversa em primeira pessoa, acompanha o jeito do visitante e evita respostas robóticas. Pagamentos, links e entregas continuam vindo somente das ações reais configuradas no sistema.</p>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('ofertas')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR: 2 CARDS LADO A LADO -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('ofertas')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Negócio e ofertas</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ANTERIOR</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Negócio e ofertas</span>
               </div>
             </button>
-            <button onclick="navigateTab('midias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+
+            <button onclick="navigateTab('midias')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Mídias da conversa</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Mídias da conversa</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -1956,7 +2088,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       <div class="flex justify-between items-center mb-4">
         <div>
           <h3 class="text-sm font-semibold text-white">Prévia do atendimento</h3>
-          <p class="text-xs text-slate-400 mt-0.5">Versão salva</p>
+          <p id="preview-save-status" class="text-xs text-slate-400 mt-0.5">Versão salva</p>
         </div>
         <button class="text-slate-400 hover:text-white transition">
           <i class="fa-regular fa-eye text-sm"></i>
@@ -2012,18 +2144,14 @@ quer que eu te mostre as opções de acesso?</textarea>
         gender: "Feminina",
         gender_desc: "Fala e se apresenta no feminino.",
         city: "",
-        bio: "Criadora adulta, espontânea e direta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.",
-        traits: "espontânea, atenta, bem-humorada"
+        bio: "Criadora adulta, espontanea e atenta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o proprio VIP sem parecer atendimento.",
+        traits: "espontanea, atenta, bem-humorada"
       },
       business: {
         context: "Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.",
-        offers: [
-          { id: "offer_1", visible: true, name: "Nova oferta", price: 19, description: "", emoji: "💎", duration: 30, highlight: false }
-        ],
-        bargain: { enabled: false, min_price: 14.90, max_discount_pct: 20 },
-        faqs: [
-          { id: "faq_1", question: "", answer: "" }
-        ]
+        offers: [],
+        bargain: { enabled: false, max_discount_pct: 40, min_price: 0, once_per_visitor: false, validity_minutes: 30 },
+        faqs: []
       },
       style: {
         strategy: "Conexão primeiro",
@@ -2037,8 +2165,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         emojis: "Leve",
         audio_replies: false,
         opening_messages: ["oii 💜", "chegou agora por aqui?"],
-        objective: "Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.",
-        rules: "Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.\nNão reinicie a conversa nem repita uma pergunta que o visitante já respondeu.\nQuando houver intenção de compra, abra os planos sem criar etapas artificiais.",
+        objective: "Entender a intencao, lembrar preferencias e conduzir naturalmente para o acesso mais adequado.",
+        rules: "Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.\nNao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.\nQuando houver intencao de compra, abra os planos sem criar etapas artificiais.",
         handoff_words: "suporte, atendente, problema no pagamento"
       },
       medias: [
@@ -2118,6 +2246,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       const side = document.getElementById('sidebar-config-status');
       if (side) side.textContent = "Alterada";
+      const prev = document.getElementById('preview-save-status');
+      if (prev) prev.textContent = "Rascunho local";
     }
 
     function markSaved() {
@@ -2128,6 +2258,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       const side = document.getElementById('sidebar-config-status');
       if (side) side.textContent = "Salva";
+      const prev = document.getElementById('preview-save-status');
+      if (prev) prev.textContent = "Versão salva";
     }
 
     function onPersonaChange() {
@@ -2137,7 +2269,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       STATE.persona.bio = document.getElementById('inp-persona-bio').value;
       STATE.persona.traits = document.getElementById('inp-persona-traits').value;
 
-      document.getElementById('bio-counter').textContent = `${STATE.persona.bio.length}/500`;
+      document.getElementById('bio-counter').textContent = `${STATE.persona.bio.length}/800`;
       document.getElementById('preview-persona-name').textContent = STATE.persona.name;
       document.getElementById('nav-sub-persona').textContent = STATE.persona.name;
       markUnsaved();
@@ -2149,6 +2281,16 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.querySelectorAll('#gender-cards .sb-radio-card').forEach(card => {
         const isSel = card.getAttribute('data-val') === gender;
         card.classList.toggle('selected', isSel);
+        const dot = card.querySelector('.gender-dot');
+        if (dot) {
+          if (isSel) {
+            dot.className = "gender-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center";
+            dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
+          } else {
+            dot.className = "gender-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center";
+            dot.innerHTML = '';
+          }
+        }
       });
       markUnsaved();
     }
@@ -2169,68 +2311,94 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function renderOffers() {
       const container = document.getElementById('offers-container');
-      container.innerHTML = STATE.business.offers.map((o, idx) => `
-        <div class="sb-subcard p-5 space-y-4">
-          <div class="flex justify-between items-center">
-            <label class="inline-flex items-center gap-2.5 cursor-pointer">
-              <label class="toggle-switch">
-                <input type="checkbox" ${o.visible ? 'checked' : ''} onchange="updateOfferField(${idx}, 'visible', this.checked)">
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="text-xs font-medium text-zinc-200">Visível</span>
-            </label>
-            <button onclick="removeOfferCard(${idx})" class="text-zinc-500 hover:text-red-400 text-xs">
-              <i class="fa-regular fa-trash-can"></i>
-            </button>
-          </div>
+      const offers = STATE.business.offers || [];
 
-          <div class="grid grid-cols-12 gap-3">
-            <div class="col-span-9">
-              <input type="text" value="${o.name}" oninput="updateOfferField(${idx}, 'name', this.value)" placeholder="Nome da oferta" class="sb-input">
-            </div>
-            <div class="col-span-3 relative">
-              <span class="absolute left-3 top-2.5 text-xs text-zinc-500">R$</span>
-              <input type="number" step="0.10" value="${o.price}" oninput="updateOfferField(${idx}, 'price', parseFloat(this.value)||0)" class="sb-input !pl-8">
-            </div>
+      if (offers.length === 0) {
+        container.innerHTML = `
+          <div class="rounded-xl border border-dashed border-[#1e2333] bg-[#090b10] py-8 px-4 text-center">
+            <i class="fa-solid fa-cube text-slate-600 text-lg mb-2 block"></i>
+            <p class="text-xs font-bold text-slate-200">Nenhuma oferta cadastrada</p>
+            <p class="text-xs text-slate-500 mt-1">O atendimento não poderá informar preços até você adicionar uma.</p>
           </div>
-
-          <div>
-            <textarea rows="2" oninput="updateOfferField(${idx}, 'description', this.value)" placeholder="O que está incluso e como funciona..." class="sb-input">${o.description || ''}</textarea>
-          </div>
-
-          <div class="grid grid-cols-12 gap-3 items-end">
-            <div class="col-span-2">
-              <label class="text-[11px] text-zinc-400 block mb-1">Emoji</label>
-              <input type="text" value="${o.emoji || '💎'}" oninput="updateOfferField(${idx}, 'emoji', this.value)" class="sb-input text-center">
-            </div>
-            <div class="col-span-7">
-              <label class="text-[11px] text-zinc-400 block">Duração de acesso</label>
-              <span class="text-[10px] text-zinc-500 block mb-1">Use 99999 para acesso vitalício</span>
-              <div class="relative">
-                <input type="number" value="${o.duration || 30}" oninput="updateOfferField(${idx}, 'duration', parseInt(this.value)||30)" class="sb-input !pr-12">
-                <span class="absolute right-3 top-2.5 text-[11px] text-zinc-500">dias</span>
-              </div>
-            </div>
-            <div class="col-span-3">
-              <div class="sb-input flex items-center justify-between !py-2">
-                <span class="text-xs text-zinc-300"><i class="fa-regular fa-star text-[10px] mr-1"></i> Destaque</span>
+        `;
+      } else {
+        container.innerHTML = offers.map((o, idx) => `
+          <div class="rounded-2xl border border-[#1b2030] bg-[#0e111a] p-5 space-y-4">
+            <div class="flex justify-between items-center">
+              <label class="inline-flex items-center gap-2.5 cursor-pointer">
                 <label class="toggle-switch">
-                  <input type="checkbox" ${o.highlight ? 'checked' : ''} onchange="updateOfferField(${idx}, 'highlight', this.checked)">
+                  <input type="checkbox" ${o.visible ? 'checked' : ''} onchange="updateOfferField(${idx}, 'visible', this.checked)">
                   <span class="toggle-slider"></span>
                 </label>
+                <span class="text-xs font-medium text-slate-200">Visível</span>
+              </label>
+              <button onclick="removeOfferCard(${idx})" class="text-slate-500 hover:text-rose-400 text-xs transition">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-12 gap-3">
+              <div class="col-span-9">
+                <input type="text" value="${o.name}" oninput="updateOfferField(${idx}, 'name', this.value)" placeholder="Nova oferta" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+              </div>
+              <div class="col-span-3 relative">
+                <span class="absolute left-3.5 top-2.5 text-xs text-slate-500">R$</span>
+                <input type="number" step="1" value="${o.price}" oninput="updateOfferField(${idx}, 'price', parseFloat(this.value)||0)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] !pl-9">
+              </div>
+            </div>
+
+            <div>
+              <textarea rows="2" oninput="updateOfferField(${idx}, 'description', this.value)" placeholder="O que está incluso e como funciona..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">${o.description || ''}</textarea>
+            </div>
+
+            <div class="grid grid-cols-12 gap-3 items-end">
+              <div class="col-span-2">
+                <label class="text-xs font-semibold text-slate-300 block mb-1.5">Emoji</label>
+                <input type="text" value="${o.emoji || '💎'}" oninput="updateOfferField(${idx}, 'emoji', this.value)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] text-center">
+              </div>
+              <div class="col-span-6">
+                <label class="text-xs font-semibold text-slate-300 block">Duração do acesso</label>
+                <span class="text-[11px] text-slate-500 block mb-1.5">Use 99999 para acesso vitalício.</span>
+                <div class="relative">
+                  <i class="fa-regular fa-calendar absolute left-3.5 top-3 text-xs text-slate-500"></i>
+                  <input type="number" value="${o.duration || 30}" oninput="updateOfferField(${idx}, 'duration', parseInt(this.value)||30)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] !pl-9 !pr-12">
+                  <span class="absolute right-3.5 top-2.5 text-xs text-slate-400">dias</span>
+                </div>
+              </div>
+              <div class="col-span-4">
+                <div class="rounded-xl bg-[#090b10] border border-[#1b2030] px-3.5 py-2.5 flex items-center justify-between">
+                  <span class="text-xs font-medium text-slate-300 flex items-center gap-2"><i class="fa-regular fa-star text-xs text-slate-400"></i> Destaque</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" ${o.highlight ? 'checked' : ''} onchange="updateOfferField(${idx}, 'highlight', this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      `).join('');
+        `).join('');
+      }
 
-      const activeCount = STATE.business.offers.filter(x => x.visible).length;
+      const activeCount = offers.filter(x => x.visible).length;
       document.getElementById('nav-sub-ofertas').textContent = `${activeCount} oferta${activeCount === 1 ? '' : 's'} ativa${activeCount === 1 ? '' : 's'}`;
+
+      const iconOfertas = document.getElementById('nav-icon-ofertas');
+      if (iconOfertas) {
+        if (activeCount > 0) {
+          iconOfertas.className = "w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs shrink-0";
+          iconOfertas.innerHTML = `<i class="fa-solid fa-check text-[11px]"></i>`;
+        } else {
+          iconOfertas.className = "w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0";
+          iconOfertas.innerHTML = `<i class="fa-solid fa-cube text-[11px]"></i>`;
+        }
+      }
 
       const upsellSelect = document.getElementById('sel-upsell-offer');
       if (upsellSelect) {
-        upsellSelect.innerHTML = STATE.business.offers.map(o => `<option value="${o.id}">${o.emoji || '💎'} ${o.name} (R$ ${Number(o.price).toFixed(2)})</option>`).join('');
+        upsellSelect.innerHTML = offers.map(o => `<option value="${o.id}">${o.emoji || '💎'} ${o.name} (R$ ${Number(o.price).toFixed(2)})</option>`).join('');
       }
+
+      if (typeof updatePrepProgress === 'function') updatePrepProgress();
     }
 
     function updateOfferField(idx, field, val) {
@@ -2240,11 +2408,12 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function addOfferCard() {
+      if ((STATE.business.offers || []).length >= 10) return;
       STATE.business.offers.push({
         id: 'offer_' + Date.now(),
         visible: true,
         name: 'Nova oferta',
-        price: 29.90,
+        price: 19,
         description: '',
         emoji: '💎',
         duration: 30,
@@ -2255,7 +2424,6 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function removeOfferCard(idx) {
-      if (STATE.business.offers.length <= 1) return;
       STATE.business.offers.splice(idx, 1);
       renderOffers();
       markUnsaved();
@@ -2263,15 +2431,24 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function renderFaqs() {
       const container = document.getElementById('faqs-container');
-      container.innerHTML = STATE.business.faqs.map((f, idx) => `
-        <div class="sb-subcard p-4 space-y-2.5">
+      const faqs = STATE.business.faqs || [];
+      if (faqs.length === 0) {
+        container.innerHTML = `
+          <div class="rounded-xl border border-dashed border-[#1e2333] bg-[#090b10] p-6 text-center text-xs text-slate-500">
+            Adicione as dúvidas mais frequentes para manter respostas consistentes.
+          </div>
+        `;
+        return;
+      }
+      container.innerHTML = faqs.map((f, idx) => `
+        <div class="rounded-2xl border border-[#1b2030] bg-[#0e111a] p-4 space-y-2.5">
           <div class="flex gap-2 items-center">
-            <input type="text" value="${f.question}" oninput="STATE.business.faqs[${idx}].question=this.value; markUnsaved()" placeholder="Ex.: Quanto tempo demora para liberar?" class="sb-input flex-1">
-            <button onclick="removeFaqItem(${idx})" class="text-zinc-500 hover:text-red-400 px-2">
+            <input type="text" value="${f.question}" oninput="STATE.business.faqs[${idx}].question=this.value; markUnsaved()" placeholder="Ex.: Quanto tempo demora para liberar?" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] flex-1">
+            <button onclick="removeFaqItem(${idx})" class="text-slate-500 hover:text-rose-400 px-2 transition">
               <i class="fa-regular fa-trash-can text-xs"></i>
             </button>
           </div>
-          <textarea rows="2" oninput="STATE.business.faqs[${idx}].answer=this.value; markUnsaved()" placeholder="Escreva a resposta correta..." class="sb-input">${f.answer}</textarea>
+          <textarea rows="2" oninput="STATE.business.faqs[${idx}].answer=this.value; markUnsaved()" placeholder="Escreva a resposta correta..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">${f.answer}</textarea>
         </div>
       `).join('');
     }
@@ -2288,15 +2465,26 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    function selectRadioGroup(groupId, stateField, value) {
+    function selectRadioGroup(groupId, stateField, value, silent = false) {
       STATE.style[stateField] = value;
       document.querySelectorAll(`#${groupId} .sb-radio-card`).forEach(card => {
-        card.classList.toggle('selected', card.getAttribute('data-val') === value);
+        const isSel = card.getAttribute('data-val') === value;
+        card.classList.toggle('selected', isSel);
+        const dot = card.querySelector('.radio-dot');
+        if (dot) {
+          if (isSel) {
+            dot.className = "radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0";
+            dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
+          } else {
+            dot.className = "radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0";
+            dot.innerHTML = '';
+          }
+        }
       });
       if (stateField === 'tone') {
         document.getElementById('nav-sub-conversa').textContent = `Tom ${value.toLowerCase()}`;
       }
-      markUnsaved();
+      if (!silent) markUnsaved();
     }
 
     function onOpeningChange() {
@@ -2312,8 +2500,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       const div = document.createElement('div');
       div.className = 'flex gap-2 items-start';
       div.innerHTML = `
-        <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input flex-1"></textarea>
-        <button onclick="this.parentElement.remove(); markUnsaved()" class="text-zinc-500 hover:text-red-400 p-2"><i class="fa-regular fa-trash-can text-xs"></i></button>
+        <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] flex-1"></textarea>
+        <button onclick="this.parentElement.remove(); markUnsaved()" class="text-slate-500 hover:text-rose-400 p-2 transition"><i class="fa-regular fa-trash-can text-xs"></i></button>
       `;
       c.appendChild(div);
       markUnsaved();
@@ -2322,7 +2510,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     function renderRightPreviewBubbles() {
       const box = document.getElementById('preview-chat-bubbles');
       box.innerHTML = STATE.style.opening_messages.map(msg => `
-        <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+        <div class="bg-[#121520] border border-[#1e2333] text-slate-200 px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] leading-relaxed">
           ${msg}
         </div>
       `).join('');
@@ -2733,25 +2921,27 @@ quer que eu te mostre as opções de acesso?</textarea>
       box.scrollTop = box.scrollHeight;
     }
 
-    function onPublishChange() {
-      STATE.publish.is_live = document.getElementById('chk-bot-live').checked;
-      STATE.publish.bot_token = document.getElementById('inp-bot-token').value;
-      STATE.publish.pushin_pay_token = document.getElementById('inp-pushin-token').value;
-      STATE.publish.cache_channel_id = document.getElementById('inp-cache-channel').value;
-      STATE.publish.delivery_destination = document.getElementById('inp-delivery-dest').value;
-      STATE.publish.support_username = document.getElementById('inp-support-user').value;
-
-      let completed = 3;
-      if (STATE.publish.bot_token) {
+    function updatePrepProgress() {
+      let completed = 2;
+      if ((STATE.business?.offers || []).some(o => o.visible)) {
         completed++;
-        document.getElementById('sidebar-bot-status').textContent = STATE.publish.bot_username || "Vinculada";
-        document.getElementById('chk-pub-bot').className = "text-emerald-400";
-        document.getElementById('chk-pub-bot').innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Bot válido e vinculado`;
       }
-      if (STATE.publish.delivery_destination) {
+      if (STATE.publish?.bot_token) {
         completed++;
-        document.getElementById('chk-pub-delivery').className = "text-emerald-400";
-        document.getElementById('chk-pub-delivery').innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Entrega configurada`;
+        document.getElementById('sidebar-bot-status').textContent = STATE.publish.bot_username || "Vinculado";
+        const chkBot = document.getElementById('chk-pub-bot');
+        if (chkBot) {
+          chkBot.className = "text-emerald-400";
+          chkBot.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Bot válido e vinculado`;
+        }
+      }
+      if (STATE.publish?.delivery_destination) {
+        completed++;
+        const chkDel = document.getElementById('chk-pub-delivery');
+        if (chkDel) {
+          chkDel.className = "text-emerald-400";
+          chkDel.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Entrega configurada`;
+        }
       }
       const pct = (completed / 5) * 100;
       document.getElementById('sidebar-prep-count').textContent = `${completed}/5`;
@@ -2759,6 +2949,16 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('hero-prep-label').textContent = `${completed} de 5 concluídos`;
       document.getElementById('hero-prep-bar').style.width = `${pct}%`;
       document.getElementById('nav-sub-resumo').textContent = `${completed} de 5 itens essenciais`;
+    }
+
+    function onPublishChange() {
+      STATE.publish.is_live = document.getElementById('chk-bot-live').checked;
+      STATE.publish.bot_token = document.getElementById('inp-bot-token').value;
+      STATE.publish.pushin_pay_token = document.getElementById('inp-pushin-token').value;
+      STATE.publish.cache_channel_id = document.getElementById('inp-cache-channel').value;
+      STATE.publish.delivery_destination = document.getElementById('inp-delivery-dest').value;
+      STATE.publish.support_username = document.getElementById('inp-support-user').value;
+      updatePrepProgress();
       markUnsaved();
     }
 
@@ -2769,13 +2969,36 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-persona-bio').value = STATE.persona.bio || '';
       document.getElementById('inp-persona-traits').value = STATE.persona.traits || '';
       document.getElementById('inp-business-context').value = STATE.business.context || '';
+      document.getElementById('context-counter').textContent = `${(STATE.business.context || '').length}/4.000`;
+
       document.getElementById('chk-bargain').checked = !!STATE.business.bargain?.enabled;
+      document.getElementById('inp-bargain-pct').value = STATE.business.bargain?.max_discount_pct ?? 40;
+      const minP = STATE.business.bargain?.min_price ?? 0;
+      document.getElementById('inp-bargain-min').value = Number(minP).toFixed(2).replace('.', ',');
+      if (document.getElementById('chk-bargain-once')) {
+        document.getElementById('chk-bargain-once').checked = !!STATE.business.bargain?.once_per_visitor;
+      }
+      if (document.getElementById('inp-bargain-validity')) {
+        document.getElementById('inp-bargain-validity').value = STATE.business.bargain?.validity_minutes ?? 30;
+      }
       toggleBargain();
 
-      document.getElementById('inp-opening-msg').value = (STATE.style.opening_messages || ['oii 💜', 'chegou agora por aqui?']).join('\n');
+      document.getElementById('inp-opening-msg').value = (STATE.style.opening_messages || ['oii 💜', 'chegou agora por aqui?']).join('\n\n');
       document.getElementById('inp-style-objective').value = STATE.style.objective || '';
       document.getElementById('inp-style-rules').value = STATE.style.rules || '';
       document.getElementById('inp-style-handoff').value = STATE.style.handoff_words || '';
+
+      document.getElementById('chk-mirror').checked = STATE.style.mirror_visitor !== false;
+      document.getElementById('chk-leadname').checked = !!STATE.style.use_lead_name;
+      document.getElementById('chk-audio-replies').checked = !!STATE.style.audio_replies;
+
+      selectRadioGroup('rg-strategy', 'strategy', STATE.style.strategy || 'Conexão primeiro', true);
+      selectRadioGroup('rg-flirt', 'flirt', STATE.style.flirt || 'Leve', true);
+      selectRadioGroup('rg-slang', 'slang', STATE.style.slang || 'Natural', true);
+      selectRadioGroup('rg-cadence', 'cadence', STATE.style.cadence === 'Calma' ? 'Calmo' : (STATE.style.cadence || 'Natural'), true);
+      selectRadioGroup('rg-tone', 'tone', STATE.style.tone === 'Provocante' ? 'Premium' : (STATE.style.tone || 'Acolhedor'), true);
+      selectRadioGroup('rg-length', 'length', STATE.style.length || 'Curta', true);
+      selectRadioGroup('rg-emojis', 'emojis', STATE.style.emojis || 'Leve', true);
 
       document.getElementById('chk-downsell-enabled').checked = !!STATE.downsell?.enabled;
       onDownsellToggle();
@@ -2835,6 +3058,18 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (res.ok) {
           const serverState = await res.json();
           STATE = { ...STATE, ...serverState };
+          if (Array.isArray(STATE.business?.faqs) && STATE.business.faqs.length === 1 && !STATE.business.faqs[0].question && !STATE.business.faqs[0].answer) {
+            STATE.business.faqs = [];
+          }
+          if (Array.isArray(STATE.business?.offers) && STATE.business.offers.length === 1 && STATE.business.offers[0].id === 'offer_1' && !STATE.business.offers[0].description) {
+            STATE.business.offers = [];
+          }
+          if (STATE.style?.objective?.startsWith("Entender o interesse")) {
+            STATE.style.objective = "Entender a intencao, lembrar preferencias e conduzir naturalmente para o acesso mais adequado.";
+          }
+          if (STATE.style?.rules?.startsWith("Puxar um detalhe")) {
+            STATE.style.rules = "Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.\nNao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.\nQuando houver intencao de compra, abra os planos sem criar etapas artificiais.";
+          }
         }
       } catch (e) {}
       syncStateToInputs();

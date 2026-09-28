@@ -45,30 +45,15 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     },
     "business": {
         "context": "Este atendimento representa uma criadora adulta que vende acesso ao próprio VIP privado pelo Telegram. O visitante pode chegar curioso ou pronto para comprar. Seja natural, acolhedora e use apenas os benefícios cadastrados nas ofertas. Chame o produto de meu VIP ou meu conteúdo, nunca de clube. O pagamento começa pelo botão seguro e a entrega configurada acontece depois da confirmação. Se houver falha de pagamento ou acesso, encaminhe para o suporte cadastrado. Nunca invente descontos, bônus, quantidade de conteúdos, atualizações ou experiências que não estejam configuradas.",
-        "offers": [
-            {
-                "id": "offer_1",
-                "visible": True,
-                "name": "Nova oferta",
-                "price": 19,
-                "description": "",
-                "emoji": "💎",
-                "duration": 30,
-                "highlight": False
-            }
-        ],
+        "offers": [],
         "bargain": {
             "enabled": False,
-            "min_price": 14.90,
-            "max_discount_pct": 20
+            "max_discount_pct": 40,
+            "min_price": 0,
+            "once_per_visitor": False,
+            "validity_minutes": 30
         },
-        "faqs": [
-            {
-                "id": "faq_1",
-                "question": "",
-                "answer": ""
-            }
-        ]
+        "faqs": []
     },
     "style": {
         "strategy": "Conexão primeiro",
@@ -82,9 +67,9 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         "emojis": "Leve",
         "audio_replies": False,
         "opening_messages": ["oii 💜", "chegou agora por aqui?"],
-        "opening_variations": [""],
-        "objective": "Entender o interesse, lembrar preferências e conduzir naturalmente para o acesso mais adequado.",
-        "rules": "Puxar um detalhe mais importante da última mensagem antes de fazer outra pergunta.\nNão reinicie a conversa nem repita uma pergunta que o visitante já respondeu.\nQuando houver intenção de compra, abra os planos sem criar etapas artificiais.",
+        "opening_variations": [],
+        "objective": "Entender a intencao, lembrar preferencias e conduzir naturalmente para o acesso mais adequado.",
+        "rules": "Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.\nNao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.\nQuando houver intencao de compra, abra os planos sem criar etapas artificiais.",
         "handoff_words": "suporte, atendente, problema no pagamento"
     },
     "medias": [
