@@ -141,7 +141,7 @@ async def _call_llm_endpoint(url: str, api_key: str, model: str, messages: List[
         headers["Authorization"] = f"Bearer {api_key}"
     for attempt in range(2):
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(
                     url,
                     headers=headers,
@@ -206,13 +206,15 @@ async def generate_ai_reply(
     )
 
     # Verifica intenção real de preço / planos / comprar
+    strong_offer_words = [
+        "preço", "preco", "valor", "quanto custa", "quanto ta", "quanto tá", "quanto é",
+        "plano", "assinar", "pix", "comprar"
+    ]
+    soft_offer_words = ["vip", "entrar", "quero ver", "como funciona", "acesso", "quero"]
+    has_strong = any(w in msg_lower for w in strong_offer_words)
+    has_soft_combo = sum(1 for w in soft_offer_words if w in msg_lower) >= 2
     wants_offer = (not is_age_question) and (
-        wants_discount or any(
-            w in msg_lower for w in [
-                "preço", "preco", "valor", "quanto custa", "quanto ta", "quanto tá", "quanto é",
-                "plano", "vip", "assinar", "entrar", "quero ver", "pix", "como funciona", "comprar", "acesso", "quero"
-            ]
-        )
+        wants_discount or has_strong or has_soft_combo
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -301,6 +303,7 @@ async def generate_ai_reply(
                 eff_min = _compute_effective_min_price(offers, bargain)
                 chosen_offer["price"] = max(eff_min, discount_price)
                 chosen_offer["name"] = f"{chosen_offer.get('name', 'VIP')} (Desconto)"
+                chosen_offer["discounted"] = True
             result["offer_card"] = chosen_offer
         return result
 
@@ -340,6 +343,7 @@ async def generate_ai_reply(
             disc_offer = dict(offers[0])
             disc_offer["price"] = eff_min
             disc_offer["name"] = f"{disc_offer.get('name', 'VIP')} (Desconto)"
+            disc_offer["discounted"] = True
             return {
                 "reply": f"poxa, quero muito te ver lá no meu VIP... consigo fazer uma condição especial de R$ {eff_min:.2f} pra você entrar agora no Pix, topa? 💜",
                 "offer_card": disc_offer,
