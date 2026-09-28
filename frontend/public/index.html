@@ -245,7 +245,7 @@
           <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">TESTE E PUBLICAÇÃO</p>
           <button onclick="navigateTab('testar')" id="nav-testar" class="sb-nav-item">
             <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-regular fa-comment-dots text-[11px]"></i>
+              <i class="fa-solid fa-flask text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Testar conversa</p>
@@ -255,7 +255,7 @@
 
           <button onclick="navigateTab('publicar')" id="nav-publicar" class="sb-nav-item">
             <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-robot text-[11px]"></i>
+              <i class="fa-solid fa-rocket text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Publicar no bot</p>
@@ -1691,171 +1691,260 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 9: TESTAR CONVERSA (FIEL AO PRINT 13)
+             TELA 9: TESTAR CONVERSA (100% FIEL AOS PRINTS 1 E 2)
         ========================================================== -->
-        <section id="sec-testar" class="tab-section hidden space-y-6">
+        <section id="sec-testar" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">TESTE E PUBLICAÇÃO</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Testar conversa</h2>
-            <p class="text-xs text-zinc-400 mt-1">Converse com a persona e revise as respostas antes de ativar.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">TESTE E PUBLICAÇÃO</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Testar conversa</h2>
+            <p class="text-xs text-slate-400 mt-1">Converse com a persona e revise as respostas antes de ativar.</p>
           </div>
 
-          <div class="sb-card p-5 space-y-4">
-            <div class="flex justify-between items-center border-b border-[#1c1c26] pb-3">
+          <!-- CARD PRINCIPAL DO SIMULADOR -->
+          <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] overflow-hidden">
+            <!-- HEADER DO SIMULADOR -->
+            <div class="p-5 border-b border-[#181c28] flex justify-between items-center">
               <div>
                 <div class="flex items-center gap-2">
                   <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <h3 class="text-xs font-bold text-white">Conversa privada de teste</h3>
+                  <h3 class="text-sm font-bold text-white">Conversa privada de teste</h3>
                 </div>
-                <p class="text-[10px] text-zinc-500 mt-0.5">Simule um visitante. Nenhum lead ou bot recebe estas mensagens.</p>
+                <p class="text-xs text-slate-400 mt-1">Testando como <span id="sim-persona-name">Atendimento</span> • nenhum lead ou bot recebe estas mensagens.</p>
               </div>
-              <button onclick="resetFullSimulator()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5">
-                <i class="fa-solid fa-rotate-right text-[10px]"></i> Limpar teste
+              <button type="button" onclick="resetFullSimulator()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-eraser text-[11px]"></i> Limpar teste
               </button>
             </div>
 
-            <div id="full-sim-messages" class="h-80 overflow-y-auto space-y-2.5 p-3 bg-[#08080c] rounded-xl border border-[#191923]"></div>
+            <!-- ÁREA DE MENSAGENS DO SIMULADOR -->
+            <div id="full-sim-messages" class="h-[360px] overflow-y-auto space-y-2.5 p-5 bg-[#07090e]"></div>
 
-            <form onsubmit="sendTestMessage(event)" class="space-y-2.5">
-              <textarea id="full-sim-input" rows="2" placeholder="Escreva como se fosse um visitante..." class="sb-input resize-none" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendTestMessage(event);}"></textarea>
+            <!-- RODAPÉ DE ENVIO -->
+            <form onsubmit="sendTestMessage(event)" class="p-4 border-t border-[#181c28] bg-[#090b10] space-y-3">
+              <textarea id="full-sim-input" rows="3" placeholder="Escreva como se fosse um visitante..." class="w-full rounded-xl bg-[#07090e] border border-[#181c28] focus:border-[#2563eb] p-3.5 text-xs text-white placeholder-slate-500 outline-none resize-none" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendTestMessage(event);}"></textarea>
               <div class="flex justify-between items-center">
-                <span class="text-[10px] text-amber-400">As alterações não salvas estão sendo usadas no teste.</span>
-                <button type="submit" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-2">
-                  <i class="fa-regular fa-paper-plane text-[10px]"></i> Enviar teste
+                <span class="text-[11px] text-amber-300/90">As alterações serão salvas antes do envio.</span>
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#5b21b6] hover:bg-[#6d28d9] text-white text-xs font-bold flex items-center gap-2 transition">
+                  <i class="fa-regular fa-paper-plane text-xs"></i> Enviar teste
                 </button>
               </div>
             </form>
           </div>
 
+          <!-- 2 CARDS INFERIORES: SALDO + SÓ VOCÊ VÊ ESTE TESTE -->
           <div class="grid grid-cols-2 gap-4">
-            <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">Saldo</span>
-              <span class="text-base font-bold text-white mt-0.5 block">R$ 0,00</span>
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-5">
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <i class="fa-solid fa-coins text-[#a855f7] text-xs"></i>
+                <span>Saldo</span>
+              </div>
+              <span class="text-xl font-bold text-white mt-2 block">R$ 0,00</span>
             </div>
-            <div class="sb-card p-4">
-              <span class="text-xs font-semibold text-white block"><i class="fa-solid fa-shield-halved text-zinc-400 mr-1"></i> Só você vê este teste</span>
-              <p class="text-[11px] text-zinc-500 mt-0.5">Nenhum lead ou bot recebe as mensagens enviadas nesta tela.</p>
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-5">
+              <div class="flex items-center gap-2 text-xs font-bold text-white">
+                <i class="fa-solid fa-lock text-emerald-400 text-xs"></i>
+                <span>Só você vê este teste</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-2 leading-relaxed">Nenhum lead ou bot recebe as mensagens enviadas nesta tela.</p>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('upsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('upsell')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Upsell</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">ANTERIOR</span>
+                <span class="text-xs font-bold text-white">Upsell</span>
               </div>
             </button>
-            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Publicar no bot</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white">Publicar no bot</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
 
         <!-- =========================================================
-             TELA 10: PUBLICAR NO BOT (FIEL AO PRINT 14)
+             TELA 10: PUBLICAR NO BOT (100% FIEL AOS PRINTS 3, 4 E 5)
         ========================================================== -->
-        <section id="sec-publicar" class="tab-section hidden space-y-6">
+        <section id="sec-publicar" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">TESTE E PUBLICAÇÃO</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Publicar no bot</h2>
-            <p class="text-xs text-zinc-400 mt-1">Conecte o bot, defina a entrega e ative o atendimento.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">TESTE E PUBLICAÇÃO</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Publicar no bot</h2>
+            <p class="text-xs text-slate-400 mt-1">Conecte o bot, defina a entrega e ative o atendimento.</p>
           </div>
 
-          <div class="sb-card p-5 bg-gradient-to-r from-[#161126] to-[#0c0c12] border-purple-500/25 flex items-center justify-between">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                <i class="fa-solid fa-rocket text-xs"></i>
+          <!-- CARD 1: COLOQUE O ATENDIMENTO NO AR -->
+          <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] flex items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#141625] border border-[#25283d] flex items-center justify-center text-slate-200 shrink-0">
+                <i class="fa-solid fa-rocket text-sm"></i>
               </div>
               <div>
-                <h4 class="text-xs font-bold text-white">Coloque o atendimento no ar</h4>
-                <p class="text-[11px] text-zinc-400 mt-0.5">Conecte o bot, defina o que será entregue e revise o checklist. O atendimento só começa depois que você ativar.</p>
+                <h4 class="text-sm font-bold text-white">Coloque o atendimento no ar</h4>
+                <p class="text-xs text-slate-300 mt-1 leading-relaxed">Conecte o bot, defina o que será entregue e revise o checklist. O atendimento só começa depois que você ativar.</p>
               </div>
             </div>
-            <label class="toggle-switch shrink-0">
-              <input type="checkbox" id="chk-bot-live" onchange="onPublishChange()">
-              <span class="toggle-slider"></span>
-            </label>
+            <input type="checkbox" id="chk-bot-live" class="hidden" onchange="onPublishChange()">
           </div>
 
-          <div class="sb-card p-6 space-y-4">
-            <div>
-              <h3 class="text-sm font-bold text-white">Bot do atendimento</h3>
-              <p class="text-[11px] text-zinc-500">Escolha o bot que receberá os novos leads deste fluxo. Cada fluxo IA usa um bot por vez.</p>
-            </div>
-            <div class="flex gap-3">
-              <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Cole o Token do BotFather (Ex: 7123456:AAH...)" class="sb-input flex-1">
-              <button onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold shrink-0">+ Vincular bot</button>
-            </div>
-            <div class="flex justify-between text-[11px] text-zinc-500">
-              <span id="bot-connected-label">Nenhum bot livre conectado ainda</span>
-              <a href="https://t.me/BotFather" target="_blank" class="text-zinc-300 hover:underline">Criar ou gerenciar bots no @BotFather ↗</a>
-            </div>
-            <div class="pt-2 border-t border-[#1c1c26]">
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Token Pushin Pay (Gateway PIX Automático)</label>
-              <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole seu Token Bearer da Pushin Pay" class="sb-input">
-            </div>
-          </div>
-
-          <div class="sb-card p-6 space-y-3">
-            <div>
-              <h3 class="text-sm font-bold text-white">Canal de cache das mídias</h3>
-              <p class="text-[11px] text-zinc-500">Preserva o file_id de fotos, vídeos, GIFs e áudios. Depois do primeiro envio, o Telegram reutiliza o arquivo sem baixar da origem novamente.</p>
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Grupo ou canal de preservação</label>
-              <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Ex.: -1001987654321 (O bot precisa ser administrador e poder publicar)" class="sb-input">
-            </div>
-          </div>
-
-          <div class="sb-card p-6 space-y-4">
-            <div>
-              <h3 class="text-sm font-bold text-white">Entrega depois do pagamento</h3>
-              <p class="text-[11px] text-zinc-500">Escolha o que o comprador receberá automaticamente assim que o pagamento for confirmado.</p>
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Destino da entrega (ID do Canal VIP ou Link de Acesso)</label>
-              <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="Ex.: -1001234567890 ou https://t.me/+seu_link" class="sb-input">
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block mb-1">Usuário de suporte no Telegram (Opcional)</label>
-              <input type="text" id="inp-support-user" oninput="onPublishChange()" placeholder="@seu_suporte" class="sb-input">
-            </div>
-          </div>
-
-          <div class="sb-card p-5 flex items-center justify-between">
-            <div>
-              <h4 class="text-xs font-bold text-white">Checklist para publicar</h4>
-              <p class="text-[11px] text-zinc-500">Complete os itens abaixo e salve para colocar no ar.</p>
-            </div>
-            <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
-              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Configuração salva</span>
-              <span id="chk-pub-bot" class="text-zinc-500"><i class="fa-regular fa-circle mr-1"></i> Bot válido e vinculado</span>
-              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Oferta ativa</span>
-              <span id="chk-pub-delivery" class="text-zinc-500"><i class="fa-regular fa-circle mr-1"></i> Entrega configurada</span>
-              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Cache das mídias</span>
-              <span class="text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Saldo disponível</span>
-            </div>
-          </div>
-
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('testar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- CARD 2: BOT DO ATENDIMENTO -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#38bdf8] shrink-0">
+                <i class="fa-solid fa-robot text-sm"></i>
+              </div>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Testar conversa</span>
+                <h3 class="text-sm font-bold text-white">Bot do atendimento</h3>
+                <p class="text-xs text-slate-400 mt-1">Escolha o bot que receberá os novos leads deste fluxo. Cada fluxo IA usa um bot por vez.</p>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-[#181c28] bg-[#07090e] p-4 space-y-3">
+              <div class="flex gap-3 items-center">
+                <select id="sel-bot-available" class="sb-input flex-1 !bg-[#0b0d14] !border-[#1e3a8a] text-slate-300">
+                  <option value="">Escolha um bot disponível</option>
+                </select>
+                <button type="button" onclick="toggleLinkBotDrawer()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#7c3aed] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
+                  <i class="fa-solid fa-plus text-[11px]"></i> Vincular bot
+                </button>
+              </div>
+              <div class="flex justify-between items-center text-[11px]">
+                <span id="bot-connected-label" class="text-slate-500">Nenhum bot livre encontrado nesta conta</span>
+                <button type="button" onclick="toggleLinkBotDrawer()" class="text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+                  <span>Criar ou gerenciar bots</span>
+                  <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                </button>
+              </div>
+
+              <!-- GAVETA EXPANSÍVEL PARA COLAR O TOKEN REAL DO BOTFATHER E PUSHINPAY -->
+              <div id="link-bot-drawer" class="hidden pt-3 mt-2 border-t border-[#181c28] space-y-3">
+                <div>
+                  <label class="text-xs font-bold text-white block mb-1">Token do Bot no @BotFather</label>
+                  <div class="flex gap-2">
+                    <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Ex.: 7123456789:AAH..." class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28]">
+                    <button type="button" onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition">Conectar</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="text-xs font-bold text-white block mb-1">Token Pushin Pay (PIX Automático)</label>
+                  <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole seu Token Bearer da Pushin Pay" class="sb-input !bg-[#0b0d14] !border-[#181c28]">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 3: CANAL DE CACHE DAS MÍDIAS -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#141224] border border-[#262142] flex items-center justify-center text-[#a78bfa] shrink-0">
+                <i class="fa-solid fa-inbox text-sm"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Canal de cache das mídias</h3>
+                <p class="text-xs text-slate-400 mt-1 leading-relaxed">Preserva o file_id de fotos, vídeos, GIFs e áudios. Depois do primeiro envio, o Telegram reutiliza o arquivo sem baixar da origem novamente.</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-white block">Grupo ou canal de preservação</label>
+              <p class="text-[11px] text-slate-400 mt-1 mb-2">O bot precisa ser administrador e poder publicar. Pode ser um grupo ou canal privado criado somente para cache.</p>
+              <div class="relative">
+                <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Vincule um bot primeiro" class="sb-input !bg-[#07090e] !border-[#181c28] pr-9">
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 absolute right-3.5 top-3.5 pointer-events-none"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: ENTREGA DEPOIS DO PAGAMENTO -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#1c1912] border border-[#362f1d] flex items-center justify-center text-amber-400 shrink-0">
+                <i class="fa-solid fa-shield-halved text-sm"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">Entrega depois do pagamento</h3>
+                <p class="text-xs text-slate-400 mt-1">Escolha o que o comprador receberá automaticamente assim que o pagamento for confirmado.</p>
+              </div>
+            </div>
+
+            <!-- DESTINO DA ENTREGA (CUSTOM DROPDOWN FIEL AOS PRINTS 4 E 5) -->
+            <div class="relative">
+              <label class="text-xs font-bold text-white block">Destino da entrega</label>
+              <p class="text-[11px] text-slate-400 mt-1 mb-2">Escolha o que o comprador recebe quando o pagamento for aprovado.</p>
+              <button type="button" id="btn-delivery-type" onclick="toggleDeliveryTypeMenu(event)" class="w-full sb-input !bg-[#07090e] !border-[#181c28] focus:!border-[#1e3a8a] min-h-[40px] flex items-center justify-between text-left">
+                <span id="lbl-delivery-type" class="text-xs font-medium text-white flex items-center gap-2"></span>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+              </button>
+
+              <div id="menu-delivery-type" class="hidden mt-1.5 w-full rounded-xl border border-[#1e2333] bg-[#0e111a] p-1.5 shadow-2xl space-y-1">
+                <button type="button" onclick="selectDeliveryType('Link de acesso', event)" data-dtype="Link de acesso" class="delivery-type-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition text-slate-200 hover:bg-[#141824]">
+                  <span class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-link text-emerald-400 text-xs"></i>
+                    <span>Link de acesso</span>
+                  </span>
+                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check hidden"></i>
+                </button>
+                <button type="button" onclick="selectDeliveryType('Mensagem no bot', event)" data-dtype="Mensagem no bot" class="delivery-type-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition text-slate-200 hover:bg-[#141824]">
+                  <span class="flex items-center gap-2.5">
+                    <i class="fa-regular fa-comment-dots text-[#a78bfa] text-xs"></i>
+                    <span>Mensagem no bot</span>
+                  </span>
+                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check hidden"></i>
+                </button>
+              </div>
+
+              <div id="delivery-dest-box" class="hidden mt-2.5">
+                <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="https://t.me/+seu_link_vip" class="sb-input !bg-[#07090e] !border-[#181c28]">
+              </div>
+            </div>
+
+            <!-- USUÁRIO DE SUPORTE NO TELEGRAM -->
+            <div>
+              <label class="text-xs font-bold text-white block">Usuário de suporte no Telegram</label>
+              <p class="text-[11px] text-slate-400 mt-1 mb-2">Opcional.</p>
+              <div class="relative">
+                <span class="absolute left-3.5 top-2.5 text-xs text-slate-500">@</span>
+                <input type="text" id="inp-support-user" oninput="onPublishChange()" placeholder="seu_suporte" class="sb-input !bg-[#07090e] !border-[#181c28] !pl-8">
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 5: CHECKLIST PARA PUBLICAR -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl flex items-center justify-between gap-6">
+            <div>
+              <h4 class="text-sm font-bold text-white">Checklist para publicar</h4>
+              <p class="text-xs text-slate-400 mt-1">Complete os itens abaixo e ative o bot no card acima.</p>
+            </div>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-2.5 text-xs shrink-0">
+              <span id="chk-pub-saved" class="text-slate-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-slate-500"></i> Configuração salva</span>
+              <span id="chk-pub-bot" class="text-slate-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-slate-500"></i> Bot ativo e vinculado</span>
+              <span id="chk-pub-offer" class="text-emerald-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-emerald-400"></i> Oferta ativa</span>
+              <span id="chk-pub-delivery" class="text-slate-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-slate-500"></i> Entrega configurada</span>
+              <span id="chk-pub-cache" class="text-slate-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-slate-500"></i> Cache das mídias</span>
+              <span id="chk-pub-balance" class="text-slate-400 flex items-center gap-2"><i class="fa-regular fa-circle-check text-slate-500"></i> Saldo disponível</span>
+            </div>
+          </div>
+
+          <!-- NAVEGAÇÃO INFERIOR -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('testar')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
+              <div>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">ANTERIOR</span>
+                <span class="text-xs font-bold text-white">Testar conversa</span>
               </div>
             </button>
-            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Memória das conversas</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white">Memória das conversas</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -3201,13 +3290,17 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function resetFullSimulator() {
       TEST_HISTORY = [];
+      const simName = document.getElementById('sim-persona-name');
+      if (simName) simName.textContent = STATE.persona?.name || 'Atendimento';
       const box = document.getElementById('full-sim-messages');
       box.innerHTML = `
-        <div class="text-center my-2">
-          <span class="text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400">✦ SIMULAÇÃO DO ATENDIMENTO</span>
+        <div class="flex justify-center mb-3">
+          <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#0e111a] border border-[#1b2030] text-[10px] font-bold uppercase tracking-wider text-slate-300">
+            <i class="fa-solid fa-robot text-[10px] text-slate-400"></i> SIMULAÇÃO DO ATENDIMENTO
+          </span>
         </div>
-        ${STATE.style.opening_messages.map(m => `
-          <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3.5 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[80%]">${m}</div>
+        ${(STATE.style?.opening_messages || ['oii 💜', 'chegou agora por aqui?']).map(m => `
+          <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-4 py-2.5 rounded-2xl text-xs w-fit max-w-[80%]">${m}</div>
         `).join('')}
       `;
     }
@@ -3259,7 +3352,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
         box.innerHTML += `
           <div class="space-y-1">
-            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3.5 py-2.5 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[80%] whitespace-pre-line">${data.reply}</div>
+            <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-4 py-2.5 rounded-2xl text-xs w-fit max-w-[80%] whitespace-pre-line">${data.reply}</div>
             ${extraHtml}
           </div>
         `;
@@ -3292,7 +3385,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         });
         const data = await res.json();
         box.innerHTML += `
-          <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] whitespace-pre-line">${data.reply}</div>
+          <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] whitespace-pre-line">${data.reply}</div>
         `;
         box.scrollTop = box.scrollHeight;
       } catch (err) {}
@@ -3316,34 +3409,85 @@ quer que eu te mostre as opções de acesso?</textarea>
       box.scrollTop = box.scrollHeight;
     }
 
-    function updatePrepProgress() {
-      let completed = 2;
-      if ((STATE.business?.offers || []).some(o => o.visible)) {
-        completed++;
+    function toggleLinkBotDrawer() {
+      const dr = document.getElementById('link-bot-drawer');
+      if (dr) dr.classList.toggle('hidden');
+    }
+
+    function toggleDeliveryTypeMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('menu-delivery-type');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function selectDeliveryType(type, e, silent = false) {
+      if (e) e.stopPropagation();
+      if (!STATE.publish) STATE.publish = {};
+      STATE.publish.delivery_type = type;
+
+      const lbl = document.getElementById('lbl-delivery-type');
+      if (lbl) {
+        if (type === 'Link de acesso') {
+          lbl.innerHTML = `<i class="fa-solid fa-link text-emerald-400 text-xs"></i> <span>Link de acesso</span>`;
+        } else if (type === 'Mensagem no bot') {
+          lbl.innerHTML = `<i class="fa-regular fa-comment-dots text-[#a78bfa] text-xs"></i> <span>Mensagem no bot</span>`;
+        } else {
+          lbl.innerHTML = '';
+        }
       }
-      if (STATE.publish?.bot_token) {
+
+      document.querySelectorAll('#menu-delivery-type .delivery-type-opt').forEach(btn => {
+        const isSel = btn.getAttribute('data-dtype') === type;
+        const chk = btn.querySelector('.dtype-check');
+        if (chk) chk.classList.toggle('hidden', !isSel);
+      });
+
+      const menu = document.getElementById('menu-delivery-type');
+      if (menu) menu.classList.add('hidden');
+      if (!silent) {
+        updatePrepProgress();
+        markUnsaved();
+      }
+    }
+
+    function updatePrepProgress() {
+      let completed = 3;
+      const hasBot = !!STATE.publish?.bot_token;
+      const hasDelivery = !!(STATE.publish?.delivery_destination || STATE.publish?.delivery_type);
+      const hasCache = !!STATE.publish?.cache_channel_id;
+
+      if (hasBot) {
         completed++;
         document.getElementById('sidebar-bot-status').textContent = STATE.publish.bot_username || "Vinculado";
-        const chkBot = document.getElementById('chk-pub-bot');
-        if (chkBot) {
-          chkBot.className = "text-emerald-400";
-          chkBot.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Bot válido e vinculado`;
-        }
       }
-      if (STATE.publish?.delivery_destination) {
+      if (hasDelivery) {
         completed++;
-        const chkDel = document.getElementById('chk-pub-delivery');
-        if (chkDel) {
-          chkDel.className = "text-emerald-400";
-          chkDel.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i> Entrega configurada`;
-        }
       }
-      const pct = (completed / 5) * 100;
-      document.getElementById('sidebar-prep-count').textContent = `${completed}/5`;
+
+      const chkBot = document.getElementById('chk-pub-bot');
+      if (chkBot) {
+        chkBot.className = hasBot ? "text-emerald-400 flex items-center gap-2" : "text-slate-400 flex items-center gap-2";
+        chkBot.innerHTML = `<i class="fa-regular fa-circle-check ${hasBot ? 'text-emerald-400' : 'text-slate-500'}"></i> Bot ativo e vinculado`;
+      }
+
+      const chkDel = document.getElementById('chk-pub-delivery');
+      if (chkDel) {
+        chkDel.className = hasDelivery ? "text-emerald-400 flex items-center gap-2" : "text-slate-400 flex items-center gap-2";
+        chkDel.innerHTML = `<i class="fa-regular fa-circle-check ${hasDelivery ? 'text-emerald-400' : 'text-slate-500'}"></i> Entrega configurada`;
+      }
+
+      const chkCache = document.getElementById('chk-pub-cache');
+      if (chkCache) {
+        chkCache.className = hasCache ? "text-emerald-400 flex items-center gap-2" : "text-slate-400 flex items-center gap-2";
+        chkCache.innerHTML = `<i class="fa-regular fa-circle-check ${hasCache ? 'text-emerald-400' : 'text-slate-500'}"></i> Cache das mídias`;
+      }
+
+      const pct = Math.min(100, (completed / 5) * 100);
+      document.getElementById('sidebar-prep-count').textContent = `${Math.min(5, completed)}/5`;
       document.getElementById('sidebar-prep-bar').style.width = `${pct}%`;
-      document.getElementById('hero-prep-label').textContent = `${completed} de 5 concluídos`;
+      document.getElementById('hero-prep-label').textContent = `${Math.min(5, completed)} de 5 concluídos`;
       document.getElementById('hero-prep-bar').style.width = `${pct}%`;
-      document.getElementById('nav-sub-resumo').textContent = `${completed} de 5 itens essenciais`;
+      document.getElementById('nav-sub-resumo').textContent = `${Math.min(5, completed)} de 5 itens essenciais`;
     }
 
     function onPublishChange() {
@@ -3415,6 +3559,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-cache-channel').value = STATE.publish?.cache_channel_id || '';
       document.getElementById('inp-delivery-dest').value = STATE.publish?.delivery_destination || '';
       document.getElementById('inp-support-user').value = STATE.publish?.support_username || '';
+      selectDeliveryType(STATE.publish?.delivery_type || '', null, true);
 
       if (STATE.publish?.bot_username) {
         document.getElementById('bot-connected-label').innerHTML = `Conectado em: <strong class="text-emerald-400">${STATE.publish.bot_username}</strong>`;
@@ -3528,6 +3673,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       const upMenu = document.getElementById('menu-upsell-origin');
       if (upMenu) upMenu.classList.add('hidden');
+      const delMenu = document.getElementById('menu-delivery-type');
+      if (delMenu) delMenu.classList.add('hidden');
     });
 
     window.addEventListener('DOMContentLoaded', loadInitialState);
