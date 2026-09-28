@@ -36,6 +36,7 @@ class ActiveBotManager:
         self.polling_task: Optional[asyncio.Task] = None
         self.current_token: str = ""
         self.downsell_tasks: Dict[str, asyncio.Task] = {}
+        self.active_tx_map: Dict[str, int] = {}
         self.state_getter = None
         self.state_saver = None
 
@@ -203,7 +204,7 @@ class ActiveBotManager:
                     return
 
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") == "Compra aprovada":
+                if lead.get("stage") in ("Compra aprovada", "Entrega concluída", "Pagamento aprovado"):
                     return
 
                 sent_steps = lead.setdefault("sent_downsell_steps", [])
@@ -223,7 +224,7 @@ class ActiveBotManager:
                 # Recarrega estado após espera
                 state = await self.state_getter()
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") == "Compra aprovada":
+                if lead.get("stage") in ("Compra aprovada", "Entrega concluída", "Pagamento aprovado"):
                     return
 
                 msg_text = next_step.get("message", "").replace("{nome}", user_first_name)
@@ -340,7 +341,7 @@ class ActiveBotManager:
 
             pub = state.get("publish", {})
             pushin_token = pub.get("pushin_pay_token", "").strip()
-            gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+            gw_provider = pub.get("gateway_provider", "syncpay").strip()
             gw_secret = pub.get("gateway_secret", "").strip()
             cents = int(round(price * 100))
             pix_code = f"00020126580014br.gov.bcb.pix0136sharkbot-{cents}5204000053039865405{price:.2f}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD"
@@ -349,23 +350,30 @@ class ActiveBotManager:
             if pushin_token:
                 try:
                     client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-                    res = await client.create_pix_charge(value_in_cents=cents)
+                    res = await client.create_pix_charge(
+                        value_in_cents=cents,
+                        client_name=callback.from_user.first_name or "Cliente VIP"
+                    )
                     pix_code = res.get("qr_code") or pix_code
                     tx_id = str(res.get("id") or tx_id)
                 except Exception as e:
                     logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
 
+            lead["last_tx_id"] = tx_id
+            self.active_tx_map[tx_id] = callback.from_user.id
+
             confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Já paguei / Liberar acesso", callback_data=f"checkpix:{tx_id}:{offer_id}")]
             ])
 
+            price_fmt = f"{price:.2f}".replace(".", ",")
             await callback.message.answer(
-                f"🔒 *Pagamento Seguro via PIX*\n\n"
-                f"Valor: *R$ {price:.2f}*\n\n"
+                f"🔒 <b>Pagamento Seguro via PIX</b>\n\n"
+                f"Valor: <b>R$ {price_fmt}</b>\n\n"
                 f"Copie o código PIX Copia e Cola abaixo e pague no app do seu banco:\n\n"
-                f"`{pix_code}`\n\n"
+                f"<code>{pix_code}</code>\n\n"
                 f"Assim que concluir, seu acesso é liberado automaticamente aqui na conversa!",
-                parse_mode="Markdown",
+                parse_mode="HTML",
                 reply_markup=confirm_kb
             )
             await self.state_saver(state)
@@ -380,7 +388,7 @@ class ActiveBotManager:
             state = await self.state_getter()
             pub = state.get("publish", {})
             pushin_token = pub.get("pushin_pay_token", "").strip()
-            gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+            gw_provider = pub.get("gateway_provider", "syncpay").strip()
             gw_secret = pub.get("gateway_secret", "").strip()
 
             if pushin_token and not tx_id.startswith("sim_"):
@@ -414,10 +422,25 @@ class ActiveBotManager:
                 return None
         return URLInputFile(url_or_b64)
 
-    async def _poll_pix_payment(self, user_id: int, tx_id: str, pushin_token: str, gw_provider: str = "pushinpay", gw_secret: str = ""):
+    async def notify_payment_by_tx_id(self, tx_id: str) -> bool:
+        if not tx_id:
+            return False
+        uid = self.active_tx_map.get(tx_id)
+        if not uid and self.state_getter:
+            state = await self.state_getter()
+            for lead in state.get("memory", {}).get("leads", []):
+                if str(lead.get("last_tx_id")) == str(tx_id):
+                    uid = int(lead.get("telegram_id"))
+                    break
+        if uid:
+            await self.deliver_purchase_and_upsell(uid)
+            return True
+        return False
+
+    async def _poll_pix_payment(self, user_id: int, tx_id: str, pushin_token: str, gw_provider: str = "syncpay", gw_secret: str = ""):
         client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-        for _ in range(60):
-            await asyncio.sleep(10)
+        for _ in range(90):
+            await asyncio.sleep(8)
             try:
                 data = await client.check_transaction_status(tx_id)
                 if str(data.get("status", "")).lower() == "paid":
@@ -445,8 +468,8 @@ class ActiveBotManager:
         if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
             await self.bot.send_message(
                 chat_id=user_id,
-                text=f"💜 *Pagamento confirmado!*\n\n{dest}",
-                parse_mode="Markdown"
+                text=f"💜 <b>Pagamento confirmado!</b>\n\n{dest}",
+                parse_mode="HTML"
             )
         else:
             invite_url = "https://t.me/+link_exclusivo_vip"
@@ -469,8 +492,8 @@ class ActiveBotManager:
 
             await self.bot.send_message(
                 chat_id=user_id,
-                text="💜 *Pagamento confirmado!*\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
-                parse_mode="Markdown",
+                text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
+                parse_mode="HTML",
                 reply_markup=kb
             )
 

@@ -129,7 +129,7 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         "delivery_type": "Link de acesso",
         "delivery_destination": os.getenv("VIP_DESTINATION", ""),
         "support_username": os.getenv("SUPPORT_USERNAME", ""),
-        "gateway_provider": os.getenv("GATEWAY_PROVIDER", "pushinpay"),
+        "gateway_provider": os.getenv("GATEWAY_PROVIDER", "syncpay"),
         "pushin_pay_token": os.getenv("GATEWAY_TOKEN", ""),
         "gateway_secret": os.getenv("GATEWAY_SECRET", "")
     },
@@ -147,7 +147,7 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "account": {
         "balance": 0.00,
         "selected_recharge": 100.00,
-        "ai_provider": os.getenv("AI_PROVIDER", "openai"),
+        "ai_provider": os.getenv("AI_PROVIDER", "deepseek"),
         "ai_api_key": os.getenv("AI_API_KEY", "")
     }
 }
@@ -165,6 +165,16 @@ def redirect_to_dashboard():
 def health_ping():
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
+def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
+    pub = state.setdefault("publish", {})
+    if pub.get("gateway_secret") and pub.get("gateway_provider") in ("pushinpay", "suitpay", "", None):
+        pub["gateway_provider"] = "syncpay"
+    acc = state.setdefault("account", {})
+    key = (acc.get("ai_api_key") or "").strip()
+    if key.startswith("sk-") and len(key) == 35 and acc.get("ai_provider") in ("openai", "", None):
+        acc["ai_provider"] = "deepseek"
+    return state
+
 async def _read_state_from_db() -> Dict[str, Any]:
     async with async_session() as session:
         result = await session.execute(select(BotConfig))
@@ -173,11 +183,13 @@ async def _read_state_from_db() -> Dict[str, Any]:
             return dict(DEFAULT_SHARKBOT_STATE)
         try:
             saved = json.loads(config.full_state_json)
-            return {**DEFAULT_SHARKBOT_STATE, **saved}
+            merged = {**DEFAULT_SHARKBOT_STATE, **saved}
+            return _normalize_providers(merged)
         except Exception:
             return dict(DEFAULT_SHARKBOT_STATE)
 
 async def _write_state_to_db(state: Dict[str, Any]) -> Dict[str, Any]:
+    state = _normalize_providers(state)
     async with async_session() as session:
         result = await session.execute(select(BotConfig))
         config = result.scalars().first()
@@ -263,7 +275,7 @@ async def create_pix_endpoint(req: CreatePixRequest):
     state = await _read_state_from_db()
     pub = state.get("publish", {})
     token = pub.get("pushin_pay_token", "").strip()
-    gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+    gw_provider = pub.get("gateway_provider", "syncpay").strip()
     gw_secret = pub.get("gateway_secret", "").strip()
     cents = int(round(req.amount * 100))
 
@@ -274,7 +286,7 @@ async def create_pix_endpoint(req: CreatePixRequest):
             return {
                 "status": "ok",
                 "real": True,
-                "provider": gw_provider,
+                "provider": client.provider,
                 "qr_code": res.get("qr_code"),
                 "qr_code_base64": res.get("qr_code_base64"),
                 "id": res.get("id")
@@ -289,11 +301,22 @@ async def create_pix_endpoint(req: CreatePixRequest):
         "qr_code": f"00020126580014br.gov.bcb.pix0136sharkbot-pix-{cents}5204000053039865405{req.amount:.2f}5802BR5913VIP TELEGRAM6009SAO PAULO62070503***6304ABCD"
     }
 
+@app.post("/api/webhook/syncpay")
 @app.post("/api/webhook/pushinpay")
-async def webhook_pushinpay(payload: Dict[str, Any]):
-    transaction_id = str(payload.get("id"))
-    status = str(payload.get("status", "")).lower()
-    if status == "paid":
+async def webhook_gateway(payload: Dict[str, Any]):
+    data_obj = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+    transaction_id = str(
+        data_obj.get("identifier")
+        or data_obj.get("reference_id")
+        or data_obj.get("id")
+        or payload.get("identifier")
+        or payload.get("reference_id")
+        or payload.get("id")
+        or ""
+    )
+    status = str(data_obj.get("status") or payload.get("status") or "").lower()
+    if status in ("paid", "completed", "approved", "settled"):
+        await bot_manager.notify_payment_by_tx_id(transaction_id)
         async with async_session() as session:
             result = await session.execute(select(Order).where(Order.transaction_id == transaction_id))
             order = result.scalars().first()
@@ -301,5 +324,5 @@ async def webhook_pushinpay(payload: Dict[str, Any]):
                 order.status = "paid"
                 order.paid_at = datetime.utcnow()
                 await session.commit()
-        return {"status": "success", "action": "approved"}
-    return {"status": "received"}
+        return {"status": "success", "action": "approved", "transaction_id": transaction_id}
+    return {"status": "received", "transaction_id": transaction_id}

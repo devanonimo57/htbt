@@ -1865,17 +1865,17 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div class="col-span-4">
                   <label class="text-xs font-bold text-white block mb-1.5">Provedor do Gateway</label>
                   <select id="sel-gateway-provider" onchange="onPublishChange()" class="sb-input !bg-[#0b0d14] !border-[#181c28]">
+                    <option value="syncpay">Sync Pay (PIX)</option>
                     <option value="pushinpay">Pushin Pay (PIX)</option>
                     <option value="mercadopago">Mercado Pago (PIX)</option>
                     <option value="openpix">OpenPix / Woovi</option>
                     <option value="asaas">Asaas (PIX)</option>
-                    <option value="suitpay">SuitPay / PixUp / BSPay</option>
                   </select>
                 </div>
                 <div class="col-span-8">
-                  <label class="text-xs font-bold text-white block mb-1.5">Chave de API / Token Bearer do Gateway</label>
+                  <label class="text-xs font-bold text-white block mb-1.5">Client ID (Sync Pay) / Chave de API do Gateway</label>
                   <div class="flex gap-2">
-                    <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole aqui sua API Key / Token Bearer do Gateway PIX" class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
+                    <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole aqui seu Client ID (Sync Pay) ou Token do Gateway PIX" class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
                     <button type="button" onclick="const i=document.getElementById('inp-pushin-token'); i.type=i.type==='password'?'text':'password';" class="px-3 rounded-xl bg-[#0b0d14] border border-[#181c28] text-slate-400 hover:text-white text-xs transition" title="Mostrar/Ocultar Chave">
                       <i class="fa-regular fa-eye"></i>
                     </button>
@@ -1886,8 +1886,13 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
               </div>
               <div>
-                <label class="text-[11px] text-slate-400 block mb-1">Client Secret / Chave Secreta (opcional — apenas se seu gateway exigir 2 chaves, ex: SuitPay/PixUp)</label>
-                <input type="password" id="inp-gateway-secret" oninput="onPublishChange()" placeholder="Opcional (deixe em branco para Pushin Pay, Mercado Pago, OpenPix ou Asaas)" class="sb-input !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
+                <label class="text-[11px] text-slate-400 block mb-1">Client Secret / Chave Secreta (obrigatório para Sync Pay — opcional para outros gateways)</label>
+                <div class="flex gap-2">
+                  <input type="password" id="inp-gateway-secret" oninput="onPublishChange()" placeholder="Cole aqui seu Client Secret da Sync Pay (UUID)" class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
+                  <button type="button" onclick="const i=document.getElementById('inp-gateway-secret'); i.type=i.type==='password'?'text':'password';" class="px-3 rounded-xl bg-[#0b0d14] border border-[#181c28] text-slate-400 hover:text-white text-xs transition" title="Mostrar/Ocultar Secret">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2280,14 +2285,14 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div>
             <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">CONTA PRIVADA</span>
             <h2 class="text-2xl font-bold text-white mt-1">Saldo da IA (Chave Própria)</h2>
-            <p class="text-xs text-slate-400 mt-1">Conecte sua chave OpenAI ou Groq direta para uso ilimitado sem intermediários.</p>
+            <p class="text-xs text-slate-400 mt-1">Conecte sua chave DeepSeek, OpenAI ou Groq direta para ler a persona configurada e responder no bot.</p>
           </div>
 
           <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] space-y-4">
             <div class="flex justify-between items-center">
               <div>
-                <h3 class="text-sm font-bold text-white">Chave de API Própria (Uso Direto)</h3>
-                <p class="text-xs text-slate-300 mt-1">Cole sua chave OpenAI ou Groq abaixo e clique em Salvar no topo para rodar o motor conversacional direto na fonte.</p>
+                <h3 class="text-sm font-bold text-white">Chave de API Própria (DeepSeek / OpenAI / Groq)</h3>
+                <p class="text-xs text-slate-300 mt-1">Cole sua chave DeepSeek (sk-...) abaixo e clique em Salvar para rodar o motor conversacional lendo toda a Persona, Negócio e Ofertas.</p>
               </div>
               <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">ATIVO</span>
             </div>
@@ -2295,14 +2300,22 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div>
                 <label class="text-xs font-bold text-white block mb-1.5">Provedor</label>
                 <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input !bg-[#07090e] !border-[#181c28]">
-                  <option value="openai">OpenAI (GPT-4o-mini)</option>
                   <option value="deepseek">DeepSeek (deepseek-chat)</option>
+                  <option value="openai">OpenAI (GPT-4o-mini)</option>
                   <option value="groq">Groq (Llama 3.3 70B - Grátis)</option>
                 </select>
               </div>
               <div class="col-span-2">
-                <label class="text-xs font-bold text-white block mb-1.5">Sua API Key</label>
-                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-... ou gsk_..." class="sb-input !bg-[#07090e] !border-[#181c28]">
+                <label class="text-xs font-bold text-white block mb-1.5">Sua API Key (DeepSeek / OpenAI / Groq)</label>
+                <div class="flex gap-2">
+                  <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="Cole aqui sua chave DeepSeek (sk-...)" class="sb-input flex-1 !bg-[#07090e] !border-[#181c28] font-mono text-xs">
+                  <button type="button" onclick="const i=document.getElementById('inp-ai-key'); i.type=i.type==='password'?'text':'password';" class="px-3 rounded-xl bg-[#07090e] border border-[#181c28] text-slate-400 hover:text-white text-xs transition" title="Mostrar/Ocultar Chave">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                  <button type="button" onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs font-bold shrink-0 transition">
+                    Salvar IA
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3473,7 +3486,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const data = await res.json();
       box.innerHTML += `
         <div class="sb-subcard p-3.5 max-w-[85%] border-emerald-500/40 space-y-2">
-          <span class="text-[10px] font-bold uppercase text-emerald-400 block">PIX COPIA E COLA GERADO (${data.real ? 'PUSHIN PAY REAL' : 'MODO TESTE'})</span>
+          <span class="text-[10px] font-bold uppercase text-emerald-400 block">PIX COPIA E COLA GERADO (${data.real ? (data.provider === 'syncpay' ? 'SYNC PAY REAL' : 'GATEWAY PIX REAL') : 'MODO TESTE'})</span>
           <input type="text" readonly value="${data.qr_code}" class="sb-input !text-[10px] font-mono">
           <p class="text-[10px] text-zinc-400">Assim que o pagamento é confirmado, o bot entrega o link único do VIP e agenda o Upsell!</p>
         </div>
@@ -3702,8 +3715,11 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       document.getElementById('chk-bot-live').checked = !!STATE.publish?.is_live;
       document.getElementById('inp-bot-token').value = STATE.publish?.bot_token || '';
+      if (STATE.publish?.gateway_secret && (!STATE.publish?.gateway_provider || STATE.publish?.gateway_provider === 'pushinpay' || STATE.publish?.gateway_provider === 'suitpay')) {
+        STATE.publish.gateway_provider = 'syncpay';
+      }
       if (document.getElementById('sel-gateway-provider')) {
-        document.getElementById('sel-gateway-provider').value = STATE.publish?.gateway_provider || 'pushinpay';
+        document.getElementById('sel-gateway-provider').value = STATE.publish?.gateway_provider || 'syncpay';
       }
       document.getElementById('inp-pushin-token').value = STATE.publish?.pushin_pay_token || '';
       if (document.getElementById('inp-gateway-secret')) {
@@ -3726,7 +3742,11 @@ quer que eu te mostre as opções de acesso?</textarea>
         document.getElementById('bot-connected-label').innerHTML = `<span class="text-slate-500">Nenhum bot livre encontrado nesta conta</span>`;
       }
 
-      document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'openai';
+      const rawAiKey = (STATE.account?.ai_api_key || '').trim();
+      if (rawAiKey.startsWith('sk-') && rawAiKey.length === 35 && (!STATE.account?.ai_provider || STATE.account?.ai_provider === 'openai')) {
+        STATE.account.ai_provider = 'deepseek';
+      }
+      document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'deepseek';
       document.getElementById('inp-ai-key').value = STATE.account?.ai_api_key || '';
 
       onPersonaChange();
