@@ -1703,7 +1703,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <!-- CARD PRINCIPAL DO SIMULADOR -->
           <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] overflow-hidden">
             <!-- HEADER DO SIMULADOR -->
-            <div class="p-5 border-b border-[#181c28] flex justify-between items-center">
+            <div class="p-5 border-b border-[#181c28] flex justify-between items-center gap-3 flex-wrap">
               <div>
                 <div class="flex items-center gap-2">
                   <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -1711,9 +1711,14 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">Testando como <span id="sim-persona-name">Atendimento</span> • nenhum lead ou bot recebe estas mensagens.</p>
               </div>
-              <button type="button" onclick="resetFullSimulator()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-eraser text-[11px]"></i> Limpar teste
-              </button>
+              <div class="flex items-center gap-2.5">
+                <button type="button" id="btn-run-diag" onclick="runPersonaDiagnostics()" class="px-3.5 py-2 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-700/50 text-xs font-bold text-emerald-300 flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-stethoscope text-[11px]"></i> Testar Todas as Funções da Persona
+                </button>
+                <button type="button" onclick="resetFullSimulator()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+                  <i class="fa-solid fa-eraser text-[11px]"></i> Limpar teste
+                </button>
+              </div>
             </div>
 
             <!-- ÁREA DE MENSAGENS DO SIMULADOR -->
@@ -3492,6 +3497,42 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-4 py-2.5 rounded-2xl text-xs w-fit max-w-[80%]">${m}</div>
         `).join('')}
       `;
+    }
+
+    async function runPersonaDiagnostics() {
+      const btn = document.getElementById('btn-run-diag');
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> Testando...`;
+      const box = document.getElementById('full-sim-messages');
+      try {
+        const res = await fetch('/api/diagnostics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: STATE })
+        });
+        const data = await res.json();
+        const rows = (data.checks || []).map(c => `
+          <div class="p-2.5 rounded-xl bg-[#0b0d14] border border-[#1e2333] space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">${c.name}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${c.ok ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' : 'bg-amber-950/70 text-amber-300 border border-amber-800/50'}">${c.ok ? 'OK ✓' : 'AVISO'}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${c.detail}</p>
+          </div>
+        `).join('');
+        box.innerHTML += `
+          <div class="rounded-2xl border border-emerald-700/40 bg-[#0d121d] p-4 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-[#1e2333] pb-2">
+              <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Diagnóstico Completo da Persona & Integrações</span>
+              <span class="text-[10px] text-slate-400">Bot: ${data.bot_running ? 'ONLINE (' + (data.bot_username || '') + ')' : 'PAUSADO'} • ${data.gateway_msg || ''}</span>
+            </div>
+            <div class="space-y-2">${rows}</div>
+          </div>
+        `;
+        box.scrollTop = box.scrollHeight;
+      } catch (err) {
+        console.error(err);
+      }
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-stethoscope text-[11px]"></i> Testar Todas as Funções da Persona`;
     }
 
     async function sendTestMessage(e) {

@@ -376,3 +376,67 @@ async def webhook_gateway(payload: Dict[str, Any]):
                 await session.commit()
         return {"status": "success", "action": "approved", "transaction_id": transaction_id}
     return {"status": "received", "transaction_id": transaction_id}
+
+class DiagnosticsRequest(BaseModel):
+    state: Optional[Dict[str, Any]] = None
+
+@app.post("/api/diagnostics")
+async def run_persona_diagnostics(req: DiagnosticsRequest):
+    import asyncio
+    state = req.state or await _read_state_from_db()
+    t1 = generate_ai_reply(state, [], "Oi! Qual é o seu nome e quantos anos você tem?", lead_name="Mari")
+    t2 = generate_ai_reply(state, [], "Quero entrar no seu VIP, quanto custa?", lead_name="Mari")
+    t3 = generate_ai_reply(state, [], "Achei meio caro, consegue fazer um desconto pra eu pagar agora no Pix?", lead_name="Mari")
+    t4 = generate_ai_reply(state, [], "Me manda uma foto sua de prévia pra eu te ver?", lead_name="Mari")
+    r1, r2, r3, r4 = await asyncio.gather(t1, t2, t3, t4)
+
+    pub = state.get("publish", {})
+    gw_ok = False
+    gw_msg = "Sem chave configurada"
+    if pub.get("pushin_pay_token"):
+        try:
+            client = PushinPayClient(
+                token=pub.get("pushin_pay_token", ""),
+                provider=pub.get("gateway_provider", "syncpay"),
+                secret=pub.get("gateway_secret", "")
+            )
+            if client.provider == "syncpay":
+                bearer = await client._get_syncpay_bearer()
+                gw_ok = bool(bearer)
+                gw_msg = "Sync Pay autenticada (OAuth Bearer ativo)"
+            else:
+                gw_ok = True
+                gw_msg = f"Gateway {client.provider} configurado"
+        except Exception as e:
+            gw_msg = f"Erro Gateway: {e}"
+
+    bot_running = bool(bot_manager.polling_task and not bot_manager.polling_task.done())
+    return {
+        "status": "ok",
+        "bot_running": bot_running,
+        "bot_username": pub.get("bot_username", ""),
+        "gateway_ok": gw_ok,
+        "gateway_msg": gw_msg,
+        "checks": [
+            {
+                "name": "1. Identidade & Idade (DeepSeek)",
+                "ok": bool(r1.get("reply")) and not r1.get("offer_card"),
+                "detail": r1.get("reply", "")
+            },
+            {
+                "name": "2. Apresentação da Oferta & Botão Checkout",
+                "ok": bool(r2.get("offer_card")),
+                "detail": f"{r2.get('reply', '')} [Botão: {r2.get('offer_card', {}).get('name', 'N/A')} — R$ {float(r2.get('offer_card', {}).get('price', 0)):.2f}]" if r2.get("offer_card") else r2.get("reply", "")
+            },
+            {
+                "name": "3. Negociação / Desconto Inteligente",
+                "ok": bool(r3.get("reply")),
+                "detail": f"{r3.get('reply', '')} [Botão: {r3.get('offer_card', {}).get('name', 'N/A')} — R$ {float(r3.get('offer_card', {}).get('price', 0)):.2f}]" if r3.get("offer_card") else r3.get("reply", "")
+            },
+            {
+                "name": "4. Gatilho de Mídia da Conversa",
+                "ok": bool(r4.get("media")) or not any(m.get("active", True) for m in state.get("medias", [])),
+                "detail": f"Mídia enviada: {r4.get('media', {}).get('name')} | {r4.get('reply', '')}" if r4.get("media") else f"(Nenhuma mídia ativa) {r4.get('reply', '')}"
+            }
+        ]
+    }

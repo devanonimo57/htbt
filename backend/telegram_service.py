@@ -310,7 +310,12 @@ class ActiveBotManager:
             await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
             await asyncio.sleep(delay)
 
-            ai_res = await generate_ai_reply(state, lead["history"], user_text)
+            ai_res = await generate_ai_reply(
+                state,
+                lead["history"],
+                user_text,
+                lead_name=lead.get("first_name", "")
+            )
             reply_text = ai_res.get("reply", "")
 
             # Se houver mídia acionada pelo contexto (suporta URL http e upload Base64)
@@ -331,10 +336,44 @@ class ActiveBotManager:
             offer_card = ai_res.get("offer_card")
             markup = self._build_offers_keyboard(state, offer_card) if offer_card else None
 
-            await message.answer(reply_text, reply_markup=markup)
+            try:
+                await message.answer(reply_text, reply_markup=markup)
+            except Exception as e:
+                logger.warning(f"Fallback envio de mensagem sem markup: {e}")
+                await message.answer(reply_text)
             lead["history"].append({"role": "assistant", "content": reply_text})
             await self.state_saver(state)
 
+            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
+
+        @self.dp.message(F.voice | F.audio | F.photo | F.sticker | F.video)
+        async def handle_non_text(message: types.Message):
+            state = await self.state_getter()
+            lead = await self._get_or_create_lead(state, message.from_user)
+            self._cancel_downsell(str(message.from_user.id))
+
+            if message.voice or message.audio:
+                synthetic_msg = "[Visitante enviou um áudio — diga de forma simpática que não consegue ouvir áudio agora e peça para ele escrever por texto]"
+            elif message.sticker:
+                synthetic_msg = f"[Visitante enviou uma figurinha {message.sticker.emoji or '😈'}]"
+            else:
+                synthetic_msg = "[Visitante enviou uma foto/vídeo]"
+
+            lead.setdefault("history", []).append({"role": "user", "content": synthetic_msg})
+            delay = self._get_cadence_delay(state)
+            await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+            await asyncio.sleep(delay)
+
+            ai_res = await generate_ai_reply(
+                state,
+                lead["history"],
+                synthetic_msg,
+                lead_name=lead.get("first_name", "")
+            )
+            reply_text = ai_res.get("reply", "")
+            await message.answer(reply_text)
+            lead["history"].append({"role": "assistant", "content": reply_text})
+            await self.state_saver(state)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
 
         @self.dp.callback_query(F.data.startswith("buy:"))
