@@ -1312,62 +1312,78 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         </section>
 
         <!-- =========================================================
-             TELA 6: MÍDIAS DA CONVERSA (FIEL AOS PRINTS 8 E 9)
+             TELA 6: MÍDIAS DA CONVERSA (100% FIEL AOS 4 PRINTS)
         ========================================================== -->
         <section id="sec-midias" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Mídias da conversa</h2>
-            <p class="text-xs text-zinc-400 mt-1">Adicione fotos, vídeos, GIFs e áudios com contexto de uso.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONTEÚDO E AUTOMAÇÕES</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Mídias da conversa</h1>
+            <p class="text-sm text-slate-400 mt-1">Adicione fotos, vídeos, GIFs e áudios com contexto de uso.</p>
           </div>
 
-          <div class="sb-card p-5 flex items-center justify-between">
-            <div class="flex items-start gap-3">
-              <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                <i class="fa-regular fa-images"></i>
+          <!-- BANNER CARD: CONTEÚDO NO MOMENTO CERTO -->
+          <div class="rounded-2xl p-6 border border-[#231d3d] bg-gradient-to-r from-[#0b0d14] via-[#111022] to-[#1a1236] flex items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
+                <i class="fa-regular fa-images text-sm"></i>
               </div>
               <div>
-                <h4 class="text-xs font-bold text-white">Conteúdo no momento certo</h4>
-                <p class="text-[11px] text-zinc-400 mt-0.5 max-w-lg">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
+                <h3 class="text-sm font-bold text-white">Conteúdo no momento certo</h3>
+                <p class="text-xs text-slate-400 mt-0.5 max-w-lg leading-relaxed">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
               </div>
             </div>
-            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-lg shadow-purple-900/30">
+            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-5 py-2.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-semibold flex items-center gap-2 shrink-0 shadow-lg shadow-purple-950/50 transition">
               <i class="fa-solid fa-plus text-[10px]"></i> Adicionar mídias
             </button>
           </div>
 
-          <div class="rounded-xl p-3.5 bg-amber-950/20 border border-amber-500/25 flex items-center gap-3 text-[11px] text-amber-200/90">
-            <i class="fa-solid fa-circle-exclamation text-amber-400"></i>
-            <span>Configure o canal de cache em <strong>Publicar no bot</strong>. O upload funciona sem ele, mas o primeiro envio no Telegram pode demorar mais.</span>
+          <!-- ALERTA ÂMBAR: CANAL DE CACHE -->
+          <div class="rounded-2xl p-4 bg-[#14110b] border border-[#2b2212] flex items-start gap-3 text-xs text-slate-300 leading-relaxed">
+            <i class="fa-solid fa-shield-halved text-amber-400 text-xs mt-0.5"></i>
+            <span>Configure o canal de cache em <strong class="text-white font-semibold">Publicar no bot</strong>. O upload funciona sem ele, mas o primeiro envio no Telegram pode demorar mais.</span>
           </div>
 
+          <!-- FILTROS E CONTADOR 1/30 ARQUIVOS -->
           <div class="flex items-center justify-between">
-            <div class="flex gap-1.5" id="media-filter-pills">
-              <button onclick="setMediaFilter('Todas')" data-filter="Todas" class="px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium">✦ Todas</button>
-              <button onclick="setMediaFilter('Fotos')" data-filter="Fotos" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-regular fa-image mr-1 text-[10px]"></i> Fotos</button>
-              <button onclick="setMediaFilter('Vídeos')" data-filter="Vídeos" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-solid fa-video mr-1 text-[10px]"></i> Vídeos</button>
-              <button onclick="setMediaFilter('GIFs')" data-filter="GIFs" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs">GIFs</button>
-              <button onclick="setMediaFilter('Áudios')" data-filter="Áudios" class="px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs"><i class="fa-solid fa-microphone mr-1 text-[10px]"></i> Áudios</button>
+            <div class="flex gap-2" id="media-filter-pills">
+              <button onclick="setMediaFilter('Todas')" data-filter="Todas" class="px-3.5 py-1.5 rounded-xl bg-[#17122b] border border-[#3d286b] text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#c084fc]"></i> Todas
+              </button>
+              <button onclick="setMediaFilter('Fotos')" data-filter="Fotos" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-regular fa-image text-[11px]"></i> Fotos
+              </button>
+              <button onclick="setMediaFilter('Vídeos')" data-filter="Vídeos" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-film text-[11px]"></i> Vídeos
+              </button>
+              <button onclick="setMediaFilter('GIFs')" data-filter="GIFs" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-clapperboard text-[11px]"></i> GIFs
+              </button>
+              <button onclick="setMediaFilter('Áudios')" data-filter="Áudios" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-wave-square text-[11px]"></i> Áudios
+              </button>
             </div>
-            <span id="media-count-badge" class="text-[11px] text-zinc-500">2/20 arquivos</span>
+            <span id="media-count-badge" class="text-xs text-slate-500">1/30 arquivos</span>
           </div>
 
+          <!-- GRADE DE MÍDIAS -->
           <div id="medias-grid" class="grid grid-cols-2 gap-4 items-start"></div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('conversa')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR: 2 CARDS LADO A LADO -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('conversa')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Jeito de conversar</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ANTERIOR</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Jeito de conversar</span>
               </div>
             </button>
-            <button onclick="navigateTab('downsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+
+            <button onclick="navigateTab('downsell')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Downsell</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Downsell</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -2172,27 +2188,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       medias: [
         {
           id: "media_1",
-          name: "cena 01 replica",
+          name: "Gym (1)",
           type: "Fotos",
-          url: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80",
-          active: true,
+          url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
+          active: false,
           description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
           objective: "Criar conexão",
-          signals: "vídeo, confiança, prévia",
+          signals: "",
+          used_in: ["Conversa da IA"],
+          caption: "",
           spoiler: false,
           expanded: true
-        },
-        {
-          id: "media_2",
-          name: "0919",
-          type: "Vídeos",
-          url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
-          active: true,
-          description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
-          objective: "Aumentar desejo",
-          signals: "vídeo, prévia, corpo",
-          spoiler: false,
-          expanded: false
         }
       ],
       downsell: {
@@ -2516,14 +2522,23 @@ quer que eu te mostre as opções de acesso?</textarea>
       `).join('');
     }
 
-    // MÍDIAS DA CONVERSA (Com filtro e upload de arquivo real)
+    // MÍDIAS DA CONVERSA (100% FIEL AOS 4 PRINTS)
+    let OPEN_OBJECTIVE_MENU_IDX = null;
+    const MEDIA_OBJECTIVES = [
+      "Criar conexão",
+      "Gerar confiança",
+      "Aumentar desejo",
+      "Responder objeção",
+      "Apoiar uma oferta"
+    ];
+
     function setMediaFilter(filterName) {
       CURRENT_MEDIA_FILTER = filterName;
       document.querySelectorAll('#media-filter-pills button').forEach(btn => {
         const active = btn.getAttribute('data-filter') === filterName;
         btn.className = active
-          ? "px-3 py-1 rounded-full bg-purple-600/20 border border-purple-500/40 text-purple-300 text-xs font-medium"
-          : "px-3 py-1 rounded-full bg-[#111118] border border-[#22222e] text-zinc-400 text-xs";
+          ? "px-3.5 py-1.5 rounded-xl bg-[#17122b] border border-[#3d286b] text-white text-xs font-semibold flex items-center gap-1.5 transition"
+          : "px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition";
       });
       renderMedias();
     }
@@ -2531,19 +2546,23 @@ quer que eu te mostre as opções de acesso?</textarea>
     function handleRealFileUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
+      if ((STATE.medias || []).length >= 30) return;
       const reader = new FileReader();
       reader.onload = function(e) {
         const isVideo = file.type.startsWith('video');
         const isAudio = file.type.startsWith('audio');
+        const isGif = file.type.includes('gif');
         STATE.medias.push({
           id: 'media_' + Date.now(),
           name: file.name.replace(/\.[^/.]+$/, ""),
-          type: isVideo ? 'Vídeos' : (isAudio ? 'Áudios' : 'Fotos'),
+          type: isGif ? 'GIFs' : (isVideo ? 'Vídeos' : (isAudio ? 'Áudios' : 'Fotos')),
           url: e.target.result,
-          active: true,
+          active: false,
           description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
           objective: "Criar conexão",
-          signals: "vídeo, confiança, prévia",
+          signals: "",
+          used_in: ["Conversa da IA"],
+          caption: "",
           spoiler: false,
           expanded: true
         });
@@ -2555,90 +2574,165 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function toggleMediaExpand(idx) {
       STATE.medias[idx].expanded = !STATE.medias[idx].expanded;
+      OPEN_OBJECTIVE_MENU_IDX = null;
       renderMedias();
+    }
+
+    function toggleMediaObjectiveMenu(idx, e) {
+      if (e) e.stopPropagation();
+      OPEN_OBJECTIVE_MENU_IDX = (OPEN_OBJECTIVE_MENU_IDX === idx) ? null : idx;
+      renderMedias();
+    }
+
+    function selectMediaObjective(idx, objVal, e) {
+      if (e) e.stopPropagation();
+      STATE.medias[idx].objective = objVal;
+      OPEN_OBJECTIVE_MENU_IDX = null;
+      renderMedias();
+      markUnsaved();
+    }
+
+    function toggleMediaUsedIn(idx, loc) {
+      if (!Array.isArray(STATE.medias[idx].used_in)) {
+        STATE.medias[idx].used_in = ["Conversa da IA"];
+      }
+      const arr = STATE.medias[idx].used_in;
+      const pos = arr.indexOf(loc);
+      if (pos >= 0) {
+        arr.splice(pos, 1);
+      } else {
+        arr.push(loc);
+      }
+      renderMedias();
+      markUnsaved();
+    }
+
+    function removeMediaItem(idx) {
+      STATE.medias.splice(idx, 1);
+      OPEN_OBJECTIVE_MENU_IDX = null;
+      renderMedias();
+      markUnsaved();
     }
 
     function renderMedias() {
       const grid = document.getElementById('medias-grid');
-      document.getElementById('media-count-badge').textContent = `${STATE.medias.length}/20 arquivos`;
-      document.getElementById('nav-sub-midias').textContent = STATE.medias.length ? `${STATE.medias.length} arquivo(s)` : 'Adicionar conteúdo';
+      const medias = STATE.medias || [];
+      document.getElementById('media-count-badge').textContent = `${medias.length}/30 arquivos`;
 
-      const filtered = STATE.medias.map((m, i) => ({ ...m, _idx: i })).filter(m => CURRENT_MEDIA_FILTER === 'Todas' || m.type === CURRENT_MEDIA_FILTER);
+      const activeCount = medias.filter(x => x.active).length;
+      document.getElementById('nav-sub-midias').textContent = activeCount > 0 ? `${activeCount} ativa(s)` : 'Adicionar conteúdo';
+
+      const filtered = medias.map((m, i) => ({ ...m, _idx: i })).filter(m => CURRENT_MEDIA_FILTER === 'Todas' || m.type === CURRENT_MEDIA_FILTER);
 
       grid.innerHTML = filtered.map(m => {
         const idx = m._idx;
+        const usedIn = Array.isArray(m.used_in) ? m.used_in : ["Conversa da IA"];
+        const objVal = m.objective || "Criar conexão";
+        const isMenuOpen = OPEN_OBJECTIVE_MENU_IDX === idx;
+
         return `
-        <div class="sb-card overflow-hidden">
-          <div class="h-80 bg-zinc-900 relative overflow-hidden">
-            <img src="${m.url}" alt="${m.name}" class="w-full h-full object-cover ${m.spoiler ? 'blur-md' : ''}">
+        <div class="sb-card border border-[#181c28] bg-[#0b0d14] rounded-2xl overflow-visible">
+          <div class="h-72 bg-[#07080c] relative overflow-hidden rounded-t-2xl">
+            <img src="${m.url}" alt="${m.name}" class="w-full h-full object-cover ${m.spoiler ? 'blur-xl scale-105' : ''} transition duration-300">
             ${m.type === 'Vídeos' ? `<div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 px-3 py-1.5 rounded-lg"><i class="fa-solid fa-play"></i> <span>0:00 / 0:11</span> <i class="fa-solid fa-volume-high"></i></div>` : ''}
           </div>
-          <div class="p-4 space-y-3">
-            <div class="flex justify-between items-start gap-2">
-              <div class="flex items-start gap-2.5">
-                <span class="w-6 h-6 rounded bg-zinc-800 border border-zinc-700 text-[10px] font-bold text-zinc-300 flex items-center justify-center shrink-0 mt-0.5">BI</span>
+          <div class="p-5 space-y-4">
+            <div class="flex justify-between items-start gap-3">
+              <div class="flex items-start gap-3">
+                <div class="w-7 h-7 rounded-lg bg-[#111524] border border-[#1d2338] text-slate-300 flex items-center justify-center text-xs shrink-0 mt-0.5">
+                  <i class="fa-regular fa-image text-[11px]"></i>
+                </div>
                 <div>
-                  <p class="text-xs font-bold text-white">${m.name}</p>
-                  <p class="text-[10px] text-zinc-500">Descreva exatamente o que esta mídia mostra antes de ativá-la.</p>
+                  <p id="media-title-${idx}" class="text-xs font-bold text-white">${m.name}</p>
+                  <p id="media-sub-${idx}" class="text-[11px] text-slate-400 mt-0.5 leading-snug">${m.description || 'Descreva exatamente o que esta mídia mostra antes de ativá-la.'}</p>
                 </div>
               </div>
               <label class="toggle-switch shrink-0">
-                <input type="checkbox" ${m.active ? 'checked' : ''} onchange="STATE.medias[${idx}].active=this.checked; markUnsaved()">
+                <input type="checkbox" ${m.active ? 'checked' : ''} onchange="STATE.medias[${idx}].active=this.checked; renderMedias(); markUnsaved()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
 
-            <button onclick="toggleMediaExpand(${idx})" class="w-full pt-2 border-t border-[#1c1c26] flex justify-between items-center text-[11px] text-zinc-400 hover:text-white">
+            <button onclick="toggleMediaExpand(${idx})" class="w-full pt-3 border-t border-[#181c28] flex justify-between items-center text-xs font-medium text-slate-300 hover:text-white transition">
               <span>${m.expanded ? 'Fechar configuração' : 'Configurar contexto'}</span>
-              <i class="fa-solid fa-chevron-${m.expanded ? 'up' : 'down'} text-[9px]"></i>
+              <i class="fa-solid fa-chevron-${m.expanded ? 'up' : 'down'} text-[10px] text-slate-400"></i>
             </button>
 
-            <div class="${m.expanded ? 'space-y-3 pt-2' : 'hidden'}">
+            <div class="${m.expanded ? 'space-y-4 pt-1' : 'hidden'}">
               <div>
-                <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Nome interno</label>
-                <input type="text" value="${m.name}" oninput="STATE.medias[${idx}].name=this.value; markUnsaved()" class="sb-input">
+                <label class="text-xs font-bold text-white block mb-2">Nome interno</label>
+                <input type="text" value="${m.name}" oninput="STATE.medias[${idx}].name=this.value; document.getElementById('media-title-${idx}').textContent=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
               </div>
+
               <div>
-                <label class="text-[11px] font-semibold text-zinc-300 block">O que esta mídia mostra?</label>
-                <span class="text-[10px] text-zinc-500 block mb-1">Seja literal. A IA usa esta descrição para decidir se o arquivo combina com a conversa.</span>
-                <textarea rows="3" oninput="STATE.medias[${idx}].description=this.value; markUnsaved()" class="sb-input">${m.description}</textarea>
+                <label class="text-xs font-bold text-white block">O que esta mídia mostra?</label>
+                <span class="text-xs text-slate-400 block mt-0.5 mb-2 leading-relaxed">Seja literal. A IA usa esta descrição para decidir se o arquivo combina com a conversa.</span>
+                <textarea rows="3" oninput="STATE.medias[${idx}].description=this.value; document.getElementById('media-sub-${idx}').textContent=this.value||'Descreva exatamente o que esta mídia mostra antes de ativá-la.'; markUnsaved()" placeholder="Descreva exatamente o que esta mídia mostra antes de ativá-la." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y leading-relaxed">${m.description || ''}</textarea>
               </div>
-              <div class="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Objetivo principal</label>
-                  <select onchange="STATE.medias[${idx}].objective=this.value; markUnsaved()" class="sb-input">
-                    <option ${m.objective==='Criar conexão'?'selected':''}>Criar conexão</option>
-                    <option ${m.objective==='Gerar confiança'?'selected':''}>Gerar confiança</option>
-                    <option ${m.objective==='Aumentar desejo'?'selected':''}>Aumentar desejo</option>
-                    <option ${m.objective==='Responder objeção'?'selected':''}>Responder objeção</option>
-                    <option ${m.objective==='Apoiar uma oferta'?'selected':''}>Apoiar uma oferta</option>
-                  </select>
+
+              <div class="grid grid-cols-2 gap-3 items-start">
+                <div class="relative">
+                  <label class="text-xs font-bold text-white block mb-2">Objetivo principal</label>
+                  <button type="button" onclick="toggleMediaObjectiveMenu(${idx}, event)" class="sb-input !bg-[#090b10] !border-[#1b2030] hover:!border-slate-700 flex items-center justify-between text-left">
+                    <span class="text-xs font-semibold text-white truncate">${objVal}</span>
+                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                  </button>
+                  ${isMenuOpen ? `
+                    <div class="absolute left-0 right-0 top-[68px] z-30 rounded-xl bg-[#0e111a] border border-[#1e2436] shadow-2xl p-1.5 space-y-0.5">
+                      ${MEDIA_OBJECTIVES.map(opt => {
+                        const isSel = opt === objVal;
+                        return `
+                          <button type="button" onclick="selectMediaObjective(${idx}, '${opt}', event)" class="w-full px-3 py-2 rounded-lg text-xs flex items-center justify-between transition ${isSel ? 'bg-[#15203b] text-white font-semibold' : 'text-slate-300 hover:bg-[#161b28]'}">
+                            <span>${opt}</span>
+                            ${isSel ? '<i class="fa-solid fa-check text-[#3b82f6] text-[11px]"></i>' : ''}
+                          </button>
+                        `;
+                      }).join('')}
+                    </div>
+                  ` : ''}
                 </div>
+
                 <div>
-                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1">Sinais da conversa</label>
-                  <input type="text" value="${m.signals}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input">
+                  <label class="text-xs font-bold text-white block">Sinais da conversa</label>
+                  <span class="text-[11px] text-slate-400 block mt-0.5 mb-1.5 leading-snug">Opcional, separadas por vírgula.</span>
+                  <input type="text" value="${m.signals || ''}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
                 </div>
               </div>
+
               <div>
-                <span class="text-[10px] text-zinc-500 block mb-1">Usada em</span>
-                <div class="flex gap-1.5">
-                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300">Conversa</span>
-                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">Downsell</span>
-                  <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500">Upsell</span>
+                <label class="text-xs font-bold text-white block mb-2">Onde pode ser usada</label>
+                <div class="flex flex-wrap gap-2">
+                  ${["Conversa da IA", "Downsell", "Upsell"].map(loc => {
+                    const activeLoc = usedIn.includes(loc);
+                    return `
+                      <button type="button" onclick="toggleMediaUsedIn(${idx}, '${loc}')" class="${activeLoc ? 'px-3 py-1.5 rounded-xl bg-[#17122b] border border-[#3d286b] text-white text-xs font-semibold' : 'px-3 py-1.5 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-slate-400 text-xs font-medium'} inline-flex items-center gap-1.5 transition">
+                        ${activeLoc ? '<i class="fa-solid fa-check text-[10px] text-slate-200"></i>' : ''}
+                        <span>${loc}</span>
+                      </button>
+                    `;
+                  }).join('')}
                 </div>
               </div>
-              <div class="sb-subcard p-2.5 flex items-center justify-between">
+
+              <div>
+                <label class="text-xs font-bold text-white block">Legenda enviada junto</label>
+                <span class="text-xs text-slate-400 block mt-0.5 mb-2">Opcional. Use {nome} para personalizar.</span>
+                <input type="text" value="${m.caption || ''}" oninput="STATE.medias[${idx}].caption=this.value; markUnsaved()" placeholder="olha essa prévia..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+              </div>
+
+              <div class="rounded-xl bg-[#090b10] border border-[#1b2030] p-3.5 flex items-center justify-between gap-3">
                 <div>
-                  <span class="text-xs font-medium text-white block">Modo de spoiler</span>
-                  <span class="text-[10px] text-zinc-500">O Telegram exige um toque para revelar</span>
+                  <span class="text-xs font-bold text-white block">Efeito de spoiler</span>
+                  <span class="text-[11px] text-slate-400 block mt-0.5">O Telegram exige um toque para revelar.</span>
                 </div>
-                <label class="toggle-switch">
+                <label class="toggle-switch shrink-0">
                   <input type="checkbox" ${m.spoiler ? 'checked' : ''} onchange="STATE.medias[${idx}].spoiler=this.checked; renderMedias(); markUnsaved()">
                   <span class="toggle-slider"></span>
                 </label>
               </div>
-              <button onclick="STATE.medias.splice(${idx},1); renderMedias(); markUnsaved()" class="text-[11px] text-red-400 hover:underline flex items-center gap-1">
-                <i class="fa-regular fa-trash-can"></i> Remover da biblioteca
+
+              <button type="button" onclick="removeMediaItem(${idx})" class="text-xs font-medium text-rose-400/90 hover:text-rose-300 flex items-center gap-2 pt-1 transition">
+                <i class="fa-regular fa-trash-can text-xs"></i> Remover da biblioteca
               </button>
             </div>
           </div>
@@ -3070,11 +3164,36 @@ quer que eu te mostre as opções de acesso?</textarea>
           if (STATE.style?.rules?.startsWith("Puxar um detalhe")) {
             STATE.style.rules = "Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.\nNao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.\nQuando houver intencao de compra, abra os planos sem criar etapas artificiais.";
           }
+          if (Array.isArray(STATE.medias) && STATE.medias.length === 2 && STATE.medias[0].name === 'cena 01 replica') {
+            STATE.medias = [
+              {
+                id: "media_1",
+                name: "Gym (1)",
+                type: "Fotos",
+                url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
+                active: false,
+                description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
+                objective: "Criar conexão",
+                signals: "",
+                used_in: ["Conversa da IA"],
+                caption: "",
+                spoiler: false,
+                expanded: true
+              }
+            ];
+          }
         }
       } catch (e) {}
       syncStateToInputs();
       markSaved();
     }
+
+    document.addEventListener('click', () => {
+      if (OPEN_OBJECTIVE_MENU_IDX !== null) {
+        OPEN_OBJECTIVE_MENU_IDX = null;
+        renderMedias();
+      }
+    });
 
     window.addEventListener('DOMContentLoaded', loadInitialState);
   </script>

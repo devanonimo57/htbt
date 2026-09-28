@@ -75,27 +75,17 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "medias": [
         {
             "id": "media_1",
-            "name": "cena 01 replica",
+            "name": "Gym (1)",
             "type": "Fotos",
-            "url": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80",
-            "active": True,
+            "url": "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
+            "active": False,
             "description": "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
             "objective": "Criar conexão",
-            "signals": "vídeo, confiança, prévia",
+            "signals": "",
+            "used_in": ["Conversa da IA"],
+            "caption": "",
             "spoiler": False,
             "expanded": True
-        },
-        {
-            "id": "media_2",
-            "name": "0919",
-            "type": "Vídeos",
-            "url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80",
-            "active": True,
-            "description": "Vídeo curto mostrando prévia descontraída no espelho.",
-            "objective": "Aumentar desejo",
-            "signals": "vídeo, prévia, corpo",
-            "spoiler": False,
-            "expanded": False
         }
     ],
     "downsell": {
