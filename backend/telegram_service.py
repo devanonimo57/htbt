@@ -45,7 +45,10 @@ class ActiveBotManager:
         state = await self.state_getter()
         publish = state.get("publish", {})
         token = publish.get("bot_token", "").strip()
-        is_live = bool(publish.get("is_live", False))
+        # Se há token preenchido, ativa por padrão a menos que explicitamente desativado
+        if token and "is_live" not in publish:
+            publish["is_live"] = True
+        is_live = bool(publish.get("is_live", True)) if token else False
 
         if not token or not is_live:
             await self.stop()
@@ -61,6 +64,7 @@ class ActiveBotManager:
             me = await test_bot.get_me()
             publish["bot_username"] = f"@{me.username}"
             publish["bot_first_name"] = me.first_name
+            publish["is_live"] = True
             await self.state_saver(state)
         except Exception as e:
             logger.error(f"Token do Telegram inválido: {e}")
@@ -94,14 +98,35 @@ class ActiveBotManager:
         self.dp = None
         self.current_token = ""
 
-    async def _run_polling(self):
+    async def _safe_feed_update(self, update: types.Update):
         try:
-            await self.bot.delete_webhook(drop_pending_updates=True)
-            await self.dp.start_polling(self.bot, handle_signals=False)
-        except asyncio.CancelledError:
-            pass
+            if self.dp and self.bot:
+                await self.dp.feed_update(self.bot, update)
         except Exception as e:
-            logger.error(f"Erro no loop de polling do Telegram: {e}")
+            logger.error(f"Erro processando update {update.update_id}: {e}")
+
+    async def _run_polling(self):
+        offset: Optional[int] = None
+        try:
+            await self.bot.delete_webhook(drop_pending_updates=False)
+        except Exception as e:
+            logger.warning(f"Aviso ao limpar webhook: {e}")
+
+        while True:
+            try:
+                updates = await self.bot.get_updates(
+                    offset=offset,
+                    timeout=15,
+                    allowed_updates=["message", "callback_query"]
+                )
+                for u in updates:
+                    offset = u.update_id + 1
+                    asyncio.create_task(self._safe_feed_update(u))
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Polling aguardando liberação de instância ({e})...")
+                await asyncio.sleep(3)
 
     def _get_cadence_delay(self, state: Dict[str, Any]) -> float:
         cadence = state.get("style", {}).get("cadence", "Natural")
@@ -224,6 +249,10 @@ class ActiveBotManager:
             style = state.get("style", {})
             variations = [v.strip() for v in style.get("opening_variations", []) if v and v.strip()]
             main_opening = style.get("opening_messages", ["oii 💜", "chegou agora por aqui?"])
+            if isinstance(main_opening, str):
+                main_opening = [l.strip() for l in main_opening.split("\n") if l.strip()]
+            if not main_opening:
+                main_opening = ["oii 💜", "chegou agora por aqui?"]
 
             if variations and random.random() < 0.4:
                 chosen_lines = [l.strip() for l in random.choice(variations).split("\n") if l.strip()]

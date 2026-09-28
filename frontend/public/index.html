@@ -2296,6 +2296,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <label class="text-xs font-bold text-white block mb-1.5">Provedor</label>
                 <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input !bg-[#07090e] !border-[#181c28]">
                   <option value="openai">OpenAI (GPT-4o-mini)</option>
+                  <option value="deepseek">DeepSeek (deepseek-chat)</option>
                   <option value="groq">Groq (Llama 3.3 70B - Grátis)</option>
                 </select>
               </div>
@@ -3612,9 +3613,26 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nav-sub-resumo').textContent = `${Math.min(5, completed)} de 5 itens essenciais`;
     }
 
+    let BACKEND_ONLINE = false;
+    let BROWSER_POLL_TIMER = null;
+    let BROWSER_POLL_OFFSET = 0;
+    let BROWSER_POLL_ACTIVE_TOKEN = "";
+
+    function saveLocalBackup() {
+      try {
+        localStorage.setItem('SHARKBOT_STATE_BACKUP', JSON.stringify(STATE));
+      } catch (e) {}
+    }
+
     function onPublishChange() {
+      const tokenVal = (document.getElementById('inp-bot-token').value || '').trim();
+      const prevToken = (STATE.publish?.bot_token || '').trim();
+      // Se o usuário acabou de colar um token válido, ativa o switch automaticamente
+      if (tokenVal && tokenVal.includes(':') && !prevToken) {
+        document.getElementById('chk-bot-live').checked = true;
+      }
       STATE.publish.is_live = document.getElementById('chk-bot-live').checked;
-      STATE.publish.bot_token = document.getElementById('inp-bot-token').value;
+      STATE.publish.bot_token = tokenVal;
       if (document.getElementById('sel-gateway-provider')) {
         STATE.publish.gateway_provider = document.getElementById('sel-gateway-provider').value;
       }
@@ -3625,6 +3643,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       STATE.publish.cache_channel_id = document.getElementById('inp-cache-channel').value;
       STATE.publish.delivery_destination = document.getElementById('inp-delivery-dest').value;
       STATE.publish.support_username = document.getElementById('inp-support-user').value;
+      saveLocalBackup();
       updatePrepProgress();
       markUnsaved();
     }
@@ -3697,12 +3716,14 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const selBot = document.getElementById('sel-bot-available');
       if (STATE.publish?.bot_username) {
-        document.getElementById('bot-connected-label').innerHTML = `Conectado em: <strong class="text-emerald-400">${STATE.publish.bot_username}</strong>`;
+        document.getElementById('bot-connected-label').innerHTML = `Conectado em: <strong class="text-emerald-400">${STATE.publish.bot_username} (Ativo — envie /start no Telegram)</strong>`;
         if (selBot) {
           selBot.innerHTML = `<option value="${STATE.publish.bot_username}" selected>${STATE.publish.bot_username} (Ativo)</option>`;
         }
       } else if (STATE.publish?.bot_token) {
         document.getElementById('bot-connected-label').innerHTML = `<span class="text-amber-400">Token preenchido — clique em Salvar ou Conectar e Ativar</span>`;
+      } else {
+        document.getElementById('bot-connected-label').innerHTML = `<span class="text-slate-500">Nenhum bot livre encontrado nesta conta</span>`;
       }
 
       document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'openai';
@@ -3717,12 +3738,287 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderRightPreviewBubbles();
     }
 
+    async function verifyTelegramTokenDirect(token) {
+      if (!token || !token.includes(':')) return null;
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token.trim()}/getMe`);
+        const data = await res.json();
+        if (data && data.ok && data.result) {
+          return data.result;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    async function browserGenerateAiReply(state, history, userMessage) {
+      const persona = state.persona || {};
+      const business = state.business || {};
+      const style = state.style || {};
+      const offers = (business.offers || []).filter(o => o.visible !== false);
+      const faqs = business.faqs || [];
+      const medias = (state.medias || []).filter(m => m.active !== false);
+      const msgLower = (userMessage || '').toLowerCase();
+
+      let triggeredMedia = null;
+      for (const m of medias) {
+        const sigs = (m.signals || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        if (sigs.some(sig => msgLower.includes(sig)) || ['foto', 'vídeo', 'video', 'prévia', 'previa', 'amostra', 'ver você'].some(w => msgLower.includes(w))) {
+          triggeredMedia = m;
+          break;
+        }
+      }
+
+      const wantsOffer = ['preço', 'preco', 'valor', 'quanto', 'plano', 'vip', 'assinar', 'entrar', 'quero', 'pix', 'como funciona', 'comprar', 'acesso'].some(w => msgLower.includes(w));
+      const apiKey = (state.account?.ai_api_key || '').trim();
+      const provider = (state.account?.ai_provider || 'openai').toLowerCase();
+
+      if (apiKey && (provider === 'openai' || provider === 'groq')) {
+        const baseUrl = provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
+        const model = provider === 'openai' ? 'gpt-4o-mini' : 'llama-3.3-70b-versatile';
+        const offersText = offers.map(o => `- ${o.emoji || '💎'} ${o.name}: R$ ${Number(o.price || 19).toFixed(2)} (${o.duration || 30} dias) - ${o.description || ''}`).join('\n');
+        const sysPrompt = `Você é ${persona.name || 'Atendimento'}, ${persona.age || 18} anos, cidade ${persona.city || 'São Paulo'}.\nBio: ${persona.bio || ''}\nTraços: ${persona.traits || ''}\nContexto: ${business.context || ''}\nOfertas:\n${offersText || 'VIP Privado R$ 19,90'}\nEstilo: Estratégia ${style.strategy || 'Conexão primeiro'}, Flerte ${style.flirt || 'Leve'}, Tom ${style.tone || 'Acolhedor'}, Tamanho ${style.length || 'Curta'}.\nRegras:\n${style.rules || ''}\nResponda sempre em primeira pessoa como num chat privado do Telegram, curto e natural.`;
+        const msgs = [{ role: 'system', content: sysPrompt }, ...(history || []).slice(-8), { role: 'user', content: userMessage }];
+        try {
+          const r = await fetch(baseUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, messages: msgs, temperature: 0.75, max_tokens: 200 })
+          });
+          if (r.ok) {
+            const d = await r.json();
+            const replyText = d.choices?.[0]?.message?.content || '';
+            const out = { reply: replyText };
+            if (triggeredMedia) out.media = triggeredMedia;
+            if ((wantsOffer || replyText.toLowerCase().includes('r$') || replyText.toLowerCase().includes('plano')) && offers.length) {
+              out.offer_card = offers[0];
+            }
+            return out;
+          }
+        } catch (err) {}
+      }
+
+      for (const f of faqs) {
+        const q = (f.question || '').toLowerCase();
+        if (q && f.answer && q.split(' ').some(w => w.length > 3 && msgLower.includes(w))) {
+          return { reply: f.answer };
+        }
+      }
+
+      if (['caro', 'desconto', 'menos', 'barato', 'não tenho', 'nao tenho'].some(w => msgLower.includes(w)) && business.bargain?.enabled) {
+        const minP = Number(business.bargain.min_price || 14.90);
+        return {
+          reply: `poxa, quero muito te ver lá no meu VIP... consigo fazer uma condição especial de R$ ${minP.toFixed(2).replace('.', ',')} pra você entrar agora no Pix, topa? 💜`,
+          offer_card: { name: offers[0]?.name || 'VIP Exclusivo', price: minP, emoji: '💎' }
+        };
+      }
+
+      if (wantsOffer) {
+        const mainOffer = offers[0] || { id: 'o1', name: 'Acesso VIP Privado', price: 19.90, emoji: '💎', duration: 30, description: 'acesso imediato ao meu conteúdo exclusivo sem censura' };
+        const pFmt = `R$ ${Number(mainOffer.price || 19.90).toFixed(2).replace('.', ',')}`;
+        return {
+          reply: `no meu VIP você tem ${mainOffer.description || 'acesso imediato aos meus conteúdos exclusivos no Telegram'} 😍\n\no plano ${mainOffer.emoji || '💎'} ${mainOffer.name} tá saindo por ${pFmt} (${mainOffer.duration || 30} dias). Vou deixar o botão seguro aqui embaixo pra você liberar agora:`,
+          offer_card: mainOffer
+        };
+      }
+
+      if (triggeredMedia) {
+        return {
+          reply: `separei isso aqui pra você ver um pouquinho do meu jeito... 😈 me diz o que achou!`,
+          media: triggeredMedia
+        };
+      }
+
+      if (['oi', 'oii', 'olá', 'ola', 'tudo bem', 'opa', 'bom dia', 'boa tarde', 'boa noite'].some(w => msgLower.includes(w))) {
+        const city = persona.city || 'São Paulo';
+        if (style.strategy === 'Direto') {
+          return { reply: `oii! tudo ótimo por aqui 💜 você já veio conhecer meu VIP privado ou quer tirar alguma dúvida antes de liberar seu acesso?` };
+        }
+        return { reply: `oii, tudo bem e com você? 💜 sou de ${city} rs, me conta, o que te chamou atenção pra vir falar comigo aqui no privado?` };
+      }
+
+      return {
+        reply: `adorei isso que você falou rs... lá no meu VIP privado eu fico bem mais à vontade e posto tudo sem censura. Quer que eu te mostre como funciona o acesso? 💜`,
+        offer_card: offers[0] || null
+      };
+    }
+
+    async function startBrowserTelegramFallbackIfNeeded() {
+      if (BACKEND_ONLINE) return; // Se o backend Python (Render) está ativo, o servidor cuida do polling 24/7
+      const token = (STATE.publish?.bot_token || '').trim();
+      if (!token || !token.includes(':') || !STATE.publish?.is_live) {
+        BROWSER_POLL_ACTIVE_TOKEN = "";
+        return;
+      }
+      if (BROWSER_POLL_ACTIVE_TOKEN === token) return;
+      BROWSER_POLL_ACTIVE_TOKEN = token;
+
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
+      } catch (e) {}
+
+      const pollLoop = async () => {
+        if (BACKEND_ONLINE || BROWSER_POLL_ACTIVE_TOKEN !== token || !STATE.publish?.is_live) return;
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${BROWSER_POLL_OFFSET}&timeout=10`);
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.result)) {
+            for (const upd of data.result) {
+              BROWSER_POLL_OFFSET = upd.update_id + 1;
+              handleBrowserTelegramUpdate(token, upd);
+            }
+          }
+        } catch (err) {}
+        if (!BACKEND_ONLINE && BROWSER_POLL_ACTIVE_TOKEN === token && STATE.publish?.is_live) {
+          BROWSER_POLL_TIMER = setTimeout(pollLoop, 1200);
+        }
+      };
+      pollLoop();
+    }
+
+    async function handleBrowserTelegramUpdate(token, upd) {
+      const apiBase = `https://api.telegram.org/bot${token}`;
+      if (upd.message && upd.message.text) {
+        const chatId = upd.message.chat.id;
+        const text = upd.message.text.trim();
+        const user = upd.message.from || {};
+
+        // Registra lead na memória
+        if (!STATE.memory) STATE.memory = { leads: [] };
+        let lead = STATE.memory.leads.find(l => String(l.telegram_id) === String(user.id));
+        if (!lead) {
+          lead = {
+            telegram_id: String(user.id || chatId),
+            first_name: user.first_name || 'Visitante',
+            username: user.username ? `@${user.username}` : 'Sem @user',
+            stage: 'Conversando',
+            last_interaction: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            history: []
+          };
+          STATE.memory.leads.unshift(lead);
+          STATE.learning.evaluated_results = STATE.memory.leads.length;
+        }
+
+        if (text.startsWith('/start')) {
+          const rawOpen = STATE.style?.opening_messages || ['oii 💜', 'chegou agora por aqui?'];
+          const lines = Array.isArray(rawOpen) ? rawOpen : String(rawOpen).split('\n').filter(Boolean);
+          for (const line of (lines.length ? lines : ['oii 💜', 'chegou agora por aqui?'])) {
+            await fetch(`${apiBase}/sendChatAction`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) });
+            await new Promise(r => setTimeout(r, 900));
+            await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: line }) });
+            lead.history.push({ role: 'assistant', content: line });
+          }
+          saveLocalBackup();
+          return;
+        }
+
+        lead.history.push({ role: 'user', content: text });
+        await fetch(`${apiBase}/sendChatAction`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) });
+        await new Promise(r => setTimeout(r, 1100));
+
+        const aiRes = await browserGenerateAiReply(STATE, lead.history, text);
+        if (aiRes.media && aiRes.media.url && aiRes.media.url.startsWith('http')) {
+          try {
+            await fetch(`${apiBase}/sendPhoto`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: chatId, photo: aiRes.media.url, caption: aiRes.media.caption || undefined, has_spoiler: !!aiRes.media.spoiler })
+            });
+          } catch (e) {}
+        }
+
+        const payload = { chat_id: chatId, text: aiRes.reply };
+        const offers = (STATE.business?.offers || []).filter(o => o.visible !== false);
+        if (aiRes.offer_card || offers.length) {
+          const listToShow = aiRes.offer_card ? [aiRes.offer_card] : offers;
+          if (aiRes.offer_card) {
+            payload.reply_markup = {
+              inline_keyboard: listToShow.map((o, i) => ([{
+                text: `${o.emoji || '💎'} ${o.name || 'Acesso VIP'} — R$ ${Number(o.price || 19.90).toFixed(2).replace('.', ',')}`,
+                callback_data: `buy:${o.id || 'o' + i}:${Number(o.price || 19.90).toFixed(2)}`
+              }]))
+            };
+          }
+        }
+
+        await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        lead.history.push({ role: 'assistant', content: aiRes.reply });
+        saveLocalBackup();
+      } else if (upd.callback_query) {
+        const cb = upd.callback_query;
+        const chatId = cb.message?.chat?.id;
+        const data = cb.data || '';
+        await fetch(`${apiBase}/answerCallbackQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: cb.id }) });
+
+        if (data.startsWith('buy:')) {
+          const parts = data.split(':');
+          const price = parseFloat(parts[2] || '19.90');
+          const cents = Math.round(price * 100);
+          let pixCode = `00020126580014br.gov.bcb.pix0136sharkbot-${cents}5204000053039865405${price.toFixed(2)}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD`;
+          const gwToken = (STATE.publish?.pushin_pay_token || '').trim();
+          if (gwToken && (STATE.publish?.gateway_provider || 'pushinpay') === 'pushinpay') {
+            try {
+              const r = await fetch('https://api.pushinpay.com.br/api/pix/cashIn', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${gwToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ value: cents })
+              });
+              const d = await r.json();
+              if (d.qr_code) pixCode = d.qr_code;
+            } catch (e) {}
+          }
+          await fetch(`${apiBase}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `🔒 <b>Pagamento Seguro via PIX</b>\n\nValor: <b>R$ ${price.toFixed(2).replace('.', ',')}</b>\n\nCopie o código PIX Copia e Cola abaixo e pague no app do seu banco:\n\n<code>${pixCode}</code>\n\nAssim que concluir, clique abaixo para liberar seu acesso:`,
+              parse_mode: 'HTML',
+              reply_markup: { inline_keyboard: [[{ text: '✅ Já paguei / Liberar acesso', callback_data: 'checkpix:ok' }]] }
+            })
+          });
+        } else if (data.startsWith('checkpix:')) {
+          const dest = (STATE.publish?.delivery_destination || 'https://t.me/+link_exclusivo_vip').trim();
+          if (STATE.publish?.delivery_type === 'Mensagem no bot' && !dest.startsWith('http')) {
+            await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `💜 Pagamento confirmado!\n\n${dest}` }) });
+          } else {
+            await fetch(`${apiBase}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: `💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:`,
+                parse_mode: 'HTML',
+                reply_markup: { inline_keyboard: [[{ text: '🔥 ENTRAR NO MEU VIP AGORA', url: dest.startsWith('http') ? dest : 'https://t.me/' }]] }
+              })
+            });
+          }
+        }
+      }
+    }
+
     async function saveFullState() {
       STATE.account.ai_provider = document.getElementById('sel-ai-provider').value;
       STATE.account.ai_api_key = document.getElementById('inp-ai-key').value;
 
+      const tokenVal = (document.getElementById('inp-bot-token').value || '').trim();
+      if (tokenVal && tokenVal.includes(':')) {
+        STATE.publish.bot_token = tokenVal;
+        STATE.publish.is_live = true;
+        document.getElementById('chk-bot-live').checked = true;
+      }
+
       const btn = document.getElementById('btn-save-top');
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> <span>Salvando...</span>`;
+
+      if (tokenVal) {
+        const me = await verifyTelegramTokenDirect(tokenVal);
+        if (me && me.username) {
+          STATE.publish.bot_username = `@${me.username}`;
+          STATE.publish.bot_first_name = me.first_name || '';
+        }
+      }
+
+      saveLocalBackup();
 
       try {
         const res = await fetch("/api/state", {
@@ -3730,80 +4026,67 @@ quer que eu te mostre as opções de acesso?</textarea>
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(STATE)
         });
-        const data = await res.json();
-        if (data.state) {
-          STATE = data.state;
-          syncStateToInputs();
+        if (res.ok) {
+          BACKEND_ONLINE = true;
+          const data = await res.json();
+          if (data.state) {
+            STATE = data.state;
+            saveLocalBackup();
+          }
         }
-        markSaved();
       } catch (e) {
-        markSaved();
+        BACKEND_ONLINE = false;
       } finally {
+        syncStateToInputs();
+        markSaved();
+        startBrowserTelegramFallbackIfNeeded();
         btn.innerHTML = `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`;
       }
     }
 
     async function loadInitialState() {
+      let localBackup = null;
+      try {
+        const raw = localStorage.getItem('SHARKBOT_STATE_BACKUP');
+        if (raw) localBackup = JSON.parse(raw);
+      } catch (e) {}
+
       try {
         const res = await fetch("/api/state");
         if (res.ok) {
+          BACKEND_ONLINE = true;
           const serverState = await res.json();
           STATE = { ...STATE, ...serverState };
-          if (Array.isArray(STATE.business?.faqs) && STATE.business.faqs.length === 1 && !STATE.business.faqs[0].question && !STATE.business.faqs[0].answer) {
-            STATE.business.faqs = [];
-          }
-          if (Array.isArray(STATE.business?.offers) && STATE.business.offers.length === 1 && STATE.business.offers[0].id === 'offer_1' && !STATE.business.offers[0].description) {
-            STATE.business.offers = [];
-          }
-          if (STATE.style?.objective?.startsWith("Entender o interesse")) {
-            STATE.style.objective = "Entender a intencao, lembrar preferencias e conduzir naturalmente para o acesso mais adequado.";
-          }
-          if (STATE.style?.rules?.startsWith("Puxar um detalhe")) {
-            STATE.style.rules = "Reaja ao detalhe mais importante da ultima mensagem antes de fazer outra pergunta.\nNao reinicie a conversa nem repita uma pergunta que o visitante ja respondeu.\nQuando houver intencao de compra, abra os planos sem criar etapas artificiais.";
-          }
-          if (Array.isArray(STATE.medias) && STATE.medias.length === 2 && STATE.medias[0].name === 'cena 01 replica') {
-            STATE.medias = [
-              {
-                id: "media_1",
-                name: "Gym (1)",
-                type: "Fotos",
-                url: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80",
-                active: false,
-                description: "Descreva exatamente o que esta mídia mostra antes de ativá-la.",
-                objective: "Criar conexão",
-                signals: "",
-                used_in: ["Conversa da IA"],
-                caption: "",
-                spoiler: false,
-                expanded: true
-              }
-            ];
-          }
-          if (STATE.downsell?.steps?.[0]?.message?.startsWith("sumiu por ai?")) {
-            STATE.downsell.steps[0].message = "sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?";
-          }
-          if (STATE.upsell) {
-            if (STATE.upsell.message?.endsWith("! 😉")) {
-              STATE.upsell.message = "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀";
-              STATE.upsell.enabled = false;
-            }
-            if (!Array.isArray(STATE.upsell.medias) || STATE.upsell.medias.length === 0) {
-              STATE.upsell.medias = [
-                {
-                  id: "up_m1",
-                  name: "Imagem do ChatGPT 27 de set. de 2026, 13 42 52 2",
-                  url: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=600&q=80",
-                  caption: "",
-                  spoiler: false,
-                  expanded: true
-                }
-              ];
-            }
+
+          // Se o servidor reiniciou no Render e perdeu o bot_token, restaura do backup local do navegador automaticamente!
+          if (localBackup && localBackup.publish?.bot_token && !STATE.publish?.bot_token) {
+            STATE = { ...STATE, ...localBackup };
+            STATE.publish.is_live = true;
+            await fetch("/api/state", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(STATE)
+            });
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        BACKEND_ONLINE = false;
+        if (localBackup) {
+          STATE = { ...STATE, ...localBackup };
+        }
+      }
+
+      if (STATE.publish?.bot_token && !STATE.publish?.bot_username) {
+        const me = await verifyTelegramTokenDirect(STATE.publish.bot_token);
+        if (me && me.username) {
+          STATE.publish.bot_username = `@${me.username}`;
+          STATE.publish.is_live = true;
+        }
+      }
+
       syncStateToInputs();
       markSaved();
+      startBrowserTelegramFallbackIfNeeded();
     }
 
     document.addEventListener('click', () => {
