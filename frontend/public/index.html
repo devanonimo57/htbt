@@ -1535,115 +1535,157 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 8: UPSELL (FIEL AO PRINT 12)
+             TELA 8: UPSELL (100% FIEL AOS 5 PRINTS DO UPSELL)
         ========================================================== -->
-        <section id="sec-upsell" class="tab-section hidden space-y-6">
+        <section id="sec-upsell" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Upsell</h2>
-            <p class="text-xs text-zinc-400 mt-1">Apresente uma nova oferta automaticamente depois da primeira compra aprovada.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">CONTEÚDO E AUTOMAÇÕES</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Upsell</h2>
+            <p class="text-xs text-slate-400 mt-1">Ofereça um novo acesso ou complemento depois da entrega inicial.</p>
           </div>
 
-          <div class="sb-card p-5 flex items-center justify-between">
-            <div class="flex items-start gap-3">
-              <div class="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-                <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+          <!-- CARD 1: BANNER TOPO COM GLOW ROXO SUAVE -->
+          <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#141625] border border-[#25283d] flex items-center justify-center text-slate-200 shrink-0">
+                <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
               <div>
-                <h4 class="text-xs font-bold text-white">Upsell • uma nova oferta após a compra</h4>
-                <p class="text-[11px] text-zinc-400 mt-0.5">A primeira entrega vai na hora. Depois, o bot faz uma extensão de acesso ou uma opção extra, com mensagem e mídias próprias.</p>
+                <h4 class="text-sm font-bold text-white">Upsell • uma nova oferta após a compra</h4>
+                <p class="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">A primeira entrega vem antes. Depois, ofereça uma extensão de acesso ou uma opção extra, com mensagem e mídias próprias.</p>
               </div>
             </div>
-            <span class="text-[9px] font-bold uppercase px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">OPCIONAL</span>
+            <span id="upsell-top-badge" class="px-3 py-1 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">DESATIVADAS</span>
           </div>
 
-          <div class="sb-card p-6 space-y-5">
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-bold text-white">Upsell</h3>
-                  <span class="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">PRÓXIMO PASSO AUTOMÁTICO</span>
+          <!-- CARD 2: CONFIGURAÇÃO DO UPSELL -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-5">
+            <div class="flex justify-between items-start gap-4">
+              <div class="flex items-start gap-3.5">
+                <div id="upsell-card-icon" class="w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-400 shrink-0 transition">
+                  <i class="fa-solid fa-bag-shopping text-sm"></i>
                 </div>
-                <p class="text-[11px] text-zinc-500 mt-0.5">Depois da entrega inicial, apresente outro plano usando o mesmo checkout, webhook e destino configurados.</p>
+                <div>
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <h3 class="text-sm font-bold text-white">Upsell</h3>
+                    <span class="px-2.5 py-0.5 rounded-full bg-emerald-950/50 border border-emerald-800/40 text-[10px] font-bold uppercase tracking-wider text-emerald-400">PAGAMENTO APROVADO</span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1 leading-relaxed">Depois da entrega inicial, apresente outra oferta usando o mesmo checkout, webhook e destino configurados.</p>
+                </div>
               </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="chk-upsell-enabled" checked onchange="STATE.upsell.enabled=this.checked; markUnsaved()">
+              <label class="toggle-switch shrink-0 mt-1">
+                <input type="checkbox" id="chk-upsell-enabled" onchange="onUpsellToggle()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
 
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Origem da oferta</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Use um plano existente ou crie algo que aparecerá somente depois da primeira compra.</p>
-              <select id="sel-upsell-origin" onchange="markUnsaved()" class="sb-input">
-                <option value="Usar plano já cadastrado">Usar plano já cadastrado</option>
-                <option value="Criar oferta exclusiva para o Upsell">Criar oferta exclusiva para o Upsell</option>
-              </select>
-            </div>
-
-            <div class="space-y-2">
-              <label class="text-xs font-semibold text-zinc-200 block">Quando enviar</label>
-              <div class="flex gap-1.5">
-                <button onclick="document.getElementById('sel-upsell-delay').value='0'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">Na hora</button>
-                <button onclick="document.getElementById('sel-upsell-delay').value='1'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500 text-xs font-semibold text-blue-300">1 min</button>
-                <button onclick="document.getElementById('sel-upsell-delay').value='5'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">5 min</button>
-                <button onclick="document.getElementById('sel-upsell-delay').value='15'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">15 min</button>
-                <button onclick="document.getElementById('sel-upsell-delay').value='60'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1h</button>
-                <button onclick="document.getElementById('sel-upsell-delay').value='1440'; markUnsaved()" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1 dia</button>
+            <!-- CORPO EXPANSÍVEL QUANDO ATIVO -->
+            <div id="upsell-body" class="hidden pl-5 border-l border-[#181c28] ml-2 space-y-5">
+              <!-- ORIGEM DA OFERTA (CUSTOM DROPDOWN FIEL AO PRINT 2) -->
+              <div class="relative">
+                <label class="text-xs font-bold text-white block">Origem da oferta</label>
+                <p class="text-[11px] text-slate-400 mt-1 mb-2">Use um plano existente ou crie algo que aparecerá somente depois da primeira compra.</p>
+                <button type="button" onclick="toggleUpsellOriginMenu(event)" class="w-full sb-input !bg-[#090b10] !border-[#1b2030] flex items-center justify-between text-left">
+                  <span id="lbl-upsell-origin" class="text-xs font-medium text-white">Usar plano já cadastrado</span>
+                  <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                </button>
+                <div id="menu-upsell-origin" class="hidden mt-1.5 w-full rounded-xl border border-[#1e2333] bg-[#0e111a] p-1.5 shadow-2xl space-y-1">
+                  <button type="button" onclick="selectUpsellOrigin('Usar plano já cadastrado', event)" data-origin="Usar plano já cadastrado" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-[#2563eb] bg-[#111624] text-white font-semibold">
+                    <span>Usar plano já cadastrado</span>
+                    <i class="fa-solid fa-check text-[#38bdf8] text-[11px] origin-check"></i>
+                  </button>
+                  <button type="button" onclick="selectUpsellOrigin('Criar nova oferta exclusiva', event)" data-origin="Criar nova oferta exclusiva" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-transparent text-slate-300 hover:bg-[#141824]">
+                    <span>Criar nova oferta exclusiva</span>
+                    <i class="fa-solid fa-check text-[#38bdf8] text-[11px] origin-check hidden"></i>
+                  </button>
+                </div>
               </div>
-              <label class="text-[10px] text-zinc-500 block">Todos os intervalos</label>
-              <select id="sel-upsell-delay" onchange="STATE.upsell.delay_minutes=parseInt(this.value)||1; markUnsaved()" class="sb-input">
-                <option value="0">Na hora</option>
-                <option value="1" selected>1 minuto</option>
-                <option value="5">5 minutos</option>
-                <option value="15">15 minutos</option>
-                <option value="60">1 hora</option>
-                <option value="1440">1 dia</option>
-              </select>
-              <p class="text-[10px] text-zinc-500">De envio imediato até 7 dias após a entrega inicial.</p>
-            </div>
 
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Plano que será apresentado</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">Se o comprador já adquiriu a mesma oferta, ela não será enviada de novo.</p>
-              <select id="sel-upsell-offer" onchange="markUnsaved()" class="sb-input">
-                <option value="offer_1">💎 Nova oferta</option>
-              </select>
-            </div>
+              <!-- QUANDO ENVIAR -->
+              <div class="space-y-2.5">
+                <label class="text-xs font-bold text-white block">Quando enviar</label>
+                <div class="flex flex-wrap gap-2" id="upsell-delay-pills">
+                  <button type="button" data-mins="0" onclick="setUpsellDelay('Na hora', 0)" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">Na hora</button>
+                  <button type="button" data-mins="1" onclick="setUpsellDelay('1 min', 1)" class="px-3.5 py-2 rounded-xl bg-[#121d2f] border border-[#1e3a8a] text-xs font-bold text-white transition">1 min</button>
+                  <button type="button" data-mins="5" onclick="setUpsellDelay('5 min', 5)" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">5 min</button>
+                  <button type="button" data-mins="15" onclick="setUpsellDelay('15 min', 15)" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">15 min</button>
+                  <button type="button" data-mins="60" onclick="setUpsellDelay('1h', 60)" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">1h</button>
+                  <button type="button" data-mins="1440" onclick="setUpsellDelay('1 dia', 1440)" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">1 dia</button>
+                </div>
 
-            <div>
-              <label class="text-xs font-semibold text-zinc-200 block">Mensagem pós-compra</label>
-              <p class="text-[11px] text-zinc-500 mb-1.5">A oferta escolhida aparece logo abaixo desta mensagem, com preço e botão de compra.</p>
-              <textarea id="inp-upsell-msg" rows="3" oninput="STATE.upsell.message=this.value; markUnsaved()" class="sb-input">agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉</textarea>
-            </div>
-
-            <div class="space-y-2">
-              <div class="flex justify-between text-xs">
-                <span class="font-semibold text-zinc-200">Mídias deste envio</span>
-                <span class="text-zinc-500">0/5</span>
+                <div class="pt-1">
+                  <label class="text-[11px] text-slate-400 block mb-1.5">Todos os intervalos</label>
+                  <select id="sel-upsell-delay" onchange="setUpsellDelayFromSelect(this)" class="sb-input !bg-[#090b10] !border-[#1b2030]">
+                    <option value="0" data-label="Na hora">Na hora</option>
+                    <option value="1" data-label="1 min" selected>1 minuto</option>
+                    <option value="5" data-label="5 min">5 minutos</option>
+                    <option value="15" data-label="15 min">15 minutos</option>
+                    <option value="30" data-label="30 min">30 minutos</option>
+                    <option value="60" data-label="1h">1 hora</option>
+                    <option value="1440" data-label="1 dia">1 dia</option>
+                  </select>
+                </div>
+                <p class="text-[11px] text-slate-400">De envio imediato até 7 dias após a entrega inicial.</p>
               </div>
-              <p class="text-[11px] text-zinc-500">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
-              <button onclick="document.getElementById('hidden-media-upload').click()" class="w-full py-3 rounded-xl bg-[#111118] border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-200 flex items-center justify-center gap-2">
-                <i class="fa-solid fa-plus text-[10px]"></i> Adicionar arquivo nesta etapa
-              </button>
-              <p class="text-[11px] text-amber-400">Antes de publicar, escolha o canal de FILE_ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
+
+              <!-- PLANO QUE SERÁ APRESENTADO -->
+              <div>
+                <label class="text-xs font-bold text-white block">Plano que será apresentado</label>
+                <p class="text-[11px] text-slate-400 mt-1 mb-2">Se o comprador já adquiriu esta mesma oferta, ela não será enviada de novo.</p>
+                <select id="sel-upsell-offer" onchange="STATE.upsell.offer_id=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030]">
+                  <option value="offer_1">💎 Nova oferta</option>
+                </select>
+              </div>
+
+              <!-- MENSAGEM PÓS-COMPRA -->
+              <div>
+                <label class="text-xs font-bold text-white block">Mensagem pós-compra</label>
+                <p class="text-[11px] text-slate-400 mt-1 mb-2">A oferta escolhida aparece logo abaixo desta mensagem, com preço e botão de compra.</p>
+                <textarea id="inp-upsell-msg" rows="4" oninput="STATE.upsell.message=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] resize-y">agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀</textarea>
+              </div>
+
+              <!-- MÍDIAS DESTE ENVIO -->
+              <div class="space-y-3 pt-1">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-white">Mídias deste envio</span>
+                  <span id="upsell-media-counter" class="text-slate-400">1/5</span>
+                </div>
+                <p class="text-[11px] text-slate-400 leading-relaxed">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
+
+                <!-- LISTA DE MÍDIAS DO UPSELL -->
+                <div id="upsell-medias-list" class="space-y-3"></div>
+
+                <input type="file" id="inp-upsell-file" class="hidden" accept="image/*,video/*,audio/*" onchange="handleUpsellFileUpload(event)">
+                <button type="button" onclick="document.getElementById('inp-upsell-file').click()" class="w-full py-3.5 rounded-xl bg-[#0e111a] hover:bg-[#141824] border border-[#181c28] text-xs font-bold text-white flex items-center justify-center gap-2 transition">
+                  <i class="fa-solid fa-cloud-arrow-up text-slate-300"></i> Adicionar arquivo nesta etapa
+                </button>
+                <p class="text-[11px] text-slate-400">Foto, vídeo, GIF ou áudio • até 50 MB por arquivo. Salve o fluxo para aplicar os novos anexos.</p>
+                <p class="text-[11px] text-amber-300/90">Antes de publicar, escolha o canal de FILE ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
+              </div>
+            </div>
+
+            <!-- RODAPÉ SEMPRE VISÍVEL DO CARD -->
+            <div class="pt-4 border-t border-[#181c28] flex items-center gap-2.5 text-xs text-slate-400">
+              <i class="fa-regular fa-circle-check text-emerald-400 text-xs shrink-0"></i>
+              <span>Os envios ficam em fila durável e não se perdem em reinícios. Uma oferta de Upsell só sai depois da aprovação e da entrega inicial.</span>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('downsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('downsell')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Downsell</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">ANTERIOR</span>
+                <span class="text-xs font-bold text-white">Downsell</span>
               </div>
             </button>
-            <button onclick="navigateTab('testar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+            <button onclick="navigateTab('testar')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Testar conversa</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white">Testar conversa</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -2226,11 +2268,22 @@ quer que eu te mostre as opções de acesso?</textarea>
         ]
       },
       upsell: {
-        enabled: true,
+        enabled: false,
         origin: "Usar plano já cadastrado",
+        delay_label: "1 min",
         delay_minutes: 1,
         offer_id: "offer_1",
-        message: "agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉"
+        message: "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀",
+        medias: [
+          {
+            id: "up_m1",
+            name: "Imagem do ChatGPT 27 de set. de 2026, 13 42 52 2",
+            url: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=600&q=80",
+            caption: "",
+            spoiler: false,
+            expanded: true
+          }
+        ]
       },
       publish: {
         is_live: false,
@@ -2875,6 +2928,188 @@ quer que eu te mostre as opções de acesso?</textarea>
       setDownsellDelay(label, mins);
     }
 
+    // UPSELL (100% FIEL AOS 5 PRINTS)
+    function updateUpsellSidebar() {
+      const en = !!STATE.upsell?.enabled;
+      const sub = document.getElementById('nav-sub-upsell');
+      const icon = document.getElementById('nav-icon-upsell');
+      const badge = document.getElementById('upsell-top-badge');
+      const cardIcon = document.getElementById('upsell-card-icon');
+      const body = document.getElementById('upsell-body');
+
+      if (sub) {
+        sub.textContent = en ? 'Ativo • após a compra' : 'Configurar oferta pós-compra';
+      }
+      if (icon) {
+        if (en) {
+          icon.className = "w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs shrink-0";
+          icon.innerHTML = `<i class="fa-solid fa-check text-[11px]"></i>`;
+        } else {
+          icon.className = "w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0";
+          icon.innerHTML = `<i class="fa-solid fa-arrow-trend-up text-[11px]"></i>`;
+        }
+      }
+      if (badge) {
+        if (en) {
+          badge.textContent = "ATIVA";
+          badge.className = "px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-bold uppercase tracking-wider text-emerald-400 shrink-0";
+        } else {
+          badge.textContent = "DESATIVADAS";
+          badge.className = "px-3 py-1 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0";
+        }
+      }
+      if (cardIcon) {
+        cardIcon.className = en
+          ? "w-10 h-10 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400 shrink-0 transition"
+          : "w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-400 shrink-0 transition";
+      }
+      if (body) {
+        body.classList.toggle('hidden', !en);
+      }
+    }
+
+    function onUpsellToggle() {
+      const en = document.getElementById('chk-upsell-enabled').checked;
+      STATE.upsell.enabled = en;
+      updateUpsellSidebar();
+      markUnsaved();
+    }
+
+    function toggleUpsellOriginMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('menu-upsell-origin');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function selectUpsellOrigin(val, e) {
+      if (e) e.stopPropagation();
+      STATE.upsell.origin = val;
+      const lbl = document.getElementById('lbl-upsell-origin');
+      if (lbl) lbl.textContent = val;
+      document.querySelectorAll('#menu-upsell-origin .upsell-origin-opt').forEach(btn => {
+        const isSel = btn.getAttribute('data-origin') === val;
+        btn.className = isSel
+          ? "upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-[#2563eb] bg-[#111624] text-white font-semibold"
+          : "upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-transparent text-slate-300 hover:bg-[#141824]";
+        const chk = btn.querySelector('.origin-check');
+        if (chk) chk.classList.toggle('hidden', !isSel);
+      });
+      const menu = document.getElementById('menu-upsell-origin');
+      if (menu) menu.classList.add('hidden');
+      markUnsaved();
+    }
+
+    function setUpsellDelay(label, mins, silent = false) {
+      STATE.upsell.delay_label = label;
+      STATE.upsell.delay_minutes = mins;
+      const sel = document.getElementById('sel-upsell-delay');
+      if (sel) sel.value = String(mins);
+      document.querySelectorAll('#upsell-delay-pills button').forEach(btn => {
+        const active = parseInt(btn.getAttribute('data-mins')) === mins;
+        btn.className = active
+          ? "px-3.5 py-2 rounded-xl bg-[#121d2f] border border-[#1e3a8a] text-xs font-bold text-white transition"
+          : "px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition";
+      });
+      if (!silent) markUnsaved();
+    }
+
+    function setUpsellDelayFromSelect(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      const label = opt.getAttribute('data-label') || opt.text;
+      const mins = parseInt(sel.value) || 0;
+      setUpsellDelay(label, mins);
+    }
+
+    function renderUpsellMedias() {
+      const list = document.getElementById('upsell-medias-list');
+      const counter = document.getElementById('upsell-media-counter');
+      if (!list) return;
+      const medias = STATE.upsell?.medias || [];
+      if (counter) counter.textContent = `${medias.length}/5`;
+
+      list.innerHTML = medias.map((m, idx) => {
+        const isExp = m.expanded !== false;
+        return `
+        <div class="rounded-2xl border border-[#181c28] bg-[#090b10] p-4 space-y-3.5">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2.5">
+              <i class="fa-regular fa-image text-[#38bdf8] text-xs"></i>
+              <div>
+                <p class="text-xs font-bold text-white">${idx + 1}. ${m.name}</p>
+                <p class="text-[11px] text-slate-400">Exclusiva desta automação</p>
+              </div>
+            </div>
+            <button type="button" onclick="removeUpsellMedia(${idx})" class="text-slate-500 hover:text-rose-400 text-xs transition">
+              <i class="fa-regular fa-trash-can"></i>
+            </button>
+          </div>
+
+          <button type="button" onclick="toggleUpsellMediaCaption(${idx})" class="w-full text-left px-3 py-2.5 rounded-xl bg-[#0b0d14] border ${isExp ? 'border-[#38bdf8]' : 'border-[#181c28]'} text-xs text-slate-300 flex items-center gap-1.5 transition">
+            <span class="text-[10px]">${isExp ? '▾' : '▸'}</span>
+            <span>Visualizar e editar legenda</span>
+          </button>
+
+          <div class="${isExp ? 'space-y-3 pt-1' : 'hidden'}">
+            <div class="flex justify-center">
+              <img src="${m.url}" class="w-28 h-48 object-cover rounded-lg border border-[#181c28]">
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-400 block mb-1.5">Legenda opcional • enviada com esta mídia</label>
+              <textarea rows="2" oninput="updateUpsellMediaField(${idx}, 'caption', this.value)" class="sb-input !bg-[#07090e] !border-[#181c28] text-xs resize-y">${m.caption || ''}</textarea>
+            </div>
+            <div class="flex justify-between items-center pt-1">
+              <span class="text-xs text-slate-300">Ocultar com spoiler</span>
+              <label class="toggle-switch">
+                <input type="checkbox" ${m.spoiler ? 'checked' : ''} onchange="updateUpsellMediaField(${idx}, 'spoiler', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      `}).join('');
+    }
+
+    function toggleUpsellMediaCaption(idx) {
+      if (!STATE.upsell?.medias?.[idx]) return;
+      STATE.upsell.medias[idx].expanded = STATE.upsell.medias[idx].expanded === false ? true : false;
+      renderUpsellMedias();
+    }
+
+    function updateUpsellMediaField(idx, field, val) {
+      if (!STATE.upsell?.medias?.[idx]) return;
+      STATE.upsell.medias[idx][field] = val;
+      markUnsaved();
+    }
+
+    function removeUpsellMedia(idx) {
+      if (!STATE.upsell?.medias) return;
+      STATE.upsell.medias.splice(idx, 1);
+      renderUpsellMedias();
+      markUnsaved();
+    }
+
+    function handleUpsellFileUpload(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!Array.isArray(STATE.upsell.medias)) STATE.upsell.medias = [];
+      if (STATE.upsell.medias.length >= 5) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        STATE.upsell.medias.push({
+          id: 'up_m_' + Date.now(),
+          name: file.name.replace(/\.[^/.]+$/, ""),
+          url: ev.target.result,
+          caption: '',
+          spoiler: false,
+          expanded: true
+        });
+        renderUpsellMedias();
+        markUnsaved();
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+
     // MEMÓRIA E APRENDIZADO
     function renderMemoryLeads() {
       const leads = STATE.memory?.leads || [];
@@ -3163,6 +3398,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('chk-downsell-enabled').checked = !!STATE.downsell?.enabled;
       onDownsellToggle();
 
+      document.getElementById('chk-upsell-enabled').checked = !!STATE.upsell?.enabled;
+      updateUpsellSidebar();
+      if (STATE.upsell?.origin) {
+        selectUpsellOrigin(STATE.upsell.origin);
+      }
+      setUpsellDelay(STATE.upsell?.delay_label || '1 min', STATE.upsell?.delay_minutes ?? 1, true);
+      if (document.getElementById('inp-upsell-msg')) {
+        document.getElementById('inp-upsell-msg').value = STATE.upsell?.message || 'agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀';
+      }
+      renderUpsellMedias();
+
       document.getElementById('chk-bot-live').checked = !!STATE.publish?.is_live;
       document.getElementById('inp-bot-token').value = STATE.publish?.bot_token || '';
       document.getElementById('inp-pushin-token').value = STATE.publish?.pushin_pay_token || '';
@@ -3251,6 +3497,24 @@ quer que eu te mostre as opções de acesso?</textarea>
           if (STATE.downsell?.steps?.[0]?.message?.startsWith("sumiu por ai?")) {
             STATE.downsell.steps[0].message = "sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?";
           }
+          if (STATE.upsell) {
+            if (STATE.upsell.message?.endsWith("! 😉")) {
+              STATE.upsell.message = "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀";
+              STATE.upsell.enabled = false;
+            }
+            if (!Array.isArray(STATE.upsell.medias) || STATE.upsell.medias.length === 0) {
+              STATE.upsell.medias = [
+                {
+                  id: "up_m1",
+                  name: "Imagem do ChatGPT 27 de set. de 2026, 13 42 52 2",
+                  url: "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=600&q=80",
+                  caption: "",
+                  spoiler: false,
+                  expanded: true
+                }
+              ];
+            }
+          }
         }
       } catch (e) {}
       syncStateToInputs();
@@ -3262,6 +3526,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         OPEN_OBJECTIVE_MENU_IDX = null;
         renderMedias();
       }
+      const upMenu = document.getElementById('menu-upsell-origin');
+      if (upMenu) upMenu.classList.add('hidden');
     });
 
     window.addEventListener('DOMContentLoaded', loadInitialState);

@@ -104,13 +104,22 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         ]
     },
     "upsell": {
-        "enabled": True,
+        "enabled": False,
         "origin": "Usar plano já cadastrado",
         "delay_label": "1 min",
         "delay_minutes": 1,
         "offer_id": "offer_1",
-        "message": "agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉",
-        "medias": []
+        "message": "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀",
+        "medias": [
+            {
+                "id": "up_m1",
+                "name": "Imagem do ChatGPT 27 de set. de 2026, 13 42 52 2",
+                "url": "https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=600&q=80",
+                "caption": "",
+                "spoiler": False,
+                "expanded": True
+            }
+        ]
     },
     "publish": {
         "is_live": False,
