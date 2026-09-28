@@ -3286,12 +3286,32 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     // MEMÓRIA E APRENDIZADO
+    const ALL_LEAD_STAGES = [
+      'Conversando',
+      'Viu os planos',
+      'Escolheu um plano',
+      'Gerou checkout',
+      'Pagamento aprovado',
+      'Entrega concluída',
+      'Recebeu upsell',
+      'Escolheu upsell',
+      'Checkout de upsell',
+      'Comprou upsell'
+    ];
+
+    function normalizeLeadStage(s) {
+      if (!s || s === 'Em conversa') return 'Conversando';
+      return s;
+    }
+
     function renderMemoryLeads() {
       const allLeads = STATE.memory?.leads || [];
       const q = (document.getElementById('inp-lead-search')?.value || '').toLowerCase().trim();
       const stage = document.getElementById('sel-lead-stage')?.value || 'Todas as etapas';
       const leads = allLeads.filter(l => {
-        const matchStage = stage === 'Todas as etapas' || (l.stage || 'Conversando') === stage;
+        const normStage = normalizeLeadStage(l.stage);
+        const hist = Array.isArray(l.stage_history) ? l.stage_history : [normStage];
+        const matchStage = stage === 'Todas as etapas' || normStage === stage || hist.includes(stage);
         const matchQ = !q || (l.first_name || '').toLowerCase().includes(q) || (l.username || '').toLowerCase().includes(q) || String(l.telegram_id || '').includes(q);
         return matchStage && matchQ;
       });
@@ -3324,11 +3344,12 @@ quer que eu te mostre as opções de acesso?</textarea>
       box.className = "flex-1 overflow-y-auto space-y-2 text-left pt-3";
       box.innerHTML = leads.map((l) => {
         const realIdx = allLeads.findIndex(item => String(item.telegram_id) === String(l.telegram_id));
+        const normStage = normalizeLeadStage(l.stage);
         return `
           <div onclick="showLeadDetail(${realIdx})" class="rounded-xl border border-[#181c28] bg-[#07090e] p-3 cursor-pointer hover:border-[#2563eb] flex justify-between items-center gap-2 transition">
             <div class="min-w-0">
               <p class="text-xs font-bold text-white truncate">${l.first_name} <span class="text-slate-500 font-normal">${l.username || ''}</span></p>
-              <span class="text-[11px] text-[#38bdf8]">${l.stage || 'Conversando'}</span>
+              <span class="text-[11px] text-[#38bdf8]">${normStage}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-[10px] text-slate-500">${l.last_interaction || ''}</span>
@@ -3342,7 +3363,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           </div>
         `;
       }).join('');
-      showLeadDetail(0);
+      const firstRealIdx = allLeads.findIndex(item => String(item.telegram_id) === String(leads[0].telegram_id));
+      showLeadDetail(firstRealIdx >= 0 ? firstRealIdx : 0);
     }
 
     function showLeadDetail(idx) {
@@ -3350,6 +3372,22 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!lead) return;
       const box = document.getElementById('lead-detail-box');
       box.className = "col-span-7 sb-card p-5 flex flex-col justify-between text-left overflow-y-auto min-h-[460px]";
+      const currStage = normalizeLeadStage(lead.stage);
+      const currIdx = ALL_LEAD_STAGES.indexOf(currStage);
+      const stageHist = Array.isArray(lead.stage_history) ? lead.stage_history : ['Conversando', currStage];
+
+      const stageBadges = ALL_LEAD_STAGES.map((st, sIdx) => {
+        const isCurrent = st === currStage;
+        const isDone = stageHist.includes(st) || (currIdx >= 0 && sIdx <= currIdx);
+        const cls = isCurrent
+          ? 'bg-emerald-950/70 border-emerald-500/60 text-emerald-300 font-bold'
+          : (isDone ? 'bg-blue-950/40 border-blue-800/50 text-blue-300' : 'bg-[#07090e] border-[#181c28] text-slate-500');
+        const icon = isCurrent
+          ? '<i class="fa-solid fa-circle-dot text-[9px] text-emerald-400"></i>'
+          : (isDone ? '<i class="fa-solid fa-check text-[9px] text-blue-400"></i>' : '<i class="fa-regular fa-circle text-[9px] text-slate-600"></i>');
+        return `<span class="px-2 py-1 rounded-lg border text-[10px] flex items-center gap-1.5 ${cls}">${icon} ${st}</span>`;
+      }).join('');
+
       const hist = (lead.history || []).map(h => `
         <div class="${h.role==='user'?'text-right':'text-left'}">
           <span class="inline-block px-3 py-1.5 rounded-xl text-xs ${h.role==='user'?'bg-purple-600 text-white':'bg-[#171721] text-zinc-200'}">${h.content}</span>
@@ -3359,7 +3397,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         <div class="border-b border-[#1c1c26] pb-3 flex justify-between items-center gap-3 flex-wrap">
           <div>
             <h4 class="text-sm font-bold text-white">${lead.first_name} (${lead.username})</h4>
-            <p class="text-[11px] text-zinc-400">Telegram ID: ${lead.telegram_id} • Etapa: <strong class="text-emerald-400">${lead.stage}</strong></p>
+            <p class="text-[11px] text-zinc-400">Telegram ID: ${lead.telegram_id} • Etapa atual: <strong class="text-emerald-400">${currStage}</strong></p>
           </div>
           <div class="flex items-center gap-2">
             <button type="button" onclick="resetLeadHistory('${lead.telegram_id}', event)" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
@@ -3370,7 +3408,25 @@ quer que eu te mostre as opções de acesso?</textarea>
             </button>
           </div>
         </div>
-        <div class="flex-1 py-3 space-y-2 overflow-y-auto max-h-[380px]">${hist || '<p class="text-xs text-zinc-500">Conversa limpa! Envie /start ou uma mensagem no Telegram para começar do zero.</p>'}</div>
+
+        <div class="py-3 border-b border-[#1c1c26] space-y-2.5">
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Jornada Comercial (10 Etapas)</p>
+            <div class="flex flex-wrap gap-1.5">${stageBadges}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <div class="rounded-xl border border-[#181c28] bg-[#07090e] px-3 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Preferências</p>
+              <p class="text-xs text-slate-200 mt-0.5">${lead.preferences || 'Iniciou conversa no bot'}</p>
+            </div>
+            <div class="rounded-xl border border-[#181c28] bg-[#07090e] px-3 py-2">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Objeções</p>
+              <p class="text-xs text-slate-200 mt-0.5">${lead.objections || 'Nenhuma identificada'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-1 py-3 space-y-2 overflow-y-auto max-h-[300px]">${hist || '<p class="text-xs text-zinc-500">Conversa limpa! Envie /start ou uma mensagem no Telegram para começar do zero.</p>'}</div>
       `;
     }
 
@@ -3381,7 +3437,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (lead) {
         lead.history = [];
         lead.stage = 'Conversando';
+        lead.stage_history = ['Conversando'];
         lead.sent_downsell_steps = [];
+        lead.preferences = 'Iniciou conversa no bot';
+        lead.objections = 'Nenhuma identificada';
       }
       saveLocalBackup();
       renderMemoryLeads();

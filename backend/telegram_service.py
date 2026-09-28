@@ -138,6 +138,125 @@ class ActiveBotManager:
             return 2.4
         return 1.3
 
+    STAGE_ORDER = [
+        "Conversando",
+        "Viu os planos",
+        "Escolheu um plano",
+        "Gerou checkout",
+        "Pagamento aprovado",
+        "Entrega concluída",
+        "Recebeu upsell",
+        "Escolheu upsell",
+        "Checkout de upsell",
+        "Comprou upsell",
+    ]
+
+    def _advance_stage(self, lead: Dict[str, Any], target_stage: str, reset: bool = False):
+        if reset:
+            lead["stage"] = "Conversando"
+            lead["stage_history"] = ["Conversando"]
+            return
+        curr = lead.get("stage") or "Conversando"
+        if curr == "Em conversa":
+            curr = "Conversando"
+            lead["stage"] = "Conversando"
+        hist: List[str] = lead.setdefault("stage_history", ["Conversando"])
+        if "Conversando" not in hist:
+            hist.insert(0, "Conversando")
+        if curr in self.STAGE_ORDER and curr not in hist:
+            hist.append(curr)
+
+        curr_idx = self.STAGE_ORDER.index(curr) if curr in self.STAGE_ORDER else 0
+        target_idx = self.STAGE_ORDER.index(target_stage) if target_stage in self.STAGE_ORDER else 0
+        if target_idx >= curr_idx:
+            lead["stage"] = target_stage
+        if target_stage not in hist:
+            hist.append(target_stage)
+
+    def _update_lead_insights(
+        self,
+        state: Dict[str, Any],
+        lead: Dict[str, Any],
+        user_text: str = "",
+        chosen_plan: str = ""
+    ):
+        t = (user_text or "").lower()
+        prefs: List[str] = lead.setdefault("prefs_list", [])
+        objs: List[str] = lead.setdefault("objs_list", [])
+
+        if chosen_plan:
+            tag = f"Plano: {chosen_plan}"
+            if tag not in prefs:
+                prefs.append(tag)
+
+        pref_map = [
+            (["vídeo", "video", "videos", "vídeos"], "Vídeos exclusivos"),
+            (["foto", "fotos", "pack"], "Fotos / Packs"),
+            (["chamada", "call", "ao vivo"], "Chamada de vídeo"),
+            (["vip", "grupo", "canal", "acesso"], "Acesso ao Grupo VIP"),
+            (["vitalício", "vitalicio", "permanente"], "Plano Vitalício"),
+            (["mensal", "30 dias", "mês", "mes"], "Plano Mensal"),
+            (["personalizado", "fetiche", "exclusivo"], "Conteúdo personalizado"),
+        ]
+        for keywords, label in pref_map:
+            if any(k in t for k in keywords) and label not in prefs:
+                prefs.append(label)
+
+        if prefs:
+            lead["preferences"] = " • ".join(prefs[:4])
+        elif not lead.get("preferences"):
+            lead["preferences"] = "Iniciou conversa no bot"
+
+        obj_map = [
+            (["caro", "desconto", "barato", "sem dinheiro", "grana", "menor valor", "abaixa", "menos"], "Preço / Pediu desconto"),
+            (["prévia", "previa", "amostra", "ver antes", "confiar", "real", "fake", "golpe"], "Pediu prévia / Prova social"),
+            (["cartão", "cartao", "boleto", "como paga", "sigilo", "discreto", "extrato"], "Dúvida sobre pagamento / Sigilo"),
+            (["depois", "amanhã", "amanha", "pensar", "agora não", "agora nao", "mais tarde"], "Deixou para depois"),
+        ]
+        for keywords, label in obj_map:
+            if any(k in t for k in keywords) and label not in objs:
+                objs.append(label)
+
+        if objs:
+            lead["objections"] = " • ".join(objs[:3])
+        elif not lead.get("objections"):
+            lead["objections"] = "Nenhuma identificada"
+
+        # Atualiza métricas globais de aprendizado
+        leads = state.get("memory", {}).get("leads", [])
+        learning = state.setdefault("learning", {})
+        learning["evaluated_results"] = len(leads)
+        paid_stages = {
+            "Pagamento aprovado",
+            "Entrega concluída",
+            "Recebeu upsell",
+            "Escolheu upsell",
+            "Checkout de upsell",
+            "Comprou upsell",
+        }
+        learning["conversations_without_purchase"] = sum(
+            1 for l in leads if l.get("stage") not in paid_stages
+        )
+
+        # Consolida objeções mais comuns e planos mais escolhidos
+        obj_counts: Dict[str, int] = {}
+        plan_counts: Dict[str, int] = {}
+        for l in leads:
+            for o_item in l.get("objs_list", []):
+                obj_counts[o_item] = obj_counts.get(o_item, 0) + 1
+            if l.get("chosen_plan"):
+                p_name = l["chosen_plan"]
+                plan_counts[p_name] = plan_counts.get(p_name, 0) + 1
+
+        learning["common_objections"] = [
+            {"name": k, "count": v}
+            for k, v in sorted(obj_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        ]
+        learning["top_plans"] = [
+            {"name": k, "count": v}
+            for k, v in sorted(plan_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        ]
+
     async def _get_or_create_lead(self, state: Dict[str, Any], user: types.User) -> Dict[str, Any]:
         memory = state.setdefault("memory", {"leads": []})
         leads: List[Dict[str, Any]] = memory.setdefault("leads", [])
@@ -147,29 +266,40 @@ class ActiveBotManager:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
                 lead["last_interaction"] = datetime.utcnow().strftime("%d/%m %H:%M")
+                if lead.get("stage") == "Em conversa" or not lead.get("stage"):
+                    lead["stage"] = "Conversando"
+                lead.setdefault("stage_history", ["Conversando"])
                 return lead
 
         new_lead = {
             "telegram_id": uid,
             "first_name": user.first_name or "Visitante",
             "username": f"@{user.username}" if user.username else "Sem @user",
-            "stage": "Em conversa",
+            "stage": "Conversando",
+            "stage_history": ["Conversando"],
             "last_interaction": datetime.utcnow().strftime("%d/%m %H:%M"),
             "preferences": "Iniciou conversa no bot",
             "objections": "Nenhuma identificada",
+            "prefs_list": [],
+            "objs_list": [],
             "sent_downsell_steps": [],
             "history": []
         }
         leads.insert(0, new_lead)
-        learning = state.setdefault("learning", {})
-        learning["evaluated_results"] = len(leads)
+        self._update_lead_insights(state, new_lead)
         return new_lead
 
-    def _build_offers_keyboard(self, state: Dict[str, Any], only_offer: Optional[Dict[str, Any]] = None) -> InlineKeyboardMarkup:
+    def _build_offers_keyboard(
+        self,
+        state: Dict[str, Any],
+        only_offer: Optional[Dict[str, Any]] = None,
+        is_upsell: bool = False
+    ) -> InlineKeyboardMarkup:
         offers = [o for o in state.get("business", {}).get("offers", []) if o.get("visible", True)]
         if only_offer:
             offers = [only_offer]
         buttons = []
+        suffix = ":up" if is_upsell else ""
         for idx, o in enumerate(offers):
             emoji = o.get("emoji", "💎")
             name = o.get("name", "Acesso VIP")
@@ -178,7 +308,7 @@ class ActiveBotManager:
             buttons.append([
                 InlineKeyboardButton(
                     text=f"{emoji} {name} — R$ {price:.2f}".replace(".", ","),
-                    callback_data=f"buy:{oid}:{price:.2f}"
+                    callback_data=f"buy:{oid}:{price:.2f}{suffix}"
                 )
             ])
         support = state.get("publish", {}).get("support_username", "").strip().lstrip("@")
@@ -197,6 +327,15 @@ class ActiveBotManager:
         self.downsell_tasks[uid] = asyncio.create_task(self._downsell_worker(user_id, user_first_name))
 
     async def _downsell_worker(self, user_id: int, user_first_name: str):
+        paid_stages = (
+            "Compra aprovada",
+            "Pagamento aprovado",
+            "Entrega concluída",
+            "Recebeu upsell",
+            "Escolheu upsell",
+            "Checkout de upsell",
+            "Comprou upsell",
+        )
         try:
             while True:
                 state = await self.state_getter()
@@ -205,7 +344,7 @@ class ActiveBotManager:
                     return
 
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") in ("Compra aprovada", "Entrega concluída", "Pagamento aprovado"):
+                if lead.get("stage") in paid_stages:
                     return
 
                 sent_steps = lead.setdefault("sent_downsell_steps", [])
@@ -225,14 +364,17 @@ class ActiveBotManager:
                 # Recarrega estado após espera
                 state = await self.state_getter()
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") in ("Compra aprovada", "Entrega concluída", "Pagamento aprovado"):
+                if lead.get("stage") in paid_stages:
                     return
 
                 msg_text = next_step.get("message", "").replace("{nome}", user_first_name)
                 accompany = next_step.get("accompany", "Botão com os planos atuais")
-                markup = self._build_offers_keyboard(state) if "planos" in accompany.lower() or "oferta" in accompany.lower() else None
+                has_plans = "planos" in accompany.lower() or "oferta" in accompany.lower()
+                markup = self._build_offers_keyboard(state) if has_plans else None
 
                 await self.bot.send_message(chat_id=user_id, text=msg_text, reply_markup=markup)
+                if has_plans:
+                    self._advance_stage(lead, "Viu os planos")
                 lead.setdefault("sent_downsell_steps", []).append(next_step.get("id"))
                 lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell] {msg_text}"})
                 await self.state_saver(state)
@@ -253,8 +395,13 @@ class ActiveBotManager:
 
             # Ao enviar /start, reinicia o histórico, etapa e downsells do lead para permitir novo ciclo limpo
             lead["history"] = []
-            lead["stage"] = "Conversando"
+            self._advance_stage(lead, "Conversando", reset=True)
             lead["sent_downsell_steps"] = []
+            lead["prefs_list"] = []
+            lead["objs_list"] = []
+            lead["preferences"] = "Iniciou conversa no bot"
+            lead["objections"] = "Nenhuma identificada"
+            self._update_lead_insights(state, lead)
 
             style = state.get("style", {})
             variations = [v.strip() for v in style.get("opening_variations", []) if v and v.strip()]
@@ -291,6 +438,16 @@ class ActiveBotManager:
             self._cancel_downsell(str(message.from_user.id))
 
             lead.setdefault("history", []).append({"role": "user", "content": user_text})
+            self._update_lead_insights(state, lead, user_text=user_text)
+
+            # Verifica se o usuário já tinha visto os planos e declarou escolha por texto
+            lower_txt = user_text.lower()
+            if "Viu os planos" in lead.get("stage_history", []):
+                if any(w in lower_txt for w in ("quero esse", "vou querer", "fechado", "manda o pix", "quero assinar", "quero entrar")):
+                    if lead.get("stage") in ("Recebeu upsell", "Escolheu upsell"):
+                        self._advance_stage(lead, "Escolheu upsell")
+                    else:
+                        self._advance_stage(lead, "Escolheu um plano")
 
             # Verifica palavras de encaminhamento para suporte humano
             handoff_words = [
@@ -298,7 +455,7 @@ class ActiveBotManager:
                 for w in state.get("style", {}).get("handoff_words", "").split(",")
                 if w.strip()
             ]
-            if any(hw in user_text.lower() for hw in handoff_words):
+            if any(hw in lower_txt for hw in handoff_words):
                 support = state.get("publish", {}).get("support_username", "@suporte")
                 reply = f"Vou te passar o contato do suporte oficial para resolver isso rapidinho: {support} 💜"
                 await message.answer(reply)
@@ -334,7 +491,16 @@ class ActiveBotManager:
                     logger.warning(f"Falha ao enviar mídia de prévia: {e}")
 
             offer_card = ai_res.get("offer_card")
-            markup = self._build_offers_keyboard(state, offer_card) if offer_card else None
+            is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
+            markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
+
+            if offer_card:
+                if is_upsell_ctx:
+                    self._advance_stage(lead, "Recebeu upsell")
+                else:
+                    self._advance_stage(lead, "Viu os planos")
+                    if offer_card.get("discounted"):
+                        self._advance_stage(lead, "Escolheu um plano")
 
             try:
                 await message.answer(reply_text, reply_markup=markup)
@@ -371,7 +537,13 @@ class ActiveBotManager:
                 lead_name=lead.get("first_name", "")
             )
             reply_text = ai_res.get("reply", "")
-            await message.answer(reply_text)
+            offer_card = ai_res.get("offer_card")
+            is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
+            markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
+            if offer_card and not is_upsell_ctx:
+                self._advance_stage(lead, "Viu os planos")
+
+            await message.answer(reply_text, reply_markup=markup)
             lead["history"].append({"role": "assistant", "content": reply_text})
             await self.state_saver(state)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
@@ -383,13 +555,41 @@ class ActiveBotManager:
             except Exception:
                 pass
             parts = callback.data.split(":")
+            oid = parts[1] if len(parts) > 1 else ""
             price = float(parts[2]) if len(parts) > 2 else 19.0
+            has_up_flag = len(parts) > 3 and parts[3] == "up"
 
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, callback.from_user)
             self._cancel_downsell(str(callback.from_user.id))
 
-            lead["stage"] = "Gerou checkout"
+            # Identifica o nome da oferta escolhida
+            chosen_offer_name = f"Oferta R$ {price:.2f}".replace(".", ",")
+            for idx, o in enumerate(state.get("business", {}).get("offers", [])):
+                cand_id = str(o.get("id", f"offer_{idx}"))[:20]
+                if cand_id == oid:
+                    chosen_offer_name = o.get("name", chosen_offer_name)
+                    break
+
+            is_upsell = has_up_flag or lead.get("stage") in (
+                "Entrega concluída",
+                "Recebeu upsell",
+                "Escolheu upsell",
+                "Checkout de upsell",
+                "Comprou upsell",
+            ) or "Entrega concluída" in lead.get("stage_history", [])
+
+            self._advance_stage(lead, "Viu os planos")
+            if is_upsell:
+                self._advance_stage(lead, "Recebeu upsell")
+                self._advance_stage(lead, "Escolheu upsell")
+                lead["chosen_upsell"] = chosen_offer_name
+            else:
+                self._advance_stage(lead, "Escolheu um plano")
+                lead["chosen_plan"] = chosen_offer_name
+
+            self._update_lead_insights(state, lead, chosen_plan=chosen_offer_name)
+
             learning = state.setdefault("learning", {})
             learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
 
@@ -413,12 +613,19 @@ class ActiveBotManager:
                 except Exception as e:
                     logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
 
+            if is_upsell:
+                self._advance_stage(lead, "Checkout de upsell")
+            else:
+                self._advance_stage(lead, "Gerou checkout")
+
             lead["last_tx_id"] = tx_id
+            lead["last_tx_is_upsell"] = is_upsell
             self.active_tx_map[tx_id] = callback.from_user.id
             price_fmt = f"{price:.2f}".replace(".", ",")
+            label_prefix = "PIX Upsell Gerado" if is_upsell else "PIX Gerado"
             lead.setdefault("history", []).append({
                 "role": "assistant",
-                "content": f"[PIX Gerado — R$ {price_fmt}] {pix_code}"
+                "content": f"[{label_prefix} — {chosen_offer_name} (R$ {price_fmt})] {pix_code}"
             })
             await self.state_saver(state)
 
@@ -436,6 +643,7 @@ class ActiveBotManager:
                     chat_id=target_chat_id,
                     text=(
                         f"🔒 <b>Pagamento Seguro via PIX</b>\n\n"
+                        f"Plano: <b>{html.escape(chosen_offer_name)}</b>\n"
                         f"Valor: <b>R$ {price_fmt}</b>\n\n"
                         f"Toque no código PIX Copia e Cola abaixo para copiar e pague no app do seu banco:\n\n"
                         f"<code>{safe_pix_html}</code>\n\n"
@@ -450,6 +658,7 @@ class ActiveBotManager:
                     chat_id=target_chat_id,
                     text=(
                         f"🔒 Pagamento Seguro via PIX\n\n"
+                        f"Plano: {chosen_offer_name}\n"
                         f"Valor: R$ {price_fmt}\n\n"
                         f"Copie o código PIX Copia e Cola abaixo:\n\n"
                         f"{pix_code}\n\n"
@@ -532,14 +741,43 @@ class ActiveBotManager:
     async def deliver_purchase_and_upsell(self, user_id: int):
         state = await self.state_getter()
         lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
-        if lead.get("stage") in ("Pagamento aprovado", "Entrega concluída", "Compra aprovada"):
+
+        is_upsell_payment = bool(lead.get("last_tx_is_upsell")) or lead.get("stage") in (
+            "Escolheu upsell",
+            "Checkout de upsell",
+        )
+
+        if is_upsell_payment:
+            if lead.get("stage") == "Comprou upsell":
+                return
+            self._advance_stage(lead, "Comprou upsell")
+            learning = state.setdefault("learning", {})
+            learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
+            if int(learning.get("unpaid_checkouts", 0)) > 0:
+                learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+            self._update_lead_insights(state, lead)
+            await self.bot.send_message(
+                chat_id=user_id,
+                text="💜 <b>Upsell confirmado!</b>\n\nSeu conteúdo extra exclusivo já está liberado!",
+                parse_mode="HTML"
+            )
+            lead.setdefault("history", []).append({
+                "role": "assistant",
+                "content": "[Upsell pago e entregue com sucesso]"
+            })
+            await self.state_saver(state)
             return
 
-        lead["stage"] = "Entrega concluída"
+        if lead.get("stage") in ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Recebeu upsell", "Comprou upsell"):
+            return
+
+        self._advance_stage(lead, "Pagamento aprovado")
         learning = state.setdefault("learning", {})
         learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
         if int(learning.get("unpaid_checkouts", 0)) > 0:
             learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+        self._update_lead_insights(state, lead)
+        await self.state_saver(state)
 
         pub = state.get("publish", {})
         dest = pub.get("delivery_destination", "").strip()
@@ -577,6 +815,11 @@ class ActiveBotManager:
                 reply_markup=kb
             )
 
+        self._advance_stage(lead, "Entrega concluída")
+        lead.setdefault("history", []).append({
+            "role": "assistant",
+            "content": "[Pagamento aprovado — Entrega concluída]"
+        })
         await self.state_saver(state)
 
         # Dispara Upsell se estiver ativo
@@ -584,6 +827,8 @@ class ActiveBotManager:
         if upsell.get("enabled", False):
             delay_mins = int(upsell.get("delay_minutes", 1))
             await asyncio.sleep(max(5, delay_mins * 60))
+            state = await self.state_getter()
+            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
             for m in upsell.get("medias", []):
                 if m.get("url"):
                     try:
@@ -601,8 +846,14 @@ class ActiveBotManager:
             await self.bot.send_message(
                 chat_id=user_id,
                 text=upsell_msg,
-                reply_markup=self._build_offers_keyboard(state)
+                reply_markup=self._build_offers_keyboard(state, is_upsell=True)
             )
+            self._advance_stage(lead, "Recebeu upsell")
+            lead.setdefault("history", []).append({
+                "role": "assistant",
+                "content": f"[Upsell] {upsell_msg}"
+            })
+            await self.state_saver(state)
 
 
 bot_manager = ActiveBotManager()

@@ -180,6 +180,14 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     key = (acc.get("ai_api_key") or "").strip()
     if key.startswith("sk-") and len(key) == 35 and acc.get("ai_provider") in ("openai", "", None):
         acc["ai_provider"] = "deepseek"
+    for lead in state.get("memory", {}).get("leads", []):
+        if lead.get("stage") in ("Em conversa", "", None):
+            lead["stage"] = "Conversando"
+        hist = lead.setdefault("stage_history", ["Conversando"])
+        if "Conversando" not in hist:
+            hist.insert(0, "Conversando")
+        if lead["stage"] not in hist:
+            hist.append(lead["stage"])
     return state
 
 async def _read_state_from_db() -> Dict[str, Any]:
@@ -281,7 +289,15 @@ async def reset_lead_conversation(telegram_id: str):
         if str(lead.get("telegram_id")) == str(telegram_id):
             lead["history"] = []
             lead["stage"] = "Conversando"
+            lead["stage_history"] = ["Conversando"]
             lead["sent_downsell_steps"] = []
+            lead["prefs_list"] = []
+            lead["objs_list"] = []
+            lead["preferences"] = "Iniciou conversa no bot"
+            lead["objections"] = "Nenhuma identificada"
+            lead.pop("chosen_plan", None)
+            lead.pop("chosen_upsell", None)
+            lead.pop("last_tx_is_upsell", None)
             break
     await _write_state_to_db(state)
     return {"status": "success", "state": state}
