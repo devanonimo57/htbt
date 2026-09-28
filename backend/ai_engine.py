@@ -15,12 +15,63 @@ def _compute_effective_min_price(offers: List[Dict[str, Any]], bargain: Dict[str
     return max(5.0, pct_floor)
 
 
-def build_system_prompt(state: Dict[str, Any], lead_name: str = "") -> str:
+def _extract_introduced_name(history: List[Dict[str, str]], current_msg: str) -> str:
+    patterns = [
+        r"(?:meu nome [eé]|me chamo|pode me chamar de|sou o|sou a)\s+([A-ZÀ-Úa-zà-ú]{2,20})",
+    ]
+    all_user_texts = [h.get("content", "") for h in history if h.get("role") == "user"] + [current_msg]
+    for txt in reversed(all_user_texts):
+        for pat in patterns:
+            m = re.search(pat, txt, flags=re.IGNORECASE)
+            if m:
+                cand = m.group(1).strip()
+                if cand.lower() not in ("um", "uma", "aqui", "novo", "nova", "eu", "voce", "você", "cliente"):
+                    return cand.capitalize()
+    return ""
+
+
+def _analyze_visitor_mirroring(user_message: str) -> str:
+    words = [w for w in re.split(r"\s+", user_message.strip()) if w]
+    w_count = len(words)
+    msg_low = user_message.lower()
+
+    if w_count <= 4:
+        size_hint = f"curtíssima ({w_count} palavra(s)) -> responda curto na mesma proporção (1 frase rápida)"
+    elif w_count <= 12:
+        size_hint = f"média/direta ({w_count} palavras) -> acompanhe com 1 a 2 frases"
+    else:
+        size_hint = f"longa/detalhada ({w_count} palavras) -> acompanhe desenvolvendo mais a resposta"
+
+    slang_tokens = ("vc", "tb", "tbm", "pq", "qnd", "cmg", "ctz", "blz", "opa", "eae", "kk", "rs", "mano", "gata", "linda", "bb")
+    formal_tokens = ("olá", "bom dia", "boa tarde", "boa noite", "gostaria", "poderia", "por gentileza", "como funciona")
+    if any(tok in msg_low for tok in slang_tokens):
+        informality_hint = "informal/descontraído -> espelhe linguagem solta de chat"
+    elif any(tok in msg_low for tok in formal_tokens):
+        informality_hint = "educado/direto -> mantenha simpatia sem exagerar nas gírias"
+    else:
+        informality_hint = "neutro/natural -> mantenha conversa fluida"
+
+    if "!" in user_message or any(e in user_message for e in ("😍", "😈", "🔥", "👀", "❤️", "💜")):
+        energy_hint = "energia alta/entusiasmada -> devolva na mesma intensidade calorosa"
+    elif w_count <= 3 and "?" not in user_message:
+        energy_hint = "energia baixa/econômica -> seja leve e faça uma pergunta simples para destravar"
+    else:
+        energy_hint = "energia engajada/curiosa -> responda o ponto principal e conduza o próximo passo"
+
+    return f"Leitura da última mensagem do visitante: Tamanho {size_hint} | Informalidade: {informality_hint} | Energia: {energy_hint}."
+
+
+def build_system_prompt(
+    state: Dict[str, Any],
+    lead_name: str = "",
+    visitor_mirror_signal: str = "",
+    already_discounted: bool = False
+) -> str:
     """
     Constrói o System Prompt completo da Persona com todos os parâmetros do Sharkbot:
     - Persona e identidade (nome, idade, apresentação/gênero, cidade, biografia curta, traços)
     - Negócio e ofertas (contexto da criadora, ofertas visíveis, negociação de preço, dúvidas frequentes)
-    - Jeito de conversar (estratégia comercial, nível de flerte, gírias, cadência, espelhamento, tom, tamanho, emojis, objetivo, regras próprias)
+    - Jeito de conversar (estratégia comercial, nível de flerte, gírias, cadência de conversão, espelhamento, tom, tamanho, emojis, objetivo, regras próprias)
     - Mídias da conversa (arquivos, descrição, objetivo principal, sinais da conversa)
     """
     persona = state.get("persona", {})
@@ -41,7 +92,10 @@ def build_system_prompt(state: Dict[str, Any], lead_name: str = "") -> str:
         for f in faqs if f.get("question")
     ])
 
-    active_medias = [m for m in medias if m.get("active", True)]
+    active_medias = [
+        m for m in medias
+        if m.get("active", True) and "Conversa da IA" in (m.get("used_in") or ["Conversa da IA"])
+    ]
     medias_text = "\n".join([
         f"- [SEND_MEDIA:{m.get('id')}] Nome: {m.get('name')} | Tipo: {m.get('type')} | O que mostra: {m.get('description')} | Objetivo: {m.get('objective')} | Sinais: {m.get('signals')}"
         for m in active_medias
@@ -50,49 +104,122 @@ def build_system_prompt(state: Dict[str, Any], lead_name: str = "") -> str:
     bargain = business.get("bargain", {})
     eff_min = _compute_effective_min_price(visible_offers, bargain)
     if bargain.get("enabled"):
-        bargain_rule = (
-            f"ATIVADA (Desconto máximo: {bargain.get('max_discount_pct', 40)}% | "
-            f"Preço mínimo autorizado: R$ {eff_min:.2f} | Validade da proposta: {bargain.get('validity_minutes', 30)} min). "
-            f"Se o visitante achar caro, pedir desconto ou disser que tem pouco dinheiro, ofereça um valor promocional entre R$ {eff_min:.2f} e o valor original, "
-            f"e inclua no final da resposta a tag [DISCOUNT_PRICE:VALOR] (ex: [DISCOUNT_PRICE:{eff_min:.2f}]) para atualizar o botão do PIX automaticamente."
-        )
+        if bargain.get("once_per_visitor") and already_discounted:
+            bargain_rule = (
+                f"JÁ UTILIZADA NESTA CONVERSA (Você já concedeu a condição especial de R$ {eff_min:.2f} para este visitante. "
+                f"Não baixe mais o valor; reforce com carinho que essa condição já é o menor preço possível)."
+            )
+        else:
+            bargain_rule = (
+                f"ATIVADA (Desconto máximo: {bargain.get('max_discount_pct', 40)}% | "
+                f"Preço mínimo autorizado: R$ {eff_min:.2f} | Validade da proposta: {bargain.get('validity_minutes', 30)} min). "
+                f"Se o visitante achar caro, pedir desconto ou disser que tem pouco dinheiro, ofereça um valor promocional entre R$ {eff_min:.2f} e o valor original, "
+                f"e inclua no final da resposta a tag [DISCOUNT_PRICE:VALOR] (ex: [DISCOUNT_PRICE:{eff_min:.2f}]) para atualizar o botão do PIX automaticamente."
+            )
     else:
         bargain_rule = "DESATIVADA (Preços estritamente fixos, nunca dê descontos nem baixe o valor)."
 
+    gender_val = (persona.get("gender") or "Feminina").strip()
+    gender_desc = (persona.get("gender_desc") or "Fala e se apresenta no feminino.").strip()
     raw_name = (persona.get("name") or "").strip()
     if not raw_name or raw_name.lower() == "atendimento":
-        name_instruction = "Apresente-se como a criadora dona do VIP (nunca diga 'meu nome é Atendimento'; se perguntarem seu nome, use um apelido feminino natural como Mari ou Mel)."
+        if gender_val == "Masculina":
+            name_instruction = "Apresente-se como o criador dono do VIP (nunca diga 'meu nome é Atendimento'; se perguntarem seu nome, use um apelido masculino natural como Léo ou Gui)."
+        elif gender_val == "Neutra":
+            name_instruction = "Apresente-se como responsável pelo VIP (nunca diga 'meu nome é Atendimento'; evite marcações de gênero ao falar de si)."
+        else:
+            name_instruction = "Apresente-se como a criadora dona do VIP (nunca diga 'meu nome é Atendimento'; se perguntarem seu nome, use um apelido feminino natural como Mari ou Mel)."
     else:
         name_instruction = f"Seu nome é {raw_name}. Sempre use esse nome quando perguntarem."
 
     city_val = (persona.get("city") or "").strip()
     city_instruction = f"morando em {city_val}" if city_val else "morando no Brasil (se perguntarem onde mora, responda de forma natural e simpática)"
 
+    # Estratégia comercial (define em que momento a oferta entra na conversa)
+    strategy_setting = style.get("strategy", "Conexão primeiro")
+    if strategy_setting == "Direto":
+        strategy_rule = "DIRETO — Apresente a oferta cedo na conversa, já explicando o acesso ao VIP logo nas primeiras respostas, sem perder a naturalidade."
+    elif strategy_setting == "Equilibrado":
+        strategy_rule = "EQUILIBRADO — Crie uma troca curta (1 a 2 mensagens) e aproveite o primeiro gancho de interesse para apresentar o VIP."
+    else:
+        strategy_rule = "CONEXÃO PRIMEIRO — Converse e entenda o interesse do visitante antes de vender; só apresente os planos depois de criar conexão ou quando ele demonstrar interesse/perguntar."
+
+    # Nível de flerte
+    flirt_setting = style.get("flirt", "Leve")
+    if flirt_setting == "Nenhum":
+        flirt_rule = "NENHUM — Seja simpática, educada e receptiva, mas sem paquera nem apelidos íntimos."
+    elif flirt_setting == "Sensual":
+        flirt_rule = "SENSUAL — Provocante, sem descrição gráfica (instigue desejo e curiosidade pelo que há no VIP com charme e malícia sutil, sem textos sexuais explícitos)."
+    else:
+        flirt_rule = "LEVE — Carinhosa e charmosa na medida certa, usando apelidos suaves (ex: bb, amor, lindo) com naturalidade."
+
+    # Uso de gírias
+    slang_setting = style.get("slang", "Natural")
+    if slang_setting == "Nenhuma":
+        slang_rule = "NENHUMA — Escreva sem gírias e sem abreviações de internet."
+    elif slang_setting == "Marcante":
+        slang_rule = "MARCANTE — Use bastante informalidade, abreviações (vc, tô, tá, pra, rs) e expressões naturais de chat brasileiro."
+    else:
+        slang_rule = "NATURAL — Use linguagem fluida de chat privado (vc, tô, rs) de forma moderada e espontânea."
+
+    # Cadência (controla a sensação de velocidade e pressão comercial na conversa)
+    cadence_setting = style.get("cadence", "Natural")
+    if cadence_setting == "Ágil":
+        cadence_rule = "ÁGIL — Balões curtos e avanço rápido (respostas diretas, ritmo acelerado, conduzindo o visitante rapidamente para a decisão de entrar no VIP)."
+    elif cadence_setting in ("Calmo", "Calma"):
+        cadence_rule = "CALMO — Mais acolhimento e menos pressão (priorize deixar o visitante confortável, ouça e valide o que ele diz sem apressar o fechamento)."
+    else:
+        cadence_rule = "NATURAL — Alterna reação, pergunta e próximo passo (reaja ao que o visitante disse, faça uma pergunta que mantenha o engajamento e avance gradualmente para a oferta)."
+
+    # Espelhar o jeito do visitante
+    mirror_enabled = style.get("mirror_visitor", True)
+    if mirror_enabled:
+        mirror_rule = (
+            "SIM — Acompanhe a energia, o tamanho das mensagens e o nível de informalidade do visitante. "
+            + (f"({visitor_mirror_signal})" if visitor_mirror_signal else "")
+        )
+    else:
+        mirror_rule = "NÃO — Mantenha sempre seu próprio estilo, ritmo e tamanho de resposta configurados abaixo, independente de como o visitante escreva."
+
+    # Usar o nome do lead
     use_lead_name = bool(style.get("use_lead_name", False))
     if use_lead_name and lead_name and lead_name.lower() not in ("visitante", "assinante"):
-        lead_name_rule = f"SIM — O nome do visitante é '{lead_name}'. Chame-o pelo nome de vez em quando para criar intimidade."
+        lead_name_rule = f"SIM — Memorize e use o nome '{lead_name}' com naturalidade depois que a pessoa interagir/se apresentar, mas SEM repetir em toda mensagem."
     else:
-        lead_name_rule = "NÃO — Não use o nome do perfil do Telegram do visitante; use termos carinhosos naturais (ex: amor, bb, lindo) conforme o nível de flerte."
+        lead_name_rule = "NÃO — Não chame o visitante pelo nome do perfil; use apenas pronomes ou termos naturais compatíveis com o nível de flerte."
 
+    # Tom de voz
+    tone_setting = style.get("tone", "Acolhedor")
+    if tone_setting == "Direto":
+        tone_rule = "DIRETO (Objetiva, segura e sem rodeios)."
+    elif tone_setting == "Descontraído":
+        tone_rule = "DESCONTRAÍDO (Leve, divertida, bem-humorada e espontânea)."
+    elif tone_setting in ("Premium", "Provocante"):
+        tone_rule = "PREMIUM (Exclusiva, magnética, confiante e de alto valor percebido)."
+    else:
+        tone_rule = "ACOLHEDOR (Calorosa, próxima e atenciosa, fazendo o visitante se sentir especial)."
+
+    # Tamanho das respostas ("Curta" | "Média" | "Detalhada" / "Longa")
     length_setting = style.get("length", "Curta")
     if length_setting == "Curta":
-        length_rule = "CURTA (1 a 2 frases curtas por mensagem, máximo 220 caracteres, estilo conversa real de WhatsApp/Telegram)."
-    elif length_setting == "Longa":
-        length_rule = "LONGA (3 a 5 frases detalhadas e envolventes)."
+        length_rule = "CURTA (1 a 2 frases curtas por mensagem, máximo 220 caracteres, estilo conversa real de Telegram)."
+    elif length_setting in ("Detalhada", "Longa"):
+        length_rule = "DETALHADA (3 a 5 frases completas, explicando bem os detalhes e criando envolvimento)."
     else:
         length_rule = "MÉDIA (2 a 3 frases equilibradas)."
 
+    # Uso de emojis ("Nenhum" | "Leve" | "Moderado" / "Frequente")
     emoji_setting = style.get("emojis", "Leve")
     if emoji_setting == "Nenhum":
         emoji_rule = "NENHUM (não use emojis nas respostas)."
-    elif emoji_setting == "Frequente":
-        emoji_rule = "FREQUENTE (use 2 a 4 emojis expressivos por mensagem)."
+    elif emoji_setting in ("Moderado", "Frequente"):
+        emoji_rule = "MODERADO (use 2 a 3 emojis expressivos que combinem com o contexto da frase)."
     else:
         emoji_rule = "LEVE (use no máximo 1 emoji sutil por mensagem, como 💜, 👀 ou 😈)."
 
-    prompt = f"""Você é uma criadora de conteúdo conversando no seu chat privado do Telegram.
+    prompt = f"""Você está conversando no seu chat privado do Telegram com um visitante interessado no seu conteúdo VIP.
 Identidade: {name_instruction} Você tem {persona.get('age', 18)} anos, {city_instruction}.
-Apresentação / Gênero: {persona.get('gender', 'Feminina')} ({persona.get('gender_desc', 'Fala e se apresenta no feminino.')}).
+Apresentação / Gênero: {gender_val} ({gender_desc} Flexione todas as palavras sobre si de acordo com esta apresentação).
 Biografia curta: {persona.get('bio', '')}
 Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humorada')}
 
@@ -108,14 +235,14 @@ Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humor
 === DÚVIDAS QUE VOCÊ JÁ SABE RESPONDER (FAQ) ===
 {faqs_text if faqs_text else 'Responda com base no contexto.'}
 
-=== JEITO DE CONVERSAR E HUMANIZAÇÃO ===
-- Estratégia comercial: {style.get('strategy', 'Conexão primeiro')}
-- Nível de flerte: {style.get('flirt', 'Leve')}
-- Uso de gírias: {style.get('slang', 'Natural')}
-- Cadência: {style.get('cadence', 'Natural')}
-- Espelhar o jeito do visitante: {'Sim (adapte-se ao ritmo e linguagem dele)' if style.get('mirror_visitor', True) else 'Não (mantenha sempre seu próprio estilo)'}
+=== JEITO DE CONVERSAR E HUMANIZAÇÃO DA VENDA ===
+- Estratégia comercial: {strategy_rule}
+- Cadência de conversão: {cadence_rule}
+- Nível de flerte: {flirt_rule}
+- Uso de gírias: {slang_rule}
+- Espelhar o jeito do visitante: {mirror_rule}
 - Usar o nome do lead: {lead_name_rule}
-- Tom de voz: {style.get('tone', 'Acolhedor')}
+- Tom de voz: {tone_rule}
 - Tamanho das respostas: {length_rule}
 - Uso de emojis: {emoji_rule}
 
@@ -173,17 +300,37 @@ async def generate_ai_reply(
     2. Fallback LLM gratuito (OpenAI-compatible via Pollinations) caso a chave esteja sem saldo/inválida
     3. Motor contextual de segurança (nunca repete respostas e responde nome, idade, cidade, FAQ e ofertas)
     """
-    system_prompt = build_system_prompt(state, lead_name=lead_name)
-    api_key = state.get("account", {}).get("ai_api_key", "").strip()
-    provider = state.get("account", {}).get("ai_provider", "deepseek").lower()
-
     persona = state.get("persona", {})
     business = state.get("business", {})
     style = state.get("style", {})
     offers = [o for o in business.get("offers", []) if o.get("visible", True)]
     faqs = business.get("faqs", [])
-    medias = [m for m in state.get("medias", []) if m.get("active", True)]
+    medias = [
+        m for m in state.get("medias", [])
+        if m.get("active", True) and "Conversa da IA" in (m.get("used_in") or ["Conversa da IA"])
+    ]
     bargain = business.get("bargain", {})
+
+    # Verifica se o visitante se apresentou no chat ("meu nome é X", "me chamo X") ou usa lead_name
+    introduced_name = _extract_introduced_name(history, user_message)
+    effective_lead_name = introduced_name or lead_name
+
+    # Verifica se já houve desconto concedido nesta conversa (para respeitar once_per_visitor)
+    already_discounted = any(
+        "(Desconto)" in h.get("content", "") or "condição especial" in h.get("content", "").lower()
+        for h in history if h.get("role") == "assistant"
+    )
+
+    visitor_mirror_signal = _analyze_visitor_mirroring(user_message) if style.get("mirror_visitor", True) else ""
+    system_prompt = build_system_prompt(
+        state,
+        lead_name=effective_lead_name,
+        visitor_mirror_signal=visitor_mirror_signal,
+        already_discounted=already_discounted
+    )
+
+    api_key = state.get("account", {}).get("ai_api_key", "").strip()
+    provider = state.get("account", {}).get("ai_provider", "deepseek").lower()
 
     msg_lower = user_message.lower().strip()
 
@@ -224,7 +371,10 @@ async def generate_ai_reply(
     messages.append({"role": "user", "content": user_message})
 
     length_setting = style.get("length", "Curta")
-    max_tok = 160 if length_setting == "Curta" else (320 if length_setting == "Longa" else 240)
+    max_tok = 160 if length_setting == "Curta" else (320 if length_setting in ("Detalhada", "Longa") else 240)
+    # Se espelhamento está ativo e a mensagem do visitante for curtíssima, evita resposta longa desproporcional
+    if style.get("mirror_visitor", True) and len(user_message.split()) <= 4 and not wants_offer:
+        max_tok = min(max_tok, 130)
 
     reply_text = ""
 
@@ -272,8 +422,11 @@ async def generate_ai_reply(
                 pass
             reply_text = re.sub(r"\[DISCOUNT_PRICE:[^\]]+\]", "", reply_text, flags=re.IGNORECASE).strip()
 
+        if bargain.get("once_per_visitor") and already_discounted:
+            discount_price = None
+
         # Se o usuário pediu desconto, a barganha está ativa e a IA citou um valor em R$ na resposta
-        if discount_price is None and wants_discount and bargain.get("enabled") and offers:
+        if discount_price is None and wants_discount and bargain.get("enabled") and not (bargain.get("once_per_visitor") and already_discounted) and offers:
             price_mentions = re.findall(r"r\$\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)", reply_text, flags=re.IGNORECASE)
             if price_mentions:
                 try:
@@ -307,7 +460,9 @@ async def generate_ai_reply(
 
     # 3. Fallback contextual inteligente (caso todas as redes externas oscilem)
     raw_name = (persona.get("name") or "").strip()
-    name = raw_name if (raw_name and raw_name.lower() != "atendimento") else "Mel"
+    gender_val = (persona.get("gender") or "Feminina").strip()
+    default_nick = "Léo" if gender_val == "Masculina" else ("Alex" if gender_val == "Neutra" else "Mel")
+    name = raw_name if (raw_name and raw_name.lower() != "atendimento") else default_nick
     age = persona.get("age") or 18
     city = persona.get("city") or "São Paulo"
 

@@ -134,7 +134,7 @@ class ActiveBotManager:
         cadence = state.get("style", {}).get("cadence", "Natural")
         if cadence == "Ágil":
             return 0.6
-        if cadence == "Calma":
+        if cadence in ("Calmo", "Calma"):
             return 2.4
         return 1.3
 
@@ -296,7 +296,7 @@ class ActiveBotManager:
         is_upsell: bool = False
     ) -> InlineKeyboardMarkup:
         offers = [o for o in state.get("business", {}).get("offers", []) if o.get("visible", True)]
-        if only_offer:
+        if only_offer and (only_offer.get("discounted") or only_offer.get("specific_match") or not offers):
             offers = [only_offer]
         buttons = []
         suffix = ":up" if is_upsell else ""
@@ -481,10 +481,11 @@ class ActiveBotManager:
                 try:
                     photo_input = self._build_input_file(media["url"], f"{media.get('name', 'media')}.jpg")
                     if photo_input:
+                        raw_cap = (media.get("caption") or "").replace("{nome}", lead.get("first_name", "")).strip()
                         await self.bot.send_photo(
                             chat_id=message.chat.id,
                             photo=photo_input,
-                            caption=media.get("caption") or None,
+                            caption=raw_cap or None,
                             has_spoiler=bool(media.get("spoiler", False))
                         )
                 except Exception as e:
@@ -843,10 +844,16 @@ class ActiveBotManager:
                     except Exception:
                         pass
             upsell_msg = upsell.get("message", "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀")
+            target_up_id = str(upsell.get("offer_id", ""))
+            matched_up_offer = None
+            for o in state.get("business", {}).get("offers", []):
+                if str(o.get("id")) == target_up_id:
+                    matched_up_offer = {**o, "specific_match": True}
+                    break
             await self.bot.send_message(
                 chat_id=user_id,
                 text=upsell_msg,
-                reply_markup=self._build_offers_keyboard(state, is_upsell=True)
+                reply_markup=self._build_offers_keyboard(state, only_offer=matched_up_offer, is_upsell=True)
             )
             self._advance_stage(lead, "Recebeu upsell")
             lead.setdefault("history", []).append({

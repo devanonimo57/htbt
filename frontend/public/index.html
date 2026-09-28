@@ -2652,6 +2652,12 @@ quer que eu te mostre as opções de acesso?</textarea>
       const upsellSelect = document.getElementById('sel-upsell-offer');
       if (upsellSelect) {
         upsellSelect.innerHTML = offers.map(o => `<option value="${o.id}">${o.emoji || '💎'} ${o.name} (R$ ${Number(o.price).toFixed(2)})</option>`).join('');
+        if (STATE.upsell?.offer_id && offers.some(o => String(o.id) === String(STATE.upsell.offer_id))) {
+          upsellSelect.value = STATE.upsell.offer_id;
+        } else if (offers[0]?.id) {
+          STATE.upsell.offer_id = offers[0].id;
+          upsellSelect.value = offers[0].id;
+        }
       }
 
       if (typeof updatePrepProgress === 'function') updatePrepProgress();
@@ -2751,15 +2757,30 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    function addOpeningVariation() {
+    function renderOpeningVariations() {
       const c = document.getElementById('variations-container');
-      const div = document.createElement('div');
-      div.className = 'flex gap-2 items-start';
-      div.innerHTML = `
-        <textarea rows="2" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] flex-1"></textarea>
-        <button onclick="this.parentElement.remove(); markUnsaved()" class="text-slate-500 hover:text-rose-400 p-2 transition"><i class="fa-regular fa-trash-can text-xs"></i></button>
-      `;
-      c.appendChild(div);
+      if (!c) return;
+      const vars = Array.isArray(STATE.style?.opening_variations) ? STATE.style.opening_variations : [];
+      c.innerHTML = vars.map((v, idx) => `
+        <div class="flex gap-2 items-start">
+          <textarea rows="2" oninput="STATE.style.opening_variations[${idx}]=this.value; markUnsaved()" placeholder="Ex.: Oi! Quer conhecer os conteúdos ou tirar alguma dúvida primeiro?" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] flex-1">${v || ''}</textarea>
+          <button type="button" onclick="removeOpeningVariation(${idx})" class="text-slate-500 hover:text-rose-400 p-2 transition"><i class="fa-regular fa-trash-can text-xs"></i></button>
+        </div>
+      `).join('');
+    }
+
+    function addOpeningVariation() {
+      if (!Array.isArray(STATE.style.opening_variations)) STATE.style.opening_variations = [];
+      if (STATE.style.opening_variations.length >= 5) return;
+      STATE.style.opening_variations.push('');
+      renderOpeningVariations();
+      markUnsaved();
+    }
+
+    function removeOpeningVariation(idx) {
+      if (!Array.isArray(STATE.style.opening_variations)) return;
+      STATE.style.opening_variations.splice(idx, 1);
+      renderOpeningVariations();
       markUnsaved();
     }
 
@@ -4166,10 +4187,12 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-ai-key').value = STATE.account?.ai_api_key || '';
 
       onPersonaChange();
+      selectGender(STATE.persona.gender || 'Feminina', STATE.persona.gender_desc || 'Fala e se apresenta no feminino.');
       onPublishChange();
       renderOffers();
       renderFaqs();
       renderMedias();
+      renderOpeningVariations();
       selectDownsellStep(SELECTED_DOWNSELL_IDX);
       renderRightPreviewBubbles();
     }
