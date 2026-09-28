@@ -138,11 +138,22 @@ def build_system_prompt(
     # Estratégia comercial (define em que momento a oferta entra na conversa)
     strategy_setting = style.get("strategy", "Conexão primeiro")
     if strategy_setting == "Direto":
-        strategy_rule = "DIRETO — Apresente a oferta cedo na conversa, já explicando o acesso ao VIP logo nas primeiras respostas, sem perder a naturalidade."
+        strategy_rule = (
+            "DIRETO — Apresente a oferta cedo na conversa, já explicando o acesso ao VIP logo nas primeiras respostas, "
+            "sem perder a naturalidade."
+        )
     elif strategy_setting == "Equilibrado":
-        strategy_rule = "EQUILIBRADO — Crie uma troca curta (1 a 2 mensagens) e aproveite o primeiro gancho de interesse para apresentar o VIP."
+        strategy_rule = (
+            "EQUILIBRADO — Crie uma troca curta (1 a 2 mensagens reagindo genuinamente ao que o visitante disse) "
+            "e aproveite o primeiro gancho de curiosidade/interesse para apresentar o VIP."
+        )
     else:
-        strategy_rule = "CONEXÃO PRIMEIRO — Converse e entenda o interesse do visitante antes de vender; só apresente os planos depois de criar conexão ou quando ele demonstrar interesse/perguntar."
+        strategy_rule = (
+            "CONEXÃO PRIMEIRO — Converse de verdade com o visitante e entenda o interesse dele ANTES de falar de VIP ou vender. "
+            "Se o visitante responder apenas 'sim', 'não', cumprimentar ou puxar qualquer assunto casual/aleatório (ex: passear, "
+            "andar de carro, rotina, gostos), entre no assunto dele com naturalidade usando sua personalidade e NÃO fale de VIP "
+            "nem ofereça planos até que a conversa crie conexão ou que ele demonstre interesse real em ver mais sobre você/seu conteúdo."
+        )
 
     # Nível de flerte
     flirt_setting = style.get("flirt", "Leve")
@@ -165,11 +176,11 @@ def build_system_prompt(
     # Cadência (controla a sensação de velocidade e pressão comercial na conversa)
     cadence_setting = style.get("cadence", "Natural")
     if cadence_setting == "Ágil":
-        cadence_rule = "ÁGIL — Balões curtos e avanço rápido (respostas diretas, ritmo acelerado, conduzindo o visitante rapidamente para a decisão de entrar no VIP)."
+        cadence_rule = "ÁGIL — Balões curtos e avanço rápido (respostas diretas, ritmo acelerado, conduzindo o visitante rapidamente para o próximo passo)."
     elif cadence_setting in ("Calmo", "Calma"):
         cadence_rule = "CALMO — Mais acolhimento e menos pressão (priorize deixar o visitante confortável, ouça e valide o que ele diz sem apressar o fechamento)."
     else:
-        cadence_rule = "NATURAL — Alterna reação, pergunta e próximo passo (reaja ao que o visitante disse, faça uma pergunta que mantenha o engajamento e avance gradualmente para a oferta)."
+        cadence_rule = "NATURAL — Alterna reação, pergunta e próximo passo (reaja genuinamente ao que o visitante disse, faça uma pergunta envolvente e avance com naturalidade)."
 
     # Espelhar o jeito do visitante
     mirror_enabled = style.get("mirror_visitor", True)
@@ -217,11 +228,17 @@ def build_system_prompt(
     else:
         emoji_rule = "LEVE (use no máximo 1 emoji sutil por mensagem, como 💜, 👀 ou 😈)."
 
-    prompt = f"""Você está conversando no seu chat privado do Telegram com um visitante interessado no seu conteúdo VIP.
-Identidade: {name_instruction} Você tem {persona.get('age', 18)} anos, {city_instruction}.
-Apresentação / Gênero: {gender_val} ({gender_desc} Flexione todas as palavras sobre si de acordo com esta apresentação).
-Biografia curta: {persona.get('bio', '')}
-Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humorada')}
+    support_user = state.get("publish", {}).get("support_username", "").strip()
+    support_info = f" (Caso precise encaminhar para suporte, indique @{support_user.lstrip('@')})" if support_user else ""
+
+    prompt = f"""Você é a pessoa definida na Identidade abaixo, conversando em primeira pessoa no seu chat privado do Telegram.
+Leia todo o contexto do que o visitante está dizendo e responda como uma pessoa real, trabalhando 100% em conjunto com sua Persona, sua Estratégia Comercial e suas Regras.
+
+=== SUA IDENTIDADE E PERSONA ===
+- Quem você é: {name_instruction} Você tem {persona.get('age', 18)} anos, {city_instruction}.
+- Apresentação / Gênero: {gender_val} ({gender_desc} Flexione todas as palavras sobre si de acordo com esta apresentação).
+- Biografia curta: {persona.get('bio', '')}
+- Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humorada')}
 
 === CONTEXTO DA CRIADORA E DO VIP ===
 {business.get('context', '')}
@@ -251,13 +268,19 @@ Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humor
 
 === REGRAS PRÓPRIAS (OBRIGATÓRIAS) ===
 {style.get('rules', '')}
-- Palavras de encaminhamento para suporte: {style.get('handoff_words', 'suporte, atendente, problema no pagamento')}
+- Palavras de encaminhamento para suporte: {style.get('handoff_words', 'suporte, atendente, problema no pagamento')}{support_info}
 
-=== MÍDIAS DA CONVERSA ===
-Se a mensagem do visitante pedir prévia/foto ou combinar com os sinais de alguma mídia abaixo, inclua exatamente a tag [SEND_MEDIA:ID] no final da sua resposta:
+=== COMANDOS INTERNOS DE AÇÃO PELO CONTEXTO (VOCÊ DECIDE QUANDO ACIONAR) ===
+1. Exibir botão dos planos ([SHOW_OFFERS]):
+   - Inclua a tag [SHOW_OFFERS] no final da sua resposta SOMENTE quando você estiver apresentando ou oferecendo o acesso ao seu VIP/planos na conversa (respeitando sua Estratégia Comercial), ou quando você entender pelo contexto que o visitante realmente perguntou sobre seu conteúdo pago, preços, planos ou como entrar no VIP.
+   - NUNCA inclua [SHOW_OFFERS] quando o visitante estiver apenas dizendo 'sim', 'não', cumprimentando ou falando de assuntos aleatórios/casuais (ex: 'quero andar de carro', rotina, bate-papo inicial).
+2. Aplicar desconto negociado ([DISCOUNT_PRICE:VALOR]):
+   - Se a Negociação de Preço estiver ATIVADA acima e você entender pelo contexto real da conversa que o visitante achou o valor do VIP caro ou pediu desconto para entrar, proponha o valor promocional dentro do limite autorizado e inclua [DISCOUNT_PRICE:VALOR] (ex: [DISCOUNT_PRICE:{eff_min:.2f}]) no final da resposta.
+3. Enviar mídia da conversa ([SEND_MEDIA:ID]):
+   - Se pelo contexto real da conversa o visitante pedir uma prévia/foto/amostra ou o momento combinar com a descrição e o objetivo de uma das mídias ativas abaixo, inclua [SEND_MEDIA:ID] no final da sua resposta:
 {medias_text if medias_text else 'Nenhuma mídia cadastrada.'}
 
-IMPORTANTE: Converse sempre em primeira pessoa no chat privado do Telegram, sem parecer robô ou suporte técnico. Nunca invente benefícios fora da descrição das ofertas.
+IMPORTANTE: Converse sempre em primeira pessoa no chat privado do Telegram, reagindo de verdade ao assunto que o visitante trouxe, sem parecer robô ou vendedor automático. Nunca invente benefícios fora da descrição das ofertas.
 """
     return prompt
 
@@ -295,10 +318,8 @@ async def generate_ai_reply(
     lead_name: str = ""
 ) -> Dict[str, Any]:
     """
-    Gera a resposta da persona usando:
-    1. API configurada pelo usuário (auto-detecta DeepSeek sk-32hex, OpenAI sk-proj, Groq gsk_) com retry automático
-    2. Fallback LLM gratuito (OpenAI-compatible via Pollinations) caso a chave esteja sem saldo/inválida
-    3. Motor contextual de segurança (nunca repete respostas e responde nome, idade, cidade, FAQ e ofertas)
+    Gera a resposta da persona usando leitura 100% contextual via LLM (DeepSeek / OpenAI / Groq)
+    trabalhando em conjunto com toda a configuração da Persona, Estratégia Comercial, Negócio e Mídias.
     """
     persona = state.get("persona", {})
     business = state.get("business", {})
@@ -332,36 +353,6 @@ async def generate_ai_reply(
     api_key = state.get("account", {}).get("ai_api_key", "").strip()
     provider = state.get("account", {}).get("ai_provider", "deepseek").lower()
 
-    msg_lower = user_message.lower().strip()
-
-    # Verifica sinais de Mídias da Conversa
-    triggered_media = None
-    for m in medias:
-        signals = [s.strip().lower() for s in m.get("signals", "").split(",") if s.strip()]
-        if (signals and any(sig in msg_lower for sig in signals)) or any(w in msg_lower for w in ["foto", "vídeo", "video", "prévia", "previa", "amostra", "ver você", "ver sua"]):
-            triggered_media = m
-            break
-
-    # Verifica se é pergunta de idade ("quantos anos", "sua idade") para NÃO confundir com "quanto custa"
-    is_age_question = any(w in msg_lower for w in ["quantos anos", "sua idade", "que idade", "idade vc tem", "idade você tem"])
-
-    # Verifica se o visitante está pedindo desconto / achando caro
-    wants_discount = any(
-        w in msg_lower for w in [
-            "caro", "desconto", "mais barato", "menos", "não tenho", "nao tenho", "só tenho", "so tenho", "abaixa", "promoção", "promocao"
-        ]
-    )
-
-    # Verifica intenção real de preço / planos / comprar
-    wants_offer = (not is_age_question) and (
-        wants_discount or any(
-            w in msg_lower for w in [
-                "preço", "preco", "valor", "quanto custa", "quanto ta", "quanto tá", "quanto é",
-                "plano", "vip", "assinar", "entrar", "quero ver", "pix", "como funciona", "comprar", "acesso", "quero"
-            ]
-        )
-    )
-
     messages = [{"role": "system", "content": system_prompt}]
     for h in history[-14:]:
         role = h.get("role", "user")
@@ -373,8 +364,8 @@ async def generate_ai_reply(
     length_setting = style.get("length", "Curta")
     max_tok = 160 if length_setting == "Curta" else (320 if length_setting in ("Detalhada", "Longa") else 240)
     # Se espelhamento está ativo e a mensagem do visitante for curtíssima, evita resposta longa desproporcional
-    if style.get("mirror_visitor", True) and len(user_message.split()) <= 4 and not wants_offer:
-        max_tok = min(max_tok, 130)
+    if style.get("mirror_visitor", True) and len(user_message.split()) <= 4:
+        max_tok = min(max_tok, 140)
 
     reply_text = ""
 
@@ -406,11 +397,18 @@ async def generate_ai_reply(
             print(f"Aviso fallback LLM Pollinations: {e}")
 
     if reply_text:
+        triggered_media = None
         for m in medias:
             tag = f"[SEND_MEDIA:{m.get('id')}]"
             if tag in reply_text:
                 reply_text = reply_text.replace(tag, "").strip()
                 triggered_media = m
+        reply_text = re.sub(r"\[SEND_MEDIA:[^\]]+\]", "", reply_text, flags=re.IGNORECASE).strip()
+
+        show_offers_tag = False
+        if re.search(r"\[SHOW_OFFERS\]", reply_text, flags=re.IGNORECASE):
+            show_offers_tag = True
+            reply_text = re.sub(r"\[SHOW_OFFERS\]", "", reply_text, flags=re.IGNORECASE).strip()
 
         # Extrai eventual tag [DISCOUNT_PRICE:XX.XX] gerada pela IA na negociação
         discount_price: Optional[float] = None
@@ -425,19 +423,6 @@ async def generate_ai_reply(
         if bargain.get("once_per_visitor") and already_discounted:
             discount_price = None
 
-        # Se o usuário pediu desconto, a barganha está ativa e a IA citou um valor em R$ na resposta
-        if discount_price is None and wants_discount and bargain.get("enabled") and not (bargain.get("once_per_visitor") and already_discounted) and offers:
-            price_mentions = re.findall(r"r\$\s*([0-9]{1,4}(?:[.,][0-9]{1,2})?)", reply_text, flags=re.IGNORECASE)
-            if price_mentions:
-                try:
-                    cand = float(price_mentions[-1].replace(",", "."))
-                    eff_min = _compute_effective_min_price(offers, bargain)
-                    orig_p = float(offers[0].get("price", 19.0))
-                    if eff_min <= cand <= orig_p:
-                        discount_price = cand
-                except Exception:
-                    pass
-
         # Respeita configuração "Nenhum" emoji caso a IA tenha colocado algum
         if style.get("emojis") == "Nenhum":
             reply_text = re.sub(r"[\U00010000-\U0010ffff]", "", reply_text).strip()
@@ -448,7 +433,7 @@ async def generate_ai_reply(
         }
         if triggered_media:
             result["media"] = triggered_media
-        if (wants_offer or discount_price is not None or "r$" in reply_text.lower() or "plano" in reply_text.lower()) and offers:
+        if (show_offers_tag or discount_price is not None) and offers:
             chosen_offer = dict(offers[0])
             if discount_price is not None and bargain.get("enabled"):
                 eff_min = _compute_effective_min_price(offers, bargain)
@@ -458,7 +443,12 @@ async def generate_ai_reply(
             result["offer_card"] = chosen_offer
         return result
 
-    # 3. Fallback contextual inteligente (caso todas as redes externas oscilem)
+    # 3. Fallback contextual inteligente (apenas caso todas as redes externas estejam offline)
+    msg_lower = user_message.lower().strip()
+    is_age_question = any(w in msg_lower for w in ["quantos anos", "sua idade", "que idade", "idade vc tem", "idade você tem"])
+    wants_discount = any(w in msg_lower for w in ["caro", "desconto", "mais barato"])
+    wants_offer = any(w in msg_lower for w in ["preço", "preco", "valor", "quanto custa", "planos", "assinar", "pix"])
+    triggered_media = None
     raw_name = (persona.get("name") or "").strip()
     gender_val = (persona.get("gender") or "Feminina").strip()
     default_nick = "Léo" if gender_val == "Masculina" else ("Alex" if gender_val == "Neutra" else "Mel")

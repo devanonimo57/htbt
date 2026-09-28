@@ -311,9 +311,6 @@ class ActiveBotManager:
                     callback_data=f"buy:{oid}:{price:.2f}{suffix}"
                 )
             ])
-        support = state.get("publish", {}).get("support_username", "").strip().lstrip("@")
-        if support:
-            buttons.append([InlineKeyboardButton(text="💬 Falar com Suporte", url=f"https://t.me/{support}")])
         return InlineKeyboardMarkup(inline_keyboard=buttons)
 
     def _cancel_downsell(self, user_id: str):
