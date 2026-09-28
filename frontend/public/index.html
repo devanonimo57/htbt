@@ -2047,231 +2047,203 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 12: APRENDIZADO DE VENDAS (FIEL AO PRINT 16)
+             TELA 12: APRENDIZADO DE VENDAS (100% FIEL AOS 2 PRINTS)
         ========================================================== -->
-        <section id="sec-aprendizado" class="tab-section hidden space-y-6">
+        <section id="sec-aprendizado" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">DEPOIS QUE ENTRAR NO AR</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Aprendizado de vendas</h2>
-            <p class="text-xs text-zinc-400 mt-1">Compare resultados e aprove melhorias baseadas em vendas.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">DEPOIS QUE ENTRAR NO AR</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Aprendizado de vendas</h2>
+            <p class="text-xs text-slate-400 mt-1">Compare resultados e aprove melhorias baseadas em vendas.</p>
           </div>
 
-          <div class="sb-card p-5 space-y-3">
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-bold text-white">Aprendizado comercial</h3>
-                  <span class="text-[9px] uppercase px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">SOMENTE NESTE FLUXO</span>
+          <!-- CARD 1: APRENDIZADO COMERCIAL -->
+          <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] space-y-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-[#141625] border border-[#25283d] flex items-center justify-center text-slate-200 shrink-0">
+                  <i class="fa-solid fa-arrow-trend-up text-sm"></i>
                 </div>
-                <p class="text-[11px] text-zinc-400 mt-0.5">Compara quem comprou com quem não comprou, encontra padrões e propõe recomendações. Nada muda nas conversas sem sua aprovação.</p>
+                <div>
+                  <div class="flex items-center gap-2.5 flex-wrap">
+                    <h3 class="text-sm font-bold text-white">Aprendizado comercial</h3>
+                    <span class="px-2.5 py-0.5 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400">SOMENTE ESTE FLUXO</span>
+                  </div>
+                  <p class="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">Compara quem comprou com quem não comprou, encontra padrões e prepara recomendações. Nada muda nas conversas sem sua aprovação.</p>
+                </div>
               </div>
-              <button onclick="loadInitialState()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300">Atualizar</button>
+              <button type="button" onclick="loadInitialState()" class="px-4 py-2.5 rounded-xl bg-[#0b0d14] hover:bg-[#141824] border border-[#1e3a8a] text-xs font-bold text-white flex items-center gap-2 shrink-0 transition">
+                <i class="fa-solid fa-arrows-rotate text-[11px] text-slate-300"></i> Atualizar
+              </button>
             </div>
-            <div class="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/25 text-[11px] text-emerald-300">
-              <i class="fa-solid fa-circle-check mr-1.5"></i> Vendas são confirmadas na base oficial de pagamentos. O aprendizado guarda métricas e estratégias, não copia a conversa para outros sellers.
+
+            <div class="rounded-xl border border-[#1c2133] bg-[#090b12]/90 px-4 py-3 flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
+              <i class="fa-solid fa-shield-halved text-emerald-400 text-xs mt-0.5 shrink-0"></i>
+              <span>Vendas são confirmadas na base oficial de pagamentos. O aprendizado guarda métricas e estratégias, não copia a conversa para outros sellers.</span>
             </div>
           </div>
 
-          <div class="grid grid-cols-4 gap-3">
-            <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">em até 6h após a primeira ent...</span>
-              <span id="kpi-eval" class="text-2xl font-bold text-white my-1 block">0</span>
-              <span class="text-[10px] uppercase tracking-wider text-zinc-500">RESULTADOS AVALIADOS</span>
+          <!-- 4 CARDS DE KPI -->
+          <div class="grid grid-cols-4 gap-3.5">
+            <!-- KPI 1 -->
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-4 space-y-3">
+              <div class="flex justify-between items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
+                  <i class="fa-solid fa-user-group text-xs"></i>
+                </div>
+                <span class="text-[10px] text-slate-500 truncate">30 até a primeira am...</span>
+              </div>
+              <span id="kpi-eval" class="text-xl font-bold text-white block">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">RESULTADOS AVALIADOS</span>
             </div>
-            <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">conversão real</span>
-              <span id="kpi-paid" class="text-2xl font-bold text-white my-1 block">0</span>
-              <span class="text-[10px] uppercase tracking-wider text-zinc-500">COMPRAS CONFIRMADAS</span>
+
+            <!-- KPI 2 -->
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-4 space-y-3">
+              <div class="flex justify-between items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400 shrink-0">
+                  <i class="fa-regular fa-circle-check text-xs"></i>
+                </div>
+                <span class="text-[10px] text-slate-500 truncate">0,0%</span>
+              </div>
+              <span id="kpi-paid" class="text-xl font-bold text-white block">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">COMPRAS CONFIRMADAS</span>
             </div>
-            <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">pix vencido 24 horas</span>
-              <span id="kpi-unpaid" class="text-2xl font-bold text-white my-1 block">0</span>
-              <span class="text-[10px] uppercase tracking-wider text-zinc-500">CHECKOUTS NÃO PAGOS</span>
+
+            <!-- KPI 3 -->
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-4 space-y-3">
+              <div class="flex justify-between items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-[#1c1912] border border-[#362f1d] flex items-center justify-center text-amber-400 shrink-0">
+                  <i class="fa-solid fa-chart-column text-xs"></i>
+                </div>
+                <span class="text-[10px] text-slate-500 truncate">janela de 24 horas</span>
+              </div>
+              <span id="kpi-unpaid" class="text-xl font-bold text-white block">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">CHECKOUTS NÃO PAGOS</span>
             </div>
-            <div class="sb-card p-4">
-              <span class="text-[10px] text-zinc-500 block">avaliadas após 24h sem c...</span>
-              <span id="kpi-nopurchase" class="text-2xl font-bold text-white my-1 block">0</span>
-              <span class="text-[10px] uppercase tracking-wider text-zinc-500">CONVERSAS SEM COMPRA</span>
+
+            <!-- KPI 4 -->
+            <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-4 space-y-3">
+              <div class="flex justify-between items-center gap-2">
+                <div class="w-8 h-8 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
+                  <i class="fa-regular fa-clock text-xs"></i>
+                </div>
+                <span class="text-[10px] text-slate-500 truncate">analisado Ainda não ...</span>
+              </div>
+              <span id="kpi-nopurchase" class="text-xl font-bold text-white block">0</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block leading-snug">CONVERSAS SEM COMPRA</span>
             </div>
           </div>
 
-          <div class="sb-card p-5 space-y-2">
-            <h4 class="text-xs font-bold text-white">Coletando comparação suficiente</h4>
-            <p class="text-[11px] text-zinc-400">O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança.</p>
-            <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div class="h-full bg-purple-500" style="width: 5%"></div>
+          <!-- CARD 2: COLETANDO COMPARAÇÃO SUFICIENTE -->
+          <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-6 space-y-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
+                <i class="fa-solid fa-brain text-sm"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">Coletando comparação suficiente</h4>
+                <p class="text-xs text-slate-400 mt-1">O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança.</p>
+              </div>
             </div>
-            <div class="flex justify-between text-[10px] text-zinc-500">
-              <span>0 resultados válidos</span>
-              <span>mínimo 30</span>
+
+            <div class="space-y-2 pt-1">
+              <div class="w-full h-1.5 bg-[#141824] rounded-full overflow-hidden">
+                <div class="h-full bg-[#3b82f6] rounded-full" style="width: 0%"></div>
+              </div>
+              <div class="flex justify-between items-center text-[11px] text-slate-500">
+                <span>0 resultados válidos</span>
+                <span>mínimo 30</span>
+              </div>
             </div>
           </div>
 
+          <!-- 2 CARDS INFERIORES: SINAIS DESTE FLUXO + HISTÓRICO -->
           <div class="grid grid-cols-12 gap-4">
-            <div class="col-span-7 sb-card p-5 space-y-3">
-              <h4 class="text-xs font-bold text-white">Sinais deste fluxo</h4>
-              <p class="text-[11px] text-zinc-500">Leitura descritiva da janela recente, limitada a 90 dias. Estes dados não alteram o bot sozinhos.</p>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="sb-subcard p-3.5">
-                  <span class="text-[9px] uppercase text-zinc-500 block">OBJEÇÕES MAIS COMUNS</span>
-                  <p class="text-[11px] text-zinc-400 mt-2">Nenhuma objeção apareceu com frequência suficiente.</p>
+            <div class="col-span-7 rounded-2xl border border-[#181c28] bg-[#0b0d14] p-6 space-y-4">
+              <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
+                  <i class="fa-solid fa-bullseye text-sm"></i>
                 </div>
-                <div class="sb-subcard p-3.5">
-                  <span class="text-[9px] uppercase text-zinc-500 block">PLANOS MAIS ESCOLHIDOS</span>
-                  <p class="text-[11px] text-zinc-400 mt-2">As primeiras compras aparecerão aqui.</p>
+                <div>
+                  <h4 class="text-sm font-bold text-white">Sinais deste fluxo</h4>
+                  <p class="text-xs text-slate-400 mt-1 leading-relaxed">Leitura descritiva da janela recente, limitada a 90 dias. Estes dados não alteram o bot sozinhos.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-xl border border-[#181c28] bg-[#07090e] p-4 space-y-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">OBJEÇÕES MAIS COMUNS</span>
+                  <p class="text-xs text-slate-400 leading-relaxed">Nenhuma objeção apareceu com frequência suficiente.</p>
+                </div>
+                <div class="rounded-xl border border-[#181c28] bg-[#07090e] p-4 space-y-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block leading-snug">PLANOS MAIS ESCOLHIDOS</span>
+                  <p class="text-xs text-slate-400 leading-relaxed">As primeiras compras aparecerão aqui.</p>
                 </div>
               </div>
             </div>
-            <div class="col-span-5 sb-card p-5 flex flex-col justify-between">
+
+            <div class="col-span-5 rounded-2xl border border-[#181c28] bg-[#0b0d14] p-6 flex flex-col justify-between space-y-4">
               <div>
-                <h4 class="text-xs font-bold text-white">Histórico</h4>
-                <p class="text-[11px] text-zinc-500">Versões aprovadas podem ser revertidas sem apagar resultados.</p>
+                <div class="flex items-center gap-2 text-sm font-bold text-white">
+                  <i class="fa-solid fa-clock-rotate-left text-xs text-slate-400"></i>
+                  <span>Histórico</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Versões aprovadas podem ser reativadas sem apagar resultados.</p>
               </div>
-              <div class="sb-subcard p-4 text-center my-2">
-                <p class="text-[11px] text-zinc-400">A primeira versão aparecerá após uma recomendação ser aprovada.</p>
+              <div class="flex-1 rounded-xl border border-dashed border-[#1e2333] bg-[#07090e] p-6 flex flex-col items-center justify-center text-center">
+                <i class="fa-solid fa-book-open text-slate-500 text-sm mb-2.5"></i>
+                <p class="text-xs text-slate-400 leading-relaxed">A primeira versão aparecerá após uma recomendação ser aprovada.</p>
               </div>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('memoria')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Memória das conversas</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">ANTERIOR</span>
+                <span class="text-xs font-bold text-white">Memória das conversas</span>
               </div>
             </button>
-            <button onclick="navigateTab('saldo')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+            <button onclick="navigateTab('saldo')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Saldo de IA</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white">Saldo da IA</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
 
         <!-- =========================================================
-             TELA 13: SALDO DA IA (FIEL AO PRINT 17 + API KEY PRÓPRIA)
+             TELA 13: MOTOR DE IA PRIVADO (SEM RECARGA / PAGAMENTO)
         ========================================================== -->
-        <section id="sec-saldo" class="tab-section hidden space-y-6">
+        <section id="sec-saldo" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTA</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Saldo da IA</h2>
-            <p class="text-xs text-zinc-400 mt-1">Consulte o saldo, faça uma recarga e acompanhe pagamentos.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">CONTA PRIVADA</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Saldo da IA (Chave Própria)</h2>
+            <p class="text-xs text-slate-400 mt-1">Conecte sua chave OpenAI ou Groq direta para uso ilimitado sem intermediários.</p>
           </div>
 
-          <div class="grid grid-cols-12 gap-4">
-            <div class="col-span-5 sb-card p-5 flex flex-col justify-between">
-              <div>
-                <span class="text-[10px] uppercase tracking-wider text-zinc-500">SALDO DISPONÍVEL</span>
-                <h3 class="text-3xl font-bold text-white mt-1">R$ 0,00</h3>
-                <span class="inline-block mt-2 text-[10px] text-emerald-400">• Cobrança por uso real</span>
-                <p class="text-[11px] text-zinc-400 mt-2 leading-relaxed">As respostas do bot são o principal consumo. Depois que a IA termina, o uso é medido e descontado do saldo.</p>
-              </div>
-            </div>
-
-            <div class="col-span-7 sb-card p-5 space-y-3">
-              <h4 class="text-xs font-bold text-white">Como os créditos viram respostas?</h4>
-              <p class="text-[11px] text-zinc-400">O tamanho da conversa e da resposta define o consumo.</p>
-              <div class="grid grid-cols-3 gap-2.5">
-                <div class="sb-subcard p-3">
-                  <span class="text-[10px] text-zinc-500 block">1</span>
-                  <p class="text-xs font-bold text-white mt-0.5">A IA lê a conversa</p>
-                  <p class="text-[10px] text-zinc-400 mt-1">Instruções, contexto e histórico entram como leitura.</p>
-                </div>
-                <div class="sb-subcard p-3">
-                  <span class="text-[10px] text-zinc-500 block">2</span>
-                  <p class="text-xs font-bold text-white mt-0.5">Ela cria a resposta</p>
-                  <p class="text-[10px] text-zinc-400 mt-1">O texto gerado para o lead conta como tokens de saída.</p>
-                </div>
-                <div class="sb-subcard p-3">
-                  <span class="text-[10px] text-zinc-500 block">3</span>
-                  <p class="text-xs font-bold text-white mt-0.5">O uso real é descontado</p>
-                  <p class="text-[10px] text-zinc-400 mt-1">A cobrança acontece após concluir.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-3">
-            <div class="sb-card p-3.5">
-              <span class="text-[9px] uppercase text-zinc-500 block">CONTEXTO LIDO</span>
-              <span class="text-xs font-bold text-white">R$ 1,45 <span class="text-zinc-500 font-normal">/ 1 mi tokens</span></span>
-            </div>
-            <div class="sb-card p-3.5">
-              <span class="text-[9px] uppercase text-zinc-500 block">RESPOSTA GERADA</span>
-              <span class="text-xs font-bold text-white">R$ 8,71 <span class="text-zinc-500 font-normal">/ 1 mi tokens</span></span>
-            </div>
-            <div class="sb-card p-3.5">
-              <span class="text-[9px] uppercase text-zinc-500 block">ÁUDIO GERADO</span>
-              <span class="text-xs font-bold text-white">R$ 87,08 <span class="text-zinc-500 font-normal">/ 1 mi tokens de áudio</span></span>
-            </div>
-          </div>
-
-          <!-- Recarga Pré-Paga Fiel ao Print 17 -->
-          <div class="sb-card p-6 space-y-5">
+          <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] space-y-4">
             <div class="flex justify-between items-center">
               <div>
-                <span class="text-[9px] font-bold uppercase text-purple-400">✦ RECARGA PRÉ-PAGA</span>
-                <h3 class="text-sm font-bold text-white">Escolha quanto saldo adicionar</h3>
-                <p class="text-[11px] text-zinc-500">Não é mensalidade. Todo o valor pago vira saldo para o Modo IA.</p>
+                <h3 class="text-sm font-bold text-white">Chave de API Própria (Uso Direto)</h3>
+                <p class="text-xs text-slate-300 mt-1">Cole sua chave OpenAI ou Groq abaixo e clique em Salvar no topo para rodar o motor conversacional direto na fonte.</p>
               </div>
-              <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">• Liberação automática após o PIX</span>
-            </div>
-
-            <div>
-              <span class="text-[11px] font-semibold text-zinc-300 block mb-2">Valores para começar</span>
-              <div class="grid grid-cols-4 gap-2.5">
-                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 50,00</span><span class="text-[10px] text-zinc-500">~ 21,2 mil tokens</span></div>
-                <div class="sb-radio-card selected"><span class="text-xs font-bold text-white block">R$ 100,00</span><span class="text-[10px] text-zinc-400">~ 42,4 mil tokens</span></div>
-                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 250,00</span><span class="text-[10px] text-zinc-500">~ 106 mil tokens</span></div>
-                <div class="sb-radio-card"><span class="text-xs font-bold text-white block">R$ 500,00</span><span class="text-[10px] text-zinc-500">~ 212,1 mil tokens</span></div>
-              </div>
-            </div>
-
-            <div>
-              <span class="text-[11px] font-semibold text-zinc-300 block mb-2">Para mais volume</span>
-              <div class="grid grid-cols-3 gap-3">
-                <div class="sb-radio-card">
-                  <span class="text-[10px] text-zinc-400">Essencial</span>
-                  <p class="text-base font-bold text-white mt-0.5">R$ 1.000,00</p>
-                  <span class="text-[10px] text-zinc-500">≈ 424 mil tokens</span>
-                </div>
-                <div class="sb-radio-card">
-                  <span class="text-[10px] text-purple-400 font-semibold">Crescimento • MAIS ESCOLHIDO</span>
-                  <p class="text-base font-bold text-white mt-0.5">R$ 2.000,00</p>
-                  <span class="text-[10px] text-zinc-500">≈ 848,1 mil tokens</span>
-                </div>
-                <div class="sb-radio-card">
-                  <span class="text-[10px] text-amber-400 font-semibold">Escala • MAIOR VOLUME</span>
-                  <p class="text-base font-bold text-white mt-0.5">R$ 3.000,00</p>
-                  <span class="text-[10px] text-zinc-500">≈ 1,3 bi tokens</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Conexão Direta da sua própria Chave de IA (Zero custo de recarga) -->
-          <div class="sb-card p-6 space-y-4 border-purple-500/40 bg-gradient-to-r from-[#141022] to-[#0c0c12]">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="text-sm font-bold text-white">Chave de API Própria (Bypass de Saldo)</h3>
-                <p class="text-[11px] text-zinc-400">Como você é o dono deste SaaS, cole sua chave OpenAI ou Groq abaixo para rodar a IA direto na fonte sem precisar pagar recarga.</p>
-              </div>
-              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">ADMIN</span>
+              <span class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">ATIVO</span>
             </div>
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="text-xs text-zinc-400 block mb-1">Provedor</label>
-                <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input">
+                <label class="text-xs font-bold text-white block mb-1.5">Provedor</label>
+                <select id="sel-ai-provider" onchange="markUnsaved()" class="sb-input !bg-[#07090e] !border-[#181c28]">
                   <option value="openai">OpenAI (GPT-4o-mini)</option>
                   <option value="groq">Groq (Llama 3.3 70B - Grátis)</option>
                 </select>
               </div>
               <div class="col-span-2">
-                <label class="text-xs text-zinc-400 block mb-1">Sua API Key</label>
-                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-... ou gsk_..." class="sb-input">
+                <label class="text-xs font-bold text-white block mb-1.5">Sua API Key</label>
+                <input type="password" id="inp-ai-key" oninput="markUnsaved()" placeholder="sk-... ou gsk_..." class="sb-input !bg-[#07090e] !border-[#181c28]">
               </div>
             </div>
           </div>
