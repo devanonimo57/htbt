@@ -1789,7 +1789,6 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <p class="text-xs text-slate-300 mt-1 leading-relaxed">Conecte o bot, defina o que será entregue e revise o checklist. O atendimento só começa depois que você ativar.</p>
               </div>
             </div>
-            <input type="checkbox" id="chk-bot-live" class="hidden" onchange="onPublishChange()">
           </div>
 
           <!-- CARD 2: BOT DO ATENDIMENTO -->
@@ -1823,11 +1822,18 @@ quer que eu te mostre as opções de acesso?</textarea>
 
               <!-- GAVETA EXPANSÍVEL PARA COLAR O TOKEN REAL DO BOTFATHER E PUSHINPAY -->
               <div id="link-bot-drawer" class="hidden pt-3 mt-2 border-t border-[#181c28] space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-xs font-bold text-white">Ativar atendimento no Telegram</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="chk-bot-live" onchange="onPublishChange()">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
                 <div>
                   <label class="text-xs font-bold text-white block mb-1">Token do Bot no @BotFather</label>
                   <div class="flex gap-2">
                     <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Ex.: 7123456789:AAH..." class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28]">
-                    <button type="button" onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition">Conectar</button>
+                    <button type="button" onclick="document.getElementById('chk-bot-live').checked=true; onPublishChange(); saveFullState();" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition">Conectar e Ativar</button>
                   </div>
                 </div>
                 <div>
