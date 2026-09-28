@@ -2163,7 +2163,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div class="w-8 h-8 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
                   <i class="fa-solid fa-user-group text-xs"></i>
                 </div>
-                <span class="text-[10px] text-slate-500 truncate">30 até a primeira am...</span>
+                <span id="kpi-eval-sub" class="text-[10px] text-slate-500 truncate">30 até a primeira am...</span>
               </div>
               <span id="kpi-eval" class="text-xl font-bold text-white block">0</span>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">RESULTADOS AVALIADOS</span>
@@ -2175,7 +2175,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div class="w-8 h-8 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400 shrink-0">
                   <i class="fa-regular fa-circle-check text-xs"></i>
                 </div>
-                <span class="text-[10px] text-slate-500 truncate">0,0%</span>
+                <span id="kpi-paid-pct" class="text-[10px] text-slate-500 truncate">0,0%</span>
               </div>
               <span id="kpi-paid" class="text-xl font-bold text-white block">0</span>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">COMPRAS CONFIRMADAS</span>
@@ -2199,7 +2199,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div class="w-8 h-8 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
                   <i class="fa-regular fa-clock text-xs"></i>
                 </div>
-                <span class="text-[10px] text-slate-500 truncate">analisado Ainda não ...</span>
+                <span id="kpi-nopurchase-sub" class="text-[10px] text-slate-500 truncate">analisado em tempo real</span>
               </div>
               <span id="kpi-nopurchase" class="text-xl font-bold text-white block">0</span>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block leading-snug">CONVERSAS SEM COMPRA</span>
@@ -2208,25 +2208,29 @@ quer que eu te mostre as opções de acesso?</textarea>
 
           <!-- CARD 2: COLETANDO COMPARAÇÃO SUFICIENTE -->
           <div class="rounded-2xl border border-[#181c28] bg-[#0b0d14] p-6 space-y-4">
-            <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
-                <i class="fa-solid fa-brain text-sm"></i>
-              </div>
-              <div>
-                <h4 class="text-sm font-bold text-white">Coletando comparação suficiente</h4>
-                <p class="text-xs text-slate-400 mt-1">O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança.</p>
+            <div class="flex items-start justify-between gap-3.5">
+              <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 shrink-0">
+                  <i class="fa-solid fa-brain text-sm"></i>
+                </div>
+                <div>
+                  <h4 id="kpi-sample-title" class="text-sm font-bold text-white">Coletando comparação suficiente</h4>
+                  <p id="kpi-sample-desc" class="text-xs text-slate-400 mt-1">O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança.</p>
+                </div>
               </div>
             </div>
 
             <div class="space-y-2 pt-1">
               <div class="w-full h-1.5 bg-[#141824] rounded-full overflow-hidden">
-                <div class="h-full bg-[#3b82f6] rounded-full" style="width: 0%"></div>
+                <div id="kpi-progress-bar" class="h-full bg-[#3b82f6] rounded-full transition-all duration-300" style="width: 0%"></div>
               </div>
               <div class="flex justify-between items-center text-[11px] text-slate-500">
-                <span>0 resultados válidos</span>
+                <span id="kpi-progress-label">0 resultados válidos</span>
                 <span>mínimo 30</span>
               </div>
             </div>
+
+            <div id="kpi-recommendation-box" class="hidden pt-2"></div>
           </div>
 
           <!-- 2 CARDS INFERIORES: SINAIS DESTE FLUXO + HISTÓRICO -->
@@ -2245,11 +2249,11 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="grid grid-cols-2 gap-3">
                 <div class="rounded-xl border border-[#181c28] bg-[#07090e] p-4 space-y-2">
                   <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">OBJEÇÕES MAIS COMUNS</span>
-                  <p class="text-xs text-slate-400 leading-relaxed">Nenhuma objeção apareceu com frequência suficiente.</p>
+                  <div id="kpi-objections-box" class="text-xs text-slate-400 leading-relaxed">Nenhuma objeção apareceu com frequência suficiente.</div>
                 </div>
                 <div class="rounded-xl border border-[#181c28] bg-[#07090e] p-4 space-y-2">
                   <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block leading-snug">PLANOS MAIS ESCOLHIDOS</span>
-                  <p class="text-xs text-slate-400 leading-relaxed">As primeiras compras aparecerão aqui.</p>
+                  <div id="kpi-plans-box" class="text-xs text-slate-400 leading-relaxed">As primeiras compras aparecerão aqui.</div>
                 </div>
               </div>
             </div>
@@ -2262,7 +2266,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
                 <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Versões aprovadas podem ser reativadas sem apagar resultados.</p>
               </div>
-              <div class="flex-1 rounded-xl border border-dashed border-[#1e2333] bg-[#07090e] p-6 flex flex-col items-center justify-center text-center">
+              <div id="kpi-history-box" class="flex-1 rounded-xl border border-dashed border-[#1e2333] bg-[#07090e] p-6 flex flex-col items-center justify-center text-center">
                 <i class="fa-solid fa-book-open text-slate-500 text-sm mb-2.5"></i>
                 <p class="text-xs text-slate-400 leading-relaxed">A primeira versão aparecerá após uma recomendação ser aprovada.</p>
               </div>
@@ -3515,10 +3519,206 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function renderLearningKpis() {
       const l = STATE.learning || {};
-      document.getElementById('kpi-eval').textContent = l.evaluated_results || 0;
-      document.getElementById('kpi-paid').textContent = l.confirmed_purchases || 0;
-      document.getElementById('kpi-unpaid').textContent = l.unpaid_checkouts || 0;
-      document.getElementById('kpi-nopurchase').textContent = l.conversations_without_purchase || 0;
+      const leads = STATE.memory?.leads || [];
+      const paidStages = ['Pagamento aprovado', 'Entrega concluída', 'Recebeu upsell', 'Escolheu upsell', 'Checkout de upsell', 'Comprou upsell'];
+
+      const evalCount = Math.max(Number(l.evaluated_results || 0), leads.length);
+      const paidCount = Number(l.confirmed_purchases || 0);
+      const unpaidCount = Number(l.unpaid_checkouts || 0);
+      const noPurchaseCount = leads.length
+        ? leads.filter(item => !paidStages.includes(normalizeLeadStage(item.stage))).length
+        : Number(l.conversations_without_purchase || 0);
+
+      const elEval = document.getElementById('kpi-eval');
+      const elPaid = document.getElementById('kpi-paid');
+      const elUnpaid = document.getElementById('kpi-unpaid');
+      const elNoPurch = document.getElementById('kpi-nopurchase');
+      if (elEval) elEval.textContent = String(evalCount);
+      if (elPaid) elPaid.textContent = String(paidCount);
+      if (elUnpaid) elUnpaid.textContent = String(unpaidCount);
+      if (elNoPurch) elNoPurch.textContent = String(noPurchaseCount);
+
+      const pct = evalCount > 0 ? ((paidCount / evalCount) * 100).toFixed(1).replace('.', ',') + '%' : '0,0%';
+      const elPct = document.getElementById('kpi-paid-pct');
+      if (elPct) elPct.textContent = pct;
+
+      const elEvalSub = document.getElementById('kpi-eval-sub');
+      if (elEvalSub) {
+        const rem = Math.max(0, 30 - evalCount);
+        elEvalSub.textContent = rem > 0 ? `${rem} até a primeira amostra` : 'Amostra de 30 atingida';
+      }
+
+      const barPct = Math.min(100, Math.round((evalCount / 30) * 100));
+      const elBar = document.getElementById('kpi-progress-bar');
+      if (elBar) elBar.style.width = `${barPct}%`;
+
+      const elProgLabel = document.getElementById('kpi-progress-label');
+      if (elProgLabel) {
+        elProgLabel.textContent = `${evalCount} ${evalCount === 1 ? 'resultado válido' : 'resultados válidos'}`;
+      }
+
+      const elSampleTitle = document.getElementById('kpi-sample-title');
+      const elSampleDesc = document.getElementById('kpi-sample-desc');
+      if (elSampleTitle && elSampleDesc) {
+        if (evalCount >= 30) {
+          elSampleTitle.textContent = 'Amostra suficiente coletada';
+          elSampleDesc.textContent = 'O fluxo atingiu 30 resultados avaliados. Compare os sinais abaixo e aprove uma versão quando desejar.';
+        } else {
+          elSampleTitle.textContent = 'Coletando comparação suficiente';
+          elSampleDesc.textContent = 'O sistema espera pelo menos 30 resultados e 10 em cada abordagem antes de sugerir uma mudança automática.';
+        }
+      }
+
+      // Consolida objeções mais comuns (do state.learning ou dos leads em memória)
+      let objections = Array.isArray(l.common_objections) ? [...l.common_objections] : [];
+      if (!objections.length && leads.length) {
+        const counts = {};
+        leads.forEach(item => {
+          const list = Array.isArray(item.objs_list) && item.objs_list.length
+            ? item.objs_list
+            : (item.objections && item.objections !== 'Nenhuma identificada' ? item.objections.split('•').map(s => s.trim()) : []);
+          list.forEach(oName => {
+            if (oName) counts[oName] = (counts[oName] || 0) + 1;
+          });
+        });
+        objections = Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+      }
+
+      const elObjBox = document.getElementById('kpi-objections-box');
+      if (elObjBox) {
+        if (!objections.length) {
+          elObjBox.innerHTML = 'Nenhuma objeção apareceu com frequência suficiente.';
+        } else {
+          elObjBox.innerHTML = `<div class="space-y-1.5 pt-1">${objections.slice(0, 4).map(o => `
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-200 truncate pr-2">${o.name}</span>
+              <span class="px-2 py-0.5 rounded-md bg-[#141824] border border-[#232a3d] text-[10px] font-bold text-amber-400 shrink-0">${o.count}x</span>
+            </div>
+          `).join('')}</div>`;
+        }
+      }
+
+      // Consolida planos mais escolhidos (do state.learning ou dos leads em memória)
+      let topPlans = Array.isArray(l.top_plans) ? [...l.top_plans] : [];
+      if (!topPlans.length && leads.length) {
+        const pCounts = {};
+        leads.forEach(item => {
+          if (item.chosen_plan) {
+            pCounts[item.chosen_plan] = (pCounts[item.chosen_plan] || 0) + 1;
+          }
+        });
+        topPlans = Object.entries(pCounts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+      }
+
+      const elPlansBox = document.getElementById('kpi-plans-box');
+      if (elPlansBox) {
+        if (!topPlans.length) {
+          elPlansBox.innerHTML = 'As primeiras compras aparecerão aqui.';
+        } else {
+          elPlansBox.innerHTML = `<div class="space-y-1.5 pt-1">${topPlans.slice(0, 4).map(p => `
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-200 truncate pr-2">${p.name}</span>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-950/50 border border-emerald-800/40 text-[10px] font-bold text-emerald-300 shrink-0">${p.count}x</span>
+            </div>
+          `).join('')}</div>`;
+        }
+      }
+
+      // Recomendação baseada em sinais reais (só aplica se o usuário clicar em Aprovar)
+      const elRecBox = document.getElementById('kpi-recommendation-box');
+      if (elRecBox) {
+        const topObj = objections[0]?.name || '';
+        let recTitle = '';
+        let recDetail = '';
+        if (topObj.toLowerCase().includes('preço') || topObj.toLowerCase().includes('desconto')) {
+          recTitle = 'Sinal detectado: Objeção de Preço / Desconto';
+          recDetail = STATE.business?.bargain?.enabled
+            ? 'A negociação de preço já está ativa para contornar pedidos de desconto.'
+            : 'Vários visitantes pediram desconto. Você pode avaliar ativar a Negociação de Preço na aba Negócio.';
+        } else if (topObj.toLowerCase().includes('prévia') || topObj.toLowerCase().includes('prova')) {
+          recTitle = 'Sinal detectado: Pedido de Prévia';
+          recDetail = 'Visitantes pediram amostra antes de assinar. Confira se há uma mídia de prévia ativa na aba Mídias.';
+        } else if (unpaidCount > 0 && !STATE.downsell?.enabled) {
+          recTitle = 'Sinal detectado: Checkouts gerados sem pagamento';
+          recDetail = 'Há checkouts pendentes. Você pode avaliar ativar o Downsell para lembrar quem não concluiu o PIX.';
+        }
+
+        if (recTitle) {
+          elRecBox.className = 'pt-2';
+          elRecBox.innerHTML = `
+            <div class="rounded-xl border border-[#1e3a8a]/60 bg-[#090d18] p-3.5 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p class="text-xs font-bold text-[#38bdf8]">${recTitle}</p>
+                <p class="text-[11px] text-slate-300 mt-0.5">${recDetail}</p>
+              </div>
+              <button type="button" onclick="approveLearningSnapshot('${recTitle.replace(/'/g, '')}')" class="px-3 py-1.5 rounded-xl bg-[#1e3a8a]/40 hover:bg-[#1e3a8a]/70 border border-[#3b82f6]/40 text-xs font-bold text-white transition shrink-0">
+                Salvar versão no histórico
+              </button>
+            </div>
+          `;
+        } else {
+          elRecBox.className = 'hidden pt-2';
+          elRecBox.innerHTML = '';
+        }
+      }
+
+      // Histórico de versões aprovadas
+      const versions = Array.isArray(l.approved_versions) ? l.approved_versions : [];
+      const elHistBox = document.getElementById('kpi-history-box');
+      if (elHistBox) {
+        if (!versions.length) {
+          elHistBox.className = 'flex-1 rounded-xl border border-dashed border-[#1e2333] bg-[#07090e] p-6 flex flex-col items-center justify-center text-center';
+          elHistBox.innerHTML = `
+            <i class="fa-solid fa-book-open text-slate-500 text-sm mb-2.5"></i>
+            <p class="text-xs text-slate-400 leading-relaxed">A primeira versão aparecerá após uma recomendação ser aprovada.</p>
+          `;
+        } else {
+          elHistBox.className = 'flex-1 rounded-xl border border-[#181c28] bg-[#07090e] p-3 space-y-2 overflow-y-auto max-h-[200px] text-left';
+          elHistBox.innerHTML = versions.map((v, idx) => `
+            <div class="rounded-lg border border-[#181c28] bg-[#0b0d14] p-2.5 flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-white truncate">Versão #${versions.length - idx} — ${v.strategy || 'Personalizada'}</p>
+                <p class="text-[10px] text-slate-400 truncate">${v.date || ''} • Conversão: ${v.conversion || '0,0%'}</p>
+              </div>
+              <button type="button" onclick="restoreLearningSnapshot(${idx})" class="px-2.5 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] font-bold text-slate-200 shrink-0 transition">
+                Reativar
+              </button>
+            </div>
+          `).join('');
+        }
+      }
+    }
+
+    function approveLearningSnapshot(note) {
+      if (!STATE.learning) STATE.learning = {};
+      if (!Array.isArray(STATE.learning.approved_versions)) STATE.learning.approved_versions = [];
+      const evalCount = Math.max(Number(STATE.learning.evaluated_results || 0), (STATE.memory?.leads || []).length);
+      const paidCount = Number(STATE.learning.confirmed_purchases || 0);
+      const pct = evalCount > 0 ? ((paidCount / evalCount) * 100).toFixed(1).replace('.', ',') + '%' : '0,0%';
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      STATE.learning.approved_versions.unshift({
+        date: dateStr,
+        note: note || 'Versão salva',
+        strategy: STATE.style?.strategy || 'Conexão primeiro',
+        tone: STATE.style?.tone || 'Acolhedor',
+        conversion: pct,
+        style_snapshot: JSON.parse(JSON.stringify(STATE.style || {})),
+        bargain_snapshot: JSON.parse(JSON.stringify(STATE.business?.bargain || {}))
+      });
+      saveLocalBackup();
+      renderLearningKpis();
+      markUnsaved();
+    }
+
+    function restoreLearningSnapshot(idx) {
+      const v = (STATE.learning?.approved_versions || [])[idx];
+      if (!v) return;
+      if (v.style_snapshot) STATE.style = JSON.parse(JSON.stringify(v.style_snapshot));
+      if (v.bargain_snapshot && STATE.business) STATE.business.bargain = JSON.parse(JSON.stringify(v.bargain_snapshot));
+      syncStateToInputs();
+      renderLearningKpis();
+      markUnsaved();
     }
 
     function applyPresetStrategy(type) {
