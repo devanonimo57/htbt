@@ -122,16 +122,16 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         ]
     },
     "publish": {
-        "is_live": False,
-        "bot_token": "",
+        "is_live": bool(os.getenv("BOT_TOKEN", "")),
+        "bot_token": os.getenv("BOT_TOKEN", ""),
         "bot_username": "",
-        "cache_channel_id": "",
+        "cache_channel_id": os.getenv("CACHE_CHANNEL_ID", ""),
         "delivery_type": "Link de acesso",
-        "delivery_destination": "",
-        "support_username": "",
-        "gateway_provider": "pushinpay",
-        "pushin_pay_token": "",
-        "gateway_secret": ""
+        "delivery_destination": os.getenv("VIP_DESTINATION", ""),
+        "support_username": os.getenv("SUPPORT_USERNAME", ""),
+        "gateway_provider": os.getenv("GATEWAY_PROVIDER", "pushinpay"),
+        "pushin_pay_token": os.getenv("GATEWAY_TOKEN", ""),
+        "gateway_secret": os.getenv("GATEWAY_SECRET", "")
     },
     "memory": {
         "leads": []
@@ -147,8 +147,8 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "account": {
         "balance": 0.00,
         "selected_recharge": 100.00,
-        "ai_provider": "openai",
-        "ai_api_key": ""
+        "ai_provider": os.getenv("AI_PROVIDER", "openai"),
+        "ai_api_key": os.getenv("AI_API_KEY", "")
     }
 }
 
@@ -159,6 +159,11 @@ if os.path.exists(frontend_path):
 @app.get("/")
 def redirect_to_dashboard():
     return RedirectResponse(url="/dashboard/")
+
+@app.get("/ping")
+@app.get("/health")
+def health_ping():
+    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
 async def _read_state_from_db() -> Dict[str, Any]:
     async with async_session() as session:
