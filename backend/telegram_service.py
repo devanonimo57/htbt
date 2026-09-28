@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import html
 import logging
 import random
 from datetime import datetime, timedelta
@@ -173,7 +174,7 @@ class ActiveBotManager:
             emoji = o.get("emoji", "💎")
             name = o.get("name", "Acesso VIP")
             price = float(o.get("price", 19))
-            oid = o.get("id", f"offer_{idx}")
+            oid = str(o.get("id", f"offer_{idx}"))[:20]
             buttons.append([
                 InlineKeyboardButton(
                     text=f"{emoji} {name} — R$ {price:.2f}".replace(".", ","),
@@ -338,9 +339,11 @@ class ActiveBotManager:
 
         @self.dp.callback_query(F.data.startswith("buy:"))
         async def handle_buy_callback(callback: types.CallbackQuery):
-            await callback.answer("Gerando seu PIX seguro...")
+            try:
+                await callback.answer("Gerando seu PIX seguro...")
+            except Exception:
+                pass
             parts = callback.data.split(":")
-            offer_id = parts[1] if len(parts) > 1 else "offer_1"
             price = float(parts[2]) if len(parts) > 2 else 19.0
 
             state = await self.state_getter()
@@ -373,22 +376,48 @@ class ActiveBotManager:
 
             lead["last_tx_id"] = tx_id
             self.active_tx_map[tx_id] = callback.from_user.id
+            price_fmt = f"{price:.2f}".replace(".", ",")
+            lead.setdefault("history", []).append({
+                "role": "assistant",
+                "content": f"[PIX Gerado — R$ {price_fmt}] {pix_code}"
+            })
+            await self.state_saver(state)
 
+            # IMPORTANTE: callback_data no Telegram tem limite rígido de 64 bytes!
+            # checkpix:<uuid 36 chars> = 45 bytes (sempre < 64 bytes).
+            safe_cb = f"checkpix:{tx_id[:50]}"
             confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Já paguei / Liberar acesso", callback_data=f"checkpix:{tx_id}:{offer_id}")]
+                [InlineKeyboardButton(text="✅ Já paguei / Liberar acesso", callback_data=safe_cb)]
             ])
 
-            price_fmt = f"{price:.2f}".replace(".", ",")
-            await callback.message.answer(
-                f"🔒 <b>Pagamento Seguro via PIX</b>\n\n"
-                f"Valor: <b>R$ {price_fmt}</b>\n\n"
-                f"Copie o código PIX Copia e Cola abaixo e pague no app do seu banco:\n\n"
-                f"<code>{pix_code}</code>\n\n"
-                f"Assim que concluir, seu acesso é liberado automaticamente aqui na conversa!",
-                parse_mode="HTML",
-                reply_markup=confirm_kb
-            )
-            await self.state_saver(state)
+            target_chat_id = callback.message.chat.id if callback.message else callback.from_user.id
+            safe_pix_html = html.escape(pix_code)
+            try:
+                await self.bot.send_message(
+                    chat_id=target_chat_id,
+                    text=(
+                        f"🔒 <b>Pagamento Seguro via PIX</b>\n\n"
+                        f"Valor: <b>R$ {price_fmt}</b>\n\n"
+                        f"Toque no código PIX Copia e Cola abaixo para copiar e pague no app do seu banco:\n\n"
+                        f"<code>{safe_pix_html}</code>\n\n"
+                        f"Assim que concluir, seu acesso é liberado automaticamente aqui na conversa!"
+                    ),
+                    parse_mode="HTML",
+                    reply_markup=confirm_kb
+                )
+            except Exception as e:
+                logger.error(f"Fallback texto simples no envio do PIX: {e}")
+                await self.bot.send_message(
+                    chat_id=target_chat_id,
+                    text=(
+                        f"🔒 Pagamento Seguro via PIX\n\n"
+                        f"Valor: R$ {price_fmt}\n\n"
+                        f"Copie o código PIX Copia e Cola abaixo:\n\n"
+                        f"{pix_code}\n\n"
+                        f"Assim que concluir, clique abaixo para liberar seu acesso!"
+                    ),
+                    reply_markup=confirm_kb
+                )
 
             if pushin_token and not tx_id.startswith("sim_"):
                 asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret))
@@ -412,7 +441,7 @@ class ActiveBotManager:
                         await self.deliver_purchase_and_upsell(callback.from_user.id)
                         return
                     else:
-                        await callback.answer("Ainda aguardando confirmação do banco. Tente novamente em instantes!", show_alert=True)
+                        await callback.answer("Ainda aguardando confirmação do banco. Assim que pagar, tente novamente!", show_alert=True)
                         return
                 except Exception:
                     pass
