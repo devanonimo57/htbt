@@ -100,220 +100,226 @@
   <input type="file" id="hidden-media-upload" class="hidden" accept="image/*,video/*,audio/*" onchange="handleRealFileUpload(event)">
 
   <!-- TOP HEADER BAR FIEL AO SHARKBOT -->
-  <header class="h-14 bg-[#08080b] border-b border-[#191922] px-4 flex items-center justify-between shrink-0 z-20">
-    <div class="flex items-center gap-3">
-      <button onclick="navigateTab('resumo')" class="w-8 h-8 rounded-lg bg-[#111118] border border-[#22222e] flex items-center justify-center text-zinc-400 hover:text-white">
-        <i class="fa-solid fa-chevron-left text-xs"></i>
+  <header class="h-16 bg-[#08090d] border-b border-[#141722] px-5 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-3.5">
+      <button onclick="navigateTab('resumo')" class="w-10 h-10 rounded-xl bg-[#0e1017] border border-[#1e2333] hover:border-slate-600 flex items-center justify-center text-slate-400 hover:text-white transition">
+        <i class="fa-solid fa-chevron-left text-sm"></i>
       </button>
       <div>
-        <div class="flex items-center gap-1.5">
-          <span id="unsaved-indicator" class="text-[9px] font-bold uppercase tracking-wider text-amber-400">MODO IA • ALTERAÇÕES NÃO SALVAS</span>
+        <div class="flex items-center gap-1.5 mb-0.5">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-[#38bdf8]">MODO IA</span>
+          <span class="text-[11px] text-slate-500">•</span>
+          <span id="unsaved-indicator" class="text-[11px] font-medium uppercase tracking-wider text-slate-400">TUDO SALVO</span>
         </div>
         <div class="flex items-baseline gap-2">
-          <h1 id="header-flow-name" class="text-sm font-bold text-white leading-none">bot</h1>
+          <h1 id="header-flow-name" class="text-base font-bold text-white leading-none">bot</h1>
         </div>
-        <p class="text-[10px] text-zinc-500 leading-none mt-0.5">Configure a conversa, teste e publique no Telegram</p>
+        <p class="text-xs text-slate-400 leading-none mt-1">Configure a conversa, teste e publique no Telegram</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2.5">
-      <button onclick="navigateTab('saldo')" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#232330] text-xs font-medium text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600">
-        <i class="fa-solid fa-coins text-zinc-400 text-[11px]"></i>
+    <div class="flex items-center gap-3">
+      <button onclick="navigateTab('saldo')" class="px-3.5 py-2 rounded-xl bg-[#0e1017] border border-[#1e2333] text-xs font-medium text-slate-200 flex items-center gap-2 hover:border-slate-600 transition">
+        <span class="w-4 h-4 rounded-full border border-slate-500 flex items-center justify-center text-[9px] text-slate-400 font-bold">%</span>
         <span id="header-balance">R$ 0,00</span>
       </button>
-      <button onclick="navigateTab('testar')" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#232330] text-xs font-medium text-zinc-200 flex items-center gap-1.5 hover:border-zinc-600">
-        <i class="fa-regular fa-eye text-zinc-400 text-[11px]"></i>
+      <button onclick="navigateTab('testar')" class="px-4 py-2 rounded-xl bg-[#0e1017] border border-[#1e2333] text-xs font-medium text-slate-200 flex items-center gap-2 hover:border-slate-600 transition">
+        <i class="fa-regular fa-eye text-slate-400 text-xs"></i>
         <span>Visualizar</span>
       </button>
-      <button onclick="saveFullState()" id="btn-save-top" class="px-4 py-1.5 rounded-lg bg-[#2563eb] hover:bg-[#1d4ed8] text-xs font-semibold text-white flex items-center gap-1.5 shadow-sm transition">
-        <i class="fa-regular fa-floppy-disk text-[11px]"></i>
+      <button onclick="saveFullState()" id="btn-save-top" class="px-5 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-xs font-semibold text-white flex items-center gap-2 shadow-lg shadow-blue-900/30 transition">
+        <i class="fa-regular fa-floppy-disk text-xs"></i>
         <span>Salvar</span>
       </button>
     </div>
   </header>
 
   <!-- CORPO 3 COLUNAS (SIDEBAR ESQUERDA + CONTEÚDO CENTRAL + PRÉVIA DIREITA) -->
-  <div class="flex-1 flex overflow-hidden max-w-[1600px] w-full mx-auto">
+  <div class="flex-1 flex overflow-hidden w-full">
 
     <!-- 1. COLUNA ESQUERDA: NAVEGAÇÃO DE ETAPAS -->
-    <aside class="w-[245px] border-r border-[#171720] bg-[#060609] flex flex-col justify-between shrink-0">
-      <div class="p-3.5 overflow-y-auto flex-1 space-y-4">
+    <aside class="w-[280px] border-r border-[#141722] bg-[#07080c] flex flex-col justify-between shrink-0">
+      <div class="p-4 overflow-y-auto flex-1 space-y-5">
         <div class="px-1">
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500">PREPARAR ATENDIMENTO</p>
-          <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Siga os grupos abaixo ou abra diretamente a etapa que deseja ajustar.</p>
+          <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">PREPARAR ATENDIMENTO</p>
+          <p class="text-xs text-slate-400 mt-1 leading-relaxed">Siga os grupos abaixo ou abra diretamente o recurso que deseja ajustar.</p>
         </div>
 
         <!-- GRUPO: COMEÇAR -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">COMEÇAR</p>
-          <button onclick="navigateTab('resumo')" id="nav-resumo" class="sb-nav-item active">
-            <div class="w-6 h-6 rounded-md bg-blue-500/15 border border-blue-500/40 text-blue-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">COMEÇAR</p>
+          
+          <button onclick="navigateTab('resumo')" id="nav-resumo" class="sb-nav-item active !bg-[#131b2e] !border-[#2563eb] relative overflow-hidden">
+            <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
             </div>
-            <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-white truncate">Resumo do atend...</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-resumo">3 de 5 itens essenciais</p>
+            <div class="overflow-hidden flex-1">
+              <p class="text-xs font-semibold text-white truncate">Resumo do atendi...</p>
+              <p class="text-[11px] text-slate-400 truncate" id="nav-sub-resumo">2 de 5 itens essenciais</p>
             </div>
+            <div class="absolute right-0 top-0 bottom-0 w-1 bg-[#3b82f6]"></div>
           </button>
 
           <button onclick="navigateTab('estrategias')" id="nav-estrategias" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-layer-group text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-layer-group text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Estratégias prontas</p>
-              <p class="text-[10px] text-zinc-500 truncate">3 opções para começar</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Estratégias prontas</p>
+              <p class="text-[11px] text-slate-500 truncate">3 opções para começar</p>
             </div>
           </button>
         </div>
 
         <!-- GRUPO: CONFIGURAÇÃO ESSENCIAL -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONFIGURAÇÃO ESSENCIAL</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">CONFIGURAÇÃO ESSENCIAL</p>
           <button onclick="navigateTab('persona')" id="nav-persona" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-check text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Persona e identid...</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-persona">Atendimento</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Persona e identidade</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-persona">Atendimento</p>
             </div>
           </button>
 
           <button onclick="navigateTab('ofertas')" id="nav-ofertas" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-check text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-cube text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Negócio e ofertas</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-ofertas">1 oferta ativa</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Negócio e ofertas</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-ofertas">0 ofertas ativas</p>
             </div>
           </button>
 
           <button onclick="navigateTab('conversa')" id="nav-conversa" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-check text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-check text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Jeito de conversar</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-conversa">Tom acolhedor</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Jeito de conversar</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-conversa">Tom acolhedor</p>
             </div>
           </button>
         </div>
 
         <!-- GRUPO: CONTEÚDO E AUTOMAÇÕES -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONTEÚDO E AUTOMAÇÕES</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">CONTEÚDO E AUTOMAÇÕES</p>
           <button onclick="navigateTab('midias')" id="nav-midias" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-regular fa-images text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-regular fa-images text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Mídias da conversa</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-midias">Adicionar conteúdo</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Mídias da conversa</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-midias">Adicionar conteúdo</p>
             </div>
           </button>
 
           <button onclick="navigateTab('downsell')" id="nav-downsell" class="sb-nav-item">
-            <div id="nav-icon-downsell" class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-check text-[10px]"></i>
+            <div id="nav-icon-downsell" class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Downsell</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-downsell">1 etapa (s) • sem resposta</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Downsell</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-downsell">1 etapa(s) • sem resposta</p>
             </div>
           </button>
 
           <button onclick="navigateTab('upsell')" id="nav-upsell" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-check text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Upsell</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-upsell">Ativo • após a compra</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Upsell</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-upsell">Ativo • após a compra</p>
             </div>
           </button>
         </div>
 
         <!-- GRUPO: TESTE E PUBLICAÇÃO -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">TESTE E PUBLICAÇÃO</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">TESTE E PUBLICAÇÃO</p>
           <button onclick="navigateTab('testar')" id="nav-testar" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-regular fa-comment-dots text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-regular fa-comment-dots text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Testar conversa</p>
-              <p class="text-[10px] text-zinc-500 truncate">Pronto para testar</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Testar conversa</p>
+              <p class="text-[11px] text-slate-500 truncate">Pronto para testar</p>
             </div>
           </button>
 
           <button onclick="navigateTab('publicar')" id="nav-publicar" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-rocket text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-robot text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Publicar no bot</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-publicar">Vincular bot</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Publicar no bot</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-publicar">Vincular bot</p>
             </div>
           </button>
         </div>
 
         <!-- GRUPO: DEPOIS QUE ENTRAR NO AR -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">DEPOIS QUE ENTRAR NO AR</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">DEPOIS QUE ENTRAR NO AR</p>
           <button onclick="navigateTab('memoria')" id="nav-memoria" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-address-book text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-address-book text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Memória das con...</p>
-              <p class="text-[10px] text-zinc-500 truncate">Perfis e histórico com...</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Memória das conversas</p>
+              <p class="text-[11px] text-slate-500 truncate">Perfis e histórico completo</p>
             </div>
           </button>
 
           <button onclick="navigateTab('aprendizado')" id="nav-aprendizado" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-chart-line text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-chart-line text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Aprendizado de v...</p>
-              <p class="text-[10px] text-zinc-500 truncate">O que mais converte</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Aprendizado de vendas</p>
+              <p class="text-[11px] text-slate-500 truncate">Descubra o que mais converte</p>
             </div>
           </button>
         </div>
 
         <!-- GRUPO: CONTA -->
         <div>
-          <p class="text-[9px] font-bold uppercase tracking-widest text-zinc-500 px-1 mb-1.5">CONTA</p>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">CONTA</p>
           <button onclick="navigateTab('saldo')" id="nav-saldo" class="sb-nav-item">
-            <div class="w-6 h-6 rounded-md bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-wallet text-[10px]"></i>
+            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+              <i class="fa-solid fa-wallet text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
-              <p class="text-xs font-semibold text-zinc-200 truncate">Saldo de IA</p>
-              <p class="text-[10px] text-zinc-500 truncate" id="nav-sub-saldo">R$ 0,00</p>
+              <p class="text-xs font-semibold text-slate-200 truncate">Saldo da IA</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-saldo">R$ 0,00</p>
             </div>
           </button>
         </div>
       </div>
 
-      <!-- RODAPÉ FIXO DA SIDEBAR ESQUERDA -->
-      <div class="p-3.5 border-t border-[#171720] bg-[#08080c] space-y-2 text-[11px]">
-        <div class="flex justify-between items-center text-zinc-400">
+      <!-- RODAPÉ FIXO DA SIDEBAR ESQUERDA FIEL AO PRINT -->
+      <div class="p-4 border-t border-[#141722] bg-[#07080c] space-y-2.5 text-xs">
+        <div class="flex justify-between items-center text-slate-400">
           <span>Preparação essencial</span>
-          <span id="sidebar-prep-count" class="font-semibold text-zinc-200">3/5</span>
+          <span id="sidebar-prep-count" class="font-semibold text-white">2/5</span>
         </div>
-        <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" style="width: 60%"></div>
+        <div class="w-full h-1.5 bg-[#171b28] rounded-full overflow-hidden">
+          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-[#38bdf8] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
         </div>
-        <div class="flex justify-between items-center text-[10px] pt-1">
-          <span class="text-zinc-500">Configuração</span>
-          <span id="sidebar-config-status" class="text-zinc-300 font-medium">Alterada</span>
+        <div class="flex justify-between items-center text-[11px] pt-1">
+          <span class="text-slate-400">Configuração</span>
+          <span id="sidebar-config-status" class="text-slate-200 font-medium">Salva</span>
         </div>
-        <div class="flex justify-between items-center text-[10px]">
-          <span class="text-zinc-500">No bot</span>
-          <span id="sidebar-bot-status" class="text-zinc-400">Não vinculada</span>
+        <div class="flex justify-between items-center text-[11px]">
+          <span class="text-slate-400">Bot real</span>
+          <span id="sidebar-bot-status" class="text-slate-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-link-slash text-[10px]"></i> Não vinculado
+          </span>
         </div>
       </div>
     </aside>
@@ -323,197 +329,214 @@
       <div class="max-w-[780px] mx-auto">
 
         <!-- =========================================================
-             TELA 1: RESUMO DO ATENDIMENTO
+             TELA 1: RESUMO DO ATENDIMENTO (100% FIEL AOS PRINTS)
         ========================================================== -->
         <section id="sec-resumo" class="tab-section space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">COMEÇAR</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Resumo do atendimento</h2>
-            <p class="text-xs text-zinc-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">COMEÇAR</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Resumo do atendimento</h1>
+            <p class="text-sm text-slate-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
           </div>
 
-          <div class="rounded-2xl p-6 border border-purple-500/25 bg-gradient-to-br from-[#191229] via-[#100d19] to-[#0c0c10] relative overflow-hidden">
+          <!-- HERO BANNER "EM PREPARAÇÃO" -->
+          <div class="rounded-2xl p-6 border border-[#2e1e4a] bg-gradient-to-br from-[#1c122e] via-[#120e21] to-[#0c0a14] relative overflow-hidden">
             <div class="flex justify-between items-start">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                <i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> EM PREPARAÇÃO
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#2a1c4a] text-[#c084fc] border border-[#4c2d82]">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#c084fc]"></span> EM PREPARAÇÃO
               </span>
-              <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
+              <div class="w-10 h-10 rounded-xl bg-[#2a1c4a]/50 border border-[#4c2d82] flex items-center justify-center text-[#c084fc]">
+                <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
             </div>
 
-            <h3 class="text-lg font-bold text-white mt-4">Prepare uma conversa que vende do seu jeito.</h3>
-            <p class="text-xs text-zinc-400 mt-1">Siga os itens essenciais abaixo. Você pode voltar e ajustar qualquer detalhe antes de ativar o bot.</p>
+            <h2 class="text-xl font-bold text-white mt-4">Prepare uma conversa que vende do seu jeito.</h2>
+            <p class="text-sm text-slate-300 mt-1.5 max-w-xl leading-relaxed">Siga os itens essenciais abaixo. Você pode voltar e ajustar qualquer detalhe antes de ativar o bot.</p>
 
-            <div class="mt-5">
-              <div class="flex justify-between text-[11px] text-zinc-400 mb-1.5">
+            <div class="mt-6">
+              <div class="flex justify-between text-xs text-slate-400 mb-2">
                 <span>Preparação essencial</span>
-                <span id="hero-prep-label">3 de 5 concluídos</span>
+                <span id="hero-prep-label" class="text-slate-300 font-medium">2 de 5 concluídos</span>
               </div>
-              <div class="w-full h-1.5 bg-zinc-800/90 rounded-full overflow-hidden">
-                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500" style="width: 60%"></div>
+              <div class="w-full h-1.5 bg-[#1f1a33] rounded-full overflow-hidden">
+                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-[#38bdf8] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
               </div>
             </div>
 
-            <div class="flex items-center gap-3 mt-5">
-              <button onclick="navigateTab('publicar')" class="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-semibold flex items-center gap-2 transition shadow-lg shadow-purple-900/30">
-                <span>Conectar um bot</span>
+            <div class="flex items-center gap-3.5 mt-6">
+              <button onclick="navigateTab('ofertas')" class="px-5 py-2.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
+                <span>Cadastrar as ofertas</span>
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </button>
-              <button onclick="navigateTab('estrategias')" class="px-4 py-2 rounded-xl bg-[#14141d] hover:bg-[#1c1c28] text-zinc-200 border border-[#262636] text-xs font-medium flex items-center gap-2 transition">
-                <i class="fa-solid fa-sliders text-[10px] text-zinc-400"></i>
+              <button onclick="navigateTab('estrategias')" class="px-4 py-2.5 rounded-xl bg-[#181329] hover:bg-[#231b3d] text-slate-200 border border-[#3b2a63] text-xs font-medium flex items-center gap-2 transition">
+                <i class="fa-solid fa-layer-group text-xs text-slate-400"></i>
                 <span>Usar estratégia pronta</span>
               </button>
             </div>
           </div>
 
-          <div class="sb-card p-5 space-y-3">
+          <!-- O ESSENCIAL PARA PUBLICAR -->
+          <div class="sb-card p-5 border border-[#181c28] bg-[#0c0e16] rounded-2xl space-y-3.5">
             <div>
-              <h4 class="text-sm font-bold text-white">O essencial para publicar</h4>
-              <p class="text-[11px] text-zinc-500 mt-0.5">Abra qualquer item para revisar ou concluir.</p>
+              <h3 class="text-sm font-bold text-white">O essencial para publicar</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Abra qualquer item para revisar ou concluir.</p>
             </div>
 
             <div class="space-y-2 pt-1">
-              <div onclick="navigateTab('persona')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-check"></i>
+              <!-- Item 1: Definir a persona (Concluído) -->
+              <div onclick="navigateTab('persona')" class="sb-subcard p-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-solid fa-check text-[11px]"></i>
                   </div>
                   <div>
                     <p class="text-xs font-semibold text-white">1. Definir a persona</p>
-                    <p class="text-[11px] text-zinc-500">Nome, história e personalidade</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Nome, história e personalidade</p>
                   </div>
                 </div>
-                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
-                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                <span class="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-solid fa-check text-[10px]"></i> Concluído <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
                 </span>
               </div>
 
-              <div onclick="navigateTab('ofertas')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-check"></i>
+              <!-- Item 2: Cadastrar as ofertas (Pendente) -->
+              <div onclick="navigateTab('ofertas')" class="sb-subcard p-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-solid fa-cube text-[11px]"></i>
                   </div>
                   <div>
                     <p class="text-xs font-semibold text-white">2. Cadastrar as ofertas</p>
-                    <p class="text-[11px] text-zinc-500">Contexto, preços e dúvidas comuns</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Contexto, preços e dúvidas comuns</p>
                   </div>
                 </div>
-                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
-                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                <span class="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle text-[10px]"></i> Pendente <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
                 </span>
               </div>
 
-              <div onclick="navigateTab('conversa')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-check"></i>
+              <!-- Item 3: Ajustar a conversa (Concluído) -->
+              <div onclick="navigateTab('conversa')" class="sb-subcard p-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-solid fa-check text-[11px]"></i>
                   </div>
                   <div>
                     <p class="text-xs font-semibold text-white">3. Ajustar a conversa</p>
-                    <p class="text-[11px] text-zinc-500">Tom, ritmo e momento da venda</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Tom, ritmo e momento da venda</p>
                   </div>
                 </div>
-                <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
-                  <i class="fa-solid fa-check text-[9px]"></i> Concluído <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                <span class="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-solid fa-check text-[10px]"></i> Concluído <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
                 </span>
               </div>
 
-              <div onclick="navigateTab('publicar')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
-                <div class="flex items-center gap-3">
-                  <div id="check-icon-4" class="w-7 h-7 rounded-lg bg-zinc-800/80 border border-zinc-700 text-zinc-400 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-robot"></i>
+              <!-- Item 4: Conectar um bot (Pendente) -->
+              <div onclick="navigateTab('publicar')" class="sb-subcard p-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-solid fa-robot text-[11px]"></i>
                   </div>
                   <div>
                     <p class="text-xs font-semibold text-white">4. Conectar um bot</p>
-                    <p class="text-[11px] text-zinc-500">Bot que atenderá os novos leads</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Bot que atenderá os novos leads</p>
                   </div>
                 </div>
-                <span id="check-status-4" class="text-[11px] text-zinc-500 font-medium flex items-center gap-1.5">
-                  <i class="fa-regular fa-circle text-[9px]"></i> Pendente <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                <span class="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle text-[10px]"></i> Pendente <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
                 </span>
               </div>
 
-              <div onclick="navigateTab('publicar')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700 transition">
-                <div class="flex items-center gap-3">
-                  <div id="check-icon-5" class="w-7 h-7 rounded-lg bg-zinc-800/80 border border-zinc-700 text-zinc-400 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-box-open"></i>
+              <!-- Item 5: Definir a entrega (Pendente) -->
+              <div onclick="navigateTab('publicar')" class="sb-subcard p-4 flex items-center justify-between cursor-pointer hover:border-slate-700 transition">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+                    <i class="fa-regular fa-paper-plane text-[11px]"></i>
                   </div>
                   <div>
                     <p class="text-xs font-semibold text-white">5. Definir a entrega</p>
-                    <p class="text-[11px] text-zinc-500">O que o comprador recebe após pagar</p>
+                    <p class="text-xs text-slate-400 mt-0.5">O que o comprador recebe após pagar</p>
                   </div>
                 </div>
-                <span id="check-status-5" class="text-[11px] text-zinc-500 font-medium flex items-center gap-1.5">
-                  <i class="fa-regular fa-circle text-[9px]"></i> Pendente <i class="fa-solid fa-chevron-right text-[9px] text-zinc-600 ml-1"></i>
+                <span class="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <i class="fa-regular fa-circle text-[10px]"></i> Pendente <i class="fa-solid fa-arrow-right text-[10px] ml-1"></i>
                 </span>
               </div>
             </div>
           </div>
 
-          <div class="sb-card p-5 space-y-3">
-            <div>
-              <h4 class="text-sm font-bold text-white">Aprimore quando quiser</h4>
-              <p class="text-[11px] text-zinc-500 mt-0.5">Recursos opcionais para deixar a conversa mais completa.</p>
-            </div>
+          <!-- APRIMORE QUANDO QUISER (FIEL AO PRINT 2) -->
+          <div class="pt-2">
+            <h3 class="text-base font-bold text-white mb-0.5">Aprimore quando quiser</h3>
+            <p class="text-xs text-slate-400 mb-3.5">Recursos opcionais para deixar a conversa mais completa.</p>
 
-            <div class="grid grid-cols-2 gap-2.5 pt-1">
-              <div onclick="navigateTab('estrategias')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="grid grid-cols-2 gap-3.5">
+              <div onclick="navigateTab('estrategias')" class="sb-card p-4 flex items-center justify-between cursor-pointer hover:border-slate-600 transition group">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0 group-hover:text-white transition">
+                    <i class="fa-solid fa-layer-group text-xs"></i>
+                  </div>
                   <div>
                     <p class="text-xs font-semibold text-white">Estratégias prontas</p>
-                    <p class="text-[10px] text-zinc-500">Comece com uma configuração completa</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Comece com uma configuração completa</p>
                   </div>
                 </div>
-                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+                <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-slate-300 transition"></i>
               </div>
 
-              <div onclick="navigateTab('midias')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-regular fa-images"></i></div>
+              <div onclick="navigateTab('midias')" class="sb-card p-4 flex items-center justify-between cursor-pointer hover:border-slate-600 transition group">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0 group-hover:text-white transition">
+                    <i class="fa-regular fa-images text-xs"></i>
+                  </div>
                   <div>
                     <p class="text-xs font-semibold text-white">Mídias da conversa</p>
-                    <p class="text-[10px] text-zinc-500">Fotos, vídeos, GIFs e áudios</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Fotos, vídeos, GIFs e áudios</p>
                   </div>
                 </div>
-                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+                <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-slate-300 transition"></i>
               </div>
 
-              <div onclick="navigateTab('downsell')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-regular fa-clock"></i></div>
+              <div onclick="navigateTab('downsell')" class="sb-card p-4 flex items-center justify-between cursor-pointer hover:border-slate-600 transition group">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0 group-hover:text-white transition">
+                    <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                  </div>
                   <div>
                     <p class="text-xs font-semibold text-white">Downsell</p>
-                    <p class="text-[10px] text-zinc-500">1 automação ativa</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Retome conversas em etapas, sem repetir</p>
                   </div>
                 </div>
-                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+                <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-slate-300 transition"></i>
               </div>
 
-              <div onclick="navigateTab('upsell')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-arrow-trend-up"></i></div>
+              <div onclick="navigateTab('upsell')" class="sb-card p-4 flex items-center justify-between cursor-pointer hover:border-slate-600 transition group">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0 group-hover:text-white transition">
+                    <i class="fa-solid fa-arrow-trend-up text-xs"></i>
+                  </div>
                   <div>
                     <p class="text-xs font-semibold text-white">Upsell</p>
-                    <p class="text-[10px] text-zinc-500">Uma nova oferta após a compra</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Uma nova oferta após a compra</p>
                   </div>
                 </div>
-                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+                <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-slate-300 transition"></i>
               </div>
 
-              <div onclick="navigateTab('aprendizado')" class="sb-subcard p-3.5 flex items-center justify-between cursor-pointer hover:border-zinc-700">
-                <div class="flex items-center gap-3">
-                  <div class="w-7 h-7 rounded-lg bg-zinc-800/80 text-zinc-400 flex items-center justify-center text-xs"><i class="fa-solid fa-chart-line"></i></div>
+              <div onclick="navigateTab('aprendizado')" class="sb-card p-4 flex items-center justify-between cursor-pointer hover:border-slate-600 transition group">
+                <div class="flex items-center gap-3.5">
+                  <div class="w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-slate-300 flex items-center justify-center text-xs shrink-0 group-hover:text-white transition">
+                    <i class="fa-solid fa-chart-line text-xs"></i>
+                  </div>
                   <div>
                     <p class="text-xs font-semibold text-white">Aprendizado de vendas</p>
-                    <p class="text-[10px] text-zinc-500">Descubra o que mais converte neste fluxo</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Descubra o que mais converte neste fluxo</p>
                   </div>
                 </div>
-                <i class="fa-solid fa-arrow-right text-[10px] text-zinc-500"></i>
+                <i class="fa-solid fa-arrow-right text-xs text-slate-500 group-hover:text-slate-300 transition"></i>
               </div>
             </div>
           </div>
+        </section>
 
           <div class="flex justify-end pt-2">
             <button onclick="navigateTab('estrategias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
@@ -1928,45 +1951,48 @@ quer que eu te mostre as opções de acesso?</textarea>
       </div>
     </main>
 
-    <!-- 3. COLUNA DIREITA: PRÉVIA DO ATENDIMENTO SEMPRE VISÍVEL -->
-    <aside class="w-[330px] bg-[#060609] p-5 flex flex-col shrink-0">
-      <div class="flex justify-between items-start mb-3">
+    <!-- 3. COLUNA DIREITA: PRÉVIA DO ATENDIMENTO (100% FIEL AO PRINT) -->
+    <aside class="w-[360px] bg-[#07080c] border-l border-[#141722] p-5 flex flex-col shrink-0">
+      <div class="flex justify-between items-center mb-4">
         <div>
-          <h3 class="text-xs font-bold text-white">Prévia do atendimento</h3>
-          <p class="text-[10px] text-zinc-500">Rascunho local</p>
+          <h3 class="text-sm font-semibold text-white">Prévia do atendimento</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Versão salva</p>
         </div>
-        <i class="fa-solid fa-circle-info text-zinc-600 text-xs"></i>
+        <button class="text-slate-400 hover:text-white transition">
+          <i class="fa-regular fa-eye text-sm"></i>
+        </button>
       </div>
 
-      <div class="sb-card p-4 flex-1 max-h-[540px] flex flex-col justify-between bg-[#0a0a0f]">
+      <div class="border border-[#171b26] rounded-2xl p-4 flex-1 flex flex-col justify-between bg-[#0b0d14]">
         <div>
-          <div class="flex items-center gap-2.5 pb-3 border-b border-[#191924]">
-            <div class="w-8 h-8 rounded-full bg-purple-600/25 border border-purple-500/40 flex items-center justify-center text-purple-300 text-xs">
-              <i class="fa-solid fa-rocket text-[11px]"></i>
+          <div class="flex items-center gap-3 pb-3.5 border-b border-[#171b26]">
+            <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+              <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
             </div>
             <div>
-              <p id="preview-persona-name" class="text-xs font-bold text-white leading-tight">Atendimento</p>
-              <p class="text-[10px] text-zinc-400 flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles text-[8px] text-purple-400"></i> Assistente (fluxo)</p>
+              <p id="preview-persona-name" class="text-sm font-bold text-white leading-tight">Atendimento</p>
+              <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                <span class="text-xs">🤖</span> Assistente virtual
+              </p>
             </div>
           </div>
 
-          <div id="preview-chat-bubbles" class="py-4 space-y-2 overflow-y-auto max-h-[380px]">
-            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+          <div id="preview-chat-bubbles" class="py-4 space-y-2 overflow-y-auto max-h-[460px]">
+            <div class="bg-[#121520] border border-[#1e2333] text-slate-200 px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] leading-relaxed">
               oii 💜
             </div>
-            <div class="bg-[#171721] border border-[#242434] text-zinc-200 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%]">
+            <div class="bg-[#121520] border border-[#1e2333] text-slate-200 px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] leading-relaxed">
               chegou agora por aqui?
             </div>
           </div>
         </div>
 
-        <form onsubmit="sendPreviewQuickMsg(event)" class="pt-2 border-t border-[#191924] flex gap-1.5">
-          <input type="text" id="preview-quick-input" placeholder="Testar conversa..." class="sb-input !py-1.5 !text-xs">
-          <button type="submit" class="px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs shrink-0">
-            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+        <form onsubmit="sendPreviewQuickMsg(event)" class="pt-3 border-t border-[#171b26] flex gap-2">
+          <input type="text" id="preview-quick-input" placeholder="Testar conversa..." class="sb-input !py-2 !text-xs">
+          <button type="submit" class="px-3.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-xs shrink-0 flex items-center justify-center transition">
+            <i class="fa-solid fa-paper-plane text-xs"></i>
           </button>
         </form>
-      </div>
     </aside>
 
   </div>
@@ -2086,16 +2112,22 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function markUnsaved() {
       const ind = document.getElementById('unsaved-indicator');
-      ind.textContent = "MODO IA • ALTERAÇÕES NÃO SALVAS";
-      ind.className = "text-[9px] font-bold uppercase tracking-wider text-amber-400";
-      document.getElementById('sidebar-config-status').textContent = "Alterada";
+      if (ind) {
+        ind.textContent = "ALTERAÇÕES NÃO SALVAS";
+        ind.className = "text-[11px] font-medium uppercase tracking-wider text-amber-400";
+      }
+      const side = document.getElementById('sidebar-config-status');
+      if (side) side.textContent = "Alterada";
     }
 
     function markSaved() {
       const ind = document.getElementById('unsaved-indicator');
-      ind.textContent = "MODO IA • CONFIGURAÇÃO SALVA";
-      ind.className = "text-[9px] font-bold uppercase tracking-wider text-emerald-400";
-      document.getElementById('sidebar-config-status').textContent = "Salva";
+      if (ind) {
+        ind.textContent = "TUDO SALVO";
+        ind.className = "text-[11px] font-medium uppercase tracking-wider text-slate-400";
+      }
+      const side = document.getElementById('sidebar-config-status');
+      if (side) side.textContent = "Salva";
     }
 
     function onPersonaChange() {
