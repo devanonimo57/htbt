@@ -269,21 +269,21 @@
           <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-1 mb-2">DEPOIS QUE ENTRAR NO AR</p>
           <button onclick="navigateTab('memoria')" id="nav-memoria" class="sb-nav-item">
             <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-address-book text-[11px]"></i>
+              <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Memória das conversas</p>
-              <p class="text-[11px] text-slate-500 truncate">Perfis e histórico completo</p>
+              <p class="text-[11px] text-slate-500 truncate">Perfis e histórico comercial</p>
             </div>
           </button>
 
           <button onclick="navigateTab('aprendizado')" id="nav-aprendizado" class="sb-nav-item">
             <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
-              <i class="fa-solid fa-chart-line text-[11px]"></i>
+              <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Aprendizado de vendas</p>
-              <p class="text-[11px] text-slate-500 truncate">Descubra o que mais converte</p>
+              <p class="text-[11px] text-slate-500 truncate">O que mais converte</p>
             </div>
           </button>
         </div>
@@ -1950,66 +1950,98 @@ quer que eu te mostre as opções de acesso?</textarea>
         </section>
 
         <!-- =========================================================
-             TELA 11: MEMÓRIA DAS CONVERSAS (FIEL AO PRINT 15)
+             TELA 11: MEMÓRIA DAS CONVERSAS (100% FIEL AOS 4 PRINTS)
         ========================================================== -->
-        <section id="sec-memoria" class="tab-section hidden space-y-6">
+        <section id="sec-memoria" class="tab-section hidden space-y-5">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">DEPOIS QUE ENTRAR NO AR</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Memória das conversas</h2>
-            <p class="text-xs text-zinc-400 mt-1">Veja preferências, objeções e a jornada de cada lead.</p>
+            <span class="text-[11px] font-bold uppercase tracking-widest text-[#3b82f6]">DEPOIS QUE ENTRAR NO AR</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Memória das conversas</h2>
+            <p class="text-xs text-slate-400 mt-1">Veja preferências, objeções e a jornada de cada lead.</p>
           </div>
 
-          <div class="sb-card p-5 space-y-3">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="text-sm font-bold text-white">Memória e jornada dos leads</h3>
-                <p class="text-[11px] text-zinc-400">Veja o que a conversa aprendeu e acompanhe o avanço real de cada lead, do primeiro clique até pagamento, entrega e Upsell.</p>
+          <!-- CARD 1: MEMÓRIA E JORNADA DOS LEADS -->
+          <div class="rounded-2xl p-6 border border-[#221d3a] bg-gradient-to-r from-[#0b0d14] via-[#121024] to-[#1a1433] space-y-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-[#141625] border border-[#25283d] flex items-center justify-center text-slate-200 shrink-0">
+                  <i class="fa-solid fa-brain text-sm"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Memória e jornada dos leads</h3>
+                  <p class="text-xs text-slate-300 mt-1 leading-relaxed max-w-xl">Veja o que a conversa aprendeu e acompanhe o avanço real de cada lead, do primeiro clique até pagamento, entrega e upsell.</p>
+                </div>
               </div>
-              <button onclick="loadInitialState()" class="px-3 py-1.5 rounded-lg bg-[#14141d] border border-[#252534] text-xs text-zinc-300 flex items-center gap-1.5">
-                <i class="fa-solid fa-rotate text-[10px]"></i> Atualizar
+              <button type="button" onclick="loadInitialState()" class="px-4 py-2.5 rounded-xl bg-[#0b0d14] hover:bg-[#141824] border border-[#1e3a8a] text-xs font-bold text-white flex items-center gap-2 shrink-0 transition">
+                <i class="fa-solid fa-arrows-rotate text-[11px] text-slate-300"></i> Atualizar
               </button>
             </div>
-            <div class="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/25 text-[11px] text-emerald-300">
-              <i class="fa-solid fa-circle-info mr-1.5"></i> Esta visão espelha a jornada para orientar a conversa. Pagamentos e entregas continuam validados pelos atalhos oficiais do fluxo.
+
+            <div class="rounded-xl border border-[#1c2133] bg-[#090b12]/90 px-4 py-3 flex items-start gap-2.5 text-xs text-slate-300 leading-relaxed">
+              <i class="fa-solid fa-shield-halved text-emerald-400 text-xs mt-0.5 shrink-0"></i>
+              <span>Esta visão espelha a jornada para orientar a conversa. Pagamentos e entregas continuam validados pelos sistemas oficiais da Shark.</span>
             </div>
           </div>
 
-          <div class="grid grid-cols-12 gap-4 h-96">
-            <div class="col-span-5 sb-card p-4 flex flex-col">
-              <input type="text" placeholder="Buscar nome, @user ou Telegram ID..." class="sb-input mb-2">
-              <select class="sb-input mb-3">
-                <option>Todas as etapas</option>
-                <option>Em conversa</option>
-                <option>Checkout gerado</option>
-                <option>Compra aprovada</option>
+          <!-- CORPO 2 COLUNAS: LISTA DE LEADS (5 COLS) + DETALHE DO LEAD (7 COLS) -->
+          <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-5 rounded-2xl border border-[#181c28] bg-[#0b0d14] p-4 flex flex-col min-h-[460px]">
+              <div class="relative mb-3">
+                <i class="fa-solid fa-magnifying-glass text-xs text-slate-500 absolute left-3.5 top-3"></i>
+                <input type="text" id="inp-lead-search" oninput="renderMemoryLeads()" placeholder="Buscar nome, @user ou Telegram" class="sb-input !bg-[#07090e] !border-[#181c28] !pl-9">
+              </div>
+
+              <select id="sel-lead-stage" onchange="renderMemoryLeads()" class="sb-input !bg-[#07090e] !border-[#181c28] mb-3.5">
+                <option value="Todas as etapas">Todas as etapas</option>
+                <option value="Conversando">Conversando</option>
+                <option value="Viu os planos">Viu os planos</option>
+                <option value="Escolheu um plano">Escolheu um plano</option>
+                <option value="Gerou checkout">Gerou checkout</option>
+                <option value="Pagamento aprovado">Pagamento aprovado</option>
+                <option value="Entrega concluída">Entrega concluída</option>
+                <option value="Recebeu upsell">Recebeu upsell</option>
+                <option value="Escolheu upsell">Escolheu upsell</option>
+                <option value="Checkout de upsell">Checkout de upsell</option>
+                <option value="Comprou upsell">Comprou upsell</option>
               </select>
-              <span id="leads-count-title" class="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">LEADS LEMBRADOS (0)</span>
-              <div id="leads-list-box" class="flex-1 overflow-y-auto flex flex-col items-center justify-center text-center p-4"></div>
+
+              <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-[#181c28]">
+                <span>LEADS LEMBRADOS</span>
+                <span id="leads-count-num">0</span>
+              </div>
+
+              <div id="leads-list-box" class="flex-1 flex flex-col items-center justify-center text-center p-6">
+                <div class="w-11 h-11 rounded-2xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 mb-3">
+                  <i class="fa-solid fa-brain text-sm"></i>
+                </div>
+                <p class="text-xs font-bold text-white">A memória começa na próxima conversa</p>
+                <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
+              </div>
             </div>
 
-            <div id="lead-detail-box" class="col-span-7 sb-card p-6 flex flex-col items-center justify-center text-center overflow-y-auto">
-              <div class="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
-                <i class="fa-regular fa-user"></i>
+            <div id="lead-detail-box" class="col-span-7 rounded-2xl border border-[#181c28] bg-[#0b0d14] p-6 flex flex-col items-center justify-center text-center min-h-[460px]">
+              <div class="w-12 h-12 rounded-2xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 mb-3">
+                <i class="fa-regular fa-user text-sm"></i>
               </div>
               <p class="text-xs font-bold text-white">Escolha um lead</p>
-              <p class="text-[11px] text-zinc-500 mt-1 max-w-xs">Abra um perfil para ver o resumo da conversa, preferências, objeções e toda a jornada comercial confirmada.</p>
+              <p class="text-xs text-slate-400 mt-1.5 max-w-sm leading-relaxed">Abra um perfil para ver o resumo da conversa, preferências, objeções e toda a jornada comercial confirmada.</p>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('publicar')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Publicar no bot</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">ANTERIOR</span>
+                <span class="text-xs font-bold text-white">Publicar no bot</span>
               </div>
             </button>
-            <button onclick="navigateTab('aprendizado')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+            <button onclick="navigateTab('aprendizado')" class="sb-card px-5 py-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Aprendizado de vendas</span>
+                <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-500">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white">Aprendizado de vendas</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -3201,28 +3233,37 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     // MEMÓRIA E APRENDIZADO
     function renderMemoryLeads() {
-      const leads = STATE.memory?.leads || [];
-      document.getElementById('leads-count-title').textContent = `LEADS LEMBRADOS (${leads.length})`;
+      const allLeads = STATE.memory?.leads || [];
+      const q = (document.getElementById('inp-lead-search')?.value || '').toLowerCase().trim();
+      const stage = document.getElementById('sel-lead-stage')?.value || 'Todas as etapas';
+      const leads = allLeads.filter(l => {
+        const matchStage = stage === 'Todas as etapas' || (l.stage || 'Conversando') === stage;
+        const matchQ = !q || (l.first_name || '').toLowerCase().includes(q) || (l.username || '').toLowerCase().includes(q) || String(l.telegram_id || '').includes(q);
+        return matchStage && matchQ;
+      });
+      const countEl = document.getElementById('leads-count-num');
+      if (countEl) countEl.textContent = String(leads.length);
       const box = document.getElementById('leads-list-box');
+      if (!box) return;
       if (!leads.length) {
-        box.className = "flex-1 flex flex-col items-center justify-center text-center p-4";
+        box.className = "flex-1 flex flex-col items-center justify-center text-center p-6";
         box.innerHTML = `
-          <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-2">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <div class="w-11 h-11 rounded-2xl bg-[#11141f] border border-[#1c2132] flex items-center justify-center text-slate-300 mb-3">
+            <i class="fa-solid fa-brain text-sm"></i>
           </div>
           <p class="text-xs font-bold text-white">A memória começa na próxima conversa</p>
-          <p class="text-[11px] text-zinc-500 mt-1">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
+          <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Quando um lead interagir com este fluxo, o resumo e a jornada aparecerão aqui.</p>
         `;
         return;
       }
-      box.className = "flex-1 overflow-y-auto space-y-2 text-left";
+      box.className = "flex-1 overflow-y-auto space-y-2 text-left pt-3";
       box.innerHTML = leads.map((l, i) => `
-        <div onclick="showLeadDetail(${i})" class="sb-subcard p-3 cursor-pointer hover:border-purple-500/50 flex justify-between items-center">
+        <div onclick="showLeadDetail(${i})" class="rounded-xl border border-[#181c28] bg-[#07090e] p-3 cursor-pointer hover:border-[#2563eb] flex justify-between items-center transition">
           <div>
-            <p class="text-xs font-bold text-white">${l.first_name} <span class="text-zinc-500 font-normal">${l.username || ''}</span></p>
-            <span class="text-[10px] text-purple-300">${l.stage || 'Em conversa'}</span>
+            <p class="text-xs font-bold text-white">${l.first_name} <span class="text-slate-500 font-normal">${l.username || ''}</span></p>
+            <span class="text-[11px] text-[#38bdf8]">${l.stage || 'Conversando'}</span>
           </div>
-          <span class="text-[10px] text-zinc-500">${l.last_interaction || ''}</span>
+          <span class="text-[10px] text-slate-500">${l.last_interaction || ''}</span>
         </div>
       `).join('');
     }
