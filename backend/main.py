@@ -253,6 +253,49 @@ async def get_config_compat():
 async def post_config_compat(data: Dict[str, Any]):
     return await save_full_state(data)
 
+@app.delete("/api/leads/{telegram_id}")
+async def delete_lead(telegram_id: str):
+    bot_manager.cancel_lead_tasks(str(telegram_id))
+    state = await _read_state_from_db()
+    memory = state.setdefault("memory", {"leads": []})
+    leads = memory.get("leads", [])
+    memory["leads"] = [l for l in leads if str(l.get("telegram_id")) != str(telegram_id)]
+    learning = state.setdefault("learning", {})
+    learning["evaluated_results"] = len(memory["leads"])
+    await _write_state_to_db(state)
+    return {"status": "success", "state": state}
+
+@app.post("/api/leads/{telegram_id}/reset")
+async def reset_lead_conversation(telegram_id: str):
+    bot_manager.cancel_lead_tasks(str(telegram_id))
+    state = await _read_state_from_db()
+    memory = state.setdefault("memory", {"leads": []})
+    for lead in memory.get("leads", []):
+        if str(lead.get("telegram_id")) == str(telegram_id):
+            lead["history"] = []
+            lead["stage"] = "Conversando"
+            lead["sent_downsell_steps"] = []
+            break
+    await _write_state_to_db(state)
+    return {"status": "success", "state": state}
+
+@app.delete("/api/leads")
+async def clear_all_leads():
+    state = await _read_state_from_db()
+    for lead in state.get("memory", {}).get("leads", []):
+        bot_manager.cancel_lead_tasks(str(lead.get("telegram_id")))
+    state["memory"] = {"leads": []}
+    state["learning"] = {
+        "evaluated_results": 0,
+        "confirmed_purchases": 0,
+        "unpaid_checkouts": 0,
+        "conversations_without_purchase": 0,
+        "common_objections": [],
+        "top_plans": []
+    }
+    await _write_state_to_db(state)
+    return {"status": "success", "state": state}
+
 class SimulateChatRequest(BaseModel):
     message: str
     history: Optional[List[Dict[str, str]]] = []

@@ -240,12 +240,20 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro no Downsell worker: {e}")
 
+    def cancel_lead_tasks(self, user_id: str):
+        self._cancel_downsell(str(user_id))
+
     def _register_handlers(self):
         @self.dp.message(CommandStart())
         async def handle_start(message: types.Message):
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, message.from_user)
             self._cancel_downsell(str(message.from_user.id))
+
+            # Ao enviar /start, reinicia o histórico, etapa e downsells do lead para permitir novo ciclo limpo
+            lead["history"] = []
+            lead["stage"] = "Conversando"
+            lead["sent_downsell_steps"] = []
 
             style = state.get("style", {})
             variations = [v.strip() for v in style.get("opening_variations", []) if v and v.strip()]
@@ -272,11 +280,15 @@ class ActiveBotManager:
 
         @self.dp.message(F.text)
         async def handle_text(message: types.Message):
+            user_text = message.text.strip()
+            if user_text.lower() in ("/reset", "/reiniciar", "/limpar"):
+                await handle_start(message)
+                return
+
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, message.from_user)
             self._cancel_downsell(str(message.from_user.id))
 
-            user_text = message.text.strip()
             lead.setdefault("history", []).append({"role": "user", "content": user_text})
 
             # Verifica palavras de encaminhamento para suporte humano
