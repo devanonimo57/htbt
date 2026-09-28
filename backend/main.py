@@ -97,7 +97,7 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
                 "title": "Apresentar planos",
                 "delay_label": "1 min",
                 "delay_minutes": 1,
-                "message": "sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?",
+                "message": "sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?",
                 "accompany": "Botão com os planos atuais",
                 "medias": []
             }

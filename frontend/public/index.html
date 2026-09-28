@@ -225,17 +225,17 @@
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Downsell</p>
-              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-downsell">1 etapa(s) • sem resposta</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-downsell">Configurar sequência</p>
             </div>
           </button>
 
           <button onclick="navigateTab('upsell')" id="nav-upsell" class="sb-nav-item">
-            <div class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
+            <div id="nav-icon-upsell" class="w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0">
               <i class="fa-solid fa-arrow-trend-up text-[11px]"></i>
             </div>
             <div class="overflow-hidden">
               <p class="text-xs font-semibold text-slate-200 truncate">Upsell</p>
-              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-upsell">Ativo • após a compra</p>
+              <p class="text-[11px] text-slate-500 truncate" id="nav-sub-upsell">Configurar oferta pós-compra</p>
             </div>
           </button>
         </div>
@@ -1389,129 +1389,147 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         </section>
 
         <!-- =========================================================
-             TELA 7: DOWNSELL (FIEL AOS PRINTS 10 E 11)
+             TELA 7: DOWNSELL (100% FIEL AOS 4 PRINTS)
         ========================================================== -->
         <section id="sec-downsell" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400">CONTEÚDO E AUTOMAÇÕES</span>
-            <h2 class="text-2xl font-bold text-white mt-0.5">Downsell</h2>
-            <p class="text-xs text-zinc-400 mt-1">Organize mensagens, mídias e ofertas para quem deixou de responder.</p>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONTEÚDO E AUTOMAÇÕES</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Downsell</h1>
+            <p class="text-sm text-slate-400 mt-1">Organize mensagens, mídias e ofertas para quem deixou de responder.</p>
           </div>
 
-          <div class="sb-card p-6 space-y-3">
+          <!-- CARD TOPO: RETOME A CONVERSA, NO TEMPO CERTO -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-3.5">
             <div class="flex justify-between items-center">
-              <span class="text-[11px] font-semibold text-blue-400">Downsell • sem resposta</span>
+              <span class="text-xs font-bold text-[#38bdf8]">Downsell • sem resposta</span>
               <label class="toggle-switch">
                 <input type="checkbox" id="chk-downsell-enabled" onchange="onDownsellToggle()">
                 <span class="toggle-slider"></span>
               </label>
             </div>
-            <h3 class="text-base font-bold text-white">Retome a conversa, no tempo certo</h3>
-            <p class="text-xs text-zinc-400 leading-relaxed">Monte até 6 etapas com mensagens escritas por você, mídias e ofertas diferentes. Cada etapa é enviada uma única vez por lead, enquanto ele estiver sem responder e ainda não tiver comprado.</p>
-            <div class="sb-subcard p-3 text-[11px] text-zinc-400">
+            <h3 class="text-lg font-bold text-white">Retome a conversa, no tempo certo</h3>
+            <p class="text-xs text-slate-300 leading-relaxed">Monte até 8 etapas com mensagens escritas por você, mídias e ofertas diferentes. Cada etapa é enviada uma única vez por lead, enquanto ele estiver sem responder e ainda não tiver comprado.</p>
+            <div class="pt-3.5 border-t border-[#181c28] text-xs text-slate-400 leading-relaxed">
               Uma resposta, clique ou checkout cancela a sequência pendente. Após uma nova resposta da IA, o contador da próxima etapa recomeça — sem repetir as que já foram enviadas. Pagamento aprovado encerra o Downsell.
             </div>
           </div>
 
-          <div id="downsell-disabled-banner" class="sb-card p-3.5 text-xs text-zinc-400 border-dashed">
+          <!-- BANNER TRACEJADO QUANDO DESATIVADO -->
+          <div id="downsell-disabled-banner" class="rounded-2xl p-4 border border-dashed border-[#1e2333] bg-[#090b10] text-xs text-slate-400">
             Downsell desativado. Você pode preparar as etapas abaixo e ativar quando quiser.
           </div>
 
-          <div class="grid grid-cols-12 gap-4 items-start">
-            <div class="col-span-4 space-y-3">
+          <!-- CORPO 2 COLUNAS: SUA SEQUÊNCIA (4 COLS) + EDITOR DA ETAPA (8 COLS) -->
+          <div class="grid grid-cols-12 gap-5 items-start">
+            <div class="col-span-4 space-y-3.5">
               <div class="flex justify-between items-center text-xs">
                 <span class="font-bold text-white">Sua sequência</span>
-                <span id="downsell-step-counter" class="text-zinc-500">1/6</span>
+                <span id="downsell-step-counter" class="text-slate-500">1/8</span>
               </div>
-              <div id="downsell-steps-list" class="space-y-2"></div>
-              <p class="text-[10px] text-zinc-500 leading-relaxed">Previsão sem novas interações. Cada espera começa após o envio anterior; etapas pausadas não entram na conta. Até 30 dias no total.</p>
-              <button onclick="addDownsellStep()" class="w-full py-2.5 rounded-xl bg-[#111118] hover:bg-[#191924] border border-[#242434] text-xs font-semibold text-zinc-200">+ Adicionar etapa</button>
+              <div id="downsell-steps-list" class="space-y-2.5"></div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">Previsão sem novas interações. Cada espera começa após o envio anterior; etapas pausadas não entram na conta. Até 28 dias no total.</p>
+              <button onclick="addDownsellStep()" class="w-full py-3 rounded-xl bg-[#0b0d14] hover:bg-[#121622] border border-[#181c28] text-xs font-semibold text-white flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i> Adicionar etapa
+              </button>
             </div>
 
-            <div class="col-span-8 sb-card p-6 space-y-5">
-              <div>
-                <span class="text-[10px] font-bold uppercase text-blue-400" id="ds-editor-badge">Etapa 1</span>
-                <h4 class="text-sm font-bold text-white mt-0.5" id="ds-editor-title">Primeiro contato após o silêncio</h4>
+            <div class="col-span-8 sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
+              <div class="pb-4 border-b border-[#181c28]">
+                <span class="text-xs font-bold text-[#38bdf8] block" id="ds-editor-badge">Etapa 1</span>
+                <h4 class="text-base font-bold text-white mt-0.5" id="ds-editor-title">Primeiro contato após o silêncio</h4>
               </div>
 
-              <div class="space-y-2">
-                <label class="text-xs font-semibold text-zinc-200 block">Quando enviar</label>
-                <p class="text-[11px] text-zinc-500">Tempo de silêncio contado após a última resposta da IA.</p>
-                <div class="flex gap-1.5" id="ds-delay-pills">
-                  <button onclick="setDownsellDelay('1 min', 1)" class="px-3 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500 text-xs font-semibold text-blue-300">1 min</button>
-                  <button onclick="setDownsellDelay('5 min', 5)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">5 min</button>
-                  <button onclick="setDownsellDelay('15 min', 15)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">15 min</button>
-                  <button onclick="setDownsellDelay('1h', 60)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1h</button>
-                  <button onclick="setDownsellDelay('1 dia', 1440)" class="px-3 py-1.5 rounded-lg bg-[#111118] border border-[#22222e] text-xs text-zinc-300">1 dia</button>
+              <!-- Quando enviar -->
+              <div class="space-y-2.5">
+                <div>
+                  <label class="text-xs font-bold text-white block">Quando enviar</label>
+                  <p class="text-xs text-slate-400 mt-0.5">Tempo de silêncio contado após a última resposta da IA.</p>
                 </div>
-                <label class="text-[10px] text-zinc-500 block pt-1">Todos os intervalos</label>
-                <select id="sel-ds-interval" onchange="setDownsellDelay(this.options[this.selectedIndex].text, parseInt(this.value))" class="sb-input">
-                  <option value="1">1 minuto</option>
-                  <option value="5">5 minutos</option>
-                  <option value="15">15 minutos</option>
-                  <option value="60">1 hora</option>
-                  <option value="1440">1 dia</option>
-                </select>
-                <p class="text-[10px] text-zinc-500">De 30 segundos a 7 dias de espera nesta etapa.</p>
-                <p class="text-[11px] text-blue-400">Esta etapa está prevista para +1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
-                <p class="text-[11px] text-amber-400">Intervalo curto: esta mensagem pode chegar enquanto a pessoa ainda lê sua resposta. Para uma conversa mais tranquila, experimente 5 ou 15 minutos.</p>
+                <div class="flex gap-2 pt-1" id="ds-delay-pills">
+                  <button type="button" onclick="setDownsellDelay('1 min', 1)" data-mins="1" class="px-3.5 py-2 rounded-xl bg-[#121d2f] border border-[#1e3a8a] text-xs font-bold text-white transition">1 min</button>
+                  <button type="button" onclick="setDownsellDelay('5 min', 5)" data-mins="5" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">5 min</button>
+                  <button type="button" onclick="setDownsellDelay('15 min', 15)" data-mins="15" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">15 min</button>
+                  <button type="button" onclick="setDownsellDelay('1h', 60)" data-mins="60" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">1h</button>
+                  <button type="button" onclick="setDownsellDelay('1 dia', 1440)" data-mins="1440" class="px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition">1 dia</button>
+                </div>
+
+                <div class="pt-1">
+                  <label class="text-xs text-slate-400 block mb-1.5">Todos os intervalos</label>
+                  <select id="sel-ds-interval" onchange="setDownsellDelayFromSelect(this)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+                    <option value="1" data-label="1 min">1 minuto</option>
+                    <option value="5" data-label="5 min">5 minutos</option>
+                    <option value="15" data-label="15 min">15 minutos</option>
+                    <option value="60" data-label="1h">1 hora</option>
+                    <option value="1440" data-label="1 dia">1 dia</option>
+                  </select>
+                </div>
+
+                <p class="text-[11px] text-slate-500 pt-0.5">De 30 segundos a 7 dias de espera nesta etapa.</p>
+                <p id="ds-forecast-text" class="text-xs text-[#38bdf8] leading-relaxed">Esta etapa está prevista para ~1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
+                <p id="ds-short-warning" class="text-xs text-amber-300/90 leading-relaxed">Intervalo curto: esta mensagem pode chegar enquanto a pessoa ainda lê sua resposta. Para uma conversa mais tranquila, experimente 5 ou 15 minutos.</p>
               </div>
 
+              <!-- Mensagem do Downsell -->
               <div>
-                <label class="text-xs font-semibold text-zinc-200 block">Mensagem do Downsell</label>
-                <p class="text-[11px] text-zinc-500 mb-1.5">Você escreve, o bot envia sem a IA reescrever. Esta mensagem é separada da legenda e também funciona sem mídia.</p>
-                <textarea id="inp-ds-message" rows="3" oninput="onDownsellMessageChange()" class="sb-input">sumiu por ai? 😜
+                <label class="text-xs font-bold text-white block">Mensagem do Downsell</label>
+                <p class="text-xs text-slate-400 mt-0.5 mb-2.5 leading-relaxed">Você escreve; o bot envia sem a IA reescrever. Esta mensagem é separada da legenda e também funciona sem mídia.</p>
+                <textarea id="inp-ds-message" rows="4" oninput="onDownsellMessageChange()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y leading-relaxed">sumiu por aí? 😜
 
 quer que eu te mostre as opções de acesso?</textarea>
-                <div class="flex justify-between text-[10px] text-zinc-500 mt-1">
+                <div class="flex justify-between text-[11px] text-slate-500 mt-1.5">
                   <span>Use {nome} para incluir o nome do visitante.</span>
-                  <span id="ds-msg-counter">63/1.000</span>
+                  <span id="ds-msg-counter">60/1.000</span>
                 </div>
               </div>
 
+              <!-- O que acompanha a mensagem? -->
               <div>
-                <label class="text-xs font-semibold text-zinc-200 block">O que acompanha a mensagem?</label>
-                <p class="text-[11px] text-zinc-500 mb-1.5">O preço especial só existe se você criar a oferta abaixo. Não prometa desconto em uma mensagem sem oferta.</p>
-                <select id="sel-ds-accompany" onchange="markUnsaved()" class="sb-input">
+                <label class="text-xs font-bold text-white block">O que acompanha a mensagem?</label>
+                <p class="text-xs text-slate-400 mt-0.5 mb-2.5 leading-relaxed">O preço especial só existe se você criar a oferta abaixo. Não prometa desconto em uma mensagem sem oferta.</p>
+                <select id="sel-ds-accompany" onchange="if(STATE.downsell.steps[SELECTED_DOWNSELL_IDX]) STATE.downsell.steps[SELECTED_DOWNSELL_IDX].accompany=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
                   <option value="Botão com os planos atuais">Botão com os planos atuais</option>
                   <option value="Oferta especial com desconto">Oferta especial com desconto</option>
                   <option value="Apenas a mensagem">Apenas a mensagem</option>
                 </select>
               </div>
 
-              <div class="space-y-2">
-                <div class="flex justify-between text-xs">
-                  <span class="font-semibold text-zinc-200">Mídias deste envio</span>
-                  <span class="text-zinc-500">0/5</span>
+              <!-- Mídias deste envio -->
+              <div class="pt-5 border-t border-[#181c28] space-y-3">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-white">Mídias deste envio</span>
+                  <span class="text-slate-500">0/5</span>
                 </div>
-                <p class="text-[11px] text-zinc-500">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
-                <button onclick="document.getElementById('hidden-media-upload').click()" class="w-full py-3 rounded-xl bg-[#111118] border border-dashed border-zinc-700 hover:border-purple-500 text-xs text-zinc-200 flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-plus text-[10px]"></i> Adicionar arquivo nesta etapa
+                <p class="text-xs text-slate-400 leading-relaxed">Adicione arquivos próprios para esta etapa. Eles não entram em Mídias da conversa e são enviados na ordem abaixo, antes da mensagem.</p>
+                <button type="button" onclick="document.getElementById('hidden-media-upload').click()" class="w-full py-3.5 rounded-xl bg-[#090b10] hover:bg-[#101420] border border-[#1b2030] text-xs font-semibold text-white flex items-center justify-center gap-2 transition">
+                  <i class="fa-solid fa-cloud-arrow-up text-xs text-slate-300"></i> Adicionar arquivo nesta etapa
                 </button>
-                <p class="text-[10px] text-zinc-500">Foto, vídeo, GIF ou áudio • até 50 MB por arquivo. Salve o fluxo para aplicar os novos anexos.</p>
-                <p class="text-[11px] text-amber-400">Antes de publicar, escolha o canal de FILE_ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
-                <div class="sb-subcard p-3 text-[11px] text-zinc-400 space-y-1">
+                <p class="text-xs text-slate-400 leading-relaxed">Foto, vídeo, GIF ou áudio • até 50 MB por arquivo. Salve o fluxo para aplicar os novos anexos.</p>
+                <p class="text-xs text-amber-300/90 leading-relaxed">Antes de publicar, escolha o canal de FILE ID em Publicar no bot. Os arquivos usam o mesmo cache do seu fluxo.</p>
+
+                <div class="pt-4 border-t border-[#181c28] space-y-2 text-xs text-slate-400">
                   <p>No Telegram, o visitante recebe a mensagem que você escreveu, com o botão para ver os planos.</p>
-                  <p class="text-zinc-500">Esses envios automáticos não consomem tokens da IA.</p>
+                  <p>Estes envios automáticos não consomem tokens de IA.</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="flex justify-between pt-2">
-            <button onclick="navigateTab('midias')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-left transition">
-              <i class="fa-solid fa-arrow-left text-xs text-zinc-400"></i>
+          <!-- NAVEGAÇÃO INFERIOR: 2 CARDS LADO A LADO -->
+          <div class="grid grid-cols-2 gap-4 pt-2">
+            <button onclick="navigateTab('midias')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center gap-3.5 text-left transition">
+              <i class="fa-solid fa-arrow-left text-xs text-slate-400"></i>
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">ANTERIOR</span>
-                <span class="text-xs font-semibold text-white">Mídias da conversa</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">ANTERIOR</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Mídias da conversa</span>
               </div>
             </button>
-            <button onclick="navigateTab('upsell')" class="sb-card px-5 py-3 hover:border-zinc-700 flex items-center gap-6 text-right transition">
+
+            <button onclick="navigateTab('upsell')" class="sb-card p-4 border border-[#181c28] bg-[#0b0d14] hover:border-slate-700 rounded-2xl flex items-center justify-end gap-3.5 text-right transition">
               <div>
-                <span class="block text-[9px] uppercase tracking-wider text-zinc-500">PRÓXIMA</span>
-                <span class="text-xs font-semibold text-white">Upsell</span>
+                <span class="block text-[10px] uppercase tracking-wider text-slate-500 font-semibold">PRÓXIMA</span>
+                <span class="text-xs font-bold text-white mt-0.5 block">Upsell</span>
               </div>
-              <i class="fa-solid fa-arrow-right text-xs text-zinc-400"></i>
+              <i class="fa-solid fa-arrow-right text-xs text-slate-400"></i>
             </button>
           </div>
         </section>
@@ -2204,7 +2222,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       downsell: {
         enabled: false,
         steps: [
-          { id: "ds_1", title: "Apresentar planos", delay_label: "1 min", delay_minutes: 1, message: "sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?", accompany: "Botão com os planos atuais" }
+          { id: "ds_1", title: "Apresentar planos", delay_label: "1 min", delay_minutes: 1, message: "sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?", accompany: "Botão com os planos atuais" }
         ]
       },
       upsell: {
@@ -2740,11 +2758,31 @@ quer que eu te mostre as opções de acesso?</textarea>
       `}).join('');
     }
 
-    // DOWNSELL
+    // DOWNSELL (100% FIEL AOS 4 PRINTS)
+    function updateDownsellSidebar() {
+      const en = !!STATE.downsell?.enabled;
+      const stepsCount = (STATE.downsell?.steps || []).length;
+      const sub = document.getElementById('nav-sub-downsell');
+      const icon = document.getElementById('nav-icon-downsell');
+      if (sub) {
+        sub.textContent = en ? `${stepsCount} etapa(s) • sem resposta` : 'Configurar sequência';
+      }
+      if (icon) {
+        if (en) {
+          icon.className = "w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xs shrink-0";
+          icon.innerHTML = `<i class="fa-solid fa-check text-[11px]"></i>`;
+        } else {
+          icon.className = "w-7 h-7 rounded-lg bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center text-xs shrink-0";
+          icon.innerHTML = `<i class="fa-solid fa-clock-rotate-left text-[11px]"></i>`;
+        }
+      }
+    }
+
     function onDownsellToggle() {
       const en = document.getElementById('chk-downsell-enabled').checked;
       STATE.downsell.enabled = en;
       document.getElementById('downsell-disabled-banner').classList.toggle('hidden', en);
+      updateDownsellSidebar();
       markUnsaved();
     }
 
@@ -2753,9 +2791,28 @@ quer que eu te mostre as opções de acesso?</textarea>
       const step = STATE.downsell.steps[idx];
       if (!step) return;
       document.getElementById('ds-editor-badge').textContent = `Etapa ${idx + 1}`;
+      document.getElementById('ds-editor-title').textContent = idx === 0 ? 'Primeiro contato após o silêncio' : step.title;
       document.getElementById('inp-ds-message').value = step.message || '';
+      document.getElementById('ds-msg-counter').textContent = `${(step.message || '').length}/1.000`;
       document.getElementById('sel-ds-interval').value = String(step.delay_minutes || 1);
       document.getElementById('sel-ds-accompany').value = step.accompany || 'Botão com os planos atuais';
+
+      document.querySelectorAll('#ds-delay-pills button').forEach(btn => {
+        const active = parseInt(btn.getAttribute('data-mins')) === (step.delay_minutes || 1);
+        btn.className = active
+          ? "px-3.5 py-2 rounded-xl bg-[#121d2f] border border-[#1e3a8a] text-xs font-bold text-white transition"
+          : "px-3.5 py-2 rounded-xl bg-[#090b10] border border-[#1b2030] hover:border-slate-700 text-xs font-medium text-slate-300 transition";
+      });
+
+      const forecast = document.getElementById('ds-forecast-text');
+      if (forecast) {
+        forecast.textContent = `Esta etapa está prevista para ~${step.delay_label || '1 min'} após a resposta da IA que inicia a sequência, se não houver nova interação.`;
+      }
+      const warn = document.getElementById('ds-short-warning');
+      if (warn) {
+        warn.classList.toggle('hidden', (step.delay_minutes || 1) > 1);
+      }
+
       renderDownsell();
     }
 
@@ -2770,29 +2827,32 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function renderDownsell() {
       const list = document.getElementById('downsell-steps-list');
-      document.getElementById('downsell-step-counter').textContent = `${STATE.downsell.steps.length}/6`;
-      document.getElementById('nav-sub-downsell').textContent = `${STATE.downsell.steps.length} etapa (s) • sem resposta`;
+      const steps = STATE.downsell.steps || [];
+      document.getElementById('downsell-step-counter').textContent = `${steps.length}/8`;
+      updateDownsellSidebar();
 
-      list.innerHTML = STATE.downsell.steps.map((s, idx) => `
-        <div onclick="selectDownsellStep(${idx})" class="sb-card p-3.5 ${idx === SELECTED_DOWNSELL_IDX ? 'border-blue-500 bg-blue-500/10' : ''} cursor-pointer flex items-center gap-3">
-          <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+      list.innerHTML = steps.map((s, idx) => {
+        const isSel = idx === SELECTED_DOWNSELL_IDX;
+        return `
+        <div onclick="selectDownsellStep(${idx})" class="rounded-2xl p-4 border ${isSel ? 'border-[#1e3a8a] bg-[#0e1526]' : 'border-[#181c28] bg-[#0b0d14] hover:border-slate-700'} cursor-pointer flex items-center gap-3.5 transition">
+          <span class="w-7 h-7 rounded-full ${isSel ? 'bg-[#38bdf8] text-[#050507]' : 'bg-[#181c28] text-slate-300'} text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
           <div class="overflow-hidden">
             <p class="text-xs font-bold text-white truncate">${s.title}</p>
-            <p class="text-[10px] text-zinc-400">Espera ${s.delay_label} • 0 mídia(s)</p>
-            <p class="text-[9px] text-zinc-500">+${s.delay_label} desde o início</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Espera ${s.delay_label} • 0 mídia(s)</p>
+            <p class="text-[11px] text-[#38bdf8] mt-0.5">~${s.delay_label} desde o início</p>
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     function addDownsellStep() {
-      if (STATE.downsell.steps.length >= 6) return alert("Máximo de 6 etapas atingido.");
+      if (STATE.downsell.steps.length >= 8) return;
       STATE.downsell.steps.push({
         id: 'ds_' + Date.now(),
-        title: 'Apresentar planos ' + (STATE.downsell.steps.length + 1),
+        title: 'Apresentar planos',
         delay_label: '5 min',
         delay_minutes: 5,
-        message: 'sumiu por ai? 😜\n\nquer que eu te mostre as opções de acesso?',
+        message: 'sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?',
         accompany: 'Botão com os planos atuais'
       });
       selectDownsellStep(STATE.downsell.steps.length - 1);
@@ -2804,9 +2864,15 @@ quer que eu te mostre as opções de acesso?</textarea>
         STATE.downsell.steps[SELECTED_DOWNSELL_IDX].delay_label = label;
         STATE.downsell.steps[SELECTED_DOWNSELL_IDX].delay_minutes = mins;
       }
-      document.getElementById('sel-ds-interval').value = String(mins);
-      renderDownsell();
+      selectDownsellStep(SELECTED_DOWNSELL_IDX);
       markUnsaved();
+    }
+
+    function setDownsellDelayFromSelect(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      const label = opt.getAttribute('data-label') || opt.text;
+      const mins = parseInt(sel.value) || 1;
+      setDownsellDelay(label, mins);
     }
 
     // MEMÓRIA E APRENDIZADO
@@ -3116,7 +3182,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderOffers();
       renderFaqs();
       renderMedias();
-      renderDownsell();
+      selectDownsellStep(SELECTED_DOWNSELL_IDX);
       renderRightPreviewBubbles();
     }
 
@@ -3181,6 +3247,9 @@ quer que eu te mostre as opções de acesso?</textarea>
                 expanded: true
               }
             ];
+          }
+          if (STATE.downsell?.steps?.[0]?.message?.startsWith("sumiu por ai?")) {
+            STATE.downsell.steps[0].message = "sumiu por aí? 😜\n\nquer que eu te mostre as opções de acesso?";
           }
         }
       } catch (e) {}
