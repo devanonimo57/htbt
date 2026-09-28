@@ -266,9 +266,6 @@ class ActiveBotManager:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
                 lead["last_interaction"] = datetime.utcnow().strftime("%d/%m %H:%M")
-                # Trunca histórico para evitar crescimento infinito do state JSON
-                if len(lead.get("history", [])) > 40:
-                    lead["history"] = lead["history"][-40:]
                 if lead.get("stage") == "Em conversa" or not lead.get("stage"):
                     lead["stage"] = "Conversando"
                 lead.setdefault("stage_history", ["Conversando"])
@@ -650,7 +647,6 @@ class ActiveBotManager:
                         f"Valor: <b>R$ {price_fmt}</b>\n\n"
                         f"Toque no código PIX Copia e Cola abaixo para copiar e pague no app do seu banco:\n\n"
                         f"<code>{safe_pix_html}</code>\n\n"
-                        f"⏰ <i>Este PIX expira em 30 minutos</i>\n\n"
                         f"Assim que concluir, seu acesso é liberado automaticamente aqui na conversa!"
                     ),
                     parse_mode="HTML",
@@ -666,7 +662,6 @@ class ActiveBotManager:
                         f"Valor: R$ {price_fmt}\n\n"
                         f"Copie o código PIX Copia e Cola abaixo:\n\n"
                         f"{pix_code}\n\n"
-                        f"⏰ Este PIX expira em 30 minutos\n\n"
                         f"Assim que concluir, clique abaixo para liberar seu acesso!"
                     ),
                     reply_markup=confirm_kb
@@ -742,18 +737,6 @@ class ActiveBotManager:
                     return
             except Exception:
                 pass
-        # PIX expirou sem pagamento — envia lembrete de recuperação
-        try:
-            state = await self.state_getter()
-            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Visitante"))
-            if lead.get("stage") in ("Gerou checkout", "Checkout de upsell"):
-                recovery_msg = "ei, vi que o PIX ficou pendente... quer que eu gere um novo? se precisar de uma condição especial me fala que a gente resolve 💜"
-                markup = self._build_offers_keyboard(state)
-                await self.bot.send_message(chat_id=user_id, text=recovery_msg, reply_markup=markup)
-                lead.setdefault("history", []).append({"role": "assistant", "content": f"[Recuperação] {recovery_msg}"})
-                await self.state_saver(state)
-        except Exception as e:
-            logger.warning(f"Erro no lembrete de checkout abandonado: {e}")
 
     async def deliver_purchase_and_upsell(self, user_id: int):
         state = await self.state_getter()
@@ -801,12 +784,9 @@ class ActiveBotManager:
         delivery_type = pub.get("delivery_type", "Link de acesso")
 
         if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
-            lead_name = lead.get("first_name", "")
-            plan_name = lead.get("chosen_plan", "VIP")
-            greeting = f"{lead_name}, s" if lead_name and lead_name not in ("Visitante", "Assinante") else "S"
             await self.bot.send_message(
                 chat_id=user_id,
-                text=f"💜 <b>Pagamento confirmado!</b>\n\n{greeting}eu acesso ao {plan_name} foi liberado!\n\n{dest}",
+                text=f"💜 <b>Pagamento confirmado!</b>\n\n{dest}",
                 parse_mode="HTML"
             )
         else:
@@ -828,12 +808,9 @@ class ActiveBotManager:
                 [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
             ])
 
-            lead_name = lead.get("first_name", "")
-            plan_name = lead.get("chosen_plan", "VIP")
-            greeting = f"{lead_name}, s" if lead_name and lead_name not in ("Visitante", "Assinante") else "S"
             await self.bot.send_message(
                 chat_id=user_id,
-                text=f"💜 <b>Pagamento confirmado!</b>\n\n{greeting}eu acesso ao {plan_name} foi liberado! Te espero lá dentro 🔥",
+                text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
                 parse_mode="HTML",
                 reply_markup=kb
             )
