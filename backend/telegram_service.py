@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import logging
 import random
 from datetime import datetime, timedelta
@@ -7,7 +8,7 @@ from typing import Dict, Any, Optional, List
 import httpx
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, URLInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, URLInputFile, BufferedInputFile
 
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply
@@ -269,15 +270,18 @@ class ActiveBotManager:
             ai_res = await generate_ai_reply(state, lead["history"], user_text)
             reply_text = ai_res.get("reply", "")
 
-            # Se houver mídia acionada pelo contexto
+            # Se houver mídia acionada pelo contexto (suporta URL http e upload Base64)
             media = ai_res.get("media")
             if media and media.get("url"):
                 try:
-                    await self.bot.send_photo(
-                        chat_id=message.chat.id,
-                        photo=URLInputFile(media["url"]),
-                        has_spoiler=bool(media.get("spoiler", False))
-                    )
+                    photo_input = self._build_input_file(media["url"], f"{media.get('name', 'media')}.jpg")
+                    if photo_input:
+                        await self.bot.send_photo(
+                            chat_id=message.chat.id,
+                            photo=photo_input,
+                            caption=media.get("caption") or None,
+                            has_spoiler=bool(media.get("spoiler", False))
+                        )
                 except Exception as e:
                     logger.warning(f"Falha ao enviar mídia de prévia: {e}")
 
@@ -301,23 +305,26 @@ class ActiveBotManager:
             lead = await self._get_or_create_lead(state, callback.from_user)
             self._cancel_downsell(str(callback.from_user.id))
 
-            lead["stage"] = "Checkout gerado"
+            lead["stage"] = "Gerou checkout"
             learning = state.setdefault("learning", {})
             learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
 
-            pushin_token = state.get("publish", {}).get("pushin_pay_token", "").strip()
+            pub = state.get("publish", {})
+            pushin_token = pub.get("pushin_pay_token", "").strip()
+            gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+            gw_secret = pub.get("gateway_secret", "").strip()
             cents = int(round(price * 100))
             pix_code = f"00020126580014br.gov.bcb.pix0136sharkbot-{cents}5204000053039865405{price:.2f}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD"
             tx_id = f"sim_{int(datetime.utcnow().timestamp())}"
 
             if pushin_token:
                 try:
-                    client = PushinPayClient(token=pushin_token)
+                    client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
                     res = await client.create_pix_charge(value_in_cents=cents)
-                    pix_code = res.get("qr_code", pix_code)
-                    tx_id = str(res.get("id", tx_id))
+                    pix_code = res.get("qr_code") or pix_code
+                    tx_id = str(res.get("id") or tx_id)
                 except Exception as e:
-                    logger.error(f"Erro Pushin Pay: {e}")
+                    logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
 
             confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="✅ Já paguei / Liberar acesso", callback_data=f"checkpix:{tx_id}:{offer_id}")]
@@ -335,18 +342,21 @@ class ActiveBotManager:
             await self.state_saver(state)
 
             if pushin_token and not tx_id.startswith("sim_"):
-                asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token))
+                asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret))
 
         @self.dp.callback_query(F.data.startswith("checkpix:"))
         async def handle_check_pix(callback: types.CallbackQuery):
             parts = callback.data.split(":")
             tx_id = parts[1] if len(parts) > 1 else ""
             state = await self.state_getter()
-            pushin_token = state.get("publish", {}).get("pushin_pay_token", "").strip()
+            pub = state.get("publish", {})
+            pushin_token = pub.get("pushin_pay_token", "").strip()
+            gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+            gw_secret = pub.get("gateway_secret", "").strip()
 
             if pushin_token and not tx_id.startswith("sim_"):
                 try:
-                    client = PushinPayClient(token=pushin_token)
+                    client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
                     status_data = await client.check_transaction_status(tx_id)
                     if str(status_data.get("status", "")).lower() == "paid":
                         await callback.answer("Pagamento confirmado! 💜")
@@ -362,8 +372,21 @@ class ActiveBotManager:
             await callback.answer("Pagamento de teste aprovado!")
             await self.deliver_purchase_and_upsell(callback.from_user.id)
 
-    async def _poll_pix_payment(self, user_id: int, tx_id: str, pushin_token: str):
-        client = PushinPayClient(token=pushin_token)
+    def _build_input_file(self, url_or_b64: str, filename: str = "media.jpg"):
+        if not url_or_b64:
+            return None
+        if url_or_b64.startswith("data:"):
+            try:
+                _, b64_data = url_or_b64.split(",", 1)
+                raw_bytes = base64.b64decode(b64_data)
+                return BufferedInputFile(raw_bytes, filename=filename)
+            except Exception as e:
+                logger.error(f"Erro decodificando mídia Base64: {e}")
+                return None
+        return URLInputFile(url_or_b64)
+
+    async def _poll_pix_payment(self, user_id: int, tx_id: str, pushin_token: str, gw_provider: str = "pushinpay", gw_secret: str = ""):
+        client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
         for _ in range(60):
             await asyncio.sleep(10)
             try:
@@ -377,41 +400,51 @@ class ActiveBotManager:
     async def deliver_purchase_and_upsell(self, user_id: int):
         state = await self.state_getter()
         lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
-        if lead.get("stage") == "Compra aprovada":
+        if lead.get("stage") in ("Pagamento aprovado", "Entrega concluída", "Compra aprovada"):
             return
 
-        lead["stage"] = "Compra aprovada"
+        lead["stage"] = "Entrega concluída"
         learning = state.setdefault("learning", {})
         learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
         if int(learning.get("unpaid_checkouts", 0)) > 0:
             learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
 
-        dest = state.get("publish", {}).get("delivery_destination", "").strip()
-        invite_url = "https://t.me/+link_exclusivo_vip"
+        pub = state.get("publish", {})
+        dest = pub.get("delivery_destination", "").strip()
+        delivery_type = pub.get("delivery_type", "Link de acesso")
 
-        if dest.startswith("http"):
-            invite_url = dest
-        elif dest and self.bot:
-            try:
-                invite = await self.bot.create_chat_invite_link(
-                    chat_id=dest,
-                    member_limit=1,
-                    expire_date=datetime.utcnow() + timedelta(days=1)
-                )
-                invite_url = invite.invite_link
-            except Exception as e:
-                logger.warning(f"Não foi possível criar link único no canal {dest}: {e}")
+        if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
+            await self.bot.send_message(
+                chat_id=user_id,
+                text=f"💜 *Pagamento confirmado!*\n\n{dest}",
+                parse_mode="Markdown"
+            )
+        else:
+            invite_url = "https://t.me/+link_exclusivo_vip"
+            if dest.startswith("http"):
+                invite_url = dest
+            elif dest and self.bot:
+                try:
+                    invite = await self.bot.create_chat_invite_link(
+                        chat_id=dest,
+                        member_limit=1,
+                        expire_date=datetime.utcnow() + timedelta(days=1)
+                    )
+                    invite_url = invite.invite_link
+                except Exception as e:
+                    logger.warning(f"Não foi possível criar link único no canal {dest}: {e}")
 
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
-        ])
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
+            ])
 
-        await self.bot.send_message(
-            chat_id=user_id,
-            text="💜 *Pagamento confirmado!*\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
-            parse_mode="Markdown",
-            reply_markup=kb
-        )
+            await self.bot.send_message(
+                chat_id=user_id,
+                text="💜 *Pagamento confirmado!*\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
+                parse_mode="Markdown",
+                reply_markup=kb
+            )
+
         await self.state_saver(state)
 
         # Dispara Upsell se estiver ativo
@@ -419,7 +452,20 @@ class ActiveBotManager:
         if upsell.get("enabled", False):
             delay_mins = int(upsell.get("delay_minutes", 1))
             await asyncio.sleep(max(5, delay_mins * 60))
-            upsell_msg = upsell.get("message", "agora que seu acesso foi liberado, tenho uma opção extra que combina com você! 😉")
+            for m in upsell.get("medias", []):
+                if m.get("url"):
+                    try:
+                        p_in = self._build_input_file(m["url"], f"{m.get('name', 'upsell')}.jpg")
+                        if p_in:
+                            await self.bot.send_photo(
+                                chat_id=user_id,
+                                photo=p_in,
+                                caption=m.get("caption") or None,
+                                has_spoiler=bool(m.get("spoiler", False))
+                            )
+                    except Exception:
+                        pass
+            upsell_msg = upsell.get("message", "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀")
             await self.bot.send_message(
                 chat_id=user_id,
                 text=upsell_msg,

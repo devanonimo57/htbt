@@ -93,6 +93,26 @@ async def generate_ai_reply(state: Dict[str, Any], history: List[Dict[str, str]]
     api_key = state.get("account", {}).get("ai_api_key", "").strip()
     provider = state.get("account", {}).get("ai_provider", "openai").lower()
 
+    persona = state.get("persona", {})
+    business = state.get("business", {})
+    style = state.get("style", {})
+    offers = [o for o in business.get("offers", []) if o.get("visible", True)]
+    faqs = business.get("faqs", [])
+    medias = [m for m in state.get("medias", []) if m.get("active", True)]
+
+    msg_lower = user_message.lower()
+
+    # Verifica sinais de Mídias da Conversa
+    triggered_media = None
+    for m in medias:
+        signals = [s.strip().lower() for s in m.get("signals", "").split(",") if s.strip()]
+        if any(sig in msg_lower for sig in signals) or any(w in msg_lower for w in ["foto", "vídeo", "video", "prévia", "previa", "amostra", "ver você"]):
+            triggered_media = m
+            break
+
+    # Verifica se deve anexar botão de oferta PIX
+    wants_offer = any(w in msg_lower for w in ["preço", "preco", "valor", "quanto", "plano", "vip", "assinar", "entrar", "quero", "pix", "como funciona", "comprar", "acesso"])
+
     # Se o usuário cadastrou chave de API (OpenAI ou Groq compatível)
     if api_key and provider in ("openai", "groq"):
         base_url = "https://api.openai.com/v1/chat/completions" if provider == "openai" else "https://api.groq.com/openai/v1/chat/completions"
@@ -112,19 +132,23 @@ async def generate_ai_reply(state: Dict[str, Any], history: List[Dict[str, str]]
                 if resp.status_code == 200:
                     data = resp.json()
                     reply_text = data["choices"][0]["message"]["content"]
-                    return {"reply": reply_text, "tokens_used": data.get("usage", {}).get("total_tokens", 180)}
+                    # Extrai tag [SEND_MEDIA:ID] se o LLM incluiu
+                    for m in medias:
+                        tag = f"[SEND_MEDIA:{m.get('id')}]"
+                        if tag in reply_text:
+                            reply_text = reply_text.replace(tag, "").strip()
+                            triggered_media = m
+                    result: Dict[str, Any] = {
+                        "reply": reply_text,
+                        "tokens_used": data.get("usage", {}).get("total_tokens", 180)
+                    }
+                    if triggered_media:
+                        result["media"] = triggered_media
+                    if (wants_offer or "r$" in reply_text.lower() or "plano" in reply_text.lower()) and offers:
+                        result["offer_card"] = offers[0]
+                    return result
         except Exception as e:
             print(f"Erro na chamada LLM: {e}")
-
-    # Motor de resposta contextual inteligente integrado às configurações da tela
-    persona = state.get("persona", {})
-    business = state.get("business", {})
-    style = state.get("style", {})
-    offers = [o for o in business.get("offers", []) if o.get("visible", True)]
-    faqs = business.get("faqs", [])
-    medias = [m for m in state.get("medias", []) if m.get("active", True)]
-
-    msg_lower = user_message.lower()
 
     # 1. Verifica se bate com alguma Dúvida Frequente (FAQ) cadastrada na aba Negócio e Ofertas
     for faq in faqs:

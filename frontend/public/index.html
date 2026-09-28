@@ -1785,13 +1785,23 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <i class="fa-solid fa-rocket text-sm"></i>
               </div>
               <div>
-                <h4 class="text-sm font-bold text-white">Coloque o atendimento no ar</h4>
+                <div class="flex items-center gap-2.5">
+                  <h4 class="text-sm font-bold text-white">Coloque o atendimento no ar</h4>
+                  <span id="pub-live-badge" class="px-2.5 py-0.5 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400">PAUSADO</span>
+                </div>
                 <p class="text-xs text-slate-300 mt-1 leading-relaxed">Conecte o bot, defina o que será entregue e revise o checklist. O atendimento só começa depois que você ativar.</p>
               </div>
             </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-xs font-bold text-white">Ativar bot</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chk-bot-live" onchange="onPublishChange()">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
 
-          <!-- CARD 2: BOT DO ATENDIMENTO -->
+          <!-- CARD 2: BOT DO ATENDIMENTO (COM CAMPO DE TOKEN SEMPRE VISÍVEL) -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div class="flex items-start gap-3.5">
               <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#38bdf8] shrink-0">
@@ -1799,7 +1809,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
               <div>
                 <h3 class="text-sm font-bold text-white">Bot do atendimento</h3>
-                <p class="text-xs text-slate-400 mt-1">Escolha o bot que receberá os novos leads deste fluxo. Cada fluxo IA usa um bot por vez.</p>
+                <p class="text-xs text-slate-400 mt-1">Escolha o bot que receberá os novos leads deste fluxo ou cole abaixo o Token gerado no @BotFather.</p>
               </div>
             </div>
 
@@ -1808,38 +1818,76 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <select id="sel-bot-available" class="sb-input flex-1 !bg-[#0b0d14] !border-[#1e3a8a] text-slate-300">
                   <option value="">Escolha um bot disponível</option>
                 </select>
-                <button type="button" onclick="toggleLinkBotDrawer()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#7c3aed] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
+                <button type="button" onclick="document.getElementById('inp-bot-token').focus()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#7c3aed] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[11px]"></i> Vincular bot
                 </button>
               </div>
               <div class="flex justify-between items-center text-[11px]">
                 <span id="bot-connected-label" class="text-slate-500">Nenhum bot livre encontrado nesta conta</span>
-                <button type="button" onclick="toggleLinkBotDrawer()" class="text-slate-400 hover:text-white flex items-center gap-1.5 transition">
-                  <span>Criar ou gerenciar bots</span>
+                <a href="https://t.me/BotFather" target="_blank" class="text-slate-400 hover:text-white flex items-center gap-1.5 transition">
+                  <span>Abrir @BotFather no Telegram</span>
                   <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
-                </button>
+                </a>
               </div>
 
-              <!-- GAVETA EXPANSÍVEL PARA COLAR O TOKEN REAL DO BOTFATHER E PUSHINPAY -->
-              <div id="link-bot-drawer" class="hidden pt-3 mt-2 border-t border-[#181c28] space-y-3">
-                <div class="flex justify-between items-center">
-                  <span class="text-xs font-bold text-white">Ativar atendimento no Telegram</span>
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="chk-bot-live" onchange="onPublishChange()">
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
+              <!-- CAMPO DO TOKEN DO BOT SEMPRE VISÍVEL -->
+              <div id="link-bot-drawer" class="pt-3 mt-2 border-t border-[#181c28] space-y-3">
                 <div>
-                  <label class="text-xs font-bold text-white block mb-1">Token do Bot no @BotFather</label>
-                  <div class="flex gap-2">
-                    <input type="password" id="inp-bot-token" oninput="onPublishChange()" placeholder="Ex.: 7123456789:AAH..." class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28]">
-                    <button type="button" onclick="document.getElementById('chk-bot-live').checked=true; onPublishChange(); saveFullState();" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition">Conectar e Ativar</button>
+                  <label class="text-xs font-bold text-white block mb-1.5">Token do Bot no @BotFather</label>
+                  <div class="flex gap-2.5">
+                    <input type="text" id="inp-bot-token" oninput="onPublishChange()" placeholder="Cole aqui o token do @BotFather (Ex.: 7123456789:AAH...)" class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
+                    <button type="button" onclick="document.getElementById('chk-bot-live').checked=true; onPublishChange(); saveFullState();" class="px-4 py-2 rounded-xl bg-[#2563eb] hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition flex items-center gap-2">
+                      <i class="fa-solid fa-plug text-[11px]"></i> Conectar e Ativar
+                    </button>
                   </div>
                 </div>
-                <div>
-                  <label class="text-xs font-bold text-white block mb-1">Token Pushin Pay (PIX Automático)</label>
-                  <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole seu Token Bearer da Pushin Pay" class="sb-input !bg-[#0b0d14] !border-[#181c28]">
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD NOVO E VISÍVEL: GATEWAY DE PAGAMENTO PIX (API) -->
+          <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
+            <div class="flex items-start justify-between gap-3.5">
+              <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400 shrink-0">
+                  <i class="fa-brands fa-pix text-sm"></i>
                 </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">Gateway de pagamento PIX (API)</h3>
+                  <p class="text-xs text-slate-400 mt-1">Integre qualquer gateway PIX colando sua chave de API para gerar cobranças Copia e Cola e aprovar automaticamente.</p>
+                </div>
+              </div>
+              <span id="gw-status-badge" class="px-2.5 py-1 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">MODO SIMULAÇÃO</span>
+            </div>
+
+            <div class="rounded-2xl border border-[#181c28] bg-[#07090e] p-4 space-y-3.5">
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-4">
+                  <label class="text-xs font-bold text-white block mb-1.5">Provedor do Gateway</label>
+                  <select id="sel-gateway-provider" onchange="onPublishChange()" class="sb-input !bg-[#0b0d14] !border-[#181c28]">
+                    <option value="pushinpay">Pushin Pay (PIX)</option>
+                    <option value="mercadopago">Mercado Pago (PIX)</option>
+                    <option value="openpix">OpenPix / Woovi</option>
+                    <option value="asaas">Asaas (PIX)</option>
+                    <option value="suitpay">SuitPay / PixUp / BSPay</option>
+                  </select>
+                </div>
+                <div class="col-span-8">
+                  <label class="text-xs font-bold text-white block mb-1.5">Chave de API / Token Bearer do Gateway</label>
+                  <div class="flex gap-2">
+                    <input type="password" id="inp-pushin-token" oninput="onPublishChange()" placeholder="Cole aqui sua API Key / Token Bearer do Gateway PIX" class="sb-input flex-1 !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
+                    <button type="button" onclick="const i=document.getElementById('inp-pushin-token'); i.type=i.type==='password'?'text':'password';" class="px-3 rounded-xl bg-[#0b0d14] border border-[#181c28] text-slate-400 hover:text-white text-xs transition" title="Mostrar/Ocultar Chave">
+                      <i class="fa-regular fa-eye"></i>
+                    </button>
+                    <button type="button" onclick="saveFullState()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shrink-0 transition">
+                      Salvar Gateway
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 block mb-1">Client Secret / Chave Secreta (opcional — apenas se seu gateway exigir 2 chaves, ex: SuitPay/PixUp)</label>
+                <input type="password" id="inp-gateway-secret" oninput="onPublishChange()" placeholder="Opcional (deixe em branco para Pushin Pay, Mercado Pago, OpenPix ou Asaas)" class="sb-input !bg-[#0b0d14] !border-[#181c28] font-mono text-xs">
               </div>
             </div>
           </div>
@@ -1858,15 +1906,15 @@ quer que eu te mostre as opções de acesso?</textarea>
 
             <div>
               <label class="text-xs font-bold text-white block">Grupo ou canal de preservação</label>
-              <p class="text-[11px] text-slate-400 mt-1 mb-2">O bot precisa ser administrador e poder publicar. Pode ser um grupo ou canal privado criado somente para cache.</p>
+              <p class="text-[11px] text-slate-400 mt-1 mb-2">O bot precisa ser administrador e poder publicar. Pode ser um grupo ou canal privado criado somente para cache (Ex: -1001234567890).</p>
               <div class="relative">
-                <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Vincule um bot primeiro" class="sb-input !bg-[#07090e] !border-[#181c28] pr-9">
+                <input type="text" id="inp-cache-channel" oninput="onPublishChange()" placeholder="Ex.: -1001234567890 (opcional)" class="sb-input !bg-[#07090e] !border-[#181c28] pr-9">
                 <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 absolute right-3.5 top-3.5 pointer-events-none"></i>
               </div>
             </div>
           </div>
 
-          <!-- CARD 4: ENTREGA DEPOIS DO PAGAMENTO -->
+          <!-- CARD 4: ENTREGA DEPOIS DO PAGAMENTO (COM CAMPO DO LINK VIP SEMPRE VISÍVEL) -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div class="flex items-start gap-3.5">
               <div class="w-10 h-10 rounded-xl bg-[#1c1912] border border-[#362f1d] flex items-center justify-center text-amber-400 shrink-0">
@@ -1878,12 +1926,14 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
             </div>
 
-            <!-- DESTINO DA ENTREGA (CUSTOM DROPDOWN FIEL AOS PRINTS 4 E 5) -->
+            <!-- DESTINO DA ENTREGA -->
             <div class="relative">
               <label class="text-xs font-bold text-white block">Destino da entrega</label>
               <p class="text-[11px] text-slate-400 mt-1 mb-2">Escolha o que o comprador recebe quando o pagamento for aprovado.</p>
               <button type="button" id="btn-delivery-type" onclick="toggleDeliveryTypeMenu(event)" class="w-full sb-input !bg-[#07090e] !border-[#181c28] focus:!border-[#1e3a8a] min-h-[40px] flex items-center justify-between text-left">
-                <span id="lbl-delivery-type" class="text-xs font-medium text-white flex items-center gap-2"></span>
+                <span id="lbl-delivery-type" class="text-xs font-medium text-white flex items-center gap-2">
+                  <i class="fa-solid fa-link text-emerald-400 text-xs"></i> <span>Link de acesso</span>
+                </span>
                 <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
               </button>
 
@@ -1893,7 +1943,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <i class="fa-solid fa-link text-emerald-400 text-xs"></i>
                     <span>Link de acesso</span>
                   </span>
-                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check hidden"></i>
+                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check"></i>
                 </button>
                 <button type="button" onclick="selectDeliveryType('Mensagem no bot', event)" data-dtype="Mensagem no bot" class="delivery-type-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition text-slate-200 hover:bg-[#141824]">
                   <span class="flex items-center gap-2.5">
@@ -1904,8 +1954,10 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </button>
               </div>
 
-              <div id="delivery-dest-box" class="hidden mt-2.5">
-                <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="https://t.me/+seu_link_vip" class="sb-input !bg-[#07090e] !border-[#181c28]">
+              <!-- CAMPO DO LINK DO CANAL VIP / MENSAGEM SEMPRE VISÍVEL -->
+              <div id="delivery-dest-box" class="mt-3">
+                <label id="lbl-delivery-dest-input" class="text-xs font-bold text-white block mb-1.5">Link do Grupo/Canal VIP ou ID do Canal (para gerar link único)</label>
+                <input type="text" id="inp-delivery-dest" oninput="onPublishChange()" placeholder="Ex.: https://t.me/+seu_link_vip ou -1001234567890" class="sb-input !bg-[#07090e] !border-[#181c28]">
               </div>
             </div>
 
@@ -3442,21 +3494,27 @@ quer que eu te mostre as opções de acesso?</textarea>
     function selectDeliveryType(type, e, silent = false) {
       if (e) e.stopPropagation();
       if (!STATE.publish) STATE.publish = {};
-      STATE.publish.delivery_type = type;
+      const finalType = type || 'Link de acesso';
+      STATE.publish.delivery_type = finalType;
 
       const lbl = document.getElementById('lbl-delivery-type');
+      const destLbl = document.getElementById('lbl-delivery-dest-input');
+      const destInp = document.getElementById('inp-delivery-dest');
+
       if (lbl) {
-        if (type === 'Link de acesso') {
-          lbl.innerHTML = `<i class="fa-solid fa-link text-emerald-400 text-xs"></i> <span>Link de acesso</span>`;
-        } else if (type === 'Mensagem no bot') {
+        if (finalType === 'Mensagem no bot') {
           lbl.innerHTML = `<i class="fa-regular fa-comment-dots text-[#a78bfa] text-xs"></i> <span>Mensagem no bot</span>`;
+          if (destLbl) destLbl.textContent = 'Mensagem automática enviada após aprovação do PIX';
+          if (destInp) destInp.placeholder = 'Ex.: Obrigada pela compra! Aqui está o seu link secreto: https://...';
         } else {
-          lbl.innerHTML = '';
+          lbl.innerHTML = `<i class="fa-solid fa-link text-emerald-400 text-xs"></i> <span>Link de acesso</span>`;
+          if (destLbl) destLbl.textContent = 'Link do Grupo/Canal VIP ou ID do Canal (para gerar link único)';
+          if (destInp) destInp.placeholder = 'Ex.: https://t.me/+seu_link_vip ou -1001234567890';
         }
       }
 
       document.querySelectorAll('#menu-delivery-type .delivery-type-opt').forEach(btn => {
-        const isSel = btn.getAttribute('data-dtype') === type;
+        const isSel = btn.getAttribute('data-dtype') === finalType;
         const chk = btn.querySelector('.dtype-check');
         if (chk) chk.classList.toggle('hidden', !isSel);
       });
@@ -3472,8 +3530,32 @@ quer que eu te mostre as opções de acesso?</textarea>
     function updatePrepProgress() {
       let completed = 3;
       const hasBot = !!STATE.publish?.bot_token;
-      const hasDelivery = !!(STATE.publish?.delivery_destination || STATE.publish?.delivery_type);
+      const isLive = !!STATE.publish?.is_live;
+      const hasGateway = !!STATE.publish?.pushin_pay_token;
+      const hasDelivery = !!STATE.publish?.delivery_destination;
       const hasCache = !!STATE.publish?.cache_channel_id;
+
+      const liveBadge = document.getElementById('pub-live-badge');
+      if (liveBadge) {
+        if (isLive && hasBot) {
+          liveBadge.textContent = "NO AR";
+          liveBadge.className = "px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-bold uppercase tracking-wider text-emerald-400";
+        } else {
+          liveBadge.textContent = "PAUSADO";
+          liveBadge.className = "px-2.5 py-0.5 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400";
+        }
+      }
+
+      const gwBadge = document.getElementById('gw-status-badge');
+      if (gwBadge) {
+        if (hasGateway) {
+          gwBadge.textContent = "API CONECTADA";
+          gwBadge.className = "px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-bold uppercase tracking-wider text-emerald-400 shrink-0";
+        } else {
+          gwBadge.textContent = "MODO SIMULAÇÃO";
+          gwBadge.className = "px-2.5 py-1 rounded-full bg-[#161926] border border-[#232738] text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0";
+        }
+      }
 
       if (hasBot) {
         completed++;
@@ -3512,7 +3594,13 @@ quer que eu te mostre as opções de acesso?</textarea>
     function onPublishChange() {
       STATE.publish.is_live = document.getElementById('chk-bot-live').checked;
       STATE.publish.bot_token = document.getElementById('inp-bot-token').value;
+      if (document.getElementById('sel-gateway-provider')) {
+        STATE.publish.gateway_provider = document.getElementById('sel-gateway-provider').value;
+      }
       STATE.publish.pushin_pay_token = document.getElementById('inp-pushin-token').value;
+      if (document.getElementById('inp-gateway-secret')) {
+        STATE.publish.gateway_secret = document.getElementById('inp-gateway-secret').value;
+      }
       STATE.publish.cache_channel_id = document.getElementById('inp-cache-channel').value;
       STATE.publish.delivery_destination = document.getElementById('inp-delivery-dest').value;
       STATE.publish.support_username = document.getElementById('inp-support-user').value;
@@ -3574,14 +3662,26 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       document.getElementById('chk-bot-live').checked = !!STATE.publish?.is_live;
       document.getElementById('inp-bot-token').value = STATE.publish?.bot_token || '';
+      if (document.getElementById('sel-gateway-provider')) {
+        document.getElementById('sel-gateway-provider').value = STATE.publish?.gateway_provider || 'pushinpay';
+      }
       document.getElementById('inp-pushin-token').value = STATE.publish?.pushin_pay_token || '';
+      if (document.getElementById('inp-gateway-secret')) {
+        document.getElementById('inp-gateway-secret').value = STATE.publish?.gateway_secret || '';
+      }
       document.getElementById('inp-cache-channel').value = STATE.publish?.cache_channel_id || '';
       document.getElementById('inp-delivery-dest').value = STATE.publish?.delivery_destination || '';
       document.getElementById('inp-support-user').value = STATE.publish?.support_username || '';
-      selectDeliveryType(STATE.publish?.delivery_type || '', null, true);
+      selectDeliveryType(STATE.publish?.delivery_type || 'Link de acesso', null, true);
 
+      const selBot = document.getElementById('sel-bot-available');
       if (STATE.publish?.bot_username) {
         document.getElementById('bot-connected-label').innerHTML = `Conectado em: <strong class="text-emerald-400">${STATE.publish.bot_username}</strong>`;
+        if (selBot) {
+          selBot.innerHTML = `<option value="${STATE.publish.bot_username}" selected>${STATE.publish.bot_username} (Ativo)</option>`;
+        }
+      } else if (STATE.publish?.bot_token) {
+        document.getElementById('bot-connected-label').innerHTML = `<span class="text-amber-400">Token preenchido — clique em Salvar ou Conectar e Ativar</span>`;
       }
 
       document.getElementById('sel-ai-provider').value = STATE.account?.ai_provider || 'openai';

@@ -126,9 +126,12 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         "bot_token": "",
         "bot_username": "",
         "cache_channel_id": "",
+        "delivery_type": "Link de acesso",
         "delivery_destination": "",
         "support_username": "",
-        "pushin_pay_token": ""
+        "gateway_provider": "pushinpay",
+        "pushin_pay_token": "",
+        "gateway_secret": ""
     },
     "memory": {
         "leads": []
@@ -253,16 +256,20 @@ class CreatePixRequest(BaseModel):
 @app.post("/api/create-pix")
 async def create_pix_endpoint(req: CreatePixRequest):
     state = await _read_state_from_db()
-    token = state.get("publish", {}).get("pushin_pay_token", "").strip()
+    pub = state.get("publish", {})
+    token = pub.get("pushin_pay_token", "").strip()
+    gw_provider = pub.get("gateway_provider", "pushinpay").strip()
+    gw_secret = pub.get("gateway_secret", "").strip()
     cents = int(round(req.amount * 100))
 
     if token:
         try:
-            client = PushinPayClient(token=token)
+            client = PushinPayClient(token=token, provider=gw_provider, secret=gw_secret)
             res = await client.create_pix_charge(value_in_cents=cents)
             return {
                 "status": "ok",
                 "real": True,
+                "provider": gw_provider,
                 "qr_code": res.get("qr_code"),
                 "qr_code_base64": res.get("qr_code_base64"),
                 "id": res.get("id")
@@ -273,6 +280,7 @@ async def create_pix_endpoint(req: CreatePixRequest):
     return {
         "status": "ok",
         "real": False,
+        "provider": gw_provider,
         "qr_code": f"00020126580014br.gov.bcb.pix0136sharkbot-pix-{cents}5204000053039865405{req.amount:.2f}5802BR5913VIP TELEGRAM6009SAO PAULO62070503***6304ABCD"
     }
 
