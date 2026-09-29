@@ -734,7 +734,7 @@ async def create_pix_endpoint(req: CreatePixRequest):
 
 @app.post("/api/webhook/syncpay")
 @app.post("/api/webhook/pushinpay")
-async def webhook_gateway(payload: Dict[str, Any], request: Optional[Request] = None):
+async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     webhook_secret = (os.getenv("WEBHOOK_SECRET") or "").strip()
     if webhook_secret:
         headers = request.headers if request and hasattr(request, "headers") else {}
