@@ -476,6 +476,53 @@ class ActiveBotManager:
         if not url:
             return None
 
+        cache_ch = None
+        try:
+            state = await self.state_getter()
+            fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
+            raw_ch = (
+                (fb.get("cache_channel_id") if isinstance(fb, dict) else "")
+                or (state.get("publish", {}).get("cache_channel_id") if isinstance(state, dict) else "")
+                or ""
+            ).strip()
+            if raw_ch:
+                cache_ch = int(raw_ch) if raw_ch.lstrip("-").isdigit() else raw_ch
+        except Exception:
+            cache_ch = None
+
+        fid = None
+        if cache_ch and str(cache_ch) != str(chat_id):
+            try:
+                inp_cache = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+                if inp_cache:
+                    if is_video:
+                        sent_cache = await self.bot.send_video(
+                            chat_id=cache_ch,
+                            video=inp_cache,
+                            caption=f"📦 Cache: {m.get('name') or 'video'}",
+                            disable_notification=True,
+                        )
+                        vid_obj = getattr(sent_cache, "video", None)
+                        fid = getattr(vid_obj, "file_id", None) if vid_obj else None
+                    else:
+                        sent_cache = await self.bot.send_photo(
+                            chat_id=cache_ch,
+                            photo=inp_cache,
+                            caption=f"📦 Cache: {m.get('name') or 'photo'}",
+                            disable_notification=True,
+                        )
+                        photos = getattr(sent_cache, "photo", None)
+                        fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
+                    if fid:
+                        m["telegram_file_id"] = str(fid)
+                        if is_video:
+                            await self.bot.send_video(chat_id=chat_id, video=str(fid), caption=caption, has_spoiler=has_spoiler)
+                        else:
+                            await self.bot.send_photo(chat_id=chat_id, photo=str(fid), caption=caption, has_spoiler=has_spoiler)
+                        return str(fid)
+            except Exception as e:
+                logger.warning(f"Upload via canal de cache ({cache_ch}) falhou, enviando direto: {e}")
+
         inp = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
         if not inp:
             return None

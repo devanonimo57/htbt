@@ -330,7 +330,25 @@
                 </label>
               </div>
               <div id="nb-welcome-medias-list" class="flex flex-wrap gap-2.5"></div>
-              <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+
+              <!-- CAMPO DO CANAL DE CACHE DE MÍDIAS -->
+              <div class="p-3.5 rounded-xl bg-[#120d0e] border border-[#2b1d20] space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-bolt text-[#ef4444]"></i>
+                    <span>Canal de Cache de Mídias (ID do Canal ou Grupo)</span>
+                  </label>
+                  <span id="nb-cache-channel-status" class="text-[11px] text-zinc-500"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="text" id="nb-bot-cache-channel" oninput="nbOnCacheChannelInput(this.value)" placeholder="Ex: -1001234567890 (bot precisa ser admin)" class="nb-input font-mono flex-1">
+                  <button type="button" onclick="nbVerifyCacheChannel()" class="px-3.5 py-2 rounded-lg bg-[#1d1214] hover:bg-[#2a191c] border border-[#3d2328] text-xs font-semibold text-white shrink-0 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-arrows-rotate text-[10px] text-[#ef4444]"></i>
+                    <span>Sincronizar</span>
+                  </button>
+                </div>
+                <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+              </div>
             </div>
           </div>
 
@@ -1194,6 +1212,11 @@
           <div>
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">TOKEN DO BOT (@BotFather) *</label>
             <input type="text" id="nb-inp-bot-token" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">CANAL DE CACHE DE MÍDIAS (ID DO CANAL/GRUPO)</label>
+            <input type="text" id="nb-inp-bot-cache-channel" placeholder="Ex: -1001234567890 (opcional — preserva file_id)" class="nb-input font-mono">
+            <p class="text-[10px] text-zinc-500 mt-1">Adicione o bot como administrador no canal/grupo privado de cache.</p>
           </div>
           <div>
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MODO DE OPERAÇÃO DO BOT</label>
@@ -5869,6 +5892,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         bot_id: botId,
         first_name: pub.bot_first_name || uname.replace("@", ""),
         token: tok,
+        cache_channel_id: (pub.cache_channel_id || "").trim(),
         active: pub.is_live !== false,
         mode: "flow",
         folder: "",
@@ -6053,6 +6077,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_EDITING_BOT_ID = null;
       document.getElementById('nb-modal-bot-title').textContent = "Conectar Novo Bot";
       document.getElementById('nb-inp-bot-token').value = "";
+      const cacheInp = document.getElementById('nb-inp-bot-cache-channel');
+      if (cacheInp) cacheInp.value = STATE.publish?.cache_channel_id || "";
       nbSelectModalBotMode('flow');
       document.getElementById('nb-btn-delete-bot').classList.add('hidden');
       document.getElementById('nb-modal-bot').classList.remove('hidden');
@@ -6064,6 +6090,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_EDITING_BOT_ID = botId;
       document.getElementById('nb-modal-bot-title').textContent = `Configurar ${b.username || 'Bot'}`;
       document.getElementById('nb-inp-bot-token').value = b.token || "";
+      const cacheInp = document.getElementById('nb-inp-bot-cache-channel');
+      if (cacheInp) cacheInp.value = b.cache_channel_id || STATE.publish?.cache_channel_id || "";
       nbSelectModalBotMode(b.mode || 'flow');
       document.getElementById('nb-btn-delete-bot').classList.toggle('hidden', (STATE.flow_bots || []).length <= 1);
       document.getElementById('nb-modal-bot').classList.remove('hidden');
@@ -6079,6 +6107,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbSubmitBotModal() {
       const tok = document.getElementById('nb-inp-bot-token').value.trim();
+      const cacheCh = (document.getElementById('nb-inp-bot-cache-channel')?.value || '').trim();
       const mode = (document.getElementById('nb-inp-bot-mode')?.value === 'ai') ? 'ai' : 'flow';
       const btn = document.getElementById('nb-btn-save-bot-modal');
       btn.textContent = "Salvando...";
@@ -6118,6 +6147,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (b) {
           b.token = tok;
           b.mode = mode;
+          b.cache_channel_id = cacheCh;
           if (tok) {
             b.bot_id = botInfo.bot_id;
             b.username = botInfo.username;
@@ -6130,12 +6160,20 @@ quer que eu te mostre as opções de acesso?</textarea>
           bot_token: tok,
           bot_username: botInfo.username,
           bot_first_name: botInfo.first_name,
+          cache_channel_id: cacheCh,
           is_live: true
         });
         newBot.bot_id = botInfo.bot_id;
         newBot.mode = mode;
+        newBot.cache_channel_id = cacheCh;
         STATE.flow_bots.push(newBot);
         targetBotId = newBot.id;
+      }
+
+      if (cacheCh) {
+        STATE.publish.cache_channel_id = cacheCh;
+        const aiCacheEl = document.getElementById('inp-cache-channel');
+        if (aiCacheEl) aiCacheEl.value = cacheCh;
       }
 
       NB_CURRENT_BOT_ID = targetBotId;
@@ -6172,6 +6210,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         STATE.publish.bot_token = activeBot.token;
         STATE.publish.bot_username = activeBot.username || STATE.publish.bot_username;
         STATE.publish.is_live = Boolean(activeBot.active);
+        if (activeBot.cache_channel_id !== undefined) {
+          STATE.publish.cache_channel_id = activeBot.cache_channel_id;
+        }
       }
     }
 
@@ -6188,6 +6229,9 @@ quer que eu te mostre as opções de acesso?</textarea>
           STATE.publish.bot_token = b.token;
           STATE.publish.bot_username = b.username || "";
           STATE.publish.is_live = b.active !== false;
+        }
+        if (b.cache_channel_id !== undefined) {
+          STATE.publish.cache_channel_id = b.cache_channel_id;
         }
         STATE.flow_name = (b.username || "bot").replace("@", "");
         syncStateToInputs();
@@ -6261,6 +6305,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nb-welcome-sec-enabled').checked = Boolean(w.secondary_enabled);
       document.getElementById('nb-welcome-sec-msg').value = w.secondary_message || "";
       document.getElementById('nb-welcome-sec-counter').textContent = `${(w.secondary_message || "").length}/4000 caracteres`;
+      const cacheEl = document.getElementById('nb-bot-cache-channel');
+      if (cacheEl) cacheEl.value = b.cache_channel_id || STATE.publish?.cache_channel_id || "";
       nbRenderMediaChips('nb-welcome-medias-list', 'nb-welcome-media-count', w.medias || [], 'welcome');
       nbUpdateWelcomeValidation();
 
@@ -6275,6 +6321,57 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // 5. PAGAMENTOS
       nbRenderPaymentsTab(b);
+    }
+
+    function nbOnCacheChannelInput(val) {
+      const clean = (val || "").trim();
+      const b = nbGetCurrentBot();
+      if (b) b.cache_channel_id = clean;
+      STATE.publish = STATE.publish || {};
+      STATE.publish.cache_channel_id = clean;
+      const aiCacheEl = document.getElementById('inp-cache-channel');
+      if (aiCacheEl) aiCacheEl.value = clean;
+    }
+
+    async function nbVerifyCacheChannel() {
+      const b = nbGetCurrentBot();
+      const chId = (document.getElementById('nb-bot-cache-channel')?.value || "").trim();
+      const stEl = document.getElementById('nb-cache-channel-status');
+      if (!chId) {
+        if (stEl) {
+          stEl.textContent = "Informe o ID do canal (ex: -100...)";
+          stEl.className = "text-[11px] text-amber-400";
+        }
+        return;
+      }
+      if (stEl) {
+        stEl.textContent = "Verificando...";
+        stEl.className = "text-[11px] text-zinc-400";
+      }
+      nbOnCacheChannelInput(chId);
+      try {
+        const res = await adminFetch("/api/flow-bots/verify-channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: b?.token || STATE.publish?.bot_token || "", channel_id: chId })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          if (stEl) {
+            stEl.textContent = `✓ Conectado: ${data.title}`;
+            stEl.className = "text-[11px] text-emerald-400 font-semibold";
+          }
+          await saveFullState();
+        } else if (stEl) {
+          stEl.textContent = `Erro: ${data.message || 'Bot sem acesso ao canal'}`;
+          stEl.className = "text-[11px] text-rose-400";
+        }
+      } catch (e) {
+        if (stEl) {
+          stEl.textContent = "Erro ao verificar canal";
+          stEl.className = "text-[11px] text-rose-400";
+        }
+      }
     }
 
     function nbInsertVar(textareaId, token) {
