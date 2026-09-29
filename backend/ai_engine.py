@@ -132,8 +132,18 @@ def build_system_prompt(
     else:
         name_instruction = f"Seu nome é {raw_name}. Sempre use esse nome quando perguntarem."
 
+    is_masc = (gender_val == "Masculina")
+    is_neutral = (gender_val == "Neutra")
+
     city_val = (persona.get("city") or "").strip()
-    city_instruction = f"morando em {city_val}" if city_val else "morando no Brasil (se perguntarem onde mora, responda de forma natural e simpática)"
+    if city_val:
+        city_instruction = f"morando em {city_val}"
+    elif is_masc:
+        city_instruction = "morando no Brasil (se perguntarem onde mora, responda de forma natural e simpático)"
+    elif is_neutral:
+        city_instruction = "morando no Brasil (se perguntarem onde mora, responda de forma natural e cordial)"
+    else:
+        city_instruction = "morando no Brasil (se perguntarem onde mora, responda de forma natural e simpática)"
 
     # Estratégia comercial (define em que momento a oferta entra na conversa)
     strategy_setting = style.get("strategy", "Conexão primeiro")
@@ -155,14 +165,38 @@ def build_system_prompt(
             "nem ofereça planos até que a conversa crie conexão ou que ele demonstre interesse real em ver mais sobre você/seu conteúdo."
         )
 
-    # Nível de flerte
+    # Nível de flerte (flexionado conforme o gênero da Persona)
     flirt_setting = style.get("flirt", "Leve")
     if flirt_setting == "Nenhum":
-        flirt_rule = "NENHUM — Seja simpática, educada e receptiva, mas sem paquera nem apelidos íntimos."
-    elif flirt_setting == "Sensual":
-        flirt_rule = "SENSUAL — Provocante, sem descrição gráfica (instigue desejo e curiosidade pelo que há no VIP com charme e malícia sutil, sem textos sexuais explícitos)."
+        if is_masc:
+            flirt_rule = "NENHUM — Seja simpático, educado e receptivo, mas sem paquera nem apelidos íntimos."
+        elif is_neutral:
+            flirt_rule = "NENHUM — Mantenha postura cordial e receptiva, mas sem paquera nem apelidos íntimos."
+        else:
+            flirt_rule = "NENHUM — Seja simpática, educada e receptiva, mas sem paquera nem apelidos íntimos."
+    elif flirt_setting in ("Explícito", "Sensual"):
+        if is_masc:
+            flirt_rule = (
+                "EXPLÍCITO — Seja provocante, safado e sem censura (use linguagem adulta +18 direta e explícita quando o papo esquentar, "
+                "acompanhe o desejo do visitante sem pudor e instigue tesão real pelo que há no VIP)."
+            )
+        elif is_neutral:
+            flirt_rule = (
+                "EXPLÍCITO — Use provocação intensa e sem censura (use linguagem adulta +18 direta e explícita quando o papo esquentar, "
+                "acompanhe o desejo do visitante sem pudor e instigue tesão real pelo que há no VIP)."
+            )
+        else:
+            flirt_rule = (
+                "EXPLÍCITO — Seja provocante, safada e sem censura (use linguagem adulta +18 direta e explícita quando o papo esquentar, "
+                "acompanhe o desejo do visitante sem pudor e instigue tesão real pelo que há no VIP)."
+            )
     else:
-        flirt_rule = "LEVE — Carinhosa e charmosa na medida certa, usando apelidos suaves (ex: bb, amor, lindo) com naturalidade."
+        if is_masc:
+            flirt_rule = "LEVE — Seja carinhoso e charmoso na medida certa, usando apelidos suaves (ex: bb, amor) com naturalidade."
+        elif is_neutral:
+            flirt_rule = "LEVE — Demonstre carinho e charme na medida certa, usando apelidos suaves (ex: bb, amor) com naturalidade."
+        else:
+            flirt_rule = "LEVE — Seja carinhosa e charmosa na medida certa, usando apelidos suaves (ex: bb, amor) com naturalidade."
 
     # Uso de gírias
     slang_setting = style.get("slang", "Natural")
@@ -199,16 +233,16 @@ def build_system_prompt(
     else:
         lead_name_rule = "NÃO — Não chame o visitante pelo nome do perfil; use apenas pronomes ou termos naturais compatíveis com o nível de flerte."
 
-    # Tom de voz
+    # Tom de voz (flexionado conforme o gênero da Persona)
     tone_setting = style.get("tone", "Acolhedor")
     if tone_setting == "Direto":
-        tone_rule = "DIRETO (Objetiva, segura e sem rodeios)."
+        tone_rule = "DIRETO (Objetivo, seguro e sem rodeios)." if is_masc else ("DIRETO (Com objetividade, segurança e sem rodeios)." if is_neutral else "DIRETO (Objetiva, segura e sem rodeios).")
     elif tone_setting == "Descontraído":
-        tone_rule = "DESCONTRAÍDO (Leve, divertida, bem-humorada e espontânea)."
+        tone_rule = "DESCONTRAÍDO (Leve, divertido, bem-humorado e espontâneo)." if is_masc else ("DESCONTRAÍDO (Leve, com bom humor e espontaneidade)." if is_neutral else "DESCONTRAÍDO (Leve, divertida, bem-humorada e espontânea).")
     elif tone_setting in ("Premium", "Provocante"):
-        tone_rule = "PREMIUM (Exclusiva, magnética, confiante e de alto valor percebido)."
+        tone_rule = "PREMIUM (Exclusivo, magnético, confiante e de alto valor percebido)." if is_masc else ("PREMIUM (Com exclusividade, magnetismo, confiança e alto valor percebido)." if is_neutral else "PREMIUM (Exclusiva, magnética, confiante e de alto valor percebido).")
     else:
-        tone_rule = "ACOLHEDOR (Calorosa, próxima e atenciosa, fazendo o visitante se sentir especial)."
+        tone_rule = "ACOLHEDOR (Caloroso, próximo e atencioso, fazendo o visitante se sentir especial)." if is_masc else ("ACOLHEDOR (Com acolhimento, proximidade e atenção, fazendo o visitante se sentir especial)." if is_neutral else "ACOLHEDOR (Calorosa, próxima e atenciosa, fazendo o visitante se sentir especial).")
 
     # Tamanho das respostas ("Curta" | "Média" | "Detalhada" / "Longa")
     length_setting = style.get("length", "Curta")
@@ -230,6 +264,7 @@ def build_system_prompt(
 
     support_user = state.get("publish", {}).get("support_username", "").strip()
     support_info = f" (Caso precise encaminhar para suporte, indique @{support_user.lstrip('@')})" if support_user else ""
+    context_header = "CONTEXTO DO CRIADOR E DO VIP" if is_masc else ("CONTEXTO DO PERFIL E DO VIP" if is_neutral else "CONTEXTO DA CRIADORA E DO VIP")
 
     prompt = f"""Você é a pessoa definida na Identidade abaixo, conversando em primeira pessoa no seu chat privado do Telegram.
 Leia todo o contexto do que o visitante está dizendo e responda como uma pessoa real, trabalhando 100% em conjunto com sua Persona, sua Estratégia Comercial e suas Regras.
@@ -240,7 +275,7 @@ Leia todo o contexto do que o visitante está dizendo e responda como uma pessoa
 - Biografia curta: {persona.get('bio', '')}
 - Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humorada')}
 
-=== CONTEXTO DA CRIADORA E DO VIP ===
+=== {context_header} ===
 {business.get('context', '')}
 
 === OFERTAS DISPONÍVEIS ===

@@ -1052,12 +1052,12 @@
                     <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
 
-                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Sensual')" data-val="Sensual" class="sb-radio-card !p-4">
+                  <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Explícito')" data-val="Explícito" class="sb-radio-card !p-4">
                     <div class="flex justify-between items-center">
-                      <span class="text-xs font-bold text-white">Sensual</span>
+                      <span class="text-xs font-bold text-white">Explícito</span>
                       <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Provocante, sem descrição gráfica.</p>
+                    <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Provocação +18 direta, safada e sem censura.</p>
                   </div>
                 </div>
               </div>
@@ -4129,7 +4129,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('chk-audio-replies').checked = !!STATE.style.audio_replies;
 
       selectRadioGroup('rg-strategy', 'strategy', STATE.style.strategy || 'Conexão primeiro', true);
-      selectRadioGroup('rg-flirt', 'flirt', STATE.style.flirt || 'Leve', true);
+      selectRadioGroup('rg-flirt', 'flirt', STATE.style.flirt === 'Sensual' ? 'Explícito' : (STATE.style.flirt || 'Leve'), true);
       selectRadioGroup('rg-slang', 'slang', STATE.style.slang || 'Natural', true);
       selectRadioGroup('rg-cadence', 'cadence', STATE.style.cadence === 'Calma' ? 'Calmo' : (STATE.style.cadence || 'Natural'), true);
       selectRadioGroup('rg-tone', 'tone', STATE.style.tone === 'Provocante' ? 'Premium' : (STATE.style.tone || 'Acolhedor'), true);
