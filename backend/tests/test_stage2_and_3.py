@@ -307,6 +307,50 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
             "backend/main.py ainda usa allow_origins=['*'] com allow_credentials=True!"
         )
 
+    async def test_6_additional_audit_findings(self):
+        """Verifica os 8 achados complementares: tx_record obrigatório, retry pós-falha de envio, Asaas pixQrCodeId, Pollinations opt-in, Docker context e XSS/Save no painel."""
+        mgr = await self._setup_manager()
+
+        # 1. checkpix e deliver_purchase_and_upsell devem rejeitar tx_id inexistente (tx_record=None)
+        res_unregistered = await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_unknown_999")
+        self.assertFalse(res_unregistered, "deliver_purchase_and_upsell aceitou tx_id sem tx_record registrado!")
+
+        # 2. Se o envio no Telegram falhar, o status não pode ficar 'paid' impedindo nova tentativa
+        mgr.bot.send_message = AsyncMock(side_effect=RuntimeError("Telegram network timeout"))
+        with self.assertRaises(RuntimeError):
+            await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_live_1001")
+        self.assertEqual(
+            self.server_state["tx_records"]["tx_live_1001"]["status"],
+            "pending",
+            "Transação foi marcada como 'paid' antes de o envio no Telegram concluir com sucesso!"
+        )
+
+        # Na segunda tentativa com Telegram operacional, a entrega deve concluir e marcar 'paid'
+        mgr.bot.send_message = AsyncMock()
+        res_retry = await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_live_1001")
+        self.assertTrue(res_retry)
+        self.assertEqual(self.server_state["tx_records"]["tx_live_1001"]["status"], "paid")
+
+        # 3. Privacidade: sem chave de IA e sem opt-in, nunca deve chamar text.pollinations.ai
+        import ai_engine
+        self.server_state["account"]["ai_api_key"] = ""
+        with patch.object(ai_engine, "_call_llm_endpoint", AsyncMock(return_value="resposta externa")) as mock_llm:
+            await ai_engine.generate_ai_reply(self.server_state, [], "Oi, tudo bem?")
+            self.assertEqual(mock_llm.call_count, 0, "Chamou text.pollinations.ai sem consentimento explícito!")
+
+        # 4. Docker Compose context, XSS de planos e saveFullState no HTML
+        compose_path = os.path.abspath(os.path.join(BACKEND_DIR, "..", "docker-compose.yml"))
+        with open(compose_path, "r", encoding="utf-8") as f:
+            compose_src = f.read()
+        self.assertIn("context: .", compose_src)
+        self.assertIn("dockerfile: ./backend/Dockerfile", compose_src)
+
+        with open(FRONTEND_HTML, "r", encoding="utf-8") as f:
+            html_src = f.read()
+        self.assertIn("escapeHtml(p.name || 'Plano')", html_src)
+        self.assertNotIn("document.getElementById('chk-bot-live').checked = true;", html_src.split("async function saveFullState()")[1].split("async function loadInitialState()")[0])
+
 
 if __name__ == "__main__":
     unittest.main()
+

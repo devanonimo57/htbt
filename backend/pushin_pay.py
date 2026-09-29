@@ -243,14 +243,34 @@ class PushinPayClient:
 
         if self.provider == "asaas":
             async with httpx.AsyncClient(timeout=20.0) as client:
+                if str(transaction_id).startswith("pay_"):
+                    resp = await client.get(
+                        f"https://api.asaas.com/v3/payments/{transaction_id}",
+                        headers={"access_token": self.token}
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    st = str(data.get("status", "")).upper()
+                    return {
+                        "status": "paid" if st in ("RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH") else st.lower(),
+                        "raw": data
+                    }
                 resp = await client.get(
-                    f"https://api.asaas.com/v3/payments/{transaction_id}",
+                    "https://api.asaas.com/v3/payments",
+                    params={"pixQrCodeId": str(transaction_id)},
                     headers={"access_token": self.token}
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                st = str(data.get("status", "")).upper()
-                return {"status": "paid" if st in ("RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH") else st.lower()}
+                payments = data.get("data") if isinstance(data.get("data"), list) else []
+                for pmt in payments:
+                    if not isinstance(pmt, dict):
+                        continue
+                    st = str(pmt.get("status", "")).upper()
+                    if st in ("RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"):
+                        return {"status": "paid", "raw": pmt}
+                first_st = str(payments[0].get("status", "pending")).lower() if payments else "pending"
+                return {"status": first_st, "raw": payments[0] if payments else {}}
 
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(

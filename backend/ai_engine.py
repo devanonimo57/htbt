@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 import httpx
 import json
@@ -426,8 +427,12 @@ async def generate_ai_reply(
             except Exception as e:
                 print(f"Aviso tentativa LLM ({url}): {e}")
 
-    # 2. Se a chave do usuário estava sem saldo (402) ou houve falha de rede, usa LLM gratuito compatível
-    if not reply_text:
+    # 2. Privacidade por padrão: só envia histórico para fallback público externo se habilitado explicitamente
+    allow_public_fallback = (
+        os.getenv("ALLOW_PUBLIC_LLM_FALLBACK", "").strip().lower() in ("1", "true", "yes")
+        or bool(state.get("account", {}).get("allow_public_llm_fallback", False))
+    )
+    if not reply_text and allow_public_fallback:
         try:
             reply_text = await _call_llm_endpoint("https://text.pollinations.ai/openai", "", "openai", messages, max_tokens=max_tok)
         except Exception as e:

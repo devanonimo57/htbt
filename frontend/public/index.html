@@ -5743,16 +5743,18 @@ quer que eu te mostre as opções de acesso?</textarea>
       STATE.updated_at_ms = Date.now();
 
       const tokenVal = (document.getElementById('inp-bot-token').value || '').trim();
-      if (tokenVal && tokenVal.includes(':')) {
+      const chkLiveEl = document.getElementById('chk-bot-live');
+      if (tokenVal) {
         STATE.publish.bot_token = tokenVal;
-        STATE.publish.is_live = true;
-        document.getElementById('chk-bot-live').checked = true;
+      }
+      if (chkLiveEl) {
+        STATE.publish.is_live = Boolean(chkLiveEl.checked && STATE.publish.bot_token);
       }
 
       const btn = document.getElementById('btn-save-top');
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> <span>Salvando...</span>`;
 
-      if (tokenVal) {
+      if (tokenVal && tokenVal.includes(':')) {
         const me = await verifyTelegramTokenDirect(tokenVal);
         if (me && me.username) {
           STATE.publish.bot_username = `@${me.username}`;
@@ -5762,6 +5764,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       saveLocalBackup();
 
+      let savedOk = false;
       try {
         const res = await adminFetch("/api/state", {
           method: "POST",
@@ -5770,20 +5773,24 @@ quer que eu te mostre as opções de acesso?</textarea>
         });
         if (res.ok) {
           BACKEND_ONLINE = true;
+          savedOk = true;
           const data = await res.json();
           if (data.state) {
             const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
             STATE = { ...data.state, saved_profiles: mergedProfiles };
             saveLocalBackup();
           }
+          markSaved();
         }
       } catch (e) {
         BACKEND_ONLINE = false;
       } finally {
         syncStateToInputs();
-        markSaved();
-        btn.innerHTML = `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`;
+        btn.innerHTML = savedOk
+          ? `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`
+          : `<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[11px]"></i> <span>Tentar Salvar</span>`;
       }
+      return savedOk;
     }
 
     async function loadInitialState() {
@@ -5966,7 +5973,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
                 <div>
                   <div class="flex items-center flex-wrap">
-                    <h3 class="text-sm font-bold text-white group-hover:text-[#ef4444] transition">${b.username || '@bot'}</h3>
+                    <h3 class="text-sm font-bold text-white group-hover:text-[#ef4444] transition">${escapeHtml(b.username || '@bot')}</h3>
                     ${modeTag}
                   </div>
                   <span class="inline-flex items-center gap-1.5 text-[11px] ${isAct ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">
@@ -6373,10 +6380,10 @@ quer que eu te mostre as opções de acesso?</textarea>
                   <div>
                     <div class="flex items-center gap-1.5 text-xs font-bold text-white">
                       <i class="fa-solid fa-bullhorn text-[11px] text-zinc-400"></i>
-                      <span>${chName}</span>
+                      <span>${escapeHtml(chName)}</span>
                       <i class="fa-solid fa-check text-emerald-400 text-[10px]"></i>
                     </div>
-                    <span class="text-[11px] text-zinc-500 font-mono block mt-0.5">Canal · ${chId}</span>
+                    <span class="text-[11px] text-zinc-500 font-mono block mt-0.5">Canal · ${escapeHtml(chId)}</span>
                   </div>
                 </div>
                 <button type="button" onclick="nbPromptPlanChannelId(${idx})" class="px-3 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
@@ -6396,8 +6403,8 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <button type="button" onclick="nbMovePlan(${idx}, 1)" class="hover:text-white">↓</button>
                   </div>
                   <span class="text-xs font-mono text-zinc-500">${num}</span>
-                  <span id="nb-plan-hdr-name-${idx}" class="text-xs font-bold text-white">${p.name || 'Plano'}</span>
-                  <span id="nb-plan-hdr-meta-${idx}" class="text-xs text-zinc-500">${priceFmt} · ${p.duration || 'Vitalício'} · ${destLabel}</span>
+                  <span id="nb-plan-hdr-name-${idx}" class="text-xs font-bold text-white">${escapeHtml(p.name || 'Plano')}</span>
+                  <span id="nb-plan-hdr-meta-${idx}" class="text-xs text-zinc-500">${priceFmt} · ${escapeHtml(p.duration || 'Vitalício')} · ${escapeHtml(destLabel)}</span>
                 </div>
                 <i class="fa-solid fa-chevron-${isExp ? 'up' : 'down'} text-[10px] text-zinc-500"></i>
               </div>
@@ -6406,7 +6413,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">NOME DO PLANO</label>
-                    <input type="text" value="${(p.name || '').replace(/"/g, '&quot;')}" oninput="nbUpdatePlanQuiet(${idx}, 'name', this.value)" class="nb-input">
+                    <input type="text" value="${escapeHtml(p.name || '')}" oninput="nbUpdatePlanQuiet(${idx}, 'name', this.value)" class="nb-input">
                   </div>
                   <div>
                     <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">PREÇO (R$)</label>
@@ -6657,9 +6664,9 @@ quer que eu te mostre as opções de acesso?</textarea>
           const isSel = selectedIds.includes(p.id);
           const pFmt = `R$${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
           return `
-            <button type="button" onclick="nbToggleDownsellPlan(${sIdx}, '${p.id}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
+            <button type="button" onclick="nbToggleDownsellPlan(${sIdx}, '${escapeHtml(p.id)}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
               ${isSel ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
-              <span>${p.name} — ${pFmt}</span>
+              <span>${escapeHtml(p.name)} — ${pFmt}</span>
             </button>
           `;
         }).join('');
@@ -6700,7 +6707,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
             <div>
               <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-[#ef4444]">*</span></label>
-              <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${msg}</textarea>
+              <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${escapeHtml(msg)}</textarea>
               <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
             </div>
 
@@ -6725,7 +6732,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
                 ${(seq.medias || []).map((m, mIdx) => `
                   <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-                    <i class="fa-regular fa-image text-[#ef4444]"></i> ${m.name || 'Mídia'}
+                    <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
                     <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
                   </span>
                 `).join('')}
@@ -6831,9 +6838,9 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="flex items-center gap-3">
             <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
             <div>
-              <span class="text-xs font-bold text-white">${ob.title || 'Order Bump'}</span>
+              <span class="text-xs font-bold text-white">${escapeHtml(ob.title || 'Order Bump')}</span>
               <span class="text-xs text-[#ef4444] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
-              <p class="text-[11px] text-zinc-500 truncate max-w-md">${ob.description || ''}</p>
+              <p class="text-[11px] text-zinc-500 truncate max-w-md">${escapeHtml(ob.description || '')}</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -7066,7 +7073,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!listEl) return;
       listEl.innerHTML = (medias || []).map((m, idx) => `
         <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-          <i class="fa-regular fa-image text-[#ef4444]"></i> ${m.name || 'Mídia'}
+          <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
           <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
         </span>
       `).join('');
