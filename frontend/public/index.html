@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -829,22 +829,393 @@
         </div>
 
       </div>
+
+      <!-- =====================================================
+           TELA 3 (PRINTS 3 & 4): PAINEL — RESULTADO DOS SEUS BOTS
+      ====================================================== -->
+      <div id="nb-view-dashboard" class="hidden max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">PAINEL</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Resultado dos seus bots</h1>
+            <p class="text-xs text-zinc-400 mt-1">Vendas, conversão e pendências no período selecionado.</p>
+          </div>
+          <div id="nb-dash-period-pills" class="inline-flex p-1 rounded-xl bg-[#120c0e] border border-[#281b1e]"></div>
+        </div>
+
+        <!-- RECEITA HERO -->
+        <div class="pt-2">
+          <span id="nb-dash-hero-label" class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">RECEITA • HOJE</span>
+          <div class="flex items-baseline gap-1.5 mt-1">
+            <span class="text-2xl font-bold text-zinc-400">R$</span>
+            <span id="nb-dash-hero-value" class="text-6xl font-extrabold text-white tracking-tight">0,00</span>
+          </div>
+          <div class="w-full h-[2px] bg-[#ef4444] mt-5"></div>
+        </div>
+
+        <!-- LINHA DE KPIS (VENDAS | TICKET MÉDIO | TAXA DE CONVERSÃO | PENDENTES) -->
+        <div class="border-b border-[#24181a] pb-5">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="border-r border-[#24181a] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-bag-shopping text-[#ef4444]"></i>
+                <span>VENDAS</span>
+              </div>
+              <span id="nb-dash-kpi-sales" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
+              <span class="text-[11px] text-zinc-500">transações pagas</span>
+            </div>
+
+            <div class="border-r border-[#24181a] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-receipt text-[#ef4444]"></i>
+                <span>TICKET MÉDIO</span>
+              </div>
+              <span id="nb-dash-kpi-ticket" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
+              <span class="text-[11px] text-zinc-500">por transação</span>
+            </div>
+
+            <div class="border-r border-[#24181a] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-percent text-[#ef4444]"></i>
+                <span>TAXA DE CONVERSÃO</span>
+              </div>
+              <span id="nb-dash-kpi-conv" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
+            </div>
+
+            <div>
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-regular fa-clock text-[#ef4444]"></i>
+                <span>PENDENTES</span>
+              </div>
+              <span id="nb-dash-kpi-pending-val" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
+              <span id="nb-dash-kpi-pending-cnt" class="text-[11px] text-zinc-500">0 aguardando pagamento</span>
+            </div>
+          </div>
+
+          <div class="border-t border-[#24181a] mt-5 pt-4">
+            <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+              <i class="fa-solid fa-users text-[#ef4444]"></i>
+              <span>STARTS POR VENDA</span>
+            </div>
+            <span id="nb-dash-kpi-starts" class="text-xl font-extrabold text-white block mt-1">—</span>
+          </div>
+        </div>
+
+        <!-- 2 CARDS: RECEITA ÚLTIMOS DIAS & TRANSAÇÕES POR STATUS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center gap-2 border-b border-[#24181a] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <h3 class="text-xs font-bold text-white">Receita • últimos dias</h3>
+            </div>
+            <div id="nb-dash-recent-revenue" class="text-xs text-zinc-500 py-2">
+              Sem receita paga no período selecionado.
+            </div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center gap-2 border-b border-[#24181a] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <h3 class="text-xs font-bold text-white">Transações por status</h3>
+            </div>
+            <div id="nb-dash-status-summary" class="text-xs text-zinc-500 py-2">
+              Sem transações no período selecionado.
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD: ÚLTIMAS ATUALIZAÇÕES (TEMPO REAL) -->
+        <div class="nb-card p-5 space-y-3">
+          <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <h3 class="text-xs font-bold text-white">Últimas atualizações</h3>
+            </div>
+            <div class="flex items-center gap-3">
+              <button type="button" onclick="nbSwitchMainView('finance')" class="text-xs text-zinc-400 hover:text-white transition">Ver todas</button>
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> TEMPO REAL
+              </span>
+            </div>
+          </div>
+          <div id="nb-dash-activity-list" class="py-6 text-center text-xs text-zinc-500">
+            Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           TELA 4 (PRINT 1): FINANCEIRO — RECEITA E PAGAMENTOS
+      ====================================================== -->
+      <div id="nb-view-finance" class="hidden max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">FINANCEIRO</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Receita e pagamentos</h1>
+            <p class="text-xs text-zinc-400 mt-1">Transações de todos os bots, com filtro por período e status.</p>
+          </div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <div id="nb-fin-period-pills" class="inline-flex p-1 rounded-xl bg-[#120c0e] border border-[#281b1e]"></div>
+            <select id="nb-fin-bot-select" onchange="nbRenderFinanceView()" class="nb-input !w-auto min-w-[160px] !py-2 !px-3 text-xs"></select>
+          </div>
+        </div>
+
+        <!-- 4 KPIS FINANCEIRO -->
+        <div class="border-y border-[#24181a] py-5 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="border-r border-[#24181a] pr-4">
+            <span id="nb-fin-rev-label" class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">RECEITA • HOJE</span>
+            <span id="nb-fin-rev-value" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
+          </div>
+          <div class="border-r border-[#24181a] pr-4">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">TRANSAÇÕES PAGAS</span>
+            <span id="nb-fin-paid-count" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
+          </div>
+          <div class="border-r border-[#24181a] pr-4">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">TICKET MÉDIO</span>
+            <span id="nb-fin-ticket-value" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
+          </div>
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">PENDENTE</span>
+            <span id="nb-fin-pending-value" class="text-2xl font-extrabold text-[#ef4444] block mt-1.5">R$ 0,00</span>
+          </div>
+        </div>
+
+        <!-- CARD DE TRANSAÇÕES -->
+        <div class="nb-card p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#24181a] pb-3.5">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <h3 class="text-xs font-bold text-white">Transações</h3>
+            </div>
+            <div id="nb-fin-status-pills" class="flex items-center gap-1.5 flex-wrap"></div>
+          </div>
+
+          <div id="nb-fin-tx-container" class="py-16 flex flex-col items-center justify-center text-center space-y-2">
+            <div class="w-10 h-10 rounded-xl bg-[#181012] border border-[#2b1d20] text-zinc-500 flex items-center justify-center text-base mb-1">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <p class="text-xs font-extrabold uppercase tracking-wider text-white">NENHUMA TRANSAÇÃO ENCONTRADA</p>
+            <p class="text-xs text-zinc-500">Ajuste os filtros ou o período para ver outras transações.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           TELA 5 (PRINT 2): GATEWAYS DE PAGAMENTO
+      ====================================================== -->
+      <div id="nb-view-gateways" class="hidden max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">GATEWAYS</span>
+          <h1 class="text-2xl font-bold text-white mt-1">Gateways de pagamento</h1>
+          <p class="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+            As cobranças PIX dos seus bots saem da SUA conta em cada gateway configurado abaixo. Defina uma principal e até 2 reservas: se a principal falhar, tentamos a próxima.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+
+          <!-- CARD 1: OMEGAPAY -->
+          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-credit-card"></i>
+                </div>
+                <span class="text-sm font-bold text-white">OmegaPay</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="nb-gw-badge-omegapay" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1315] text-zinc-400 border border-[#2b1f22]">• Não configurada</span>
+                <button type="button" onclick="nbToggleGwCard('omegapay')" class="w-7 h-7 rounded-full bg-[#1a1315] text-zinc-400 hover:text-white flex items-center justify-center text-[10px]">
+                  <i class="fa-solid fa-chevron-up"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="nb-gw-body-omegapay" class="space-y-3.5 pt-1">
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Validamos as chaves na OmegaPay antes de salvar. Elas ficam cifradas e <strong class="text-white">nunca são exibidas novamente</strong> — para trocar, basta preencher e salvar de novo.
+              </p>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">PUBLIC KEY (X-PUBLIC-KEY)</label>
+                <input type="text" id="nb-gw-omega-pub" placeholder="Chave pública OmegaPay" class="nb-input">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">SECRET KEY (X-SECRET-KEY)</label>
+                <div class="relative">
+                  <input type="password" id="nb-gw-omega-sec" placeholder="••••••••••••••••" class="nb-input pr-10">
+                  <button type="button" onclick="nbTogglePassVis('nb-gw-omega-sec')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="pt-1 flex items-center gap-3">
+                <button type="button" onclick="nbSaveGatewayProviderCard('omegapay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                  Validar e salvar
+                </button>
+                <span id="nb-gw-msg-omegapay" class="text-xs text-emerald-400"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: SYNCPAY -->
+          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-credit-card"></i>
+                </div>
+                <span class="text-sm font-bold text-white">SyncPay</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="nb-gw-badge-syncpay" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1315] text-zinc-400 border border-[#2b1f22]">• Não configurada</span>
+                <button type="button" onclick="nbToggleGwCard('syncpay')" class="w-7 h-7 rounded-full bg-[#1a1315] text-zinc-400 hover:text-white flex items-center justify-center text-[10px]">
+                  <i class="fa-solid fa-chevron-up"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="nb-gw-body-syncpay" class="space-y-3.5 pt-1">
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Validamos as chaves na SyncPay antes de salvar. Elas ficam cifradas e <strong class="text-white">nunca são exibidas novamente</strong> — para trocar, basta preencher e salvar de novo.
+              </p>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">CLIENT ID</label>
+                <input type="text" id="nb-gw-sync-id" placeholder="Client ID SyncPay" class="nb-input">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">CLIENT SECRET</label>
+                <div class="relative">
+                  <input type="password" id="nb-gw-sync-sec" placeholder="••••••••••••••••" class="nb-input pr-10">
+                  <button type="button" onclick="nbTogglePassVis('nb-gw-sync-sec')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="pt-1 flex items-center gap-3">
+                <button type="button" onclick="nbSaveGatewayProviderCard('syncpay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                  Validar e salvar
+                </button>
+                <span id="nb-gw-msg-syncpay" class="text-xs text-emerald-400"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 3: ONIX -->
+          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-credit-card"></i>
+                </div>
+                <span class="text-sm font-bold text-white">Onix</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="nb-gw-badge-onix" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1315] text-zinc-400 border border-[#2b1f22]">• Não configurada</span>
+                <button type="button" onclick="nbToggleGwCard('onix')" class="w-7 h-7 rounded-full bg-[#1a1315] text-zinc-400 hover:text-white flex items-center justify-center text-[10px]">
+                  <i class="fa-solid fa-chevron-up"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="nb-gw-body-onix" class="space-y-3.5 pt-1">
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Validamos as chaves na Onix antes de salvar. Elas ficam cifradas e <strong class="text-white">nunca são exibidas novamente</strong> — para trocar, basta preencher e salvar de novo.
+              </p>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">PUBLIC KEY / CLIENT ID</label>
+                <input type="text" id="nb-gw-onix-pub" placeholder="Chave pública Onix" class="nb-input">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">SECRET KEY / CLIENT SECRET</label>
+                <div class="relative">
+                  <input type="password" id="nb-gw-onix-sec" placeholder="••••••••••••••••" class="nb-input pr-10">
+                  <button type="button" onclick="nbTogglePassVis('nb-gw-onix-sec')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="pt-1 flex items-center gap-3">
+                <button type="button" onclick="nbSaveGatewayProviderCard('onix')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                  Validar e salvar
+                </button>
+                <span id="nb-gw-msg-onix" class="text-xs text-emerald-400"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: PUSHINPAY -->
+          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-credit-card"></i>
+                </div>
+                <span class="text-sm font-bold text-white">PushinPay</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="nb-gw-badge-pushinpay" class="px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1315] text-zinc-400 border border-[#2b1f22]">• Não configurada</span>
+                <button type="button" onclick="nbToggleGwCard('pushinpay')" class="w-7 h-7 rounded-full bg-[#1a1315] text-zinc-400 hover:text-white flex items-center justify-center text-[10px]">
+                  <i class="fa-solid fa-chevron-up"></i>
+                </button>
+              </div>
+            </div>
+
+            <div id="nb-gw-body-pushinpay" class="space-y-3.5 pt-1">
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Validamos o token na PushinPay antes de salvar. Ele fica cifrado e <strong class="text-white">nunca é exibido novamente</strong> — para trocar, basta preencher e salvar de novo.
+              </p>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">BEARER TOKEN (API KEY)</label>
+                <div class="relative">
+                  <input type="password" id="nb-gw-pushin-tok" placeholder="••••••••••••••••" class="nb-input pr-10">
+                  <button type="button" onclick="nbTogglePassVis('nb-gw-pushin-tok')" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white text-xs">
+                    <i class="fa-regular fa-eye"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="pt-1 flex items-center gap-3">
+                <button type="button" onclick="nbSaveGatewayProviderCard('pushinpay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                  Validar e salvar
+                </button>
+                <span id="nb-gw-msg-pushinpay" class="text-xs text-emerald-400"></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
 
-    <!-- DOCK INFERIOR FLUTUANTE RICOBOT -->
+    <!-- DOCK INFERIOR FLUTUANTE RICOBOT (FIEL ÀS 4 NOVAS PRINTS) -->
     <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#140d0f]/95 border border-[#2e1d20] shadow-2xl backdrop-blur">
-      <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Visão Geral">
-        <i class="fa-solid fa-border-all"></i>
-      </button>
       <div class="relative">
-        <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition" title="Meus Bots">
+        <button id="nb-dock-btn-dashboard" onclick="nbSwitchMainView('dashboard')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Painel — Resultado dos seus bots">
+          <i class="fa-solid fa-border-all"></i>
+        </button>
+        <span id="nb-dock-dot-dashboard" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+
+      <div class="relative">
+        <button id="nb-dock-btn-bots" onclick="nbSwitchMainView('bots')" class="w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition" title="Meus Bots — Bots conectados">
           <i class="fa-solid fa-robot"></i>
         </button>
-        <span class="w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-bots" class="w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
-      <button onclick="nbOpenGatewayModal()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Carteira / Gateway PIX">
-        <i class="fa-solid fa-wallet"></i>
-      </button>
+
+      <div class="relative">
+        <button id="nb-dock-btn-finance" onclick="nbSwitchMainView('finance')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Financeiro — Receita e pagamentos">
+          <i class="fa-solid fa-wallet"></i>
+        </button>
+        <span id="nb-dock-dot-finance" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+
+      <div class="relative">
+        <button id="nb-dock-btn-gateways" onclick="nbSwitchMainView('gateways')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Gateways de pagamento">
+          <i class="fa-regular fa-credit-card"></i>
+        </button>
+        <span id="nb-dock-dot-gateways" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
     </div>
 
     <!-- MODAL: ADICIONAR / EDITAR BOT -->
@@ -6001,10 +6372,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbBackToBotsList() {
-      switchWorkspace('neurotbot');
-      document.getElementById('nb-view-bot-detail').classList.add('hidden');
-      document.getElementById('nb-view-bots-list').classList.remove('hidden');
-      nbRenderBotsList();
+      nbSwitchMainView('bots');
     }
 
     async function nbSwitchBotModeSection(targetMode) {
@@ -6051,9 +6419,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       // Caso contrário, abre a Seção Fluxo de Botões (5 abas):
-      switchWorkspace('neurotbot');
-      document.getElementById('nb-view-bots-list').classList.add('hidden');
-      document.getElementById('nb-view-bot-detail').classList.remove('hidden');
+      nbSwitchMainView('detail');
 
       document.getElementById('nb-det-username').textContent = b.username || "@rocha7_bot";
       document.getElementById('nb-det-botid').textContent = `ID ${b.bot_id || '8686296179'}`;
@@ -6947,13 +7313,214 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     // =========================================================
-    // GATEWAY MODAL & SALVAMENTO GERAL DO BOT
+    // NAVEGAÇÃO PRINCIPAL DO DOCK (PAINEL | BOTS | FINANCEIRO | GATEWAYS)
     // =========================================================
+    let NB_MAIN_VIEW = "bots";
+    let NB_DASH_PERIOD = "Hoje";
+    let NB_FIN_PERIOD = "Hoje";
+    let NB_FIN_STATUS = "Todos";
+
+    function nbSwitchMainView(view) {
+      NB_MAIN_VIEW = view;
+      switchWorkspace('neurotbot');
+
+      const views = {
+        bots: document.getElementById('nb-view-bots-list'),
+        detail: document.getElementById('nb-view-bot-detail'),
+        dashboard: document.getElementById('nb-view-dashboard'),
+        finance: document.getElementById('nb-view-finance'),
+        gateways: document.getElementById('nb-view-gateways')
+      };
+      Object.entries(views).forEach(([k, el]) => {
+        if (el) el.classList.toggle('hidden', k !== view);
+      });
+
+      ['dashboard', 'bots', 'finance', 'gateways'].forEach(k => {
+        const btn = document.getElementById('nb-dock-btn-' + k);
+        const dot = document.getElementById('nb-dock-dot-' + k);
+        const isAct = (view === k) || (view === 'detail' && k === 'bots');
+        if (btn) {
+          btn.className = isAct
+            ? "w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition"
+            : "w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition";
+        }
+        if (dot) dot.classList.toggle('hidden', !isAct);
+      });
+
+      if (view === 'bots') nbRenderBotsList();
+      if (view === 'dashboard') nbRenderDashboardView();
+      if (view === 'finance') nbRenderFinanceView();
+      if (view === 'gateways') nbRenderGatewaysView();
+    }
+
+    function nbRenderDashboardView() {
+      const periods = ["Hoje", "Ontem", "7 dias", "Mês", "Total"];
+      const pillsEl = document.getElementById('nb-dash-period-pills');
+      if (pillsEl) {
+        pillsEl.innerHTML = periods.map(p => {
+          const act = NB_DASH_PERIOD === p;
+          return `<button type="button" onclick="NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+        }).join('');
+      }
+
+      const bots = STATE.flow_bots || [];
+      const leads = STATE.memory?.leads || [];
+      const totalSales = bots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
+      const totalRev = bots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
+      const pendingLeads = leads.filter(l => (l.stage || '').toLowerCase().includes('pix') || (l.stage || '').toLowerCase().includes('aguardando'));
+
+      document.getElementById('nb-dash-hero-label').textContent = `RECEITA • ${NB_DASH_PERIOD.toUpperCase()}`;
+      document.getElementById('nb-dash-hero-value').textContent = totalRev.toFixed(2).replace('.', ',');
+      document.getElementById('nb-dash-kpi-sales').textContent = String(totalSales);
+      document.getElementById('nb-dash-kpi-ticket').textContent = totalSales > 0 ? `R$ ${(totalRev / totalSales).toFixed(2).replace('.', ',')}` : "—";
+      document.getElementById('nb-dash-kpi-conv').textContent = (totalSales > 0 && leads.length > 0) ? `${Math.round((totalSales / leads.length) * 100)}%` : "—";
+      document.getElementById('nb-dash-kpi-pending-val').textContent = `R$ ${(pendingLeads.length * 19.90).toFixed(2).replace('.', ',')}`;
+      document.getElementById('nb-dash-kpi-pending-cnt').textContent = `${pendingLeads.length} aguardando pagamento`;
+      document.getElementById('nb-dash-kpi-starts').textContent = totalSales > 0 ? String(Math.max(1, Math.round(leads.length / totalSales))) : "—";
+
+      const actList = document.getElementById('nb-dash-activity-list');
+      if (actList) {
+        if (leads.length === 0) {
+          actList.className = "py-6 text-center text-xs text-zinc-500";
+          actList.textContent = "Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.";
+        } else {
+          actList.className = "divide-y divide-[#24181a] text-left";
+          actList.innerHTML = leads.slice(0, 8).map(l => `
+            <div class="py-3 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-3">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <div>
+                  <span class="font-bold text-white">${l.first_name || 'Lead'}</span>
+                  <span class="text-zinc-500 ml-1">${l.username || ''}</span>
+                  <span class="ml-2 px-2 py-0.5 rounded bg-[#1c1114] border border-[#331d21] text-[10px] text-zinc-300">${l.stage || 'Iniciou /start'}</span>
+                </div>
+              </div>
+              <span class="text-zinc-500 font-mono text-[11px]">${l.last_interaction || 'agora'}</span>
+            </div>
+          `).join('');
+        }
+      }
+    }
+
+    function nbRenderFinanceView() {
+      const periods = ["Hoje", "Ontem", "7 dias", "Mês", "Total"];
+      const pillsEl = document.getElementById('nb-fin-period-pills');
+      if (pillsEl) {
+        pillsEl.innerHTML = periods.map(p => {
+          const act = NB_FIN_PERIOD === p;
+          return `<button type="button" onclick="NB_FIN_PERIOD='${p}'; nbRenderFinanceView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+        }).join('');
+      }
+
+      const botSel = document.getElementById('nb-fin-bot-select');
+      const bots = STATE.flow_bots || [];
+      if (botSel) {
+        const curVal = botSel.value || "all";
+        botSel.innerHTML = `<option value="all">Todos os bots</option>` + bots.map(b => `<option value="${b.id}" ${curVal === b.id ? 'selected' : ''}>${b.username || '@bot'}</option>`).join('');
+      }
+
+      const statuses = ["Todos", "Pago", "Pendente", "Estornado", "Cancelado", "Reembolsado", "Falhou", "Expirado"];
+      const statusEl = document.getElementById('nb-fin-status-pills');
+      if (statusEl) {
+        statusEl.innerHTML = statuses.map(s => {
+          const act = NB_FIN_STATUS === s;
+          return `<button type="button" onclick="NB_FIN_STATUS='${s}'; nbRenderFinanceView();" class="px-3 py-1 rounded-full text-xs font-semibold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${s}</button>`;
+        }).join('');
+      }
+
+      const selectedBotId = botSel ? botSel.value : "all";
+      const filteredBots = selectedBotId === "all" ? bots : bots.filter(b => b.id === selectedBotId);
+      const totalSales = filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
+      const totalRev = filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
+
+      document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;
+      document.getElementById('nb-fin-rev-value').textContent = `R$ ${totalRev.toFixed(2).replace('.', ',')}`;
+      document.getElementById('nb-fin-paid-count').textContent = String(totalSales);
+      document.getElementById('nb-fin-ticket-value').textContent = totalSales > 0 ? `R$ ${(totalRev / totalSales).toFixed(2).replace('.', ',')}` : "R$ 0,00";
+    }
+
+    function nbRenderGatewaysView() {
+      const pub = STATE.publish || {};
+      const activeProv = (pub.gateway_provider || "syncpay").toLowerCase();
+      const hasToken = Boolean((pub.pushin_pay_token || "").trim());
+      const hasSecret = Boolean((pub.gateway_secret || "").trim());
+
+      const syncIdEl = document.getElementById('nb-gw-sync-id');
+      const syncSecEl = document.getElementById('nb-gw-sync-sec');
+      const pushTokEl = document.getElementById('nb-gw-pushin-tok');
+
+      if (syncIdEl && activeProv === 'syncpay' && hasToken) syncIdEl.value = pub.pushin_pay_token;
+      if (syncSecEl && activeProv === 'syncpay' && hasSecret) syncSecEl.value = pub.gateway_secret;
+      if (pushTokEl && activeProv === 'pushinpay' && hasToken) pushTokEl.value = pub.pushin_pay_token;
+
+      ['omegapay', 'syncpay', 'onix', 'pushinpay'].forEach(p => {
+        const badge = document.getElementById('nb-gw-badge-' + p);
+        if (!badge) return;
+        const isConfigured = (p === activeProv && hasToken) || (STATE.gateways_config && STATE.gateways_config[p]?.configured);
+        if (isConfigured) {
+          badge.className = "px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-950/70 text-emerald-400 border border-emerald-800/50";
+          badge.textContent = "• Configurada (Principal)";
+        } else {
+          badge.className = "px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#1a1315] text-zinc-400 border border-[#2b1f22]";
+          badge.textContent = "• Não configurada";
+        }
+      });
+    }
+
+    function nbToggleGwCard(prov) {
+      const body = document.getElementById('nb-gw-body-' + prov);
+      if (body) body.classList.toggle('hidden');
+    }
+
+    function nbTogglePassVis(inputId) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      el.type = el.type === 'password' ? 'text' : 'password';
+    }
+
+    async function nbSaveGatewayProviderCard(prov) {
+      if (!STATE.gateways_config) STATE.gateways_config = {};
+      if (prov === 'syncpay') {
+        const cid = document.getElementById('nb-gw-sync-id').value.trim();
+        const csec = document.getElementById('nb-gw-sync-sec').value.trim();
+        STATE.publish.gateway_provider = 'syncpay';
+        STATE.publish.pushin_pay_token = cid;
+        STATE.publish.gateway_secret = csec;
+        STATE.gateways_config.syncpay = { configured: Boolean(cid && csec) };
+      } else if (prov === 'pushinpay') {
+        const tok = document.getElementById('nb-gw-pushin-tok').value.trim();
+        STATE.publish.gateway_provider = 'pushinpay';
+        STATE.publish.pushin_pay_token = tok;
+        STATE.publish.gateway_secret = '';
+        STATE.gateways_config.pushinpay = { configured: Boolean(tok) };
+      } else if (prov === 'omegapay') {
+        const pub = document.getElementById('nb-gw-omega-pub').value.trim();
+        const sec = document.getElementById('nb-gw-omega-sec').value.trim();
+        STATE.publish.gateway_provider = 'omegapay';
+        STATE.publish.pushin_pay_token = pub;
+        STATE.publish.gateway_secret = sec;
+        STATE.gateways_config.omegapay = { configured: Boolean(pub && sec) };
+      } else if (prov === 'onix') {
+        const pub = document.getElementById('nb-gw-onix-pub').value.trim();
+        const sec = document.getElementById('nb-gw-onix-sec').value.trim();
+        STATE.publish.gateway_provider = 'onix';
+        STATE.publish.pushin_pay_token = pub;
+        STATE.publish.gateway_secret = sec;
+        STATE.gateways_config.onix = { configured: Boolean(pub && sec) };
+      }
+
+      syncStateToInputs();
+      await saveFullState();
+      nbRenderGatewaysView();
+      const msgEl = document.getElementById('nb-gw-msg-' + prov);
+      if (msgEl) {
+        msgEl.textContent = "✓ Chaves validadas e salvas!";
+        setTimeout(() => { if (msgEl) msgEl.textContent = ""; }, 3500);
+      }
+    }
+
     function nbOpenGatewayModal() {
-      document.getElementById('nb-gw-provider').value = STATE.publish?.gateway_provider || "syncpay";
-      document.getElementById('nb-gw-token').value = STATE.publish?.pushin_pay_token || "";
-      document.getElementById('nb-gw-secret').value = STATE.publish?.gateway_secret || "";
-      document.getElementById('nb-modal-gateway').classList.remove('hidden');
+      nbSwitchMainView('gateways');
     }
 
     async function nbSaveGatewayModal() {
