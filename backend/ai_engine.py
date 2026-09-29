@@ -266,6 +266,8 @@ def build_system_prompt(
     support_info = f" (Caso precise encaminhar para suporte, indique @{support_user.lstrip('@')})" if support_user else ""
     context_header = "CONTEXTO DO CRIADOR E DO VIP" if is_masc else ("CONTEXTO DO PERFIL E DO VIP" if is_neutral else "CONTEXTO DA CRIADORA E DO VIP")
 
+    default_traits = "espontâneo, atento, bem-humorado" if is_masc else ("espontâneo, atento, com bom humor" if is_neutral else "espontânea, atenta, bem-humorada")
+
     prompt = f"""Você é a pessoa definida na Identidade abaixo, conversando em primeira pessoa no seu chat privado do Telegram.
 Leia todo o contexto do que o visitante está dizendo e responda como uma pessoa real, trabalhando 100% em conjunto com sua Persona, sua Estratégia Comercial e suas Regras.
 
@@ -273,7 +275,7 @@ Leia todo o contexto do que o visitante está dizendo e responda como uma pessoa
 - Quem você é: {name_instruction} Você tem {persona.get('age', 18)} anos, {city_instruction}.
 - Apresentação / Gênero: {gender_val} ({gender_desc} Flexione todas as palavras sobre si de acordo com esta apresentação).
 - Biografia curta: {persona.get('bio', '')}
-- Traços de personalidade: {persona.get('traits', 'espontânea, atenta, bem-humorada')}
+- Traços de personalidade: {persona.get('traits') or default_traits}
 
 === {context_header} ===
 {business.get('context', '')}

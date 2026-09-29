@@ -120,6 +120,27 @@
       </div>
     </div>
 
+    <!-- BARRA CENTRAL: LISTA DE CONFIGURAÇÕES SALVAS (PERSISTENTE) -->
+    <div class="flex items-center gap-2 bg-[#0b0d14] border border-[#1b2030] rounded-xl px-3 py-1.5">
+      <i class="fa-solid fa-bookmark text-[#8b5cf6] text-xs"></i>
+      <select id="sel-saved-profiles" class="bg-[#07090e] border border-[#1e2333] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#8b5cf6] min-w-[180px] max-w-[230px]">
+        <option value="">Configurações salvas (0)</option>
+      </select>
+      <button type="button" onclick="applySelectedProfile()" id="btn-apply-profile" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center gap-1.5" title="Carregar e aplicar esta configuração no bot">
+        <i class="fa-solid fa-check text-[10px]"></i>
+        <span>Aplicar</span>
+      </button>
+      <div class="h-4 w-[1px] bg-[#1e2333] mx-0.5"></div>
+      <input type="text" id="inp-new-profile-name" placeholder="Nome da config..." class="bg-[#07090e] border border-[#1e2333] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#38bdf8] w-32">
+      <button type="button" onclick="saveCurrentToProfileList()" class="px-3 py-1.5 rounded-lg bg-[#151c2c] hover:bg-[#1e2940] border border-[#26324d] text-[#38bdf8] text-xs font-bold transition flex items-center gap-1.5" title="Salvar a configuração atual na lista">
+        <i class="fa-solid fa-plus text-[10px]"></i>
+        <span>Salvar na lista</span>
+      </button>
+      <button type="button" onclick="deleteSelectedProfile()" class="px-2 py-1.5 rounded-lg bg-[#141722] hover:bg-rose-950/60 border border-[#1e2333] hover:border-rose-800/50 text-slate-400 hover:text-rose-300 text-xs transition" title="Excluir configuração selecionada da lista">
+        <i class="fa-regular fa-trash-can text-[11px]"></i>
+      </button>
+    </div>
+
     <div class="flex items-center gap-3">
       <button onclick="navigateTab('saldo')" class="px-3.5 py-2 rounded-xl bg-[#0e1017] border border-[#1e2333] text-xs font-medium text-slate-200 flex items-center gap-2 hover:border-slate-600 transition">
         <span class="w-4 h-4 rounded-full border border-slate-500 flex items-center justify-center text-[9px] text-slate-400 font-bold">%</span>
@@ -853,7 +874,7 @@
           <!-- CARD 1: CONTEXTO DA CRIADORA E DO VIP -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div>
-              <h3 class="text-sm font-bold text-white">Contexto da criadora e do VIP</h3>
+              <h3 id="lbl-business-context-title" class="text-sm font-bold text-white">Contexto da criadora e do VIP</h3>
               <p class="text-xs text-slate-400 mt-0.5">Detalhes concretos evitam respostas genéricas. A persona usa este texto como fonte principal da conversa.</p>
             </div>
 
@@ -1057,7 +1078,7 @@
                       <span class="text-xs font-bold text-white">Explícito</span>
                       <span class="radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0"></span>
                     </div>
-                    <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Provocação +18 direta, safada e sem censura.</p>
+                    <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">Provocação +18 direta, quente e sem censura.</p>
                   </div>
                 </div>
               </div>
@@ -2531,7 +2552,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       markUnsaved();
     }
 
-    function selectGender(gender, desc) {
+    function selectGender(gender, desc, silent = false) {
       STATE.persona.gender = gender;
       STATE.persona.gender_desc = desc;
       document.querySelectorAll('#gender-cards .sb-radio-card').forEach(card => {
@@ -2548,7 +2569,59 @@ quer que eu te mostre as opções de acesso?</textarea>
           }
         }
       });
-      markUnsaved();
+
+      const ctxTitle = document.getElementById('lbl-business-context-title');
+      if (ctxTitle) {
+        ctxTitle.textContent = gender === 'Masculina'
+          ? 'Contexto do criador e do VIP'
+          : (gender === 'Neutra' ? 'Contexto do perfil e do VIP' : 'Contexto da criadora e do VIP');
+      }
+
+      // Se a bio/traços/contexto ainda forem os padrões iniciais, adapta a flexão de gênero automaticamente
+      if (!silent) {
+        const bioInp = document.getElementById('inp-persona-bio');
+        const traitsInp = document.getElementById('inp-persona-traits');
+        const ctxInp = document.getElementById('inp-business-context');
+        if (bioInp && /^(Criadora adulta|Criador adulto|Perfil adulto)/i.test(bioInp.value.trim())) {
+          if (gender === 'Masculina') {
+            bioInp.value = "Criador adulto, espontâneo e atento. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.";
+          } else if (gender === 'Neutra') {
+            bioInp.value = "Perfil adulto, espontâneo e atento. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.";
+          } else {
+            bioInp.value = "Criadora adulta, espontânea e atenta. Conversa como em um chat privado, lembra o que a pessoa contou e apresenta o próprio VIP sem parecer atendimento.";
+          }
+          STATE.persona.bio = bioInp.value;
+          document.getElementById('bio-counter').textContent = `${STATE.persona.bio.length}/800`;
+        }
+        if (traitsInp && /^(espont[aâ]ne[ao]|atent[ao])/i.test(traitsInp.value.trim())) {
+          traitsInp.value = gender === 'Masculina'
+            ? "espontâneo, atento, bem-humorado"
+            : (gender === 'Neutra' ? "espontâneo, atento, com bom humor" : "espontânea, atenta, bem-humorada");
+          STATE.persona.traits = traitsInp.value;
+        }
+        if (ctxInp && /^Este atendimento representa (uma criadora adulta|um criador adulto|um perfil adulto)/i.test(ctxInp.value.trim())) {
+          if (gender === 'Masculina') {
+            ctxInp.value = ctxInp.value
+              .replace(/uma criadora adulta/gi, 'um criador adulto')
+              .replace(/um perfil adulto/gi, 'um criador adulto')
+              .replace(/Seja natural, acolhedora/gi, 'Seja natural, acolhedor');
+          } else if (gender === 'Neutra') {
+            ctxInp.value = ctxInp.value
+              .replace(/uma criadora adulta/gi, 'um perfil adulto')
+              .replace(/um criador adulto/gi, 'um perfil adulto')
+              .replace(/Seja natural, acolhedor[a]?/gi, 'Converse com naturalidade e acolhimento');
+          } else {
+            ctxInp.value = ctxInp.value
+              .replace(/um criador adulto/gi, 'uma criadora adulta')
+              .replace(/um perfil adulto/gi, 'uma criadora adulta')
+              .replace(/Seja natural, acolhedor\b/gi, 'Seja natural, acolhedora')
+              .replace(/Converse com naturalidade e acolhimento/gi, 'Seja natural, acolhedora');
+          }
+          STATE.business.context = ctxInp.value;
+          document.getElementById('context-counter').textContent = `${STATE.business.context.length}/4.000`;
+        }
+        markUnsaved();
+      }
     }
 
     function onBusinessChange() {
@@ -4068,8 +4141,152 @@ quer que eu te mostre as opções de acesso?</textarea>
     let BROWSER_POLL_OFFSET = 0;
     let BROWSER_POLL_ACTIVE_TOKEN = "";
 
+    function getMergedSavedProfiles(serverProfiles) {
+      let localList = [];
+      try {
+        const raw = localStorage.getItem('SHARKBOT_SAVED_PROFILES');
+        if (raw) localList = JSON.parse(raw) || [];
+      } catch (e) {}
+      const srvList = Array.isArray(serverProfiles) ? serverProfiles : (Array.isArray(STATE.saved_profiles) ? STATE.saved_profiles : []);
+      const map = new Map();
+      [...srvList, ...localList].forEach(item => {
+        if (item && item.id) {
+          const existing = map.get(item.id);
+          if (!existing || (item.saved_at_ms || 0) >= (existing.saved_at_ms || 0)) {
+            map.set(item.id, item);
+          }
+        }
+      });
+      const merged = Array.from(map.values()).sort((a, b) => (b.saved_at_ms || 0) - (a.saved_at_ms || 0));
+      try {
+        localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(merged));
+      } catch (e) {}
+      return merged;
+    }
+
+    function renderSavedProfilesDropdown(selectedId) {
+      const sel = document.getElementById('sel-saved-profiles');
+      if (!sel) return;
+      const profiles = getMergedSavedProfiles();
+      STATE.saved_profiles = profiles;
+      const currentVal = selectedId !== undefined ? selectedId : sel.value;
+      if (!profiles.length) {
+        sel.innerHTML = `<option value="">Configurações salvas (0)</option>`;
+        return;
+      }
+      sel.innerHTML = profiles.map(p => {
+        const label = `${p.name} (${p.gender || 'Feminina'} • ${p.flirt || 'Leve'})`;
+        return `<option value="${p.id}">${label}</option>`;
+      }).join('');
+      if (currentVal && profiles.some(p => p.id === currentVal)) {
+        sel.value = currentVal;
+      } else {
+        sel.value = profiles[0].id;
+      }
+    }
+
+    async function saveCurrentToProfileList() {
+      onPersonaChange();
+      onBusinessChange();
+      onPublishChange();
+      STATE.account.ai_provider = document.getElementById('sel-ai-provider').value;
+      STATE.account.ai_api_key = document.getElementById('inp-ai-key').value;
+
+      const nameInp = document.getElementById('inp-new-profile-name');
+      let customName = (nameInp?.value || '').trim();
+      if (!customName) {
+        const pName = STATE.persona?.name && STATE.persona.name !== 'Atendimento' ? STATE.persona.name : 'Config';
+        const nowStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        customName = `${pName} — ${nowStr}`;
+      }
+
+      const snapshot = JSON.parse(JSON.stringify({
+        persona: STATE.persona,
+        business: STATE.business,
+        style: STATE.style,
+        medias: STATE.medias,
+        downsell: STATE.downsell,
+        upsell: STATE.upsell,
+        publish: STATE.publish,
+        account: STATE.account
+      }));
+
+      const profiles = getMergedSavedProfiles();
+      const existingIdx = profiles.findIndex(p => (p.name || '').toLowerCase() === customName.toLowerCase());
+      const profileObj = {
+        id: existingIdx >= 0 ? profiles[existingIdx].id : ('prof_' + Date.now()),
+        name: customName,
+        gender: STATE.persona?.gender || 'Feminina',
+        flirt: STATE.style?.flirt || 'Leve',
+        saved_at_ms: Date.now(),
+        snapshot
+      };
+
+      if (existingIdx >= 0) {
+        profiles[existingIdx] = profileObj;
+      } else {
+        profiles.unshift(profileObj);
+      }
+
+      STATE.saved_profiles = profiles;
+      try {
+        localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(profiles));
+      } catch (e) {}
+      if (nameInp) nameInp.value = '';
+      renderSavedProfilesDropdown(profileObj.id);
+      await saveFullState();
+    }
+
+    async function applySelectedProfile() {
+      const sel = document.getElementById('sel-saved-profiles');
+      const profId = sel?.value;
+      const profiles = getMergedSavedProfiles();
+      const found = profiles.find(p => p.id === profId);
+      if (!found || !found.snapshot) return;
+
+      const snap = JSON.parse(JSON.stringify(found.snapshot));
+      if (snap.persona) STATE.persona = snap.persona;
+      if (snap.business) STATE.business = snap.business;
+      if (snap.style) STATE.style = snap.style;
+      if (snap.medias) STATE.medias = snap.medias;
+      if (snap.downsell) STATE.downsell = snap.downsell;
+      if (snap.upsell) STATE.upsell = snap.upsell;
+      if (snap.publish) STATE.publish = snap.publish;
+      if (snap.account) STATE.account = snap.account;
+      STATE.saved_profiles = profiles;
+      STATE.updated_at_ms = Date.now();
+
+      const btn = document.getElementById('btn-apply-profile');
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> <span>Aplicando...</span>`;
+      syncStateToInputs();
+      await saveFullState();
+      renderSavedProfilesDropdown(profId);
+      if (btn) {
+        btn.innerHTML = `<i class="fa-solid fa-check text-[10px]"></i> <span>Aplicado!</span>`;
+        setTimeout(() => {
+          btn.innerHTML = `<i class="fa-solid fa-check text-[10px]"></i> <span>Aplicar</span>`;
+        }, 1800);
+      }
+    }
+
+    async function deleteSelectedProfile() {
+      const sel = document.getElementById('sel-saved-profiles');
+      const profId = sel?.value;
+      if (!profId) return;
+      const profiles = getMergedSavedProfiles().filter(p => p.id !== profId);
+      STATE.saved_profiles = profiles;
+      try {
+        localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(profiles));
+      } catch (e) {}
+      renderSavedProfilesDropdown();
+      await saveFullState();
+    }
+
     function saveLocalBackup() {
       try {
+        if (Array.isArray(STATE.saved_profiles) && STATE.saved_profiles.length) {
+          localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(STATE.saved_profiles));
+        }
         localStorage.setItem('SHARKBOT_STATE_BACKUP', JSON.stringify(STATE));
       } catch (e) {}
     }
@@ -4187,7 +4404,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('inp-ai-key').value = STATE.account?.ai_api_key || '';
 
       onPersonaChange();
-      selectGender(STATE.persona.gender || 'Feminina', STATE.persona.gender_desc || 'Fala e se apresenta no feminino.');
+      selectGender(STATE.persona.gender || 'Feminina', STATE.persona.gender_desc || 'Fala e se apresenta no feminino.', true);
       onPublishChange();
       renderOffers();
       renderFaqs();
@@ -4195,6 +4412,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderOpeningVariations();
       selectDownsellStep(SELECTED_DOWNSELL_IDX);
       renderRightPreviewBubbles();
+      renderSavedProfilesDropdown();
     }
 
     async function verifyTelegramTokenDirect(token) {
@@ -4460,6 +4678,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function saveFullState() {
       STATE.account.ai_provider = document.getElementById('sel-ai-provider').value;
       STATE.account.ai_api_key = document.getElementById('inp-ai-key').value;
+      STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
+      STATE.updated_at_ms = Date.now();
 
       const tokenVal = (document.getElementById('inp-bot-token').value || '').trim();
       if (tokenVal && tokenVal.includes(':')) {
@@ -4491,7 +4711,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           BACKEND_ONLINE = true;
           const data = await res.json();
           if (data.state) {
-            STATE = data.state;
+            const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+            STATE = { ...data.state, saved_profiles: mergedProfiles };
             saveLocalBackup();
           }
         }
@@ -4517,23 +4738,33 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (res.ok) {
           BACKEND_ONLINE = true;
           const serverState = await res.json();
-          STATE = { ...STATE, ...serverState };
+          const mergedProfiles = getMergedSavedProfiles(serverState.saved_profiles);
+          const localTs = Number(localBackup?.updated_at_ms || 0);
+          const serverTs = Number(serverState?.updated_at_ms || 0);
 
-          // Se o servidor reiniciou no Render e perdeu o bot_token, restaura do backup local do navegador automaticamente!
-          if (localBackup && localBackup.publish?.bot_token && !STATE.publish?.bot_token) {
-            STATE = { ...STATE, ...localBackup };
-            STATE.publish.is_live = true;
+          // Se o Render reiniciou (voltou para o seed sem updated_at_ms ou com timestamp mais antigo que o navegador),
+          // restaura automaticamente a configuração salva no navegador e reenvia para o Render!
+          if (localBackup && (localTs > serverTs || (localBackup.publish?.bot_token && !serverState.publish?.bot_token))) {
+            STATE = { ...serverState, ...localBackup, saved_profiles: mergedProfiles };
+            if (Array.isArray(serverState.memory?.leads) && serverState.memory.leads.length > (localBackup.memory?.leads?.length || 0)) {
+              STATE.memory = serverState.memory;
+              STATE.learning = serverState.learning || STATE.learning;
+            }
+            saveLocalBackup();
             await fetch("/api/state", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(STATE)
             });
+          } else {
+            STATE = { ...STATE, ...serverState, saved_profiles: mergedProfiles };
+            saveLocalBackup();
           }
         }
       } catch (e) {
         BACKEND_ONLINE = false;
         if (localBackup) {
-          STATE = { ...STATE, ...localBackup };
+          STATE = { ...STATE, ...localBackup, saved_profiles: getMergedSavedProfiles(localBackup.saved_profiles) };
         }
       }
 
