@@ -326,6 +326,164 @@ class ActiveBotManager:
             ])
         return InlineKeyboardMarkup(inline_keyboard=buttons)
 
+    def _get_active_flow_bot(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        flow_bots = state.get("flow_bots", [])
+        if not isinstance(flow_bots, list):
+            return None
+        for fb in flow_bots:
+            if fb.get("active") and fb.get("mode", "flow") == "flow":
+                # Usa modo fluxo se houver mensagem de boas-vindas ou planos cadastrados
+                if (fb.get("welcome", {}).get("message") or "").strip() or fb.get("plans"):
+                    return fb
+        return None
+
+    def _render_flow_vars(
+        self,
+        text: str,
+        user: types.User,
+        bot_cfg: Dict[str, Any],
+        plan_name: str = "",
+        valor_str: str = "",
+        pix_code_fmt: str = ""
+    ) -> str:
+        if not text:
+            return ""
+        brt_hour = (datetime.utcnow() - timedelta(hours=3)).hour
+        if 5 <= brt_hour < 12:
+            saudacao = "Bom dia"
+        elif 12 <= brt_hour < 18:
+            saudacao = "Boa tarde"
+        else:
+            saudacao = "Boa noite"
+        nome = (user.first_name or "Cliente").strip()
+        rep = {
+            "{saudacao}": saudacao,
+            "{nome}": nome,
+            "{estado}": "São Paulo",
+            "{uf}": "SP",
+            "{cidade}": "São Paulo",
+            "{localizacao}": "São Paulo - SP",
+            "{bot.nome}": bot_cfg.get("first_name") or "VIP Bot",
+            "{bot.username}": bot_cfg.get("username") or "@bot",
+            "{plano}": plan_name,
+            "{valor}": valor_str,
+            "{pix_code}": pix_code_fmt,
+        }
+        out = text
+        for k, v in rep.items():
+            out = out.replace(k, str(v))
+        return out
+
+    def _parse_discount_pct(self, disc_str: str) -> int:
+        if not disc_str or "sem" in disc_str.lower():
+            return 0
+        digits = "".join(ch for ch in str(disc_str) if ch.isdigit())
+        return int(digits) if digits else 0
+
+    def _build_flow_plans_kb(
+        self,
+        bot_cfg: Dict[str, Any],
+        filter_plan_ids: Optional[List[str]] = None,
+        discount_str: str = "Sem desconto"
+    ) -> Optional[InlineKeyboardMarkup]:
+        plans = bot_cfg.get("plans", [])
+        if not plans:
+            return None
+        disc_pct = self._parse_discount_pct(discount_str)
+        color_emoji = {
+            "Azul": "🔵 ",
+            "Verde": "🟢 ",
+            "Vermelho": "🔴 ",
+            "Padrão": ""
+        }
+        buttons = []
+        for idx, p in enumerate(plans):
+            pid = str(p.get("id", f"plan_{idx+1}"))[:20]
+            if filter_plan_ids and pid not in filter_plan_ids:
+                continue
+            name = p.get("name") or f"Plano {idx+1}"
+            raw_price = float(p.get("price") or 0)
+            final_price = round(raw_price * (1.0 - disc_pct / 100.0), 2) if disc_pct > 0 else raw_price
+            price_fmt = f"{final_price:.2f}".replace(".", ",")
+            prefix = color_emoji.get(p.get("button_color", "Padrão"), "")
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"{prefix}{name} — R$ {price_fmt}",
+                    callback_data=f"fplan:{pid}:{disc_pct}"
+                )
+            ])
+        return InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+
+    async def _send_flow_medias(self, chat_id: int, medias: List[Dict[str, Any]]):
+        for m in (medias or [])[:3]:
+            url = m.get("url")
+            if not url:
+                continue
+            try:
+                inp = self._build_input_file(url, m.get("name") or "media.jpg")
+                if inp:
+                    mtype = (m.get("type") or "").lower()
+                    if "video" in mtype or str(url).startswith("data:video"):
+                        await self.bot.send_video(chat_id=chat_id, video=inp)
+                    else:
+                        await self.bot.send_photo(chat_id=chat_id, photo=inp)
+            except Exception as e:
+                logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
+
+    def _schedule_flow_downsell(self, user: types.User, track: str = "general"):
+        uid = str(user.id)
+        self._cancel_downsell(uid)
+        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track))
+
+    async def _flow_downsell_worker(self, user: types.User, track: str):
+        paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
+        try:
+            state = await self.state_getter()
+            fb = self._get_active_flow_bot(state)
+            if not fb:
+                return
+            ds_cfg = fb.get("downsell_pix" if track == "pix" else "downsell_general", {})
+            if not ds_cfg.get("enabled", False):
+                return
+            sequences = sorted(
+                ds_cfg.get("sequences", []),
+                key=lambda s: max(1, int(s.get("delay_minutes") or 1))
+            )
+            elapsed_mins = 0
+            for seq in sequences:
+                msg_tmpl = (seq.get("message") or "").strip()
+                if not msg_tmpl:
+                    continue
+                target_mins = max(1, int(seq.get("delay_minutes") or 1))
+                wait_mins = max(1, target_mins - elapsed_mins)
+                await asyncio.sleep(wait_mins * 60)
+                elapsed_mins += wait_mins
+
+                state = await self.state_getter()
+                lead = await self._get_or_create_lead(state, user)
+                if lead.get("stage") in paid_stages:
+                    return
+                if track == "general" and lead.get("stage") == "Gerou checkout":
+                    return
+
+                fb = self._get_active_flow_bot(state)
+                if not fb:
+                    return
+                await self._send_flow_medias(user.id, seq.get("medias", []))
+                txt = self._render_flow_vars(msg_tmpl, user, fb)
+                kb = self._build_flow_plans_kb(
+                    fb,
+                    filter_plan_ids=seq.get("plan_ids") or None,
+                    discount_str=seq.get("discount", "Sem desconto")
+                )
+                await self.bot.send_message(chat_id=user.id, text=txt, parse_mode="HTML", reply_markup=kb)
+                lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
+                await self.state_saver(state)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Erro no Flow Downsell ({track}): {e}")
+
     def _cancel_downsell(self, user_id: str):
         task = self.downsell_tasks.pop(user_id, None)
         if task and not task.done():
@@ -411,7 +569,35 @@ class ActiveBotManager:
             lead["objs_list"] = []
             lead["preferences"] = "Iniciou conversa no bot"
             lead["objections"] = "Nenhuma identificada"
+            lead.pop("accepted_bump_deliverable", None)
+            lead.pop("flow_plan_id", None)
             self._update_lead_insights(state, lead)
+
+            flow_bot = self._get_active_flow_bot(state)
+            if flow_bot:
+                welcome = flow_bot.get("welcome", {})
+                await self._send_flow_medias(message.chat.id, welcome.get("medias", []))
+                kb = self._build_flow_plans_kb(flow_bot)
+                main_msg = self._render_flow_vars(
+                    welcome.get("message") or "Olá {saudacao}, {nome}! Escolha seu plano abaixo:",
+                    message.from_user,
+                    flow_bot
+                )
+                sec_enabled = bool(welcome.get("secondary_enabled", False))
+                sec_msg = self._render_flow_vars(welcome.get("secondary_message") or "", message.from_user, flow_bot).strip()
+
+                if sec_enabled and sec_msg:
+                    await message.answer(main_msg, parse_mode="HTML")
+                    await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                    lead.setdefault("history", []).append({"role": "assistant", "content": f"{main_msg}\n\n{sec_msg}"})
+                else:
+                    await message.answer(main_msg, parse_mode="HTML", reply_markup=kb)
+                    lead.setdefault("history", []).append({"role": "assistant", "content": main_msg})
+
+                self._advance_stage(lead, "Viu os planos")
+                await self.state_saver(state)
+                self._schedule_flow_downsell(message.from_user, track="general")
+                return
 
             style = state.get("style", {})
             variations = [v.strip() for v in style.get("opening_variations", []) if v and v.strip()]
@@ -719,6 +905,226 @@ class ActiveBotManager:
             await callback.answer("Pagamento de teste aprovado!")
             await self.deliver_purchase_and_upsell(callback.from_user.id)
 
+        @self.dp.callback_query(F.data.startswith("fplan:"))
+        async def handle_flow_plan_click(callback: types.CallbackQuery):
+            try:
+                await callback.answer("Carregando oferta...")
+            except Exception:
+                pass
+            parts = callback.data.split(":")
+            plan_id = parts[1] if len(parts) > 1 else ""
+            disc_pct = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+
+            state = await self.state_getter()
+            fb = self._get_active_flow_bot(state)
+            if not fb:
+                return
+
+            active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+            if active_bumps:
+                await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=0)
+            else:
+                await self._generate_flow_checkout(callback, fb, state, plan_id, disc_pct, accepted_bumps=[])
+
+        @self.dp.callback_query(F.data.startswith("fbump:"))
+        async def handle_flow_bump_click(callback: types.CallbackQuery):
+            try:
+                await callback.answer("Processando...")
+            except Exception:
+                pass
+            parts = callback.data.split(":")
+            decision = parts[1] if len(parts) > 1 else "no"
+            plan_id = parts[2] if len(parts) > 2 else ""
+            disc_pct = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+            bump_idx = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
+
+            state = await self.state_getter()
+            fb = self._get_active_flow_bot(state)
+            if not fb:
+                return
+            lead = await self._get_or_create_lead(state, callback.from_user)
+            accepted_list = lead.setdefault("accepted_bump_indices", [])
+            if bump_idx == 0 and decision == "no" and not accepted_list:
+                pass
+            if decision == "yes" and bump_idx not in accepted_list:
+                accepted_list.append(bump_idx)
+            await self.state_saver(state)
+
+            active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+            next_idx = bump_idx + 1
+            if next_idx < len(active_bumps):
+                await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=next_idx)
+            else:
+                chosen_bumps = [active_bumps[i] for i in accepted_list if 0 <= i < len(active_bumps)]
+                lead["accepted_bump_indices"] = []
+                await self._generate_flow_checkout(callback, fb, state, plan_id, disc_pct, accepted_bumps=chosen_bumps)
+
+    async def _present_flow_order_bump(
+        self,
+        callback: types.CallbackQuery,
+        fb: Dict[str, Any],
+        plan_id: str,
+        disc_pct: int,
+        bump_index: int
+    ):
+        active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+        if bump_index >= len(active_bumps):
+            return
+        bump = active_bumps[bump_index]
+        chat_id = callback.message.chat.id if callback.message else callback.from_user.id
+        await self._send_flow_medias(chat_id, bump.get("medias", []))
+
+        color_emoji = {"Azul": "🔵 ", "Verde": "🟢 ", "Vermelho": "🔴 ", "Padrão": ""}
+        acc_text = (bump.get("accept_text") or "Adicionar ao pedido").strip()
+        rej_text = (bump.get("reject_text") or "Continuar sem o adicional").strip()
+        acc_pref = color_emoji.get(bump.get("accept_color", "Padrão"), "")
+        rej_pref = color_emoji.get(bump.get("reject_color", "Padrão"), "")
+
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"{acc_pref}{acc_text}", callback_data=f"fbump:yes:{plan_id}:{disc_pct}:{bump_index}")],
+            [InlineKeyboardButton(text=f"{rej_pref}{rej_text}", callback_data=f"fbump:no:{plan_id}:{disc_pct}:{bump_index}")]
+        ])
+
+        val_fmt = f"R$ {float(bump.get('price') or 0):.2f}".replace(".", ",")
+        offer_msg = (bump.get("offer_message") or "").strip()
+        if not offer_msg:
+            title = bump.get("title") or "Oferta Especial"
+            desc = bump.get("description") or ""
+            offer_msg = f"🎁 <b>{html.escape(title)}</b> (+{val_fmt})\n\n{html.escape(desc)}"
+
+        await self.bot.send_message(chat_id=chat_id, text=offer_msg, parse_mode="HTML", reply_markup=kb)
+
+    async def _generate_flow_checkout(
+        self,
+        callback: types.CallbackQuery,
+        fb: Dict[str, Any],
+        state: Dict[str, Any],
+        plan_id: str,
+        disc_pct: int,
+        accepted_bumps: List[Dict[str, Any]]
+    ):
+        lead = await self._get_or_create_lead(state, callback.from_user)
+        self._cancel_downsell(str(callback.from_user.id))
+
+        plan = None
+        for idx, p in enumerate(fb.get("plans", [])):
+            if str(p.get("id", f"plan_{idx+1}"))[:20] == plan_id:
+                plan = p
+                break
+        if not plan and fb.get("plans"):
+            plan = fb["plans"][0]
+
+        plan_name = (plan.get("name") if plan else "Plano VIP") or "Plano VIP"
+        base_price = float(plan.get("price", 19.90)) if plan else 19.90
+        discounted_price = round(base_price * (1.0 - disc_pct / 100.0), 2) if disc_pct > 0 else base_price
+        bump_total = sum(float(b.get("price") or 0) for b in accepted_bumps)
+        total_price = round(discounted_price + bump_total, 2)
+
+        if fb.get("price_variation", False):
+            total_price = round(total_price + random.randint(1, 9) / 100.0, 2)
+
+        if accepted_bumps:
+            bump_titles = " + ".join(b.get("title") or "Adicional" for b in accepted_bumps)
+            full_plan_label = f"{plan_name} (+ {bump_titles})"
+            deliverables = [b.get("deliverable", "").strip() for b in accepted_bumps if (b.get("deliverable") or "").strip()]
+            lead["accepted_bump_deliverable"] = "\n\n".join(deliverables)
+        else:
+            full_plan_label = plan_name
+            lead.pop("accepted_bump_deliverable", None)
+
+        lead["flow_plan_id"] = plan.get("id") if plan else ""
+        lead["flow_plan_price"] = total_price
+        lead["chosen_plan"] = full_plan_label
+        self._advance_stage(lead, "Escolheu um plano")
+        self._advance_stage(lead, "Gerou checkout")
+        self._update_lead_insights(state, lead, chosen_plan=full_plan_label)
+
+        learning = state.setdefault("learning", {})
+        learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
+
+        pub = state.get("publish", {})
+        pushin_token = pub.get("pushin_pay_token", "").strip()
+        gw_provider = pub.get("gateway_provider", "syncpay").strip()
+        gw_secret = pub.get("gateway_secret", "").strip()
+        cents = max(50, int(round(total_price * 100)))
+        pix_code = f"00020126580014br.gov.bcb.pix0136neurotbot-{cents}5204000053039865405{total_price:.2f}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD"
+        tx_id = f"sim_{int(datetime.utcnow().timestamp())}"
+
+        if pushin_token:
+            try:
+                client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
+                res = await client.create_pix_charge(
+                    value_in_cents=cents,
+                    client_name=callback.from_user.first_name or "Cliente VIP"
+                )
+                pix_code = res.get("qr_code") or pix_code
+                tx_id = str(res.get("id") or tx_id)
+            except Exception as e:
+                logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
+
+        lead["last_tx_id"] = tx_id
+        lead["last_tx_is_upsell"] = False
+        self.active_tx_map[tx_id] = callback.from_user.id
+
+        valor_str = f"R$ {total_price:.2f}".replace(".", ",")
+        pay_cfg = fb.get("payments", {})
+        pix_fmt_mode = pay_cfg.get("pix_format", "Código (monoespaçado)")
+        safe_pix = html.escape(pix_code)
+        if "bloco" in pix_fmt_mode.lower():
+            pix_code_formatted = f"<pre>{safe_pix}</pre>"
+        elif "simples" in pix_fmt_mode.lower():
+            pix_code_formatted = safe_pix
+        else:
+            pix_code_formatted = f"<code>{safe_pix}</code>"
+
+        gen_tmpl = pay_cfg.get("generated_message") or (
+            "⭐ <b>Você selecionou o seguinte plano:</b>\n\n"
+            "🎁 Plano: {plano}\n💲 Valor: {valor}\n\n"
+            "💎 Pague via Pix Copia e Cola:\n\n{pix_code}"
+        )
+        rendered_gen = self._render_flow_vars(
+            gen_tmpl,
+            callback.from_user,
+            fb,
+            plan_name=full_plan_label,
+            valor_str=valor_str,
+            pix_code_fmt=pix_code_formatted
+        )
+
+        chat_id = callback.message.chat.id if callback.message else callback.from_user.id
+        await self._send_flow_medias(chat_id, pay_cfg.get("generated_medias", []))
+
+        safe_cb = f"checkpix:{tx_id[:50]}"
+        confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Verificar pagamento", callback_data=safe_cb)]
+        ])
+
+        try:
+            await self.bot.send_message(chat_id=chat_id, text=rendered_gen, parse_mode="HTML", reply_markup=confirm_kb)
+        except Exception:
+            await self.bot.send_message(chat_id=chat_id, text=rendered_gen, reply_markup=confirm_kb)
+
+        if pay_cfg.get("secondary_enabled") and (pay_cfg.get("secondary_message") or "").strip():
+            sec_txt = self._render_flow_vars(
+                pay_cfg["secondary_message"],
+                callback.from_user,
+                fb,
+                plan_name=full_plan_label,
+                valor_str=valor_str,
+                pix_code_fmt=pix_code_formatted
+            )
+            await self.bot.send_message(chat_id=chat_id, text=sec_txt, parse_mode="HTML")
+
+        lead.setdefault("history", []).append({
+            "role": "assistant",
+            "content": f"[PIX Flow — {full_plan_label} ({valor_str})] {pix_code}"
+        })
+        await self.state_saver(state)
+
+        self._schedule_flow_downsell(callback.from_user, track="pix")
+        if pushin_token and not tx_id.startswith("sim_"):
+            asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret))
+
     def _build_input_file(self, url_or_b64: str, filename: str = "media.jpg"):
         if not url_or_b64:
             return None
@@ -762,6 +1168,7 @@ class ActiveBotManager:
     async def deliver_purchase_and_upsell(self, user_id: int):
         state = await self.state_getter()
         lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
+        self._cancel_downsell(str(user_id))
 
         is_upsell_payment = bool(lead.get("last_tx_is_upsell")) or lead.get("stage") in (
             "Escolheu upsell",
@@ -798,6 +1205,84 @@ class ActiveBotManager:
         if int(learning.get("unpaid_checkouts", 0)) > 0:
             learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
         self._update_lead_insights(state, lead)
+
+        flow_bot = self._get_active_flow_bot(state)
+        if flow_bot:
+            paid_val = float(lead.get("flow_plan_price") or 9.90)
+            flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
+            flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
+
+            plan_obj = None
+            for p in flow_bot.get("plans", []):
+                if str(p.get("id")) == str(lead.get("flow_plan_id")):
+                    plan_obj = p
+                    break
+            if not plan_obj and flow_bot.get("plans"):
+                plan_obj = flow_bot["plans"][0]
+
+            fb_deliv = flow_bot.get("fallback_delivery", {})
+            dest_type = (plan_obj.get("delivery_dest_type") if plan_obj else "Herdar do fluxo") or "Herdar do fluxo"
+            if dest_type == "Herdar do fluxo":
+                eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
+                ch_target = (fb_deliv.get("channel_id") or "").strip()
+                ext_url = (fb_deliv.get("external_url") or "").strip()
+            else:
+                eff_type = dest_type
+                ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
+                ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
+
+            invite_url = "https://t.me/+link_exclusivo_vip"
+            if eff_type == "Link externo" and ext_url:
+                invite_url = ext_url
+            elif ch_target and self.bot:
+                try:
+                    invite = await self.bot.create_chat_invite_link(
+                        chat_id=ch_target,
+                        member_limit=1,
+                        expire_date=datetime.utcnow() + timedelta(minutes=15)
+                    )
+                    invite_url = invite.invite_link
+                except Exception as e:
+                    logger.warning(f"Erro gerando link de convite no canal {ch_target}: {e}")
+
+            pay_cfg = flow_bot.get("payments", {})
+            await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []))
+
+            btn_txt = (pay_cfg.get("access_button_text") or "Acessar conteúdo").strip()
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=btn_txt, url=invite_url)]
+            ])
+            fake_user = types.User(id=user_id, is_bot=False, first_name=lead.get("first_name") or "Assinante")
+            app_tmpl = pay_cfg.get("approved_message") or (
+                "✅ <b>Pagamento Aprovado!</b>\n\n"
+                "Parabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n"
+                "🎉 Você já tem acesso ao conteúdo!"
+            )
+            rendered_app = self._render_flow_vars(
+                app_tmpl,
+                fake_user,
+                flow_bot,
+                plan_name=lead.get("chosen_plan") or "Plano VIP",
+                valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
+            )
+            await self.bot.send_message(chat_id=user_id, text=rendered_app, parse_mode="HTML", reply_markup=kb)
+
+            bump_deliv = (lead.get("accepted_bump_deliverable") or "").strip()
+            if bump_deliv:
+                await self.bot.send_message(
+                    chat_id=user_id,
+                    text=f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
+                    parse_mode="HTML"
+                )
+
+            self._advance_stage(lead, "Entrega concluída")
+            lead.setdefault("history", []).append({
+                "role": "assistant",
+                "content": "[Pagamento aprovado Flow — Entrega concluída]"
+            })
+            await self.state_saver(state)
+            return
+
         await self.state_saver(state)
 
         pub = state.get("publish", {})

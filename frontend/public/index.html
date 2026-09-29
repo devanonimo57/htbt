@@ -94,18 +94,849 @@
     }
     input:checked + .toggle-slider { background-color: #3b82f6; }
     input:checked + .toggle-slider:before { transform: translateX(17px); }
+
+    /* NEUROTBOT STYLES (FIEL AOS 12 PRINTS) */
+    .nb-grid-bg {
+      background-color: #0b0a08;
+      background-image:
+        radial-gradient(circle at 20% 0%, rgba(234, 179, 8, 0.09), transparent 38%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 100% 100%, 48px 48px, 48px 48px;
+    }
+    .nb-card {
+      background-color: #12110d;
+      border: 1px solid #232119;
+      border-radius: 12px;
+    }
+    .nb-input {
+      width: 100%;
+      background-color: #0c0b08;
+      border: 1px solid #26241b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #f4f4f0;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .nb-input:focus {
+      border-color: #eab308;
+    }
+    .nb-var-chip {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background-color: #181711;
+      border: 1px solid #2b291e;
+      color: #b8b5a8;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .nb-var-chip:hover {
+      border-color: #eab308;
+      color: #eab308;
+      background-color: #211e12;
+    }
+    .nb-toggle {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 21px;
+    }
+    .nb-toggle input { opacity: 0; width: 0; height: 0; }
+    .nb-toggle-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: #26251d; border-radius: 999px; transition: 0.2s;
+    }
+    .nb-toggle-slider:before {
+      position: absolute; content: ""; height: 15px; width: 15px;
+      left: 3px; bottom: 3px; background-color: #0b0a08; border-radius: 50%; transition: 0.2s;
+    }
+    .nb-toggle input:not(:checked) + .nb-toggle-slider:before {
+      background-color: #a1a19a;
+    }
+    .nb-toggle input:checked + .nb-toggle-slider {
+      background-color: #eab308;
+    }
+    .nb-toggle input:checked + .nb-toggle-slider:before {
+      transform: translateX(17px);
+      background-color: #0b0a08;
+    }
+    .nb-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #8c8a7e;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .nb-tab-btn:hover { color: #e4e2d8; }
+    .nb-tab-btn.active {
+      color: #ffffff;
+      font-weight: 600;
+      border-bottom-color: #eab308;
+    }
   </style>
 </head>
 <body class="h-screen flex flex-col select-none">
 
   <!-- Input oculto para upload real de arquivos de mídia -->
   <input type="file" id="hidden-media-upload" class="hidden" accept="image/*,video/*,audio/*" onchange="handleRealFileUpload(event)">
+  <input type="file" id="nb-hidden-media-input" class="hidden" accept="image/*,video/*,audio/*" onchange="nbHandleMediaUpload(event)">
+
+  <!-- =========================================================
+       WORKSPACE 1 (TELA INICIAL): NEUROTBOT — MEUS BOTS E GERENCIADOR DE FLUXO
+  ========================================================== -->
+  <div id="workspace-neurotbot" class="h-screen flex flex-col w-full nb-grid-bg text-[#f3f3ee] overflow-hidden relative">
+
+    <!-- TOP BAR NEUROTBOT -->
+    <header class="h-14 border-b border-[#1f1e16] bg-[#0b0a08]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
+      <div class="flex items-center gap-2.5 cursor-pointer" onclick="nbBackToBotsList()">
+        <div class="w-7 h-7 rounded-md bg-[#eab308] text-black flex items-center justify-center font-bold text-xs shadow-sm">
+          <i class="fa-solid fa-bolt"></i>
+        </div>
+        <span class="text-sm font-bold tracking-tight text-white">neurotbot</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="switchWorkspace('ai')" class="px-3.5 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222017] border border-[#2e2b1f] text-xs font-semibold text-[#eab308] flex items-center gap-2 transition" title="Ir para Meus Fluxos (Modo IA)">
+          <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
+          <span>Meus Fluxos (Modo IA)</span>
+        </button>
+        <button onclick="nbOpenGatewayModal()" class="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Configurar Gateway PIX">
+          <i class="fa-regular fa-sun"></i>
+        </button>
+        <button onclick="switchWorkspace('ai')" class="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Conta e IA">
+          <i class="fa-regular fa-user"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ÁREA CENTRAL ROLÁVEL -->
+    <div class="flex-1 overflow-y-auto pb-28">
+
+      <!-- =====================================================
+           TELA 1 (PRINT 1): MEUS BOTS — BOTS CONECTADOS
+      ====================================================== -->
+      <div id="nb-view-bots-list" class="max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">MEUS BOTS</span>
+            <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
+            <p class="text-xs text-zinc-400 mt-1">Organize por pasta e acompanhe o status de cada bot.</p>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <button onclick="nbOpenFolderModal()" class="px-4 py-2 rounded-lg bg-[#14130f] hover:bg-[#1d1c16] border border-[#2a281e] text-xs font-medium text-zinc-200 flex items-center gap-2 transition">
+              <i class="fa-regular fa-folder-open text-xs text-zinc-400"></i>
+              <span>Nova pasta</span>
+            </button>
+            <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shadow-lg shadow-yellow-950/30 transition">
+              <i class="fa-solid fa-plus text-[11px]"></i>
+              <span>Adicionar bot</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PILLS DE PASTAS -->
+        <div id="nb-folder-pills" class="flex items-center gap-2 flex-wrap pt-1"></div>
+
+        <!-- GRADE DE CARDS DOS BOTS CONECTADOS -->
+        <div id="nb-bots-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1"></div>
+      </div>
+
+      <!-- =====================================================
+           TELA 2 (PRINTS 2 A 12): GERENCIAR O BOT SELECIONADO
+      ====================================================== -->
+      <div id="nb-view-bot-detail" class="hidden max-w-[1020px] mx-auto px-8 pt-8 space-y-6">
+
+        <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) -->
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
+              <i class="fa-solid fa-chevron-left text-[10px]"></i>
+              <span>Voltar</span>
+            </button>
+            <h2 id="nb-det-username" class="text-lg font-bold text-white">@rocha7_bot</h2>
+            <span id="nb-det-botid" class="text-xs text-zinc-500 font-mono">ID 8686296179</span>
+            <span id="nb-det-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950/70 text-emerald-400 border border-emerald-800/50">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ativo
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="nbOpenBotInAiMode()" class="px-3.5 py-1.5 rounded-lg bg-[#191710] hover:bg-[#252216] border border-[#332f1f] text-xs font-semibold text-[#eab308] flex items-center gap-1.5 transition" title="Configurar este bot com Inteligência Artificial (Meus Fluxos)">
+              <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+              <span>Meus Fluxos (Modo IA)</span>
+            </button>
+            <button id="nb-det-deactivate-btn" onclick="nbToggleCurrentBotActive()" class="px-4 py-1.5 rounded-lg bg-[#14130f] hover:bg-[#1f1d17] border border-[#2b291f] text-xs font-semibold text-zinc-200 transition">
+              Desativar
+            </button>
+            <button onclick="nbOpenEditTokenModal()" class="w-8 h-8 rounded-lg bg-[#14130f] hover:bg-[#1f1d17] border border-[#2b291f] text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Editar Token ou Excluir Bot">
+              <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- SUB-ABAS: Boas-vindas | Planos | Downsell | Order Bump | Pagamentos -->
+        <div class="border-b border-[#222018] flex items-center gap-2 overflow-x-auto">
+          <button onclick="nbSwitchBotTab('welcome')" id="nbtab-btn-welcome" class="nb-tab-btn active">
+            <i class="fa-regular fa-comment-dots text-xs"></i>
+            <span>Boas-vindas</span>
+          </button>
+          <button onclick="nbSwitchBotTab('plans')" id="nbtab-btn-plans" class="nb-tab-btn">
+            <i class="fa-solid fa-cube text-xs"></i>
+            <span>Planos</span>
+          </button>
+          <button onclick="nbSwitchBotTab('downsell')" id="nbtab-btn-downsell" class="nb-tab-btn">
+            <i class="fa-solid fa-arrow-trend-down text-xs"></i>
+            <span>Downsell</span>
+          </button>
+          <button onclick="nbSwitchBotTab('orderbump')" id="nbtab-btn-orderbump" class="nb-tab-btn">
+            <i class="fa-solid fa-gift text-xs"></i>
+            <span>Order Bump</span>
+          </button>
+          <button onclick="nbSwitchBotTab('payments')" id="nbtab-btn-payments" class="nb-tab-btn">
+            <i class="fa-regular fa-credit-card text-xs"></i>
+            <span>Pagamentos</span>
+          </button>
+        </div>
+
+        <!-- ===================================================
+             ABA 1: BOAS-VINDAS (PRINTS 2 & 3)
+        ==================================================== -->
+        <div id="nbtab-panel-welcome" class="nb-subtab-panel space-y-5">
+          <div class="nb-card p-5 space-y-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+              <h3 class="text-xs font-bold text-white">Boas-vindas</h3>
+            </div>
+            <div class="border-t border-[#1e1d15] pt-3">
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                O que o cliente recebe ao dar /start: primeiro as mídias abaixo (uma a uma ou em álbum) e, logo depois, esta mensagem — com <strong class="text-white font-semibold">os planos como botões nela mesma</strong>. As variáveis são substituídas pelos dados do cliente no envio.
+              </p>
+            </div>
+          </div>
+
+          <div class="nb-card p-5 space-y-4">
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+              <textarea id="nb-welcome-msg" rows="4" maxlength="4000" oninput="nbOnWelcomeInput()" placeholder="Digite a mensagem de boas-vindas..." class="nb-input resize-y"></textarea>
+              <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-welcome-counter">0/4000 caracteres</div>
+            </div>
+
+            <div class="space-y-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">INSERIR VARIÁVEL</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{saudacao}')" class="nb-var-chip">{saudacao}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{nome}')" class="nb-var-chip">{nome}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{estado}')" class="nb-var-chip">{estado}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{uf}')" class="nb-var-chip">{uf}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{cidade}')" class="nb-var-chip">{cidade}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{localizacao}')" class="nb-var-chip">{localizacao}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{bot.nome}')" class="nb-var-chip">{bot.nome}</button>
+                <button type="button" onclick="nbInsertVar('nb-welcome-msg', '{bot.username}')" class="nb-var-chip">{bot.username}</button>
+              </div>
+              <p class="text-[11px] text-zinc-500">Localidades são sempre brasileiras e {saudacao} segue o horário de Brasília.</p>
+            </div>
+
+            <div class="border-t border-[#1e1d15] pt-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-white">Mídias (opcional)</span>
+                <span id="nb-welcome-media-count" class="text-xs text-zinc-500 font-mono">0/3</span>
+              </div>
+              <div class="flex items-center gap-4">
+                <button type="button" onclick="nbTriggerMediaUpload('welcome')" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                  <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                  <span>Adicionar mídia</span>
+                </button>
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                  <span class="nb-toggle">
+                    <input type="checkbox" id="nb-welcome-uncompressed" onchange="nbOnWelcomeInput()">
+                    <span class="nb-toggle-slider"></span>
+                  </span>
+                  <span>Enviar sem compressão</span>
+                </label>
+              </div>
+              <div id="nb-welcome-medias-list" class="flex flex-wrap gap-2.5"></div>
+              <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+            </div>
+          </div>
+
+          <!-- MENSAGEM SECUNDÁRIA -->
+          <div class="nb-card p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
+              </div>
+              <label class="nb-toggle">
+                <input type="checkbox" id="nb-welcome-sec-enabled" onchange="nbOnWelcomeInput()">
+                <span class="nb-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="border-t border-[#1e1d15] pt-3 space-y-3">
+              <p class="text-xs text-zinc-400">Separada da mensagem principal. Quando habilitada, os botões (planos e os demais configurados) saem da mensagem principal e vão só nesta.</p>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-2">MENSAGEM</label>
+                <textarea id="nb-welcome-sec-msg" rows="3" maxlength="4000" oninput="nbOnWelcomeInput()" placeholder="Mensagem secundária opcional..." class="nb-input resize-y"></textarea>
+                <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-welcome-sec-counter">0/4000 caracteres</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 pt-1">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+              Salvar alterações
+            </button>
+            <span id="nb-welcome-validation" class="text-xs text-rose-400">A mensagem de boas-vindas é obrigatória.</span>
+          </div>
+        </div>
+
+        <!-- ===================================================
+             ABA 2: PLANOS (PRINTS 4 & 5)
+        ==================================================== -->
+        <div id="nbtab-panel-plans" class="nb-subtab-panel hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+            <!-- COLUNA ESQUERDA: PLANOS DE PAGAMENTO (8 COLUNAS) -->
+            <div class="lg:col-span-8 nb-card p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <h3 class="text-xs font-bold text-white">Planos de pagamento</h3>
+                </div>
+                <span id="nb-plans-count-badge" class="text-xs text-zinc-500 font-mono">01 / 10</span>
+              </div>
+
+              <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
+                <p class="text-xs text-zinc-400">Configure até 10 planos com entregas personalizadas.</p>
+                <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shrink-0 transition">
+                  <i class="fa-solid fa-plus text-[10px]"></i>
+                  <span>Novo plano</span>
+                </button>
+              </div>
+
+              <!-- LISTA DE PLANOS ACORDEÃO -->
+              <div id="nb-plans-accordion" class="space-y-3 pt-1"></div>
+            </div>
+
+            <!-- COLUNA DIREITA: ENTREGA PADRÃO (FALLBACK) + VARIAÇÃO DE PREÇO (4 COLUNAS) -->
+            <div class="lg:col-span-4 space-y-4">
+              <div class="nb-card p-5 space-y-4">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <h3 class="text-xs font-bold text-white">Entrega padrão (fallback)</h3>
+                </div>
+
+                <p class="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-cube text-[10px] text-zinc-500"></i>
+                  <span>Usada quando o plano está em "Herdar do fluxo".</span>
+                </p>
+
+                <div>
+                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1.5">Destino da entrega <span class="text-[#eab308]">*</span></label>
+                  <div class="flex border-b border-[#25231a] text-xs">
+                    <button type="button" id="nb-fb-tab-channel" onclick="nbSetFallbackType('Canal ou grupo')" class="px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]">Canal ou grupo</button>
+                    <button type="button" id="nb-fb-tab-external" onclick="nbSetFallbackType('Link externo')" class="px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent">Link externo</button>
+                  </div>
+                </div>
+
+                <div id="nb-fb-channel-box" class="space-y-3">
+                  <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#eab308]">*</span></span>
+                    <button type="button" onclick="nbSyncFallbackChannel()" class="text-[11px] text-zinc-400 hover:text-[#eab308] flex items-center gap-1 transition">
+                      <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
+                    </button>
+                  </div>
+
+                  <div class="p-3 rounded-lg bg-[#16150f] border border-[#2e2b1d] flex items-center justify-between">
+                    <div>
+                      <div class="flex items-center gap-1.5 text-xs font-bold text-white">
+                        <i class="fa-solid fa-bullhorn text-[11px] text-zinc-400"></i>
+                        <span id="nb-fb-ch-name">Rocha VENDAS</span>
+                        <i class="fa-solid fa-check text-emerald-400 text-[10px]"></i>
+                      </div>
+                      <span id="nb-fb-ch-id" class="text-[11px] text-zinc-500 font-mono block mt-0.5">Canal · -1003939135982</span>
+                    </div>
+                  </div>
+
+                  <p id="nb-fb-verified-at" class="text-[11px] text-zinc-500">Última verificação: hoje</p>
+
+                  <button type="button" onclick="nbPromptFallbackChannelId()" class="px-3 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-plus text-[10px]"></i> Adicionar por ID
+                  </button>
+
+                  <p class="text-[11px] text-zinc-500 leading-relaxed">O bot precisa ser administrador com permissão de convidar. O link enviado é de uso único e expira em 15 minutos.</p>
+                </div>
+
+                <div id="nb-fb-external-box" class="hidden space-y-2">
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">URL DE ENTREGA EXTERNA</label>
+                  <input type="text" id="nb-fb-ext-url" oninput="nbOnFallbackUrlInput()" placeholder="https://t.me/+seu_link" class="nb-input">
+                </div>
+
+                <div class="p-3 rounded-lg bg-[#0e0d0a] border border-[#222018] text-[11px] text-zinc-400 flex items-start gap-2">
+                  <i class="fa-solid fa-circle-info text-zinc-500 mt-0.5"></i>
+                  <span>Vale para todo plano marcado como "Herdar do fluxo". Cada plano pode ter a própria entrega personalizada.</span>
+                </div>
+              </div>
+
+              <!-- VARIAÇÃO DE PREÇO -->
+              <div class="nb-card p-5 space-y-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <h3 class="text-xs font-bold text-white">Variação de preço</h3>
+                </div>
+                <div class="border-t border-[#1e1d15] pt-3 flex items-start justify-between gap-3">
+                  <p class="text-[11px] text-zinc-400 leading-relaxed">Dá a cada cliente um valor único em centavos, impedindo que dois clientes reaproveitem o mesmo comprovante.</p>
+                  <label class="nb-toggle shrink-0 mt-0.5">
+                    <input type="checkbox" id="nb-price-variation" onchange="nbOnPriceVariationToggle()">
+                    <span class="nb-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+                Salvar alterações
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ===================================================
+             ABA 3: DOWNSELL (PRINTS 6 & 7)
+        ==================================================== -->
+        <div id="nbtab-panel-downsell" class="nb-subtab-panel hidden space-y-5">
+          <div class="inline-flex p-1 rounded-lg bg-[#14130f] border border-[#25231b]">
+            <button type="button" id="nb-ds-pill-general" onclick="nbSwitchDownsellTrack('general')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition">Geral</button>
+            <button type="button" id="nb-ds-pill-pix" onclick="nbSwitchDownsellTrack('pix')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition">PIX Gerado</button>
+          </div>
+
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <h3 id="nb-ds-header-title" class="text-xs font-bold text-white">Downsell — Geral</h3>
+              </div>
+              <div class="flex items-center gap-3">
+                <span id="nb-ds-count-badge" class="text-xs text-zinc-500 font-mono">1/20</span>
+                <label class="nb-toggle">
+                  <input type="checkbox" id="nb-ds-enabled-toggle" onchange="nbOnDownsellToggle()">
+                  <span class="nb-toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="border-t border-[#1e1d15] pt-3">
+              <p id="nb-ds-header-desc" class="text-xs text-zinc-400">Sequências enviadas após o /start para leads que não compraram. Recupere vendas com ofertas alternativas.</p>
+            </div>
+          </div>
+
+          <!-- LISTA DE SEQUÊNCIAS DO DOWNSELL -->
+          <div id="nb-ds-sequences-container" class="space-y-4"></div>
+
+          <!-- BOTÃO ADICIONAR SEQUÊNCIA -->
+          <button type="button" onclick="nbAddDownsellSequence()" class="w-full py-3.5 rounded-xl border border-dashed border-[#eab308]/60 hover:border-[#eab308] bg-[#14120b]/60 hover:bg-[#1c190f] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-plus text-[11px] text-[#eab308]"></i>
+            <span>Adicionar sequência</span>
+          </button>
+
+          <div class="flex items-center gap-4 pt-1">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+              Salvar alterações
+            </button>
+            <span id="nb-ds-validation" class="text-xs text-rose-400"></span>
+          </div>
+        </div>
+
+        <!-- ===================================================
+             ABA 4: ORDER BUMP (PRINTS 8 & 9)
+        ==================================================== -->
+        <div id="nbtab-panel-orderbump" class="nb-subtab-panel hidden space-y-5">
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <h3 class="text-xs font-bold text-white">Order bump</h3>
+              </div>
+              <span id="nb-ob-count-badge" class="text-xs text-zinc-500 font-mono">00 / 10</span>
+            </div>
+
+            <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
+              <p class="text-xs text-zinc-400 leading-relaxed max-w-2xl">Ofertas de acréscimo mostradas antes do PIX, após o clique em qualquer plano do fluxo principal ou do downsell. Até 10 bumps; todos os ativos são oferecidos em sequência, e o valor aceito soma ao do plano.</p>
+              <button type="button" onclick="nbOpenOrderBumpForm(-1)" class="px-3.5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shrink-0 transition">
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>Novo order bump</span>
+              </button>
+            </div>
+
+            <!-- LISTA DE ORDER BUMPS JÁ CRIADOS -->
+            <div id="nb-ob-saved-list" class="space-y-2.5 pt-2"></div>
+
+            <!-- FORMULÁRIO NOVO / EDITAR ORDER BUMP (FIEL AOS PRINTS 8 E 9) -->
+            <div id="nb-ob-form-wrapper" class="border-l-2 border-[#eab308] pl-5 pt-3 space-y-4 mt-4">
+              <h4 id="nb-ob-form-title" class="text-xs font-bold text-white">Novo order bump</h4>
+
+              <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-white font-medium">
+                <input type="checkbox" id="nb-ob-active" checked class="w-4 h-4 accent-[#3b82f6] rounded">
+                <span>Ativo</span>
+              </label>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">TÍTULO</label>
+                  <input type="text" id="nb-ob-title" placeholder="Ex.: E-book bônus" class="nb-input">
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">VALOR (R$)</label>
+                  <input type="text" id="nb-ob-price" placeholder="9,90" class="nb-input">
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCRIÇÃO</label>
+                <textarea id="nb-ob-desc" rows="2" placeholder="O que é esse adicional (mostrado ao cliente na oferta)" class="nb-input resize-y"></textarea>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">ENTREGÁVEL</label>
+                <textarea id="nb-ob-deliverable" rows="2" placeholder="Texto ou link mandado direto ao cliente quando o pagamento é aprovado" class="nb-input resize-y"></textarea>
+              </div>
+
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM DA OFERTA</label>
+                <textarea id="nb-ob-offer-msg" rows="2" placeholder="Convite mostrado antes dos botões de aceitar/recusar" class="nb-input resize-y"></textarea>
+              </div>
+
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">Mídias</span>
+                  <span id="nb-ob-media-count" class="text-xs text-zinc-500 font-mono">0/3</span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <button type="button" onclick="nbTriggerMediaUpload('orderbump')" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                    <span>Adicionar mídia</span>
+                  </button>
+                  <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                    <span class="nb-toggle">
+                      <input type="checkbox" id="nb-ob-uncompressed">
+                      <span class="nb-toggle-slider"></span>
+                    </span>
+                    <span>Enviar sem compressão</span>
+                  </label>
+                </div>
+                <div id="nb-ob-medias-list" class="flex flex-wrap gap-2"></div>
+                <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+              </div>
+
+              <!-- 2 BOXES LADO A LADO: BOTÃO DE ACEITAR & BOTÃO DE REJEITAR -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div class="p-4 rounded-xl bg-[#0e0d0a] border border-[#232119] space-y-3">
+                  <h5 class="text-xs font-bold text-white">Botão de aceitar</h5>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">TEXTO</label>
+                    <input type="text" id="nb-ob-accept-text" value="Adicionar ao pedido" class="nb-input">
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">COR</label>
+                    <div id="nb-ob-accept-colors" class="flex items-center gap-3 text-xs border-b border-[#222018] pt-1"></div>
+                  </div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-[#0e0d0a] border border-[#232119] space-y-3">
+                  <h5 class="text-xs font-bold text-white">Botão de rejeitar</h5>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">TEXTO</label>
+                    <input type="text" id="nb-ob-reject-text" value="Continuar sem o adicional" class="nb-input">
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1">COR</label>
+                    <div id="nb-ob-reject-colors" class="flex items-center gap-3 text-xs border-b border-[#222018] pt-1"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4 pt-2">
+                <button type="button" onclick="nbSaveOrderBumpForm()" id="nb-ob-submit-btn" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+                  Criar order bump
+                </button>
+                <button type="button" onclick="nbResetOrderBumpForm()" class="text-xs text-zinc-400 hover:text-white transition">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================
+             ABA 5: PAGAMENTOS (PRINTS 10, 11 & 12)
+        ==================================================== -->
+        <div id="nbtab-panel-payments" class="nb-subtab-panel hidden space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="inline-flex p-1 rounded-lg bg-[#14130f] border border-[#25231b]">
+              <button type="button" id="nb-pay-pill-gen" onclick="nbSwitchPaymentSubtab('generated')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition">Pagamento Gerado</button>
+              <button type="button" id="nb-pay-pill-app" onclick="nbSwitchPaymentSubtab('approved')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition">Pagamento Aprovado</button>
+            </div>
+
+            <button type="button" onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#16150f] hover:bg-[#222017] border border-[#2e2b1d] text-xs font-semibold text-[#eab308] flex items-center gap-2 transition">
+              <i class="fa-solid fa-key text-[11px]"></i>
+              <span>Credenciais do Gateway PIX</span>
+            </button>
+          </div>
+
+          <!-- SUB-ABA: PAGAMENTO GERADO (PRINTS 10 & 11) -->
+          <div id="nb-pay-panel-generated" class="space-y-5">
+            <div class="nb-card p-5 space-y-4">
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+                <textarea id="nb-pay-gen-msg" rows="10" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
+                <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-gen-counter">0/4000 caracteres</div>
+              </div>
+
+              <div class="space-y-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">INSERIR VARIÁVEL</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{saudacao}')" class="nb-var-chip">{saudacao}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{nome}')" class="nb-var-chip">{nome}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{plano}')" class="nb-var-chip">{plano}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{valor}')" class="nb-var-chip">{valor}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{uf}')" class="nb-var-chip">{uf}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-gen-msg', '{pix_code}')" class="nb-var-chip">{pix_code}</button>
+                </div>
+                <p class="text-[11px] text-zinc-500">{pix_code} é obrigatória — sem ela o PIX não chega ao cliente.</p>
+              </div>
+
+              <div class="border-t border-[#1e1d15] pt-4 max-w-sm space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">FORMATO DO CÓDIGO PIX</label>
+                <select id="nb-pay-pix-format" onchange="nbOnPaymentsInput()" class="nb-input !border-[#eab308]">
+                  <option value="Código (monoespaçado)">Código (monoespaçado)</option>
+                  <option value="Bloco de código">Bloco de código</option>
+                  <option value="Texto simples">Texto simples</option>
+                </select>
+                <p class="text-[11px] text-zinc-500">Como o {pix_code} aparece dentro da mensagem.</p>
+              </div>
+
+              <div class="border-t border-[#1e1d15] pt-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">Mídias (opcional)</span>
+                  <span id="nb-pay-gen-media-count" class="text-xs text-zinc-500 font-mono">0/3</span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <button type="button" onclick="nbTriggerMediaUpload('pay_gen')" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                    <span>Adicionar mídia</span>
+                  </button>
+                  <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                    <span class="nb-toggle">
+                      <input type="checkbox" id="nb-pay-gen-uncompressed" onchange="nbOnPaymentsInput()">
+                      <span class="nb-toggle-slider"></span>
+                    </span>
+                    <span>Enviar sem compressão</span>
+                  </label>
+                </div>
+                <div id="nb-pay-gen-medias-list" class="flex flex-wrap gap-2"></div>
+                <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+              </div>
+            </div>
+
+            <div class="nb-card p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
+                </div>
+                <label class="nb-toggle">
+                  <input type="checkbox" id="nb-pay-sec-enabled" onchange="nbOnPaymentsInput()">
+                  <span class="nb-toggle-slider"></span>
+                </label>
+              </div>
+              <div class="border-t border-[#1e1d15] pt-3 space-y-3">
+                <p class="text-xs text-zinc-400">Enviada logo após a mensagem principal (com o {pix_code}). Sem botão.</p>
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block mb-1.5">MENSAGEM</label>
+                  <textarea id="nb-pay-sec-msg" rows="3" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y"></textarea>
+                  <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-sec-counter">0/4000 caracteres</div>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+              Salvar alterações
+            </button>
+          </div>
+
+          <!-- SUB-ABA: PAGAMENTO APROVADO (PRINT 12) -->
+          <div id="nb-pay-panel-approved" class="hidden space-y-5">
+            <div class="nb-card p-5 space-y-4">
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+                <textarea id="nb-pay-app-msg" rows="6" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
+                <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-app-counter">0/4000 caracteres</div>
+              </div>
+
+              <div class="space-y-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">INSERIR VARIÁVEL</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button" onclick="nbInsertVar('nb-pay-app-msg', '{saudacao}')" class="nb-var-chip">{saudacao}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-app-msg', '{nome}')" class="nb-var-chip">{nome}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-app-msg', '{plano}')" class="nb-var-chip">{plano}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-app-msg', '{valor}')" class="nb-var-chip">{valor}</button>
+                  <button type="button" onclick="nbInsertVar('nb-pay-app-msg', '{uf}')" class="nb-var-chip">{uf}</button>
+                </div>
+              </div>
+
+              <div class="border-t border-[#1e1d15] pt-4 max-w-sm space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">TEXTO DO BOTÃO DE ACESSO</label>
+                <input type="text" id="nb-pay-access-btn" oninput="nbOnPaymentsInput()" value="Acessar conteúdo" class="nb-input">
+                <p class="text-[11px] text-zinc-500 leading-relaxed">Usado quando a entrega é canal/grupo ou link externo. Entrega por mensagem de texto não tem botão.</p>
+              </div>
+
+              <div class="border-t border-[#1e1d15] pt-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">Mídias (opcional)</span>
+                  <span id="nb-pay-app-media-count" class="text-xs text-zinc-500 font-mono">0/3</span>
+                </div>
+                <div class="flex items-center gap-4">
+                  <button type="button" onclick="nbTriggerMediaUpload('pay_app')" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                    <span>Adicionar mídia</span>
+                  </button>
+                  <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                    <span class="nb-toggle">
+                      <input type="checkbox" id="nb-pay-app-uncompressed" onchange="nbOnPaymentsInput()">
+                      <span class="nb-toggle-slider"></span>
+                    </span>
+                    <span>Enviar sem compressão</span>
+                  </label>
+                </div>
+                <div id="nb-pay-app-medias-list" class="flex flex-wrap gap-2"></div>
+                <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+              </div>
+            </div>
+
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+              Salvar alterações
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- DOCK INFERIOR FLUTUANTE FIEL AOS PRINTS -->
+    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#14130f]/95 border border-[#29271d] shadow-2xl backdrop-blur">
+      <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Visão Geral">
+        <i class="fa-solid fa-border-all"></i>
+      </button>
+      <div class="relative">
+        <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl bg-[#eab308] text-black flex items-center justify-center text-sm font-bold shadow-md transition" title="Meus Bots">
+          <i class="fa-solid fa-robot"></i>
+        </button>
+        <span class="w-1 h-1 rounded-full bg-[#eab308] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+      <button onclick="nbOpenGatewayModal()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Carteira / Gateway PIX">
+        <i class="fa-solid fa-wallet"></i>
+      </button>
+      <button onclick="switchWorkspace('ai'); navigateTab('memoria');" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Leads & Vendas">
+        <i class="fa-regular fa-credit-card"></i>
+      </button>
+      <button onclick="switchWorkspace('ai')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-[#eab308] hover:bg-white/5 flex items-center justify-center text-sm transition" title="Meus Fluxos (Modo IA)">
+        <i class="fa-solid fa-user-gear"></i>
+      </button>
+      <div class="h-5 w-[1px] bg-[#29271d] mx-1"></div>
+      <button onclick="switchWorkspace('ai')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Alternar para Modo IA">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+      </button>
+    </div>
+
+    <!-- MODAL: ADICIONAR / EDITAR BOT -->
+    <div id="nb-modal-bot" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#333022]">
+        <div class="flex items-center justify-between">
+          <h3 id="nb-modal-bot-title" class="text-sm font-bold text-white">Conectar Bot do Telegram</h3>
+          <button onclick="nbCloseBotModal()" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">TOKEN DO BOT (@BotFather) *</label>
+            <input type="text" id="nb-inp-bot-token" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">PASTA (OPCIONAL)</label>
+              <select id="nb-inp-bot-folder" class="nb-input"></select>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">MODO DE OPERAÇÃO</label>
+              <select id="nb-inp-bot-mode" class="nb-input">
+                <option value="flow">Fluxo de Botões (NeurotBot)</option>
+                <option value="ai">Modo IA Conversacional</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <button type="button" id="nb-btn-delete-bot" onclick="nbDeleteEditingBot()" class="hidden text-xs font-semibold text-rose-400 hover:text-rose-300">
+            <i class="fa-regular fa-trash-can mr-1"></i> Excluir bot
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#181711] text-xs text-zinc-300 hover:text-white">Cancelar</button>
+            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black">Salvar e Conectar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: GATEWAY PIX -->
+    <div id="nb-modal-gateway" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#333022]">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white">Configurar Gateway PIX</h3>
+          <button onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">PROVEDOR PIX</label>
+            <select id="nb-gw-provider" class="nb-input">
+              <option value="syncpay">SyncPay</option>
+              <option value="pushinpay">PushinPay</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">CLIENT ID / TOKEN PRINCIPAL</label>
+            <input type="text" id="nb-gw-token" placeholder="Client ID ou Bearer Token" class="nb-input font-mono">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">CLIENT SECRET (SYNCPAY)</label>
+            <input type="password" id="nb-gw-secret" placeholder="Client Secret (se usar SyncPay)" class="nb-input font-mono">
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-[#181711] text-xs text-zinc-300">Fechar</button>
+          <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black">Salvar Gateway</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- =========================================================
+       WORKSPACE 2: MODO IA (SHARKBOT) — ACESSADO VIA MEUS BOTS / MEUS FLUXOS
+  ========================================================== -->
+  <div id="workspace-ai-mode" class="hidden h-screen flex flex-col w-full">
 
   <!-- TOP HEADER BAR FIEL AO SHARKBOT -->
   <header class="h-16 bg-[#08090d] border-b border-[#141722] px-5 flex items-center justify-between shrink-0 z-20">
     <div class="flex items-center gap-3.5">
-      <button onclick="navigateTab('resumo')" class="w-10 h-10 rounded-xl bg-[#0e1017] border border-[#1e2333] hover:border-slate-600 flex items-center justify-center text-slate-400 hover:text-white transition">
-        <i class="fa-solid fa-chevron-left text-sm"></i>
+      <button onclick="switchWorkspace('neurotbot')" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#0e1017] border border-[#1e2333] hover:border-[#eab308] flex items-center justify-center gap-2 text-slate-300 hover:text-[#eab308] text-xs font-semibold transition">
+        <i class="fa-solid fa-chevron-left text-xs"></i>
+        <span>Meus Bots</span>
       </button>
       <div>
         <div class="flex items-center gap-1.5 mb-0.5">
@@ -2403,6 +3234,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         </form>
     </aside>
 
+  </div>
   </div>
 
   <!-- =========================================================
@@ -4777,8 +5609,1323 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       syncStateToInputs();
+      nbInitNeurotBot();
       markSaved();
       startBrowserTelegramFallbackIfNeeded();
+    }
+
+    // =========================================================
+    // NEUROTBOT CONTROLLER (MEUS BOTS + 5 ABAS DE GERENCIAMENTO)
+    // =========================================================
+    let NB_SELECTED_FOLDER = "Todas";
+    let NB_CURRENT_BOT_ID = null;
+    let NB_CURRENT_SUBTAB = "welcome";
+    let NB_DOWNSELL_TRACK = "general";
+    let NB_PAYMENT_SUBTAB = "generated";
+    let NB_EDITING_BOT_ID = null;
+    let NB_EDITING_BUMP_IDX = -1;
+    let NB_OB_ACCEPT_COLOR = "Padrão";
+    let NB_OB_REJECT_COLOR = "Padrão";
+    let NB_OB_TEMP_MEDIAS = [];
+    let NB_MEDIA_TARGET = null; // { section: 'welcome' | 'downsell' | 'orderbump' | 'pay_gen' | 'pay_app', seqIdx?: number }
+
+    function switchWorkspace(mode) {
+      const nb = document.getElementById('workspace-neurotbot');
+      const ai = document.getElementById('workspace-ai-mode');
+      if (mode === 'ai') {
+        if (nb) nb.classList.add('hidden');
+        if (ai) ai.classList.remove('hidden');
+      } else {
+        if (ai) ai.classList.add('hidden');
+        if (nb) nb.classList.remove('hidden');
+        nbRenderBotsList();
+      }
+    }
+
+    function nbBuildDefaultBotObj(pub = {}) {
+      const tok = (pub.bot_token || "").trim();
+      const botId = tok.includes(":") ? tok.split(":")[0] : "8686296179";
+      let uname = (pub.bot_username || "@rocha7_bot").trim();
+      if (!uname.startsWith("@")) uname = "@" + uname;
+      const chId = (pub.cache_channel_id || "-1003939135982").trim();
+      return {
+        id: "bot_" + Date.now(),
+        username: uname,
+        bot_id: botId,
+        first_name: pub.bot_first_name || uname.replace("@", ""),
+        token: tok,
+        active: pub.is_live !== false,
+        mode: "flow",
+        folder: "",
+        sales_today: 0,
+        revenue_today: 0.0,
+        welcome: {
+          message: "",
+          medias: [],
+          send_uncompressed: false,
+          secondary_enabled: false,
+          secondary_message: ""
+        },
+        plans: [
+          {
+            id: "plan_1",
+            name: "aa",
+            price: 9.90,
+            duration: "Vitalício",
+            button_color: "Padrão",
+            delivery_dest_type: "Canal ou grupo",
+            delivery_channel_id: chId,
+            delivery_channel_name: "Rocha VENDAS",
+            delivery_external_url: "",
+            expanded: true
+          }
+        ],
+        fallback_delivery: {
+          dest_type: "Canal ou grupo",
+          channel_id: chId,
+          channel_name: "Rocha VENDAS",
+          external_url: "",
+          last_verified: "28/09, 09:23"
+        },
+        price_variation: false,
+        downsell_general: {
+          enabled: true,
+          sequences: [
+            {
+              id: "seq_1",
+              delay_minutes: 10,
+              discount: "Sem desconto",
+              plan_ids: ["plan_1"],
+              message: "",
+              medias: [],
+              send_uncompressed: false
+            }
+          ]
+        },
+        downsell_pix: {
+          enabled: false,
+          sequences: []
+        },
+        order_bumps: [],
+        payments: {
+          generated_message: "⭐ <b>Você selecionou o seguinte plano:</b>\n\n🎁 Plano: {plano}\n💲 Valor: {valor}\n\n💎 Pague via Pix Copia e Cola (ou QR Code em alguns bancos):\n\n{pix_code}\n\n👆 Toque na chave PIX acima para copiá-la\n\nApós efetuar o pagamento, clique no botão abaixo ⤵️",
+          pix_format: "Código (monoespaçado)",
+          generated_medias: [],
+          generated_uncompressed: false,
+          secondary_enabled: false,
+          secondary_message: "",
+          approved_message: "✅ <b>Pagamento Aprovado!</b>\n\nParabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n🎉 Você já tem acesso ao conteúdo!",
+          access_button_text: "Acessar conteúdo",
+          approved_medias: [],
+          approved_uncompressed: false
+        }
+      };
+    }
+
+    function nbInitNeurotBot() {
+      if (!Array.isArray(STATE.bot_folders)) STATE.bot_folders = [];
+      if (!Array.isArray(STATE.flow_bots) || STATE.flow_bots.length === 0) {
+        STATE.flow_bots = [nbBuildDefaultBotObj(STATE.publish || {})];
+      }
+      nbRenderBotsList();
+    }
+
+    function nbGetCurrentBot() {
+      if (!Array.isArray(STATE.flow_bots)) return null;
+      return STATE.flow_bots.find(b => b.id === NB_CURRENT_BOT_ID) || STATE.flow_bots[0] || null;
+    }
+
+    function nbRenderBotsList() {
+      const pillsEl = document.getElementById('nb-folder-pills');
+      const gridEl = document.getElementById('nb-bots-grid');
+      if (!pillsEl || !gridEl) return;
+
+      const allFolders = ["Todas", ...(STATE.bot_folders || [])];
+      pillsEl.innerHTML = allFolders.map(f => {
+        const isSel = NB_SELECTED_FOLDER === f;
+        return `<button type="button" onclick="nbSelectFolder('${f.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition ${isSel ? 'bg-[#eab308] text-black shadow-sm' : 'bg-[#15140f] text-zinc-400 hover:text-white border border-[#28261c]'}">${f}</button>`;
+      }).join('');
+
+      const bots = (STATE.flow_bots || []).filter(b => {
+        if (NB_SELECTED_FOLDER === "Todas") return true;
+        return (b.folder || "") === NB_SELECTED_FOLDER;
+      });
+
+      const cardsHtml = bots.map(b => {
+        const isAct = b.active !== false;
+        const sales = Number(b.sales_today || 0);
+        const rev = Number(b.revenue_today || 0).toFixed(2).replace('.', ',');
+        const folderLabel = (b.folder || "").trim() ? b.folder.toUpperCase() : "SEM PASTA";
+        const modeTag = b.mode === 'ai' ? '<span class="ml-1.5 px-1.5 py-0.5 rounded bg-purple-950/80 border border-purple-700/40 text-[9px] text-purple-300 font-bold">IA</span>' : '';
+        return `
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#3d3926] transition group min-h-[178px]">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[#1f1c10] border border-[#332e19] text-[#eab308] flex items-center justify-center text-sm shrink-0">
+                  <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                  <div class="flex items-center">
+                    <h3 class="text-sm font-bold text-white group-hover:text-[#eab308] transition">${b.username || '@bot'}</h3>
+                    ${modeTag}
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 text-[11px] ${isAct ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full ${isAct ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
+                    ${isAct ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+              </div>
+              <button type="button" onclick="event.stopPropagation(); nbOpenEditBotModal('${b.id}')" class="w-7 h-7 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-white flex items-center justify-center text-xs transition" title="Configurações do Bot">
+                <i class="fa-solid fa-ellipsis-vertical"></i>
+              </button>
+            </div>
+
+            <div class="border-t border-[#1e1d15] my-3.5 pt-3.5 flex items-baseline justify-between">
+              <div>
+                <span class="text-base font-bold text-white block">${sales} vendas</span>
+                <span class="text-[11px] text-zinc-500">hoje</span>
+              </div>
+              <div class="text-right">
+                <span class="text-base font-bold text-white block">R$ ${rev}</span>
+                <span class="text-[11px] text-zinc-500">receita hoje</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1" onclick="event.stopPropagation()">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">${folderLabel}</span>
+              <label class="nb-toggle">
+                <input type="checkbox" ${isAct ? 'checked' : ''} onchange="nbToggleBotFromCard('${b.id}', this.checked)">
+                <span class="nb-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const addCardHtml = `
+        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#3d3926] transition min-h-[178px] bg-[#0e0d0a]/60">
+          <div class="w-10 h-10 rounded-xl bg-[#191812] border border-[#2a281d] text-zinc-400 flex items-center justify-center text-sm">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <span class="text-xs font-bold text-white">Adicionar bot</span>
+        </div>
+      `;
+
+      gridEl.innerHTML = cardsHtml + addCardHtml;
+    }
+
+    function nbSelectFolder(folder) {
+      NB_SELECTED_FOLDER = folder;
+      nbRenderBotsList();
+    }
+
+    function nbOpenFolderModal() {
+      const name = prompt("Digite o nome da nova pasta para organizar seus bots:");
+      if (!name || !name.trim()) return;
+      const clean = name.trim();
+      if (!Array.isArray(STATE.bot_folders)) STATE.bot_folders = [];
+      if (!STATE.bot_folders.includes(clean)) {
+        STATE.bot_folders.push(clean);
+      }
+      NB_SELECTED_FOLDER = clean;
+      nbRenderBotsList();
+      saveFullState();
+    }
+
+    function nbPopulateFolderSelect(selectedVal = "") {
+      const sel = document.getElementById('nb-inp-bot-folder');
+      if (!sel) return;
+      const folders = STATE.bot_folders || [];
+      sel.innerHTML = `<option value="">Sem pasta</option>` + folders.map(f => `<option value="${f}" ${f === selectedVal ? 'selected' : ''}>${f}</option>`).join('');
+    }
+
+    function nbOpenAddBotModal() {
+      NB_EDITING_BOT_ID = null;
+      document.getElementById('nb-modal-bot-title').textContent = "Adicionar Novo Bot";
+      document.getElementById('nb-inp-bot-token').value = "";
+      nbPopulateFolderSelect("");
+      document.getElementById('nb-inp-bot-mode').value = "flow";
+      document.getElementById('nb-btn-delete-bot').classList.add('hidden');
+      document.getElementById('nb-modal-bot').classList.remove('hidden');
+    }
+
+    function nbOpenEditBotModal(botId) {
+      const b = (STATE.flow_bots || []).find(x => x.id === botId);
+      if (!b) return;
+      NB_EDITING_BOT_ID = botId;
+      document.getElementById('nb-modal-bot-title').textContent = `Configurar ${b.username || 'Bot'}`;
+      document.getElementById('nb-inp-bot-token').value = b.token || "";
+      nbPopulateFolderSelect(b.folder || "");
+      document.getElementById('nb-inp-bot-mode').value = b.mode || "flow";
+      document.getElementById('nb-btn-delete-bot').classList.toggle('hidden', (STATE.flow_bots || []).length <= 1);
+      document.getElementById('nb-modal-bot').classList.remove('hidden');
+    }
+
+    function nbOpenEditTokenModal() {
+      if (NB_CURRENT_BOT_ID) nbOpenEditBotModal(NB_CURRENT_BOT_ID);
+    }
+
+    function nbCloseBotModal() {
+      document.getElementById('nb-modal-bot').classList.add('hidden');
+    }
+
+    async function nbSubmitBotModal() {
+      const tok = document.getElementById('nb-inp-bot-token').value.trim();
+      const folder = document.getElementById('nb-inp-bot-folder').value;
+      const mode = document.getElementById('nb-inp-bot-mode').value;
+      const btn = document.getElementById('nb-btn-save-bot-modal');
+      btn.textContent = "Verificando...";
+
+      let botInfo = {
+        bot_id: tok.includes(":") ? tok.split(":")[0] : String(Math.floor(1000000000 + Math.random() * 900000000)),
+        username: "@novo_bot",
+        first_name: "Bot"
+      };
+
+      if (tok) {
+        try {
+          const r = await fetch("/api/flow-bots/verify-token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: tok })
+          });
+          const data = await r.json();
+          if (data.status === "ok") {
+            botInfo = data;
+          } else {
+            const direct = await verifyTelegramTokenDirect(tok);
+            if (direct && direct.username) {
+              botInfo = {
+                bot_id: String(direct.id || botInfo.bot_id),
+                username: "@" + direct.username,
+                first_name: direct.first_name || direct.username
+              };
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (NB_EDITING_BOT_ID) {
+        const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
+        if (b) {
+          b.token = tok;
+          b.folder = folder;
+          b.mode = mode;
+          if (tok) {
+            b.bot_id = botInfo.bot_id;
+            b.username = botInfo.username;
+            b.first_name = botInfo.first_name;
+          }
+        }
+      } else {
+        const newBot = nbBuildDefaultBotObj({
+          bot_token: tok,
+          bot_username: botInfo.username,
+          bot_first_name: botInfo.first_name,
+          is_live: true
+        });
+        newBot.bot_id = botInfo.bot_id;
+        newBot.folder = folder;
+        newBot.mode = mode;
+        STATE.flow_bots.push(newBot);
+        NB_CURRENT_BOT_ID = newBot.id;
+      }
+
+      btn.textContent = "Salvar e Conectar";
+      nbCloseBotModal();
+      nbSyncActiveBotToPublish();
+      nbRenderBotsList();
+      if (!document.getElementById('nb-view-bot-detail').classList.contains('hidden') && NB_CURRENT_BOT_ID) {
+        nbOpenBotDetail(NB_CURRENT_BOT_ID);
+      }
+      await saveFullState();
+    }
+
+    async function nbDeleteEditingBot() {
+      if (!NB_EDITING_BOT_ID) return;
+      STATE.flow_bots = (STATE.flow_bots || []).filter(x => x.id !== NB_EDITING_BOT_ID);
+      nbCloseBotModal();
+      nbBackToBotsList();
+      await saveFullState();
+    }
+
+    async function nbToggleBotFromCard(botId, isChecked) {
+      const b = (STATE.flow_bots || []).find(x => x.id === botId);
+      if (!b) return;
+      if (isChecked) {
+        // Garante que este bot assuma o polling ativo se possuir token
+        b.active = true;
+      } else {
+        b.active = false;
+      }
+      nbSyncActiveBotToPublish();
+      nbRenderBotsList();
+      await saveFullState();
+    }
+
+    function nbSyncActiveBotToPublish() {
+      const activeBot = (STATE.flow_bots || []).find(b => b.active && b.token) || (STATE.flow_bots || [])[0];
+      if (activeBot && activeBot.token) {
+        STATE.publish.bot_token = activeBot.token;
+        STATE.publish.bot_username = activeBot.username || STATE.publish.bot_username;
+        STATE.publish.is_live = Boolean(activeBot.active);
+      }
+    }
+
+    function nbBackToBotsList() {
+      document.getElementById('nb-view-bot-detail').classList.add('hidden');
+      document.getElementById('nb-view-bots-list').classList.remove('hidden');
+      nbRenderBotsList();
+    }
+
+    function nbOpenBotInAiMode() {
+      const b = nbGetCurrentBot();
+      if (b) {
+        b.mode = "ai";
+        if (b.token) {
+          STATE.publish.bot_token = b.token;
+          STATE.publish.bot_username = b.username || "";
+          STATE.publish.is_live = true;
+        }
+        STATE.flow_name = (b.username || "bot").replace("@", "");
+        syncStateToInputs();
+      }
+      switchWorkspace('ai');
+      navigateTab('resumo');
+    }
+
+    function nbOpenBotDetail(botId) {
+      NB_CURRENT_BOT_ID = botId;
+      const b = nbGetCurrentBot();
+      if (!b) return;
+
+      // Se o bot foi marcado como modo IA, mas o usuário clicou no card, abre a tela de gerenciamento (e permite ir para Meus Fluxos)
+      document.getElementById('nb-view-bots-list').classList.add('hidden');
+      document.getElementById('nb-view-bot-detail').classList.remove('hidden');
+
+      document.getElementById('nb-det-username').textContent = b.username || "@rocha7_bot";
+      document.getElementById('nb-det-botid').textContent = `ID ${b.bot_id || '8686296179'}`;
+      nbUpdateDetailHeaderStatus(b);
+
+      nbSwitchBotTab(NB_CURRENT_SUBTAB || 'welcome');
+      nbLoadBotIntoTabs(b);
+    }
+
+    function nbUpdateDetailHeaderStatus(b) {
+      const badge = document.getElementById('nb-det-badge');
+      const btn = document.getElementById('nb-det-deactivate-btn');
+      const isAct = b.active !== false;
+      if (badge) {
+        badge.className = isAct
+          ? "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950/70 text-emerald-400 border border-emerald-800/50"
+          : "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-700";
+        badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${isAct ? 'bg-emerald-400' : 'bg-zinc-500'}"></span> ${isAct ? 'ativo' : 'inativo'}`;
+      }
+      if (btn) {
+        btn.textContent = isAct ? "Desativar" : "Ativar";
+      }
+    }
+
+    async function nbToggleCurrentBotActive() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      b.active = !b.active;
+      nbUpdateDetailHeaderStatus(b);
+      nbSyncActiveBotToPublish();
+      await saveFullState();
+    }
+
+    function nbSwitchBotTab(tab) {
+      NB_CURRENT_SUBTAB = tab;
+      ['welcome', 'plans', 'downsell', 'orderbump', 'payments'].forEach(t => {
+        const btn = document.getElementById('nbtab-btn-' + t);
+        const panel = document.getElementById('nbtab-panel-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+      });
+      const b = nbGetCurrentBot();
+      if (b) nbLoadBotIntoTabs(b);
+    }
+
+    function nbLoadBotIntoTabs(b) {
+      // 1. BOAS-VINDAS
+      const w = b.welcome || (b.welcome = { message: "", medias: [], send_uncompressed: false, secondary_enabled: false, secondary_message: "" });
+      document.getElementById('nb-welcome-msg').value = w.message || "";
+      document.getElementById('nb-welcome-counter').textContent = `${(w.message || "").length}/4000 caracteres`;
+      document.getElementById('nb-welcome-uncompressed').checked = Boolean(w.send_uncompressed);
+      document.getElementById('nb-welcome-sec-enabled').checked = Boolean(w.secondary_enabled);
+      document.getElementById('nb-welcome-sec-msg').value = w.secondary_message || "";
+      document.getElementById('nb-welcome-sec-counter').textContent = `${(w.secondary_message || "").length}/4000 caracteres`;
+      nbRenderMediaChips('nb-welcome-medias-list', 'nb-welcome-media-count', w.medias || [], 'welcome');
+      nbUpdateWelcomeValidation();
+
+      // 2. PLANOS
+      nbRenderPlansTab(b);
+
+      // 3. DOWNSELL
+      nbRenderDownsellTab(b);
+
+      // 4. ORDER BUMP
+      nbRenderOrderBumpTab(b);
+
+      // 5. PAGAMENTOS
+      nbRenderPaymentsTab(b);
+    }
+
+    function nbInsertVar(textareaId, token) {
+      const el = document.getElementById(textareaId);
+      if (!el) return;
+      const start = el.selectionStart || el.value.length;
+      const end = el.selectionEnd || el.value.length;
+      const before = el.value.substring(0, start);
+      const after = el.value.substring(end);
+      el.value = before + token + after;
+      el.focus();
+      el.selectionStart = el.selectionEnd = start + token.length;
+      if (textareaId.startsWith('nb-welcome')) nbOnWelcomeInput();
+      if (textareaId.startsWith('nb-pay')) nbOnPaymentsInput();
+    }
+
+    function nbOnWelcomeInput() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const w = b.welcome || (b.welcome = {});
+      w.message = document.getElementById('nb-welcome-msg').value;
+      w.send_uncompressed = document.getElementById('nb-welcome-uncompressed').checked;
+      w.secondary_enabled = document.getElementById('nb-welcome-sec-enabled').checked;
+      w.secondary_message = document.getElementById('nb-welcome-sec-msg').value;
+      document.getElementById('nb-welcome-counter').textContent = `${w.message.length}/4000 caracteres`;
+      document.getElementById('nb-welcome-sec-counter').textContent = `${w.secondary_message.length}/4000 caracteres`;
+      nbUpdateWelcomeValidation();
+    }
+
+    function nbUpdateWelcomeValidation() {
+      const b = nbGetCurrentBot();
+      const valEl = document.getElementById('nb-welcome-validation');
+      if (!b || !valEl) return;
+      const hasMsg = Boolean((b.welcome?.message || "").trim());
+      if (!hasMsg) {
+        valEl.textContent = "A mensagem de boas-vindas é obrigatória.";
+        valEl.className = "text-xs text-rose-400";
+      } else {
+        valEl.textContent = "";
+      }
+    }
+
+    // =========================================================
+    // ABA 2: PLANOS DE PAGAMENTO
+    // =========================================================
+    function nbRenderPlansTab(b) {
+      const plans = b.plans || (b.plans = []);
+      const countEl = document.getElementById('nb-plans-count-badge');
+      if (countEl) countEl.textContent = `${String(plans.length).padStart(2, '0')} / 10`;
+
+      const accEl = document.getElementById('nb-plans-accordion');
+      if (accEl) {
+        accEl.innerHTML = plans.map((p, idx) => {
+          const num = String(idx + 1).padStart(2, '0');
+          const priceFmt = `R$ ${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
+          const destLabel = p.delivery_dest_type || "Canal ou grupo";
+          const isExp = p.expanded !== false;
+          const colors = [
+            { label: "Padrão", dot: "border border-zinc-500" },
+            { label: "Azul", dot: "bg-blue-500" },
+            { label: "Verde", dot: "bg-emerald-500" },
+            { label: "Vermelho", dot: "bg-rose-500" }
+          ];
+          const colorTabs = colors.map(c => {
+            const active = (p.button_color || "Padrão") === c.label;
+            return `
+              <button type="button" onclick="nbSetPlanField(${idx}, 'button_color', '${c.label}')" class="px-3 py-2 flex items-center gap-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 hover:text-white border-b-2 border-transparent'}">
+                <span class="w-2 h-2 rounded-full ${c.dot}"></span>
+                <span>${c.label}</span>
+              </button>
+            `;
+          }).join('');
+
+          const destTypes = ["Herdar do fluxo", "Canal ou grupo", "Link externo"];
+          const destTabs = destTypes.map(dt => {
+            const active = (p.delivery_dest_type || "Canal ou grupo") === dt;
+            return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
+          }).join('');
+
+          let deliveryBody = '';
+          if ((p.delivery_dest_type || "Canal ou grupo") === "Link externo") {
+            deliveryBody = `
+              <div class="pt-2 space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">LINK EXTERNO DE ENTREGA *</label>
+                <input type="text" value="${(p.delivery_external_url || '').replace(/"/g, '&quot;')}" oninput="nbUpdatePlanQuiet(${idx}, 'delivery_external_url', this.value)" placeholder="https://t.me/+link_do_canal" class="nb-input">
+              </div>
+            `;
+          } else if (p.delivery_dest_type === "Herdar do fluxo") {
+            deliveryBody = `<p class="text-[11px] text-zinc-500 pt-2">Este plano usará a Entrega padrão (fallback) configurada na coluna ao lado.</p>`;
+          } else {
+            const chName = p.delivery_channel_name || b.fallback_delivery?.channel_name || "Rocha VENDAS";
+            const chId = p.delivery_channel_id || b.fallback_delivery?.channel_id || "-1003939135982";
+            deliveryBody = `
+              <div class="space-y-3 pt-2">
+                <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#eab308]">*</span></span>
+                  <button type="button" onclick="nbSyncPlanChannel(${idx})" class="text-[11px] text-zinc-400 hover:text-[#eab308] flex items-center gap-1">
+                    <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
+                  </button>
+                </div>
+                <div class="p-3 rounded-lg bg-[#16150f] border border-[#2e2b1d] flex items-center justify-between">
+                  <div>
+                    <div class="flex items-center gap-1.5 text-xs font-bold text-white">
+                      <i class="fa-solid fa-bullhorn text-[11px] text-zinc-400"></i>
+                      <span>${chName}</span>
+                      <i class="fa-solid fa-check text-emerald-400 text-[10px]"></i>
+                    </div>
+                    <span class="text-[11px] text-zinc-500 font-mono block mt-0.5">Canal · ${chId}</span>
+                  </div>
+                </div>
+                <button type="button" onclick="nbPromptPlanChannelId(${idx})" class="px-3 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                  <i class="fa-solid fa-plus text-[10px]"></i> Adicionar por ID
+                </button>
+                <p class="text-[11px] text-zinc-500">O bot precisa ser administrador com permissão de convidar. O link enviado é de uso único e expira em 15 minutos.</p>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="rounded-xl bg-[#0e0d0a] border border-[#232119] ${isExp ? 'border-l-2 border-l-[#eab308]' : ''} overflow-hidden">
+              <div onclick="nbTogglePlanExpand(${idx})" class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-white/[0.02]">
+                <div class="flex items-center gap-3">
+                  <div class="flex flex-col text-[9px] text-zinc-500 leading-none gap-0.5" onclick="event.stopPropagation()">
+                    <button type="button" onclick="nbMovePlan(${idx}, -1)" class="hover:text-white">↑</button>
+                    <button type="button" onclick="nbMovePlan(${idx}, 1)" class="hover:text-white">↓</button>
+                  </div>
+                  <span class="text-xs font-mono text-zinc-500">${num}</span>
+                  <span id="nb-plan-hdr-name-${idx}" class="text-xs font-bold text-white">${p.name || 'Plano'}</span>
+                  <span id="nb-plan-hdr-meta-${idx}" class="text-xs text-zinc-500">${priceFmt} · ${p.duration || 'Vitalício'} · ${destLabel}</span>
+                </div>
+                <i class="fa-solid fa-chevron-${isExp ? 'up' : 'down'} text-[10px] text-zinc-500"></i>
+              </div>
+
+              <div class="${isExp ? 'px-5 pb-5 pt-2 space-y-4 border-t border-[#1c1b14]' : 'hidden'}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">NOME DO PLANO</label>
+                    <input type="text" value="${(p.name || '').replace(/"/g, '&quot;')}" oninput="nbUpdatePlanQuiet(${idx}, 'name', this.value)" class="nb-input">
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">PREÇO (R$)</label>
+                    <input type="number" step="0.01" value="${p.price ?? 9.9}" oninput="nbUpdatePlanQuiet(${idx}, 'price', parseFloat(this.value || 0))" class="nb-input">
+                  </div>
+                </div>
+
+                <div class="max-w-xs space-y-1">
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">DURAÇÃO</label>
+                  <select onchange="nbSetPlanField(${idx}, 'duration', this.value)" class="nb-input">
+                    ${['Vitalício', 'Semanal (7 dias)', 'Mensal (30 dias)', 'Trimestral (90 dias)', 'Semestral (180 dias)', 'Anual (365 dias)'].map(d => `<option value="${d}" ${(p.duration || 'Vitalício') === d ? 'selected' : ''}>${d}</option>`).join('')}
+                  </select>
+                  <p class="text-[11px] text-zinc-500 pt-0.5">Vitalício não expira e fica fora da renovação e da expulsão.</p>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">COR DO BOTÃO</label>
+                  <div class="flex items-center gap-2 border-b border-[#222018]">
+                    ${colorTabs}
+                  </div>
+                </div>
+
+                <div class="p-4 rounded-xl bg-[#12110d] border border-[#232119] space-y-3">
+                  <div class="flex items-center gap-2 text-xs font-bold text-white">
+                    <i class="fa-solid fa-cube text-zinc-400"></i>
+                    <span>Entrega deste plano</span>
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Destino</label>
+                    <div class="flex items-center gap-2 border-b border-[#222018]">
+                      ${destTabs}
+                    </div>
+                  </div>
+                  ${deliveryBody}
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                  <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+                    Salvar alterações
+                  </button>
+                  <button type="button" onclick="nbRemovePlan(${idx})" class="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1.5">
+                    <i class="fa-regular fa-trash-can"></i> Remover plano
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Coluna Direita: Fallback + Variação de Preço
+      const fb = b.fallback_delivery || (b.fallback_delivery = { dest_type: "Canal ou grupo", channel_id: "-1003939135982", channel_name: "Rocha VENDAS", external_url: "", last_verified: "hoje" });
+      const isExt = fb.dest_type === "Link externo";
+      document.getElementById('nb-fb-tab-channel').className = !isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
+      document.getElementById('nb-fb-tab-external').className = isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
+      document.getElementById('nb-fb-channel-box').classList.toggle('hidden', isExt);
+      document.getElementById('nb-fb-external-box').classList.toggle('hidden', !isExt);
+      document.getElementById('nb-fb-ch-name').textContent = fb.channel_name || "Rocha VENDAS";
+      document.getElementById('nb-fb-ch-id').textContent = `Canal · ${fb.channel_id || '-1003939135982'}`;
+      document.getElementById('nb-fb-verified-at').textContent = `Última verificação: ${fb.last_verified || 'hoje'}`;
+      document.getElementById('nb-fb-ext-url').value = fb.external_url || "";
+      document.getElementById('nb-price-variation').checked = Boolean(b.price_variation);
+    }
+
+    function nbUpdatePlanQuiet(idx, field, val) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans || !b.plans[idx]) return;
+      b.plans[idx][field] = val;
+      const p = b.plans[idx];
+      const nameEl = document.getElementById(`nb-plan-hdr-name-${idx}`);
+      const metaEl = document.getElementById(`nb-plan-hdr-meta-${idx}`);
+      if (nameEl) nameEl.textContent = p.name || 'Plano';
+      if (metaEl) metaEl.textContent = `R$ ${Number(p.price || 0).toFixed(2).replace('.', ',')} · ${p.duration || 'Vitalício'} · ${p.delivery_dest_type || 'Canal ou grupo'}`;
+    }
+
+    function nbSetPlanField(idx, field, val) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans || !b.plans[idx]) return;
+      b.plans[idx][field] = val;
+      nbRenderPlansTab(b);
+    }
+
+    function nbTogglePlanExpand(idx) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans || !b.plans[idx]) return;
+      b.plans[idx].expanded = b.plans[idx].expanded === false ? true : false;
+      nbRenderPlansTab(b);
+    }
+
+    function nbAddPlan() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      if (!Array.isArray(b.plans)) b.plans = [];
+      if (b.plans.length >= 10) return;
+      b.plans.forEach(p => p.expanded = false);
+      b.plans.push({
+        id: "plan_" + Date.now(),
+        name: "Novo Plano VIP",
+        price: 19.90,
+        duration: "Vitalício",
+        button_color: "Padrão",
+        delivery_dest_type: "Herdar do fluxo",
+        delivery_channel_id: b.fallback_delivery?.channel_id || "-1003939135982",
+        delivery_channel_name: b.fallback_delivery?.channel_name || "Rocha VENDAS",
+        delivery_external_url: "",
+        expanded: true
+      });
+      nbRenderPlansTab(b);
+    }
+
+    function nbRemovePlan(idx) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans) return;
+      b.plans.splice(idx, 1);
+      nbRenderPlansTab(b);
+    }
+
+    function nbMovePlan(idx, dir) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans) return;
+      const target = idx + dir;
+      if (target < 0 || target >= b.plans.length) return;
+      const tmp = b.plans[idx];
+      b.plans[idx] = b.plans[target];
+      b.plans[target] = tmp;
+      nbRenderPlansTab(b);
+    }
+
+    function nbSetFallbackType(dt) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      b.fallback_delivery = b.fallback_delivery || {};
+      b.fallback_delivery.dest_type = dt;
+      nbRenderPlansTab(b);
+    }
+
+    function nbOnFallbackUrlInput() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      b.fallback_delivery = b.fallback_delivery || {};
+      b.fallback_delivery.external_url = document.getElementById('nb-fb-ext-url').value;
+    }
+
+    function nbOnPriceVariationToggle() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      b.price_variation = document.getElementById('nb-price-variation').checked;
+    }
+
+    async function nbPromptFallbackChannelId() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const chId = prompt("Digite o ID do Canal ou Grupo (ex: -1003939135982):", b.fallback_delivery?.channel_id || "-100");
+      if (!chId || !chId.trim()) return;
+      b.fallback_delivery.channel_id = chId.trim();
+      await nbSyncFallbackChannel();
+    }
+
+    async function nbSyncFallbackChannel() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const chId = b.fallback_delivery?.channel_id || "-1003939135982";
+      try {
+        const res = await fetch("/api/flow-bots/verify-channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          b.fallback_delivery.channel_name = data.title;
+          b.fallback_delivery.last_verified = data.verified_at;
+        }
+      } catch (e) {}
+      nbRenderPlansTab(b);
+    }
+
+    async function nbPromptPlanChannelId(idx) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans[idx]) return;
+      const chId = prompt("Digite o ID do Canal ou Grupo deste plano (ex: -1003939135982):", b.plans[idx].delivery_channel_id || "-100");
+      if (!chId || !chId.trim()) return;
+      b.plans[idx].delivery_channel_id = chId.trim();
+      await nbSyncPlanChannel(idx);
+    }
+
+    async function nbSyncPlanChannel(idx) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.plans[idx]) return;
+      const chId = b.plans[idx].delivery_channel_id || "-1003939135982";
+      try {
+        const res = await fetch("/api/flow-bots/verify-channel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          b.plans[idx].delivery_channel_name = data.title;
+        }
+      } catch (e) {}
+      nbRenderPlansTab(b);
+    }
+
+    // =========================================================
+    // ABA 3: DOWNSELL (GERAL & PIX GERADO)
+    // =========================================================
+    function nbSwitchDownsellTrack(track) {
+      NB_DOWNSELL_TRACK = track;
+      const b = nbGetCurrentBot();
+      if (b) nbRenderDownsellTab(b);
+    }
+
+    function nbGetActiveDownsellObj(b) {
+      if (NB_DOWNSELL_TRACK === 'pix') {
+        if (!b.downsell_pix) b.downsell_pix = { enabled: false, sequences: [] };
+        return b.downsell_pix;
+      }
+      if (!b.downsell_general) b.downsell_general = { enabled: true, sequences: [] };
+      return b.downsell_general;
+    }
+
+    function nbRenderDownsellTab(b) {
+      const isPix = NB_DOWNSELL_TRACK === 'pix';
+      document.getElementById('nb-ds-pill-general').className = !isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
+      document.getElementById('nb-ds-pill-pix').className = isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
+
+      const ds = nbGetActiveDownsellObj(b);
+      const seqs = ds.sequences || (ds.sequences = []);
+
+      document.getElementById('nb-ds-header-title').textContent = isPix ? "Downsell — PIX Gerado" : "Downsell — Geral";
+      document.getElementById('nb-ds-header-desc').textContent = isPix
+        ? "Sequências enviadas após a geração do PIX para clientes que ainda não finalizaram o pagamento."
+        : "Sequências enviadas após o /start para leads que não compraram. Recupere vendas com ofertas alternativas.";
+      document.getElementById('nb-ds-count-badge').textContent = `${seqs.length}/20`;
+      document.getElementById('nb-ds-enabled-toggle').checked = Boolean(ds.enabled);
+
+      const plans = b.plans || [];
+      const container = document.getElementById('nb-ds-sequences-container');
+      const discounts = ["Sem desconto", "5% OFF", "10% OFF", "15% OFF", "20% OFF", "25% OFF", "30% OFF", "40% OFF", "50% OFF"];
+
+      let hasInvalid = false;
+      container.innerHTML = seqs.map((seq, sIdx) => {
+        const msg = seq.message || "";
+        if (!msg.trim()) hasInvalid = true;
+        const selectedIds = Array.isArray(seq.plan_ids) ? seq.plan_ids : plans.map(p => p.id);
+        const planChips = plans.map(p => {
+          const isSel = selectedIds.includes(p.id);
+          const pFmt = `R$${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
+          return `
+            <button type="button" onclick="nbToggleDownsellPlan(${sIdx}, '${p.id}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
+              ${isSel ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
+              <span>${p.name} — ${pFmt}</span>
+            </button>
+          `;
+        }).join('');
+
+        return `
+          <div class="nb-card p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-[#1e1d15] pb-3">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <h4 class="text-xs font-bold text-white">Sequência ${sIdx + 1}</h4>
+              </div>
+              <div class="flex items-center gap-3 text-xs text-zinc-500">
+                <button type="button" onclick="nbDuplicateDownsellSeq(${sIdx})" class="hover:text-white" title="Duplicar sequência"><i class="fa-regular fa-copy"></i></button>
+                <button type="button" onclick="nbDeleteDownsellSeq(${sIdx})" class="hover:text-rose-400 text-rose-500/80" title="Excluir sequência"><i class="fa-regular fa-trash-can"></i></button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">ENVIAR APÓS (MINUTOS)</label>
+                <input type="number" min="1" value="${seq.delay_minutes || 10}" oninput="nbUpdateDownsellSeq(${sIdx}, 'delay_minutes', parseInt(this.value || 1))" class="nb-input">
+                <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Contado a partir do gatilho da trilha (o /start, ou a geração do PIX), não da sequência anterior.</p>
+              </div>
+              <div>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCONTO</label>
+                <select onchange="nbUpdateDownsellSeq(${sIdx}, 'discount', this.value)" class="nb-input">
+                  ${discounts.map(d => `<option value="${d}" ${(seq.discount || 'Sem desconto') === d ? 'selected' : ''}>${d}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">PLANOS EXIBIDOS NESTA SEQUÊNCIA</label>
+              <div class="flex flex-wrap gap-2">
+                ${planChips || '<span class="text-xs text-zinc-500">Cadastre um plano na aba Planos</span>'}
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-[#eab308]">*</span></label>
+              <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${msg}</textarea>
+              <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
+            </div>
+
+            <div class="border-t border-[#1e1d15] pt-3 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-white">Mídias</span>
+                <span class="text-xs text-zinc-500 font-mono">${(seq.medias || []).length}/3</span>
+              </div>
+              <div class="flex items-center gap-4">
+                <button type="button" onclick="nbTriggerMediaUpload('downsell', ${sIdx})" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                  <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                  <span>Adicionar mídia</span>
+                </button>
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                  <span class="nb-toggle">
+                    <input type="checkbox" ${seq.send_uncompressed ? 'checked' : ''} onchange="nbUpdateDownsellSeq(${sIdx}, 'send_uncompressed', this.checked)">
+                    <span class="nb-toggle-slider"></span>
+                  </span>
+                  <span>Enviar sem compressão</span>
+                </label>
+              </div>
+              <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
+                ${(seq.medias || []).map((m, mIdx) => `
+                  <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
+                    <i class="fa-regular fa-image text-[#eab308]"></i> ${m.name || 'Mídia'}
+                    <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+                  </span>
+                `).join('')}
+              </div>
+              <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+              <div id="nb-ds-err-${sIdx}" class="${!msg.trim() ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">A mensagem é obrigatória.</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const valEl = document.getElementById('nb-ds-validation');
+      if (valEl) {
+        valEl.textContent = hasInvalid && seqs.length > 0 ? "Há sequências incompletas ou inválidas." : "";
+      }
+    }
+
+    function nbOnDownsellToggle() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      ds.enabled = document.getElementById('nb-ds-enabled-toggle').checked;
+    }
+
+    function nbUpdateDownsellSeq(sIdx, field, val) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      if (!ds.sequences[sIdx]) return;
+      ds.sequences[sIdx][field] = val;
+      if (field === 'message') {
+        const cEl = document.getElementById(`nb-ds-counter-${sIdx}`);
+        if (cEl) cEl.textContent = `${val.length}/4000 caracteres`;
+        const errEl = document.getElementById(`nb-ds-err-${sIdx}`);
+        if (errEl) errEl.className = !val.trim() ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden';
+        const anyInvalid = ds.sequences.some(s => !(s.message || "").trim());
+        document.getElementById('nb-ds-validation').textContent = anyInvalid ? "Há sequências incompletas ou inválidas." : "";
+      }
+    }
+
+    function nbToggleDownsellPlan(sIdx, planId) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      const seq = ds.sequences[sIdx];
+      if (!seq) return;
+      if (!Array.isArray(seq.plan_ids)) seq.plan_ids = (b.plans || []).map(p => p.id);
+      if (seq.plan_ids.includes(planId)) {
+        seq.plan_ids = seq.plan_ids.filter(id => id !== planId);
+      } else {
+        seq.plan_ids.push(planId);
+      }
+      nbRenderDownsellTab(b);
+    }
+
+    function nbAddDownsellSequence() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      if (ds.sequences.length >= 20) return;
+      ds.sequences.push({
+        id: "seq_" + Date.now(),
+        delay_minutes: 10,
+        discount: "Sem desconto",
+        plan_ids: (b.plans || []).map(p => p.id),
+        message: "",
+        medias: [],
+        send_uncompressed: false
+      });
+      nbRenderDownsellTab(b);
+    }
+
+    function nbDuplicateDownsellSeq(sIdx) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      const orig = ds.sequences[sIdx];
+      if (!orig || ds.sequences.length >= 20) return;
+      const copy = JSON.parse(JSON.stringify(orig));
+      copy.id = "seq_" + Date.now();
+      ds.sequences.splice(sIdx + 1, 0, copy);
+      nbRenderDownsellTab(b);
+    }
+
+    function nbDeleteDownsellSeq(sIdx) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      ds.sequences.splice(sIdx, 1);
+      nbRenderDownsellTab(b);
+    }
+
+    // =========================================================
+    // ABA 4: ORDER BUMP
+    // =========================================================
+    function nbRenderOrderBumpTab(b) {
+      const bumps = b.order_bumps || (b.order_bumps = []);
+      document.getElementById('nb-ob-count-badge').textContent = `${String(bumps.length).padStart(2, '0')} / 10`;
+
+      const listEl = document.getElementById('nb-ob-saved-list');
+      listEl.innerHTML = bumps.map((ob, idx) => `
+        <div class="p-3.5 rounded-xl bg-[#0c0b08] border border-[#26241b] flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
+            <div>
+              <span class="text-xs font-bold text-white">${ob.title || 'Order Bump'}</span>
+              <span class="text-xs text-[#eab308] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
+              <p class="text-[11px] text-zinc-500 truncate max-w-md">${ob.description || ''}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="nbOpenOrderBumpForm(${idx})" class="px-2.5 py-1 rounded bg-[#181711] hover:bg-[#25231a] text-xs text-zinc-300">Editar</button>
+            <button type="button" onclick="nbDeleteOrderBump(${idx})" class="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-xs text-rose-300"><i class="fa-regular fa-trash-can"></i></button>
+          </div>
+        </div>
+      `).join('');
+
+      nbRenderOrderBumpColorPickers();
+    }
+
+    function nbRenderOrderBumpColorPickers() {
+      const colors = [
+        { label: "Padrão", dot: "border border-zinc-500" },
+        { label: "Azul", dot: "bg-blue-500" },
+        { label: "Verde", dot: "bg-emerald-500" },
+        { label: "Vermelho", dot: "bg-rose-500" }
+      ];
+      const accEl = document.getElementById('nb-ob-accept-colors');
+      const rejEl = document.getElementById('nb-ob-reject-colors');
+      if (accEl) {
+        accEl.innerHTML = colors.map(c => `
+          <button type="button" onclick="NB_OB_ACCEPT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_ACCEPT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 border-b-2 border-transparent'}">
+            <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
+          </button>
+        `).join('');
+      }
+      if (rejEl) {
+        rejEl.innerHTML = colors.map(c => `
+          <button type="button" onclick="NB_OB_REJECT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_REJECT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 border-b-2 border-transparent'}">
+            <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
+          </button>
+        `).join('');
+      }
+    }
+
+    function nbOpenOrderBumpForm(idx) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      NB_EDITING_BUMP_IDX = idx;
+      if (idx >= 0 && b.order_bumps && b.order_bumps[idx]) {
+        const ob = b.order_bumps[idx];
+        document.getElementById('nb-ob-form-title').textContent = "Editar order bump";
+        document.getElementById('nb-ob-submit-btn').textContent = "Salvar order bump";
+        document.getElementById('nb-ob-active').checked = ob.active !== false;
+        document.getElementById('nb-ob-title').value = ob.title || "";
+        document.getElementById('nb-ob-price').value = String(ob.price || "9,90").replace('.', ',');
+        document.getElementById('nb-ob-desc').value = ob.description || "";
+        document.getElementById('nb-ob-deliverable').value = ob.deliverable || "";
+        document.getElementById('nb-ob-offer-msg').value = ob.offer_message || "";
+        document.getElementById('nb-ob-uncompressed').checked = Boolean(ob.send_uncompressed);
+        document.getElementById('nb-ob-accept-text').value = ob.accept_text || "Adicionar ao pedido";
+        document.getElementById('nb-ob-reject-text').value = ob.reject_text || "Continuar sem o adicional";
+        NB_OB_ACCEPT_COLOR = ob.accept_color || "Padrão";
+        NB_OB_REJECT_COLOR = ob.reject_color || "Padrão";
+        NB_OB_TEMP_MEDIAS = JSON.parse(JSON.stringify(ob.medias || []));
+      } else {
+        nbResetOrderBumpForm();
+      }
+      nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+      nbRenderOrderBumpColorPickers();
+    }
+
+    function nbResetOrderBumpForm() {
+      NB_EDITING_BUMP_IDX = -1;
+      document.getElementById('nb-ob-form-title').textContent = "Novo order bump";
+      document.getElementById('nb-ob-submit-btn').textContent = "Criar order bump";
+      document.getElementById('nb-ob-active').checked = true;
+      document.getElementById('nb-ob-title').value = "";
+      document.getElementById('nb-ob-price').value = "";
+      document.getElementById('nb-ob-desc').value = "";
+      document.getElementById('nb-ob-deliverable').value = "";
+      document.getElementById('nb-ob-offer-msg').value = "";
+      document.getElementById('nb-ob-uncompressed').checked = false;
+      document.getElementById('nb-ob-accept-text').value = "Adicionar ao pedido";
+      document.getElementById('nb-ob-reject-text').value = "Continuar sem o adicional";
+      NB_OB_ACCEPT_COLOR = "Padrão";
+      NB_OB_REJECT_COLOR = "Padrão";
+      NB_OB_TEMP_MEDIAS = [];
+      nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+      nbRenderOrderBumpColorPickers();
+    }
+
+    async function nbSaveOrderBumpForm() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const title = document.getElementById('nb-ob-title').value.trim() || "Adicional VIP";
+      const rawPrice = document.getElementById('nb-ob-price').value.replace(',', '.');
+      const price = parseFloat(rawPrice) || 9.90;
+      const obj = {
+        id: "ob_" + Date.now(),
+        active: document.getElementById('nb-ob-active').checked,
+        title,
+        price,
+        description: document.getElementById('nb-ob-desc').value,
+        deliverable: document.getElementById('nb-ob-deliverable').value,
+        offer_message: document.getElementById('nb-ob-offer-msg').value,
+        send_uncompressed: document.getElementById('nb-ob-uncompressed').checked,
+        accept_text: document.getElementById('nb-ob-accept-text').value || "Adicionar ao pedido",
+        reject_text: document.getElementById('nb-ob-reject-text').value || "Continuar sem o adicional",
+        accept_color: NB_OB_ACCEPT_COLOR,
+        reject_color: NB_OB_REJECT_COLOR,
+        medias: NB_OB_TEMP_MEDIAS
+      };
+      if (!Array.isArray(b.order_bumps)) b.order_bumps = [];
+      if (NB_EDITING_BUMP_IDX >= 0 && b.order_bumps[NB_EDITING_BUMP_IDX]) {
+        b.order_bumps[NB_EDITING_BUMP_IDX] = obj;
+      } else if (b.order_bumps.length < 10) {
+        b.order_bumps.push(obj);
+      }
+      nbResetOrderBumpForm();
+      nbRenderOrderBumpTab(b);
+      await nbSaveCurrentBot();
+    }
+
+    async function nbDeleteOrderBump(idx) {
+      const b = nbGetCurrentBot();
+      if (!b || !b.order_bumps) return;
+      b.order_bumps.splice(idx, 1);
+      nbRenderOrderBumpTab(b);
+      await nbSaveCurrentBot();
+    }
+
+    // =========================================================
+    // ABA 5: PAGAMENTOS (GERADO & APROVADO)
+    // =========================================================
+    function nbSwitchPaymentSubtab(sub) {
+      NB_PAYMENT_SUBTAB = sub;
+      const isGen = sub === 'generated';
+      document.getElementById('nb-pay-pill-gen').className = isGen
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition"
+        : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
+      document.getElementById('nb-pay-pill-app').className = !isGen
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition"
+        : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
+      document.getElementById('nb-pay-panel-generated').classList.toggle('hidden', !isGen);
+      document.getElementById('nb-pay-panel-approved').classList.toggle('hidden', isGen);
+    }
+
+    function nbRenderPaymentsTab(b) {
+      const pay = b.payments || (b.payments = {});
+      document.getElementById('nb-pay-gen-msg').value = pay.generated_message || "";
+      document.getElementById('nb-pay-gen-counter').textContent = `${(pay.generated_message || "").length}/4000 caracteres`;
+      document.getElementById('nb-pay-pix-format').value = pay.pix_format || "Código (monoespaçado)";
+      document.getElementById('nb-pay-gen-uncompressed').checked = Boolean(pay.generated_uncompressed);
+      document.getElementById('nb-pay-sec-enabled').checked = Boolean(pay.secondary_enabled);
+      document.getElementById('nb-pay-sec-msg').value = pay.secondary_message || "";
+      document.getElementById('nb-pay-sec-counter').textContent = `${(pay.secondary_message || "").length}/4000 caracteres`;
+      nbRenderMediaChips('nb-pay-gen-medias-list', 'nb-pay-gen-media-count', pay.generated_medias || [], 'pay_gen');
+
+      document.getElementById('nb-pay-app-msg').value = pay.approved_message || "";
+      document.getElementById('nb-pay-app-counter').textContent = `${(pay.approved_message || "").length}/4000 caracteres`;
+      document.getElementById('nb-pay-access-btn').value = pay.access_button_text || "Acessar conteúdo";
+      document.getElementById('nb-pay-app-uncompressed').checked = Boolean(pay.approved_uncompressed);
+      nbRenderMediaChips('nb-pay-app-medias-list', 'nb-pay-app-media-count', pay.approved_medias || [], 'pay_app');
+    }
+
+    function nbOnPaymentsInput() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const pay = b.payments || (b.payments = {});
+      pay.generated_message = document.getElementById('nb-pay-gen-msg').value;
+      pay.pix_format = document.getElementById('nb-pay-pix-format').value;
+      pay.generated_uncompressed = document.getElementById('nb-pay-gen-uncompressed').checked;
+      pay.secondary_enabled = document.getElementById('nb-pay-sec-enabled').checked;
+      pay.secondary_message = document.getElementById('nb-pay-sec-msg').value;
+      pay.approved_message = document.getElementById('nb-pay-app-msg').value;
+      pay.access_button_text = document.getElementById('nb-pay-access-btn').value;
+      pay.approved_uncompressed = document.getElementById('nb-pay-app-uncompressed').checked;
+
+      document.getElementById('nb-pay-gen-counter').textContent = `${pay.generated_message.length}/4000 caracteres`;
+      document.getElementById('nb-pay-sec-counter').textContent = `${pay.secondary_message.length}/4000 caracteres`;
+      document.getElementById('nb-pay-app-counter').textContent = `${pay.approved_message.length}/4000 caracteres`;
+    }
+
+    // =========================================================
+    // UPLOAD REAL DE MÍDIAS NAS ABAS DO NEUROTBOT
+    // =========================================================
+    function nbTriggerMediaUpload(section, seqIdx = 0) {
+      NB_MEDIA_TARGET = { section, seqIdx };
+      document.getElementById('nb-hidden-media-input').value = "";
+      document.getElementById('nb-hidden-media-input').click();
+    }
+
+    function nbHandleMediaUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file || !NB_MEDIA_TARGET) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b = nbGetCurrentBot();
+        if (!b) return;
+        const item = {
+          id: "nbm_" + Date.now(),
+          name: file.name,
+          type: file.type.startsWith("video") ? "Vídeos" : "Fotos",
+          url: reader.result
+        };
+        const { section, seqIdx } = NB_MEDIA_TARGET;
+        if (section === 'welcome') {
+          b.welcome.medias = b.welcome.medias || [];
+          if (b.welcome.medias.length < 3) b.welcome.medias.push(item);
+        } else if (section === 'downsell') {
+          const ds = nbGetActiveDownsellObj(b);
+          const seq = ds.sequences?.[seqIdx];
+          if (seq) {
+            seq.medias = seq.medias || [];
+            if (seq.medias.length < 3) seq.medias.push(item);
+          }
+        } else if (section === 'orderbump') {
+          if (NB_OB_TEMP_MEDIAS.length < 3) NB_OB_TEMP_MEDIAS.push(item);
+          nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+          return;
+        } else if (section === 'pay_gen') {
+          b.payments.generated_medias = b.payments.generated_medias || [];
+          if (b.payments.generated_medias.length < 3) b.payments.generated_medias.push(item);
+        } else if (section === 'pay_app') {
+          b.payments.approved_medias = b.payments.approved_medias || [];
+          if (b.payments.approved_medias.length < 3) b.payments.approved_medias.push(item);
+        }
+        nbLoadBotIntoTabs(b);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function nbRenderMediaChips(listId, countId, medias, section) {
+      const listEl = document.getElementById(listId);
+      const countEl = document.getElementById(countId);
+      if (countEl) countEl.textContent = `${(medias || []).length}/3`;
+      if (!listEl) return;
+      listEl.innerHTML = (medias || []).map((m, idx) => `
+        <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
+          <i class="fa-regular fa-image text-[#eab308]"></i> ${m.name || 'Mídia'}
+          <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+        </span>
+      `).join('');
+    }
+
+    function nbRemoveMedia(section, mIdx, seqIdx = 0) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      if (section === 'welcome') {
+        (b.welcome.medias || []).splice(mIdx, 1);
+      } else if (section === 'downsell') {
+        const ds = nbGetActiveDownsellObj(b);
+        if (ds.sequences?.[seqIdx]?.medias) ds.sequences[seqIdx].medias.splice(mIdx, 1);
+      } else if (section === 'orderbump') {
+        NB_OB_TEMP_MEDIAS.splice(mIdx, 1);
+        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+        return;
+      } else if (section === 'pay_gen') {
+        (b.payments.generated_medias || []).splice(mIdx, 1);
+      } else if (section === 'pay_app') {
+        (b.payments.approved_medias || []).splice(mIdx, 1);
+      }
+      nbLoadBotIntoTabs(b);
+    }
+
+    // =========================================================
+    // GATEWAY MODAL & SALVAMENTO GERAL DO BOT
+    // =========================================================
+    function nbOpenGatewayModal() {
+      document.getElementById('nb-gw-provider').value = STATE.publish?.gateway_provider || "syncpay";
+      document.getElementById('nb-gw-token').value = STATE.publish?.pushin_pay_token || "";
+      document.getElementById('nb-gw-secret').value = STATE.publish?.gateway_secret || "";
+      document.getElementById('nb-modal-gateway').classList.remove('hidden');
+    }
+
+    async function nbSaveGatewayModal() {
+      STATE.publish.gateway_provider = document.getElementById('nb-gw-provider').value;
+      STATE.publish.pushin_pay_token = document.getElementById('nb-gw-token').value.trim();
+      STATE.publish.gateway_secret = document.getElementById('nb-gw-secret').value.trim();
+      document.getElementById('nb-modal-gateway').classList.add('hidden');
+      syncStateToInputs();
+      await saveFullState();
+    }
+
+    async function nbSaveCurrentBot() {
+      const b = nbGetCurrentBot();
+      if (b) {
+        b.mode = "flow";
+        nbSyncActiveBotToPublish();
+      }
+      await saveFullState();
+      const valEl = document.getElementById('nb-welcome-validation');
+      if (valEl && (b?.welcome?.message || "").trim()) {
+        valEl.textContent = "✓ Alterações salvas com sucesso!";
+        valEl.className = "text-xs text-emerald-400 font-semibold";
+        setTimeout(() => { if (valEl) valEl.textContent = ""; }, 3000);
+      }
     }
 
     document.addEventListener('click', () => {

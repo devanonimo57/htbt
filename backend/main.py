@@ -179,6 +179,86 @@ _DB_LOCK = _asyncio.Lock()
 MAX_ACTIVE_LEADS = 500
 MAX_HISTORY_PER_LEAD = 60
 
+def _build_default_flow_bot(pub: Dict[str, Any]) -> Dict[str, Any]:
+    tok = (pub.get("bot_token") or "").strip()
+    bot_id = tok.split(":")[0] if ":" in tok else "8686296179"
+    uname = (pub.get("bot_username") or "@rocha7_bot").strip()
+    if not uname.startswith("@"):
+        uname = f"@{uname}"
+    ch_id = (pub.get("cache_channel_id") or "-1003939135982").strip()
+    return {
+        "id": "bot_default_1",
+        "username": uname,
+        "bot_id": bot_id,
+        "first_name": pub.get("bot_first_name") or uname.lstrip("@"),
+        "token": tok,
+        "active": bool(pub.get("is_live", True)),
+        "mode": "flow",
+        "folder": "",
+        "sales_today": 0,
+        "revenue_today": 0.0,
+        "welcome": {
+            "message": "",
+            "medias": [],
+            "send_uncompressed": False,
+            "secondary_enabled": False,
+            "secondary_message": ""
+        },
+        "plans": [
+            {
+                "id": "plan_1",
+                "name": "aa",
+                "price": 9.90,
+                "duration": "Vitalício",
+                "button_color": "Padrão",
+                "delivery_dest_type": "Canal ou grupo",
+                "delivery_channel_id": ch_id,
+                "delivery_channel_name": "Rocha VENDAS",
+                "delivery_external_url": "",
+                "expanded": True
+            }
+        ],
+        "fallback_delivery": {
+            "dest_type": "Canal ou grupo",
+            "channel_id": ch_id,
+            "channel_name": "Rocha VENDAS",
+            "external_url": pub.get("delivery_destination") if str(pub.get("delivery_destination", "")).startswith("http") else "",
+            "last_verified": datetime.now().strftime("%d/%m, %H:%M")
+        },
+        "price_variation": False,
+        "downsell_general": {
+            "enabled": True,
+            "sequences": [
+                {
+                    "id": "seq_1",
+                    "delay_minutes": 10,
+                    "discount": "Sem desconto",
+                    "plan_ids": ["plan_1"],
+                    "message": "",
+                    "medias": [],
+                    "send_uncompressed": False
+                }
+            ]
+        },
+        "downsell_pix": {
+            "enabled": False,
+            "sequences": []
+        },
+        "order_bumps": [],
+        "payments": {
+            "generated_message": "⭐ <b>Você selecionou o seguinte plano:</b>\n\n🎁 Plano: {plano}\n💲 Valor: {valor}\n\n💎 Pague via Pix Copia e Cola (ou QR Code em alguns bancos):\n\n{pix_code}\n\n👆 Toque na chave PIX acima para copiá-la\n\nApós efetuar o pagamento, clique no botão abaixo ⤵️",
+            "pix_format": "Código (monoespaçado)",
+            "generated_medias": [],
+            "generated_uncompressed": False,
+            "secondary_enabled": False,
+            "secondary_message": "",
+            "approved_message": "✅ <b>Pagamento Aprovado!</b>\n\nParabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n🎉 Você já tem acesso ao conteúdo!",
+            "access_button_text": "Acessar conteúdo",
+            "approved_medias": [],
+            "approved_uncompressed": False
+        }
+    }
+
 def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     pub = state.setdefault("publish", {})
     if pub.get("gateway_secret") and pub.get("gateway_provider") in ("pushinpay", "suitpay", "", None):
@@ -187,6 +267,19 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     key = (acc.get("ai_api_key") or "").strip()
     if key.startswith("sk-") and len(key) == 35 and acc.get("ai_provider") in ("openai", "", None):
         acc["ai_provider"] = "deepseek"
+
+    state.setdefault("bot_folders", [])
+    flow_bots = state.setdefault("flow_bots", [])
+    if not isinstance(flow_bots, list) or len(flow_bots) == 0:
+        state["flow_bots"] = [_build_default_flow_bot(pub)]
+        flow_bots = state["flow_bots"]
+
+    # Sincroniza token ativo para que o polling rode o bot selecionado/ativo
+    active_fb = next((b for b in flow_bots if b.get("active") and b.get("token")), None)
+    if active_fb:
+        pub["bot_token"] = active_fb["token"]
+        pub["bot_username"] = active_fb.get("username", pub.get("bot_username", ""))
+        pub["is_live"] = True
 
     memory = state.setdefault("memory", {"leads": []})
     leads = memory.get("leads", [])
@@ -485,3 +578,77 @@ async def run_persona_diagnostics(req: DiagnosticsRequest):
             }
         ]
     }
+
+
+class VerifyTokenRequest(BaseModel):
+    token: str
+
+@app.post("/api/flow-bots/verify-token")
+async def verify_flow_bot_token(req: VerifyTokenRequest):
+    from aiogram import Bot
+    tok = (req.token or "").strip()
+    if not tok:
+        return {"status": "error", "message": "Token vazio"}
+    temp_bot = None
+    try:
+        temp_bot = Bot(token=tok)
+        me = await temp_bot.get_me()
+        return {
+            "status": "ok",
+            "bot_id": str(me.id),
+            "username": f"@{me.username}" if me.username else f"bot_{me.id}",
+            "first_name": me.first_name or "Bot"
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        if temp_bot:
+            try:
+                await temp_bot.session.close()
+            except Exception:
+                pass
+
+
+class VerifyChannelRequest(BaseModel):
+    token: Optional[str] = ""
+    channel_id: str
+
+@app.post("/api/flow-bots/verify-channel")
+async def verify_flow_channel(req: VerifyChannelRequest):
+    from aiogram import Bot
+    state = await _read_state_from_db()
+    tok = (req.token or state.get("publish", {}).get("bot_token") or "").strip()
+    ch_id = (req.channel_id or "").strip()
+    if not ch_id:
+        return {"status": "error", "message": "ID do canal vazio"}
+    if not tok:
+        return {
+            "status": "ok",
+            "channel_id": ch_id,
+            "title": f"Canal ({ch_id})",
+            "verified_at": datetime.now().strftime("%d/%m, %H:%M")
+        }
+    temp_bot = None
+    try:
+        temp_bot = Bot(token=tok)
+        chat = await temp_bot.get_chat(chat_id=ch_id)
+        return {
+            "status": "ok",
+            "channel_id": str(chat.id),
+            "title": chat.title or chat.username or str(chat.id),
+            "verified_at": datetime.now().strftime("%d/%m, %H:%M")
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        if temp_bot:
+            try:
+                await temp_bot.session.close()
+            except Exception:
+                pass
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+
