@@ -282,6 +282,23 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
             "Segundo envio não reutilizou o telegram_file_id cacheado!"
         )
 
+        # Quando há 2 ou 3 mídias (ex: 1 foto + 1 vídeo), deve enviar lado a lado via send_media_group (Álbum)
+        video_item = {
+            "id": "m_cache_2",
+            "name": "0929(3).mp4",
+            "type": "Vídeos",
+            "url": "data:video/mp4;base64,AAAAIGZ0eXBpc29t",
+        }
+        fake_album_resp = [
+            types.SimpleNamespace(photo=[types.SimpleNamespace(file_id="AgACAgEAAxkB_ALBUM_PHOTO_1")]),
+            types.SimpleNamespace(video=types.SimpleNamespace(file_id="BAACAgEAAxkB_ALBUM_VIDEO_2")),
+        ]
+        mgr.bot.send_media_group = AsyncMock(return_value=fake_album_resp)
+        await mgr._send_flow_medias(1003, [media_item, video_item])
+        self.assertTrue(mgr.bot.send_media_group.called, "Não utilizou send_media_group para enviar 2 mídias lado a lado!")
+        self.assertEqual(video_item.get("telegram_file_id"), "BAACAgEAAxkB_ALBUM_VIDEO_2")
+        self.assertEqual(video_item.get("telegram_send_as"), "video")
+
     def test_5_frontend_hygiene_and_cors_configuration(self):
         """Etapa 2.1 & 3.1 & 3.4: Sem sobrescrita automática por localStorage, sem checkpix:ok morto no HTML e CORS restrito."""
         with open(FRONTEND_HTML, "r", encoding="utf-8") as f:

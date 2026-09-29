@@ -11,6 +11,25 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, URLInputFile, BufferedInputFile
 
+try:
+    from aiogram.types import InputMediaPhoto, InputMediaVideo
+except ImportError:
+    class InputMediaPhoto:
+        def __init__(self, media=None, caption=None, parse_mode=None, has_spoiler=False, **kwargs):
+            self.type = "photo"
+            self.media = media
+            self.caption = caption
+            self.parse_mode = parse_mode
+            self.has_spoiler = has_spoiler
+
+    class InputMediaVideo:
+        def __init__(self, media=None, caption=None, parse_mode=None, has_spoiler=False, **kwargs):
+            self.type = "video"
+            self.media = media
+            self.caption = caption
+            self.parse_mode = parse_mode
+            self.has_spoiler = has_spoiler
+
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply, _compute_effective_min_price
 
@@ -639,6 +658,198 @@ class ActiveBotManager:
             m["_cache_error"] = last_error
         return None
 
+    def _is_video_media(self, m: Dict[str, Any]) -> bool:
+        mtype = (m.get("type") or "").lower()
+        fname = str(m.get("name") or "")
+        url = str(m.get("url") or "")
+        send_as = (m.get("telegram_send_as") or "").lower()
+        return (
+            send_as in ("video", "animation")
+            or "video" in mtype
+            or "vídeo" in mtype
+            or url.startswith("data:video")
+            or fname.lower().endswith((".mp4", ".mov", ".webm", ".mkv"))
+        )
+
+    async def _download_file_by_id(self, bot_instance: Bot, file_id: str) -> Optional[bytes]:
+        if not bot_instance or not file_id:
+            return None
+        try:
+            import io
+            buf = io.BytesIO()
+            if hasattr(bot_instance, "download"):
+                await bot_instance.download(file_id, destination=buf)
+                data = buf.getvalue()
+                if data:
+                    return data
+            if hasattr(bot_instance, "get_file") and hasattr(bot_instance, "download_file"):
+                f_info = await bot_instance.get_file(file_id)
+                await bot_instance.download_file(f_info.file_path, destination=buf)
+                data = buf.getvalue()
+                if data:
+                    return data
+        except Exception as e:
+            logger.warning(f"Falha ao baixar arquivo {file_id[:16]} do Telegram: {e}")
+        return None
+
+    async def _build_group_media_input(
+        self,
+        m: Dict[str, Any],
+        bot_instance: Bot,
+        force_upload: bool = False,
+        caption: Optional[str] = None
+    ):
+        is_video = self._is_video_media(m)
+        fid = (m.get("telegram_file_id") or "").strip()
+        send_as = (m.get("telegram_send_as") or "").lower()
+        fname = str(m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+        url = str(m.get("url") or "")
+
+        # No Telegram, file_ids de Animation (CgAC...) ou Document (BQAC...) não são aceitos em sendMediaGroup
+        # sem reenviar os bytes dentro de InputMediaVideo / InputMediaPhoto para gerar um file_id nativo de álbum.
+        needs_upload = (
+            force_upload
+            or not fid
+            or send_as in ("animation", "document")
+            or fid.startswith(("CgAC", "BQAC"))
+        )
+
+        media_ref = None
+        if not needs_upload:
+            media_ref = fid
+        else:
+            if url and not url.startswith("tg://"):
+                media_ref = self._build_input_file(url, fname)
+            elif fid:
+                raw_bytes = await self._download_file_by_id(bot_instance, fid)
+                if raw_bytes:
+                    media_ref = BufferedInputFile(raw_bytes, filename=fname)
+                else:
+                    media_ref = fid
+        if not media_ref:
+            return None
+
+        has_spoiler = bool(m.get("spoiler", False))
+        if is_video:
+            return InputMediaVideo(media=media_ref, caption=caption, has_spoiler=has_spoiler)
+        return InputMediaPhoto(media=media_ref, caption=caption, has_spoiler=has_spoiler)
+
+    async def warm_media_group_in_channel(
+        self,
+        mlist: List[Dict[str, Any]],
+        state: Optional[Dict[str, Any]],
+        fb: Optional[Dict[str, Any]] = None,
+        bot_instance: Optional[Bot] = None,
+        exclude_chat_id: Optional[int] = None,
+        force_upload: bool = False
+    ) -> int:
+        valid_items = [
+            m for m in (mlist or [])[:3]
+            if isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+        ]
+        if len(valid_items) < 2:
+            return 0
+
+        target_bot = bot_instance or self.bot
+        if not target_bot or not hasattr(target_bot, "send_media_group"):
+            return 0
+
+        needs_group_warm = force_upload or any(
+            not (m.get("telegram_file_id") or "").strip()
+            or (m.get("telegram_send_as") or "").lower() in ("animation", "document")
+            or str(m.get("telegram_file_id") or "").startswith(("CgAC", "BQAC"))
+            or not m.get("album_cached")
+            for m in valid_items
+        )
+        if not needs_group_warm:
+            return 0
+
+        channels = self._get_candidate_cache_channels(state, fb)
+        for cache_ch in channels:
+            if exclude_chat_id is not None and str(cache_ch) == str(exclude_chat_id):
+                continue
+            try:
+                group_inputs = []
+                for idx, m in enumerate(valid_items):
+                    cap = "📦 Cache Álbum (Lado a Lado)" if idx == 0 else None
+                    inp_item = await self._build_group_media_input(
+                        m,
+                        target_bot,
+                        force_upload=force_upload,
+                        caption=cap
+                    )
+                    if not inp_item:
+                        group_inputs = []
+                        break
+                    group_inputs.append(inp_item)
+
+                if len(group_inputs) < 2:
+                    continue
+
+                sent_msgs = await target_bot.send_media_group(
+                    chat_id=cache_ch,
+                    media=group_inputs,
+                    disable_notification=True
+                )
+                if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
+                    warmed_count = 0
+                    for m, sent_msg in zip(valid_items, sent_msgs):
+                        is_vid = self._is_video_media(m)
+                        fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
+                        if fid:
+                            m["telegram_file_id"] = str(fid)
+                            m["telegram_send_as"] = detected_kind
+                            m["cached_channel_id"] = str(cache_ch)
+                            m["album_cached"] = True
+                            m.pop("_cache_error", None)
+                            url = str(m.get("url") or "")
+                            if url.startswith("data:video") or len(url) > 350000:
+                                m["url"] = f"tg://file_id/{fid}"
+                            warmed_count += 1
+                    logger.info(f"Álbum com {warmed_count} mídias salvo lado a lado no canal {cache_ch}")
+                    return warmed_count
+            except Exception as e:
+                logger.warning(f"Falha ao aquecer álbum de mídias no canal {cache_ch}: {e}")
+                if not force_upload:
+                    # Tenta forçando reupload dos bytes caso um file_id antigo fosse incompatível com álbum
+                    try:
+                        group_inputs_retry = []
+                        for idx, m in enumerate(valid_items):
+                            cap = "📦 Cache Álbum (Lado a Lado)" if idx == 0 else None
+                            inp_item = await self._build_group_media_input(
+                                m,
+                                target_bot,
+                                force_upload=True,
+                                caption=cap
+                            )
+                            if inp_item:
+                                group_inputs_retry.append(inp_item)
+                        if len(group_inputs_retry) == len(valid_items):
+                            sent_msgs = await target_bot.send_media_group(
+                                chat_id=cache_ch,
+                                media=group_inputs_retry,
+                                disable_notification=True
+                            )
+                            if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
+                                warmed_count = 0
+                                for m, sent_msg in zip(valid_items, sent_msgs):
+                                    is_vid = self._is_video_media(m)
+                                    fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
+                                    if fid:
+                                        m["telegram_file_id"] = str(fid)
+                                        m["telegram_send_as"] = detected_kind
+                                        m["cached_channel_id"] = str(cache_ch)
+                                        m["album_cached"] = True
+                                        m.pop("_cache_error", None)
+                                        url = str(m.get("url") or "")
+                                        if url.startswith("data:video") or len(url) > 350000:
+                                            m["url"] = f"tg://file_id/{fid}"
+                                        warmed_count += 1
+                                return warmed_count
+                    except Exception as retry_err:
+                        logger.warning(f"Retry de álbum no canal {cache_ch} falhou: {retry_err}")
+        return 0
+
     async def warm_all_state_medias(self, state: Dict[str, Any]) -> int:
         if not isinstance(state, dict):
             return 0
@@ -682,6 +893,15 @@ class ActiveBotManager:
                         media_lists.append(fb["payments"]["approved_medias"])
 
                 for mlist in media_lists:
+                    valid_in_list = [
+                        m for m in mlist[:3]
+                        if isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+                    ]
+                    if len(valid_in_list) >= 2 and hasattr(bot_to_use, "send_media_group"):
+                        gw = await self.warm_media_group_in_channel(valid_in_list, state, fb=fb, bot_instance=bot_to_use)
+                        if gw > 0:
+                            warmed += gw
+                            continue
                     for m in mlist:
                         if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip() and m.get("url"):
                             fid = await self.warm_media_item_in_channel(m, state, fb=fb, bot_instance=bot_to_use)
@@ -707,13 +927,18 @@ class ActiveBotManager:
                             warmed += 1
             upsell = state.get("upsell")
             if isinstance(upsell, dict):
-                for m in (upsell.get("medias") or []):
-                    if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip():
-                        u = str(m.get("url") or "")
-                        if u.startswith("data:") or upsell.get("enabled"):
-                            fid = await self.warm_media_item_in_channel(m, state, fb=active_fb, bot_instance=bot_for_ai)
-                            if fid:
-                                warmed += 1
+                up_medias = upsell.get("medias") or []
+                if len(up_medias) >= 2 and hasattr(bot_for_ai, "send_media_group"):
+                    gw = await self.warm_media_group_in_channel(up_medias, state, fb=active_fb, bot_instance=bot_for_ai)
+                    warmed += gw
+                else:
+                    for m in up_medias:
+                        if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip():
+                            u = str(m.get("url") or "")
+                            if u.startswith("data:") or upsell.get("enabled"):
+                                fid = await self.warm_media_item_in_channel(m, state, fb=active_fb, bot_instance=bot_for_ai)
+                                if fid:
+                                    warmed += 1
 
         return warmed
 
@@ -728,14 +953,8 @@ class ActiveBotManager:
             return None
         url = m.get("url")
         cached_fid = (m.get("telegram_file_id") or "").strip()
-        mtype = (m.get("type") or "").lower()
+        is_video = self._is_video_media(m)
         fname = str(m.get("name") or "")
-        is_video = (
-            "video" in mtype
-            or "vídeo" in mtype
-            or str(url or "").startswith("data:video")
-            or fname.lower().endswith((".mp4", ".mov", ".webm", ".mkv"))
-        )
         send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
 
         if cached_fid:
@@ -821,7 +1040,100 @@ class ActiveBotManager:
         return None
 
     async def _send_flow_medias(self, chat_id: int, medias: List[Dict[str, Any]]):
-        for m in (medias or [])[:3]:
+        valid_items = [
+            m for m in (medias or [])[:3]
+            if isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+        ]
+        if not valid_items:
+            return
+
+        # Se houver apenas 1 mídia, envia individualmente via cache
+        if len(valid_items) == 1 or not hasattr(self.bot, "send_media_group"):
+            for m in valid_items:
+                try:
+                    await self._send_single_media_cached(chat_id, m)
+                except Exception as e:
+                    logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
+            return
+
+        # Quando há 2 ou 3 mídias, envia LADO A LADO (Álbum / send_media_group)
+        state = None
+        fb = None
+        try:
+            if self.state_getter:
+                state = await self.state_getter()
+                fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
+        except Exception:
+            state = None
+
+        # Garante que todas as mídias do grupo já estejam aquecidas em formato compatível com Álbum no canal de cache
+        warmed_cnt = await self.warm_media_group_in_channel(
+            valid_items,
+            state,
+            fb=fb,
+            bot_instance=self.bot,
+            exclude_chat_id=chat_id
+        )
+        if warmed_cnt > 0 and state and self.state_saver:
+            try:
+                await self.state_saver(state)
+            except Exception:
+                pass
+
+        try:
+            group_inputs = []
+            for m in valid_items:
+                inp_item = await self._build_group_media_input(m, self.bot, force_upload=False)
+                if inp_item:
+                    group_inputs.append(inp_item)
+
+            if len(group_inputs) >= 2:
+                sent_msgs = await self.bot.send_media_group(chat_id=chat_id, media=group_inputs)
+                if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
+                    updated = False
+                    for m, sent_msg in zip(valid_items, sent_msgs):
+                        if not (m.get("telegram_file_id") or "").strip():
+                            is_vid = self._is_video_media(m)
+                            fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
+                            if fid:
+                                m["telegram_file_id"] = str(fid)
+                                m["telegram_send_as"] = detected_kind
+                                m["album_cached"] = True
+                                updated = True
+                    if updated and state and self.state_saver:
+                        try:
+                            await self.state_saver(state)
+                        except Exception:
+                            pass
+                return
+        except Exception as group_err:
+            logger.warning(f"Tentando reconversão de álbum lado a lado após erro ({group_err})...")
+            try:
+                group_inputs_retry = []
+                for m in valid_items:
+                    inp_item = await self._build_group_media_input(m, self.bot, force_upload=True)
+                    if inp_item:
+                        group_inputs_retry.append(inp_item)
+                if len(group_inputs_retry) >= 2:
+                    sent_msgs = await self.bot.send_media_group(chat_id=chat_id, media=group_inputs_retry)
+                    if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
+                        for m, sent_msg in zip(valid_items, sent_msgs):
+                            is_vid = self._is_video_media(m)
+                            fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
+                            if fid:
+                                m["telegram_file_id"] = str(fid)
+                                m["telegram_send_as"] = detected_kind
+                                m["album_cached"] = True
+                        if state and self.state_saver:
+                            try:
+                                await self.state_saver(state)
+                            except Exception:
+                                pass
+                    return
+            except Exception as retry_err:
+                logger.warning(f"Fallback para envio individual após falha no álbum: {retry_err}")
+
+        for m in valid_items:
             try:
                 await self._send_single_media_cached(chat_id, m)
             except Exception as e:
@@ -1763,8 +2075,11 @@ class ActiveBotManager:
             if not upsell.get("enabled", False):
                 return
             lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
-            for m in upsell.get("medias", []):
-                if isinstance(m, dict) and (m.get("url") or m.get("telegram_file_id")):
+            up_medias = [m for m in upsell.get("medias", []) if isinstance(m, dict) and (m.get("url") or m.get("telegram_file_id"))]
+            if len(up_medias) >= 2:
+                await self._send_flow_medias(user_id, up_medias)
+            else:
+                for m in up_medias:
                     try:
                         await self._send_single_media_cached(
                             user_id,
