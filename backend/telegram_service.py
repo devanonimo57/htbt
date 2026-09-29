@@ -18,6 +18,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("SharkBotTelegram")
 
 
+def _create_bot_instance(token: str) -> Bot:
+    try:
+        import socket
+        from aiogram.client.session.aiohttp import AiohttpSession
+        session = AiohttpSession(timeout=120)
+        if hasattr(session, "_connector_init") and isinstance(session._connector_init, dict):
+            session._connector_init["family"] = socket.AF_INET
+        return Bot(token=token, session=session)
+    except Exception:
+        return Bot(token=token)
+
+
 class ActiveBotManager:
     """
     Gerencia a instância ativa do Bot do Telegram em background,
@@ -44,6 +56,10 @@ class ActiveBotManager:
         self.lead_locks: Dict[str, asyncio.Lock] = {}
         self.state_getter = None
         self.state_saver = None
+
+    @property
+    def active_token(self) -> str:
+        return self.current_token
 
     def _get_lead_lock(self, uid: str) -> asyncio.Lock:
         if len(self.lead_locks) > 1000:
@@ -78,7 +94,7 @@ class ActiveBotManager:
         await self.stop()
 
         try:
-            test_bot = Bot(token=token)
+            test_bot = _create_bot_instance(token)
             me = await test_bot.get_me()
             publish["bot_username"] = f"@{me.username}"
             publish["bot_first_name"] = me.first_name
@@ -492,6 +508,49 @@ class ActiveBotManager:
 
         return primary if primary else fallback_placeholder
 
+    def _extract_sent_file_id(self, sent_msg: Any, default_kind: str = "photo"):
+        if not sent_msg:
+            return None, default_kind
+        vid = getattr(sent_msg, "video", None)
+        if vid and getattr(vid, "file_id", None):
+            return str(vid.file_id), "video"
+        anim = getattr(sent_msg, "animation", None)
+        if anim and getattr(anim, "file_id", None):
+            return str(anim.file_id), "animation"
+        photos = getattr(sent_msg, "photo", None)
+        if photos and len(photos) > 0 and getattr(photos[-1], "file_id", None):
+            return str(photos[-1].file_id), "photo"
+        doc = getattr(sent_msg, "document", None)
+        if doc and getattr(doc, "file_id", None):
+            return str(doc.file_id), "document"
+        return None, default_kind
+
+    async def _send_by_cached_fid(
+        self,
+        bot_instance: Bot,
+        chat_id: Any,
+        fid: str,
+        send_as: str,
+        caption: Optional[str] = None,
+        has_spoiler: bool = False
+    ):
+        if send_as == "document":
+            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+        if send_as == "animation":
+            try:
+                return await bot_instance.send_animation(chat_id=chat_id, animation=fid, caption=caption, has_spoiler=has_spoiler)
+            except Exception:
+                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler)
+        if send_as == "video":
+            try:
+                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler)
+            except Exception:
+                return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+        try:
+            return await bot_instance.send_photo(chat_id=chat_id, photo=fid, caption=caption, has_spoiler=has_spoiler)
+        except Exception:
+            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+
     async def warm_media_item_in_channel(
         self,
         m: Dict[str, Any],
@@ -515,44 +574,69 @@ class ActiveBotManager:
             return None
 
         mtype = (m.get("type") or "").lower()
-        is_video = "video" in mtype or "vídeo" in mtype or str(url).startswith("data:video")
+        fname = str(m.get("name") or "")
+        is_video = (
+            "video" in mtype
+            or "vídeo" in mtype
+            or str(url).startswith("data:video")
+            or fname.lower().endswith((".mp4", ".mov", ".webm", ".mkv"))
+        )
         channels = self._get_candidate_cache_channels(state, fb)
+        last_error = ""
 
         for cache_ch in channels:
             if exclude_chat_id is not None and str(cache_ch) == str(exclude_chat_id):
                 continue
             try:
-                inp_cache = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+                default_fn = fname or ("media.mp4" if is_video else "media.jpg")
+                inp_cache = self._build_input_file(url, default_fn)
                 if not inp_cache:
                     return None
-                if is_video:
-                    sent_cache = await target_bot.send_video(
-                        chat_id=cache_ch,
-                        video=inp_cache,
-                        caption=f"📦 Cache Mídia: {m.get('name') or 'video'}",
-                        disable_notification=True,
-                    )
-                    vid_obj = getattr(sent_cache, "video", None)
-                    fid = getattr(vid_obj, "file_id", None) if vid_obj else None
-                else:
-                    sent_cache = await target_bot.send_photo(
-                        chat_id=cache_ch,
-                        photo=inp_cache,
-                        caption=f"📦 Cache Mídia: {m.get('name') or 'photo'}",
-                        disable_notification=True,
-                    )
-                    photos = getattr(sent_cache, "photo", None)
-                    fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
+                sent_cache = None
+                try:
+                    if is_video:
+                        sent_cache = await target_bot.send_video(
+                            chat_id=cache_ch,
+                            video=inp_cache,
+                            caption=f"📦 Cache Mídia: {default_fn}",
+                            disable_notification=True,
+                        )
+                    else:
+                        sent_cache = await target_bot.send_photo(
+                            chat_id=cache_ch,
+                            photo=inp_cache,
+                            caption=f"📦 Cache Mídia: {default_fn}",
+                            disable_notification=True,
+                        )
+                except Exception as primary_err:
+                    # Fallback para send_document caso a imagem tenha dimensão > 10000px ou formato atípico
+                    if hasattr(target_bot, "send_document"):
+                        inp_doc = self._build_input_file(url, default_fn)
+                        sent_cache = await target_bot.send_document(
+                            chat_id=cache_ch,
+                            document=inp_doc,
+                            caption=f"📦 Cache Mídia: {default_fn}",
+                            disable_notification=True,
+                        )
+                    else:
+                        raise primary_err
+
+                fid, send_as = self._extract_sent_file_id(sent_cache, "video" if is_video else "photo")
                 if fid:
                     m["telegram_file_id"] = str(fid)
+                    m["telegram_send_as"] = send_as
                     m["cached_channel_id"] = str(cache_ch)
+                    m.pop("_cache_error", None)
                     if str(url).startswith("data:video") or len(str(url)) > 350000:
                         m["url"] = f"tg://file_id/{fid}"
-                    logger.info(f"Mídia '{m.get('name')}' salva em cache no canal {cache_ch} -> file_id={fid[:18]}...")
+                    logger.info(f"Mídia '{default_fn}' salva em cache no canal {cache_ch} ({send_as}) -> file_id={fid[:18]}...")
                     return str(fid)
             except Exception as e:
-                logger.warning(f"Upload de cache no canal ({cache_ch}) falhou: {e}")
+                last_error = str(e)
+                logger.warning(f"Upload de cache no canal ({cache_ch}) falhou para '{m.get('name')}': {e}")
 
+        if last_error:
+            m["_cache_error"] = last_error
         return None
 
     async def warm_all_state_medias(self, state: Dict[str, Any]) -> int:
@@ -564,13 +648,16 @@ class ActiveBotManager:
                 continue
             tok = (fb.get("token") or state.get("publish", {}).get("bot_token") or "").strip()
             if not tok or tok == "***configured***":
+                tok = self.current_token
+
+            if not tok:
                 continue
 
             temp_bot = None
-            bot_to_use = self.bot if (self.bot and self.active_token == tok) else None
+            bot_to_use = self.bot if (self.bot and self.current_token == tok) else None
             if not bot_to_use:
                 try:
-                    temp_bot = Bot(token=tok)
+                    temp_bot = _create_bot_instance(tok)
                     bot_to_use = temp_bot
                 except Exception:
                     continue
@@ -642,14 +729,25 @@ class ActiveBotManager:
         url = m.get("url")
         cached_fid = (m.get("telegram_file_id") or "").strip()
         mtype = (m.get("type") or "").lower()
-        is_video = "video" in mtype or "vídeo" in mtype or str(url or "").startswith("data:video")
+        fname = str(m.get("name") or "")
+        is_video = (
+            "video" in mtype
+            or "vídeo" in mtype
+            or str(url or "").startswith("data:video")
+            or fname.lower().endswith((".mp4", ".mov", ".webm", ".mkv"))
+        )
+        send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
 
         if cached_fid:
             try:
-                if is_video:
-                    await self.bot.send_video(chat_id=chat_id, video=cached_fid, caption=caption, has_spoiler=has_spoiler)
-                else:
-                    await self.bot.send_photo(chat_id=chat_id, photo=cached_fid, caption=caption, has_spoiler=has_spoiler)
+                await self._send_by_cached_fid(
+                    self.bot,
+                    chat_id=chat_id,
+                    fid=cached_fid,
+                    send_as=send_as,
+                    caption=caption,
+                    has_spoiler=has_spoiler
+                )
                 return cached_fid
             except Exception:
                 m.pop("telegram_file_id", None)
@@ -679,27 +777,39 @@ class ActiveBotManager:
                     await self.state_saver(state)
                 except Exception:
                     pass
-            if is_video:
-                await self.bot.send_video(chat_id=chat_id, video=str(fid), caption=caption, has_spoiler=has_spoiler)
-            else:
-                await self.bot.send_photo(chat_id=chat_id, photo=str(fid), caption=caption, has_spoiler=has_spoiler)
+            eff_send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
+            await self._send_by_cached_fid(
+                self.bot,
+                chat_id=chat_id,
+                fid=str(fid),
+                send_as=eff_send_as,
+                caption=caption,
+                has_spoiler=has_spoiler
+            )
             return str(fid)
 
-        inp = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+        default_fn = fname or ("media.mp4" if is_video else "media.jpg")
+        inp = self._build_input_file(url, default_fn)
         if not inp:
             return None
 
-        if is_video:
-            sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler)
-            vid_obj = getattr(sent, "video", None)
-            fid = getattr(vid_obj, "file_id", None) if vid_obj else None
-        else:
-            sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler)
-            photos = getattr(sent, "photo", None)
-            fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
+        sent = None
+        try:
+            if is_video:
+                sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler)
+            else:
+                sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler)
+        except Exception as primary_err:
+            if hasattr(self.bot, "send_document"):
+                inp_doc = self._build_input_file(url, default_fn)
+                sent = await self.bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption)
+            else:
+                raise primary_err
 
+        fid, detected_kind = self._extract_sent_file_id(sent, "video" if is_video else "photo")
         if fid:
             m["telegram_file_id"] = str(fid)
+            m["telegram_send_as"] = detected_kind
             if str(url).startswith("data:video") or len(str(url)) > 350000:
                 m["url"] = f"tg://file_id/{fid}"
             if state and self.state_saver:

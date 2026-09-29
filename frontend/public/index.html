@@ -6312,7 +6312,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       const cacheEl = document.getElementById('nb-bot-cache-channel');
       const salesCh = b.plans?.find(p => p.delivery_channel_id && p.delivery_channel_id !== '-1003939135982')?.delivery_channel_id
         || (b.fallback_delivery?.channel_id && b.fallback_delivery.channel_id !== '-1003939135982' ? b.fallback_delivery.channel_id : "");
-      if (cacheEl) cacheEl.value = b.cache_channel_id || STATE.publish?.cache_channel_id || salesCh || "";
+      const resolvedCacheCh = (b.cache_channel_id || STATE.publish?.cache_channel_id || salesCh || "").trim();
+      if (cacheEl) cacheEl.value = resolvedCacheCh;
+      if (resolvedCacheCh && !b.cache_channel_id) {
+        b.cache_channel_id = resolvedCacheCh;
+      }
       nbRenderMediaChips('nb-welcome-medias-list', 'nb-welcome-media-count', w.medias || [], 'welcome');
       nbUpdateWelcomeValidation();
 
@@ -6351,23 +6355,34 @@ quer que eu te mostre as opções de acesso?</textarea>
         return;
       }
       if (stEl) {
-        stEl.textContent = "Verificando...";
-        stEl.className = "text-[11px] text-zinc-400";
+        stEl.textContent = "Sincronizando canal e enviando mídias para cache...";
+        stEl.className = "text-[11px] text-amber-300";
       }
       nbOnCacheChannelInput(chId);
       try {
+        await saveFullState();
+        const curBot = nbGetCurrentBot();
         const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: b?.token || STATE.publish?.bot_token || "", channel_id: chId })
+          body: JSON.stringify({ token: curBot?.token || STATE.publish?.bot_token || "", channel_id: chId })
         });
         const data = await res.json();
         if (data.status === "ok") {
+          if (data.state) {
+            const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+            STATE = { ...data.state, saved_profiles: mergedProfiles };
+            saveLocalBackup();
+            const refreshedBot = nbGetCurrentBot();
+            if (refreshedBot) nbLoadBotIntoTabs(refreshedBot);
+          }
           if (stEl) {
-            stEl.textContent = `✓ Conectado: ${data.title}`;
+            const wCount = Number(data.warmed_medias || 0);
+            stEl.textContent = wCount > 0
+              ? `✓ Conectado: ${data.title} (${wCount} mídia(s) enviada(s) ao cache)`
+              : `✓ Conectado: ${data.title}`;
             stEl.className = "text-[11px] text-emerald-400 font-semibold";
           }
-          await saveFullState();
         } else if (stEl) {
           stEl.textContent = `Erro: ${data.message || 'Bot sem acesso ao canal'}`;
           stEl.className = "text-[11px] text-rose-400";
@@ -7232,11 +7247,12 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (countEl) countEl.textContent = `${(medias || []).length}/3`;
       if (!listEl) return;
       listEl.innerHTML = (medias || []).map((m, idx) => {
+        const errHint = m._cache_error || m._cacheError || '';
         const badge = m.telegram_file_id
           ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-700/60 text-[10px] text-emerald-300 font-semibold" title="file_id: ${escapeHtml(m.telegram_file_id)}">✓ Cache Telegram</span>`
           : (m._caching
               ? `<span class="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-[10px] text-amber-300 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Enviando ao canal...</span>`
-              : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400" title="${escapeHtml(m._cacheError || 'Será enviado ao canal ao salvar')}">Pendente cache</span>`);
+              : `<button type="button" onclick="nbVerifyCacheChannel()" class="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[10px] text-amber-300 cursor-pointer" title="${escapeHtml(errHint || 'Clique para enviar ao canal de cache agora')}">Pendente cache ↻</button>`);
         return `
           <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
             <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
@@ -7489,6 +7505,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbSaveCurrentBot() {
+      const chVal = (document.getElementById('nb-bot-cache-channel')?.value || "").trim();
+      if (chVal) nbOnCacheChannelInput(chVal);
       const b = nbGetCurrentBot();
       if (b) {
         b.mode = "flow";
@@ -7497,7 +7515,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       await saveFullState();
       const valEl = document.getElementById('nb-welcome-validation');
       if (valEl && (b?.welcome?.message || "").trim()) {
-        valEl.textContent = "✓ Alterações salvas com sucesso!";
+        valEl.textContent = "✓ Alterações salvas e mídias sincronizadas com o cache!";
         valEl.className = "text-xs text-emerald-400 font-semibold";
         setTimeout(() => { if (valEl) valEl.textContent = ""; }, 3000);
       }

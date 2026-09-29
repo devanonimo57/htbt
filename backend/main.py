@@ -602,6 +602,16 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             await session.commit()
         return _STATE_CACHE
 
+async def _startup_warm_medias_task():
+    try:
+        st = await _read_state_from_db()
+        warmed = await bot_manager.warm_all_state_medias(st)
+        if warmed > 0:
+            await _write_state_to_db(st)
+    except Exception:
+        pass
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -621,6 +631,7 @@ async def init_db():
 
     # Se o bot estiver ativo no banco, já inicia o polling automaticamente
     await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
+    _asyncio.create_task(_startup_warm_medias_task())
 
 @app.on_event("startup")
 async def on_startup():
@@ -650,6 +661,7 @@ async def save_full_state(state: Dict[str, Any]):
     await _write_state_to_db(state, preserve_runtime=True)
     bot_status = await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
     updated_state = await _read_state_from_db()
+    warmed = 0
     try:
         warmed = await bot_manager.warm_all_state_medias(updated_state)
         if warmed > 0:
@@ -659,6 +671,7 @@ async def save_full_state(state: Dict[str, Any]):
     return {
         "status": "success",
         "bot_status": bot_status,
+        "warmed_medias": warmed,
         "state": _redact_state_secrets(updated_state),
         "updated_at": datetime.utcnow().isoformat()
     }
@@ -919,7 +932,7 @@ class VerifyTokenRequest(BaseModel):
 
 @app.post("/api/flow-bots/verify-token", dependencies=[Depends(verify_admin_auth)])
 async def verify_flow_bot_token(req: VerifyTokenRequest):
-    from aiogram import Bot
+    from telegram_service import _create_bot_instance
     tok = (req.token or "").strip()
     if tok == REDACTED_SECRET_MASK:
         state = await _read_state_from_db()
@@ -928,7 +941,7 @@ async def verify_flow_bot_token(req: VerifyTokenRequest):
         return {"status": "error", "message": "Token vazio"}
     temp_bot = None
     try:
-        temp_bot = Bot(token=tok)
+        temp_bot = _create_bot_instance(tok)
         me = await temp_bot.get_me()
         return {
             "status": "ok",
@@ -952,11 +965,11 @@ class VerifyChannelRequest(BaseModel):
 
 @app.post("/api/flow-bots/verify-channel", dependencies=[Depends(verify_admin_auth)])
 async def verify_flow_channel(req: VerifyChannelRequest):
-    from aiogram import Bot
+    from telegram_service import _create_bot_instance
     state = await _read_state_from_db()
     tok = (req.token or "").strip()
     if not tok or tok == REDACTED_SECRET_MASK:
-        tok = (state.get("publish", {}).get("bot_token") or "").strip()
+        tok = (state.get("publish", {}).get("bot_token") or bot_manager.current_token or "").strip()
     ch_id = (req.channel_id or "").strip()
     if not ch_id:
         return {"status": "error", "message": "ID do canal vazio"}
@@ -964,13 +977,23 @@ async def verify_flow_channel(req: VerifyChannelRequest):
         return {"status": "error", "message": "Token do bot não configurado"}
     temp_bot = None
     try:
-        temp_bot = Bot(token=tok)
-        chat = await temp_bot.get_chat(chat_id=ch_id)
+        temp_bot = _create_bot_instance(tok)
+        parsed_ch = int(ch_id) if ch_id.lstrip("-").isdigit() else ch_id
+        chat = await temp_bot.get_chat(chat_id=parsed_ch)
+        resolved_id = str(chat.id)
+        state.setdefault("publish", {})["cache_channel_id"] = resolved_id
+        fb = bot_manager._get_active_flow_bot(state)
+        if isinstance(fb, dict):
+            fb["cache_channel_id"] = resolved_id
+        warmed = await bot_manager.warm_all_state_medias(state)
+        state = await _write_state_to_db(state)
         return {
             "status": "ok",
-            "channel_id": str(chat.id),
-            "title": chat.title or chat.username or str(chat.id),
-            "verified_at": datetime.now().strftime("%d/%m, %H:%M")
+            "channel_id": resolved_id,
+            "title": chat.title or chat.username or resolved_id,
+            "verified_at": datetime.now().strftime("%d/%m, %H:%M"),
+            "warmed_medias": warmed,
+            "state": _redact_state_secrets(state)
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -990,7 +1013,7 @@ class CacheMediaRequest(BaseModel):
 
 @app.post("/api/flow-bots/cache-media", dependencies=[Depends(verify_admin_auth)])
 async def cache_flow_media(req: CacheMediaRequest):
-    from aiogram import Bot
+    from telegram_service import _create_bot_instance
     state = await _read_state_from_db()
     fb = None
     for b in (state.get("flow_bots") or []):
@@ -1000,19 +1023,26 @@ async def cache_flow_media(req: CacheMediaRequest):
     if not fb:
         fb = bot_manager._get_active_flow_bot(state)
 
-    tok = ((fb.get("token") if isinstance(fb, dict) else "") or state.get("publish", {}).get("bot_token") or "").strip()
+    tok = (
+        (fb.get("token") if isinstance(fb, dict) else "")
+        or state.get("publish", {}).get("bot_token")
+        or bot_manager.current_token
+        or ""
+    ).strip()
+    if tok == REDACTED_SECRET_MASK:
+        tok = (state.get("publish", {}).get("bot_token") or bot_manager.current_token or "").strip()
     if not tok or tok == REDACTED_SECRET_MASK:
         return {"status": "error", "message": "Token do bot não configurado"}
 
     media_copy = dict(req.media or {})
-    if req.channel_id and isinstance(fb, dict) and not fb.get("cache_channel_id"):
+    if req.channel_id and isinstance(fb, dict):
         fb["cache_channel_id"] = req.channel_id.strip()
 
     temp_bot = None
-    bot_to_use = bot_manager.bot if (bot_manager.bot and bot_manager.active_token == tok) else None
+    bot_to_use = bot_manager.bot if (bot_manager.bot and bot_manager.current_token == tok) else None
     if not bot_to_use:
         try:
-            temp_bot = Bot(token=tok)
+            temp_bot = _create_bot_instance(tok)
             bot_to_use = temp_bot
         except Exception as e:
             return {"status": "error", "message": str(e)}
@@ -1025,13 +1055,15 @@ async def cache_flow_media(req: CacheMediaRequest):
             bot_instance=bot_to_use
         )
         if not fid:
+            err_detail = media_copy.get("_cache_error") or "Verifique se o bot é administrador do canal com permissão de postar mensagens."
             return {
                 "status": "error",
-                "message": "Não foi possível enviar ao canal de vendas/cache. Verifique se o bot é administrador do canal com permissão de postar mensagens."
+                "message": f"Falha ao enviar ao canal: {err_detail}"
             }
         return {
             "status": "ok",
             "telegram_file_id": fid,
+            "telegram_send_as": media_copy.get("telegram_send_as", ""),
             "cached_channel_id": media_copy.get("cached_channel_id", ""),
             "media": media_copy
         }
