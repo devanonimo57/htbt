@@ -1,34 +1,34 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SharkBot IA - Fluxo de Atendimento</title>
+  <title>RicoBot - Gerenciador de Fluxos e IA para Telegram</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    body { background-color: #050507; color: #e4e4e7; margin: 0; overflow: hidden; }
+    body { background-color: #070506; color: #e4e4e7; margin: 0; overflow: hidden; }
 
-    /* Scrollbars azuis idênticas ao Sharkbot */
+    /* Scrollbars vermelhas RicoBot */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #09090d; }
-    ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: #090708; }
+    ::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 9999px; }
 
     .sb-card {
-      background-color: #0c0c10;
-      border: 1px solid #1c1c26;
+      background-color: #0e0a0b;
+      border: 1px solid #24191b;
       border-radius: 14px;
     }
     .sb-subcard {
-      background-color: #101016;
-      border: 1px solid #1e1e2a;
+      background-color: #130d0f;
+      border: 1px solid #281c1f;
       border-radius: 12px;
     }
     .sb-input {
-      background-color: #08080c;
-      border: 1px solid #1f1f2b;
+      background-color: #090607;
+      border: 1px solid #281c1f;
       border-radius: 10px;
       color: #f4f4f5;
       font-size: 13px;
@@ -38,21 +38,21 @@
     }
     .sb-input:focus {
       outline: none;
-      border-color: #6d28d9;
+      border-color: #ef4444;
     }
     .sb-radio-card {
-      background-color: #0e0e14;
-      border: 1px solid #1f1f2b;
+      background-color: #110b0d;
+      border: 1px solid #281c1f;
       border-radius: 12px;
       padding: 12px 14px;
       cursor: pointer;
       transition: all 0.15s;
       position: relative;
     }
-    .sb-radio-card:hover { border-color: #3f3f52; }
+    .sb-radio-card:hover { border-color: #4c262b; }
     .sb-radio-card.selected {
-      background-color: rgba(109, 40, 217, 0.14);
-      border-color: #7c3aed;
+      background-color: rgba(239, 68, 68, 0.14);
+      border-color: #ef4444;
     }
     .sb-nav-item {
       display: flex;
@@ -61,21 +61,21 @@
       width: 100%;
       padding: 10px 12px;
       border-radius: 12px;
-      border: 1px solid #141722;
+      border: 1px solid #1f1416;
       text-align: left;
       transition: all 0.15s;
-      background: #0b0d13;
+      background: #0d090a;
       margin-bottom: 7px;
       position: relative;
       overflow: hidden;
     }
     .sb-nav-item:hover {
-      background: #10131d;
-      border-color: #222738;
+      background: #170f11;
+      border-color: #331d20;
     }
     .sb-nav-item.active {
-      background: #121a2d !important;
-      border-color: #1e3a8a !important;
+      background: #241013 !important;
+      border-color: #dc2626 !important;
     }
     .toggle-switch {
       position: relative;
@@ -86,33 +86,33 @@
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
     .toggle-slider {
       position: absolute; cursor: pointer; inset: 0;
-      background-color: #272732; border-radius: 999px; transition: 0.2s;
+      background-color: #2b2123; border-radius: 999px; transition: 0.2s;
     }
     .toggle-slider:before {
       position: absolute; content: ""; height: 15px; width: 15px;
       left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: 0.2s;
     }
-    input:checked + .toggle-slider { background-color: #3b82f6; }
+    input:checked + .toggle-slider { background-color: #ef4444; }
     input:checked + .toggle-slider:before { transform: translateX(17px); }
 
-    /* NEUROTBOT STYLES (FIEL AOS 12 PRINTS) */
+    /* RICOBOT STYLES (DESTAQUE VERMELHO) */
     .nb-grid-bg {
-      background-color: #0b0a08;
+      background-color: #090707;
       background-image:
-        radial-gradient(circle at 20% 0%, rgba(234, 179, 8, 0.09), transparent 38%),
+        radial-gradient(circle at 20% 0%, rgba(239, 68, 68, 0.11), transparent 38%),
         linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
       background-size: 100% 100%, 48px 48px, 48px 48px;
     }
     .nb-card {
-      background-color: #12110d;
-      border: 1px solid #232119;
+      background-color: #110c0d;
+      border: 1px solid #261b1d;
       border-radius: 12px;
     }
     .nb-input {
       width: 100%;
-      background-color: #0c0b08;
-      border: 1px solid #26241b;
+      background-color: #0a0708;
+      border: 1px solid #2b1d20;
       border-radius: 8px;
       padding: 10px 14px;
       color: #f4f4f0;
@@ -121,23 +121,23 @@
       transition: border-color 0.15s;
     }
     .nb-input:focus {
-      border-color: #eab308;
+      border-color: #ef4444;
     }
     .nb-var-chip {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 11px;
       padding: 3px 8px;
       border-radius: 4px;
-      background-color: #181711;
-      border: 1px solid #2b291e;
-      color: #b8b5a8;
+      background-color: #181113;
+      border: 1px solid #2e1f22;
+      color: #c4b5b8;
       cursor: pointer;
       transition: all 0.15s;
     }
     .nb-var-chip:hover {
-      border-color: #eab308;
-      color: #eab308;
-      background-color: #211e12;
+      border-color: #ef4444;
+      color: #ef4444;
+      background-color: #241316;
     }
     .nb-toggle {
       position: relative;
@@ -148,21 +148,21 @@
     .nb-toggle input { opacity: 0; width: 0; height: 0; }
     .nb-toggle-slider {
       position: absolute; cursor: pointer; inset: 0;
-      background-color: #26251d; border-radius: 999px; transition: 0.2s;
+      background-color: #291e20; border-radius: 999px; transition: 0.2s;
     }
     .nb-toggle-slider:before {
       position: absolute; content: ""; height: 15px; width: 15px;
-      left: 3px; bottom: 3px; background-color: #0b0a08; border-radius: 50%; transition: 0.2s;
+      left: 3px; bottom: 3px; background-color: #ffffff; border-radius: 50%; transition: 0.2s;
     }
     .nb-toggle input:not(:checked) + .nb-toggle-slider:before {
-      background-color: #a1a19a;
+      background-color: #a19a9b;
     }
     .nb-toggle input:checked + .nb-toggle-slider {
-      background-color: #eab308;
+      background-color: #ef4444;
     }
     .nb-toggle input:checked + .nb-toggle-slider:before {
       transform: translateX(17px);
-      background-color: #0b0a08;
+      background-color: #ffffff;
     }
     .nb-tab-btn {
       display: inline-flex;
@@ -171,15 +171,15 @@
       padding: 10px 14px;
       font-size: 12px;
       font-weight: 500;
-      color: #8c8a7e;
+      color: #948689;
       border-bottom: 2px solid transparent;
       transition: all 0.15s;
     }
-    .nb-tab-btn:hover { color: #e4e2d8; }
+    .nb-tab-btn:hover { color: #f0e6e8; }
     .nb-tab-btn.active {
       color: #ffffff;
       font-weight: 600;
-      border-bottom-color: #eab308;
+      border-bottom-color: #ef4444;
     }
   </style>
 </head>
@@ -190,29 +190,23 @@
   <input type="file" id="nb-hidden-media-input" class="hidden" accept="image/*,video/*,audio/*" onchange="nbHandleMediaUpload(event)">
 
   <!-- =========================================================
-       WORKSPACE 1 (TELA INICIAL): NEUROTBOT — MEUS BOTS E GERENCIADOR DE FLUXO
+       WORKSPACE 1 (TELA INICIAL): RICOBOT — MEUS BOTS E GERENCIADOR DE FLUXO
   ========================================================== -->
   <div id="workspace-neurotbot" class="h-screen flex flex-col w-full nb-grid-bg text-[#f3f3ee] overflow-hidden relative">
 
-    <!-- TOP BAR NEUROTBOT -->
-    <header class="h-14 border-b border-[#1f1e16] bg-[#0b0a08]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
+    <!-- TOP BAR RICOBOT -->
+    <header class="h-14 border-b border-[#24181a] bg-[#090707]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
       <div class="flex items-center gap-2.5 cursor-pointer" onclick="nbBackToBotsList()">
-        <div class="w-7 h-7 rounded-md bg-[#eab308] text-black flex items-center justify-center font-bold text-xs shadow-sm">
+        <div class="w-7 h-7 rounded-md bg-[#ef4444] text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-red-950/50">
           <i class="fa-solid fa-bolt"></i>
         </div>
-        <span class="text-sm font-bold tracking-tight text-white">neurotbot</span>
+        <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#ef4444]">Bot</span></span>
       </div>
 
       <div class="flex items-center gap-3">
-        <button onclick="switchWorkspace('ai')" class="px-3.5 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222017] border border-[#2e2b1f] text-xs font-semibold text-[#eab308] flex items-center gap-2 transition" title="Ir para Meus Fluxos (Modo IA)">
-          <i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
-          <span>Meus Fluxos (Modo IA)</span>
-        </button>
-        <button onclick="nbOpenGatewayModal()" class="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Configurar Gateway PIX">
-          <i class="fa-regular fa-sun"></i>
-        </button>
-        <button onclick="switchWorkspace('ai')" class="w-8 h-8 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Conta e IA">
-          <i class="fa-regular fa-user"></i>
+        <button onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#171012] hover:bg-[#241619] border border-[#332024] text-xs font-semibold text-zinc-200 hover:text-white flex items-center gap-2 transition" title="Configurar Gateway PIX">
+          <i class="fa-solid fa-key text-[11px] text-[#ef4444]"></i>
+          <span>Gateway PIX</span>
         </button>
       </div>
     </header>
@@ -226,16 +220,16 @@
       <div id="nb-view-bots-list" class="max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">MEUS BOTS</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-[#ef4444] block">MEUS BOTS</span>
             <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
-            <p class="text-xs text-zinc-400 mt-1">Organize por pasta e acompanhe o status de cada bot.</p>
+            <p class="text-xs text-zinc-400 mt-1">Clique no bot para gerenciar e escolha a seção de operação (Fluxo de Botões ou Fluxo de IA).</p>
           </div>
           <div class="flex items-center gap-2.5">
-            <button onclick="nbOpenFolderModal()" class="px-4 py-2 rounded-lg bg-[#14130f] hover:bg-[#1d1c16] border border-[#2a281e] text-xs font-medium text-zinc-200 flex items-center gap-2 transition">
+            <button onclick="nbOpenFolderModal()" class="px-4 py-2 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2e1f22] text-xs font-medium text-zinc-200 flex items-center gap-2 transition">
               <i class="fa-regular fa-folder-open text-xs text-zinc-400"></i>
               <span>Nova pasta</span>
             </button>
-            <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shadow-lg shadow-yellow-950/30 transition">
+            <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-red-950/40 transition">
               <i class="fa-solid fa-plus text-[11px]"></i>
               <span>Adicionar bot</span>
             </button>
@@ -250,11 +244,11 @@
       </div>
 
       <!-- =====================================================
-           TELA 2 (PRINTS 2 A 12): GERENCIAR O BOT SELECIONADO
+           TELA 2 (PRINTS 2 A 12): GERENCIAR O BOT SELECIONADO (SEÇÃO FLUXO DE BOTÕES)
       ====================================================== -->
       <div id="nb-view-bot-detail" class="hidden max-w-[1020px] mx-auto px-8 pt-8 space-y-6">
 
-        <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) -->
+        <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) + SELETOR DE SEÇÃO -->
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
             <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
@@ -268,15 +262,23 @@
             </span>
           </div>
 
-          <div class="flex items-center gap-2">
-            <button onclick="nbOpenBotInAiMode()" class="px-3.5 py-1.5 rounded-lg bg-[#191710] hover:bg-[#252216] border border-[#332f1f] text-xs font-semibold text-[#eab308] flex items-center gap-1.5 transition" title="Configurar este bot com Inteligência Artificial (Meus Fluxos)">
-              <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-              <span>Meus Fluxos (Modo IA)</span>
-            </button>
-            <button id="nb-det-deactivate-btn" onclick="nbToggleCurrentBotActive()" class="px-4 py-1.5 rounded-lg bg-[#14130f] hover:bg-[#1f1d17] border border-[#2b291f] text-xs font-semibold text-zinc-200 transition">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <!-- SELETOR POR SEÇÃO DENTRO DO BOT -->
+            <div class="inline-flex p-1 rounded-xl bg-[#140e10] border border-[#2b1d20]">
+              <button type="button" onclick="nbSwitchBotModeSection('flow')" class="px-3 py-1.5 rounded-lg bg-[#ef4444] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-list-check text-[10px]"></i>
+                <span>Seção: Fluxo de Botões</span>
+              </button>
+              <button type="button" onclick="nbSwitchBotModeSection('ai')" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#ef4444]"></i>
+                <span>Seção: Fluxo de IA</span>
+              </button>
+            </div>
+
+            <button id="nb-det-deactivate-btn" onclick="nbToggleCurrentBotActive()" class="px-4 py-1.5 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2b1d20] text-xs font-semibold text-zinc-200 transition">
               Desativar
             </button>
-            <button onclick="nbOpenEditTokenModal()" class="w-8 h-8 rounded-lg bg-[#14130f] hover:bg-[#1f1d17] border border-[#2b291f] text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Editar Token ou Excluir Bot">
+            <button onclick="nbOpenEditTokenModal()" class="w-8 h-8 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2b1d20] text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Editar Token, Modo ou Excluir Bot">
               <i class="fa-solid fa-ellipsis-vertical"></i>
             </button>
           </div>
@@ -312,7 +314,7 @@
         <div id="nbtab-panel-welcome" class="nb-subtab-panel space-y-5">
           <div class="nb-card p-5 space-y-2.5">
             <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
               <h3 class="text-xs font-bold text-white">Boas-vindas</h3>
             </div>
             <div class="border-t border-[#1e1d15] pt-3">
@@ -324,7 +326,7 @@
 
           <div class="nb-card p-5 space-y-4">
             <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
               <textarea id="nb-welcome-msg" rows="4" maxlength="4000" oninput="nbOnWelcomeInput()" placeholder="Digite a mensagem de boas-vindas..." class="nb-input resize-y"></textarea>
               <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-welcome-counter">0/4000 caracteres</div>
             </div>
@@ -371,7 +373,7 @@
           <div class="nb-card p-5 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                 <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
               </div>
               <label class="nb-toggle">
@@ -390,7 +392,7 @@
           </div>
 
           <div class="flex items-center gap-4 pt-1">
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
             <span id="nb-welcome-validation" class="text-xs text-rose-400">A mensagem de boas-vindas é obrigatória.</span>
@@ -407,7 +409,7 @@
             <div class="lg:col-span-8 nb-card p-5 space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                   <h3 class="text-xs font-bold text-white">Planos de pagamento</h3>
                 </div>
                 <span id="nb-plans-count-badge" class="text-xs text-zinc-500 font-mono">01 / 10</span>
@@ -415,7 +417,7 @@
 
               <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
                 <p class="text-xs text-zinc-400">Configure até 10 planos com entregas personalizadas.</p>
-                <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shrink-0 transition">
+                <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[10px]"></i>
                   <span>Novo plano</span>
                 </button>
@@ -429,7 +431,7 @@
             <div class="lg:col-span-4 space-y-4">
               <div class="nb-card p-5 space-y-4">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                   <h3 class="text-xs font-bold text-white">Entrega padrão (fallback)</h3>
                 </div>
 
@@ -439,9 +441,9 @@
                 </p>
 
                 <div>
-                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1.5">Destino da entrega <span class="text-[#eab308]">*</span></label>
+                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1.5">Destino da entrega <span class="text-[#ef4444]">*</span></label>
                   <div class="flex border-b border-[#25231a] text-xs">
-                    <button type="button" id="nb-fb-tab-channel" onclick="nbSetFallbackType('Canal ou grupo')" class="px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]">Canal ou grupo</button>
+                    <button type="button" id="nb-fb-tab-channel" onclick="nbSetFallbackType('Canal ou grupo')" class="px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]">Canal ou grupo</button>
                     <button type="button" id="nb-fb-tab-external" onclick="nbSetFallbackType('Link externo')" class="px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent">Link externo</button>
                   </div>
                 </div>
@@ -449,8 +451,8 @@
                 <div id="nb-fb-channel-box" class="space-y-3">
                   <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#eab308]">*</span></span>
-                    <button type="button" onclick="nbSyncFallbackChannel()" class="text-[11px] text-zinc-400 hover:text-[#eab308] flex items-center gap-1 transition">
+                    <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#ef4444]">*</span></span>
+                    <button type="button" onclick="nbSyncFallbackChannel()" class="text-[11px] text-zinc-400 hover:text-[#ef4444] flex items-center gap-1 transition">
                       <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
                     </button>
                   </div>
@@ -489,7 +491,7 @@
               <!-- VARIAÇÃO DE PREÇO -->
               <div class="nb-card p-5 space-y-3">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                   <h3 class="text-xs font-bold text-white">Variação de preço</h3>
                 </div>
                 <div class="border-t border-[#1e1d15] pt-3 flex items-start justify-between gap-3">
@@ -501,7 +503,7 @@
                 </div>
               </div>
 
-              <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+              <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
                 Salvar alterações
               </button>
             </div>
@@ -521,7 +523,7 @@
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                 <h3 id="nb-ds-header-title" class="text-xs font-bold text-white">Downsell — Geral</h3>
               </div>
               <div class="flex items-center gap-3">
@@ -541,13 +543,13 @@
           <div id="nb-ds-sequences-container" class="space-y-4"></div>
 
           <!-- BOTÃO ADICIONAR SEQUÊNCIA -->
-          <button type="button" onclick="nbAddDownsellSequence()" class="w-full py-3.5 rounded-xl border border-dashed border-[#eab308]/60 hover:border-[#eab308] bg-[#14120b]/60 hover:bg-[#1c190f] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-plus text-[11px] text-[#eab308]"></i>
+          <button type="button" onclick="nbAddDownsellSequence()" class="w-full py-3.5 rounded-xl border border-dashed border-[#ef4444]/60 hover:border-[#ef4444] bg-[#14120b]/60 hover:bg-[#1c190f] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-plus text-[11px] text-[#ef4444]"></i>
             <span>Adicionar sequência</span>
           </button>
 
           <div class="flex items-center gap-4 pt-1">
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
             <span id="nb-ds-validation" class="text-xs text-rose-400"></span>
@@ -561,7 +563,7 @@
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                 <h3 class="text-xs font-bold text-white">Order bump</h3>
               </div>
               <span id="nb-ob-count-badge" class="text-xs text-zinc-500 font-mono">00 / 10</span>
@@ -569,7 +571,7 @@
 
             <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
               <p class="text-xs text-zinc-400 leading-relaxed max-w-2xl">Ofertas de acréscimo mostradas antes do PIX, após o clique em qualquer plano do fluxo principal ou do downsell. Até 10 bumps; todos os ativos são oferecidos em sequência, e o valor aceito soma ao do plano.</p>
-              <button type="button" onclick="nbOpenOrderBumpForm(-1)" class="px-3.5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black flex items-center gap-1.5 shrink-0 transition">
+              <button type="button" onclick="nbOpenOrderBumpForm(-1)" class="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
                 <i class="fa-solid fa-plus text-[10px]"></i>
                 <span>Novo order bump</span>
               </button>
@@ -579,7 +581,7 @@
             <div id="nb-ob-saved-list" class="space-y-2.5 pt-2"></div>
 
             <!-- FORMULÁRIO NOVO / EDITAR ORDER BUMP (FIEL AOS PRINTS 8 E 9) -->
-            <div id="nb-ob-form-wrapper" class="border-l-2 border-[#eab308] pl-5 pt-3 space-y-4 mt-4">
+            <div id="nb-ob-form-wrapper" class="border-l-2 border-[#ef4444] pl-5 pt-3 space-y-4 mt-4">
               <h4 id="nb-ob-form-title" class="text-xs font-bold text-white">Novo order bump</h4>
 
               <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-white font-medium">
@@ -663,7 +665,7 @@
               </div>
 
               <div class="flex items-center gap-4 pt-2">
-                <button type="button" onclick="nbSaveOrderBumpForm()" id="nb-ob-submit-btn" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+                <button type="button" onclick="nbSaveOrderBumpForm()" id="nb-ob-submit-btn" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
                   Criar order bump
                 </button>
                 <button type="button" onclick="nbResetOrderBumpForm()" class="text-xs text-zinc-400 hover:text-white transition">
@@ -680,11 +682,11 @@
         <div id="nbtab-panel-payments" class="nb-subtab-panel hidden space-y-5">
           <div class="flex items-center justify-between flex-wrap gap-3">
             <div class="inline-flex p-1 rounded-lg bg-[#14130f] border border-[#25231b]">
-              <button type="button" id="nb-pay-pill-gen" onclick="nbSwitchPaymentSubtab('generated')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition">Pagamento Gerado</button>
+              <button type="button" id="nb-pay-pill-gen" onclick="nbSwitchPaymentSubtab('generated')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition">Pagamento Gerado</button>
               <button type="button" id="nb-pay-pill-app" onclick="nbSwitchPaymentSubtab('approved')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition">Pagamento Aprovado</button>
             </div>
 
-            <button type="button" onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#16150f] hover:bg-[#222017] border border-[#2e2b1d] text-xs font-semibold text-[#eab308] flex items-center gap-2 transition">
+            <button type="button" onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#16150f] hover:bg-[#222017] border border-[#2e2b1d] text-xs font-semibold text-[#ef4444] flex items-center gap-2 transition">
               <i class="fa-solid fa-key text-[11px]"></i>
               <span>Credenciais do Gateway PIX</span>
             </button>
@@ -694,7 +696,7 @@
           <div id="nb-pay-panel-generated" class="space-y-5">
             <div class="nb-card p-5 space-y-4">
               <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
                 <textarea id="nb-pay-gen-msg" rows="10" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
                 <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-gen-counter">0/4000 caracteres</div>
               </div>
@@ -714,7 +716,7 @@
 
               <div class="border-t border-[#1e1d15] pt-4 max-w-sm space-y-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">FORMATO DO CÓDIGO PIX</label>
-                <select id="nb-pay-pix-format" onchange="nbOnPaymentsInput()" class="nb-input !border-[#eab308]">
+                <select id="nb-pay-pix-format" onchange="nbOnPaymentsInput()" class="nb-input !border-[#ef4444]">
                   <option value="Código (monoespaçado)">Código (monoespaçado)</option>
                   <option value="Bloco de código">Bloco de código</option>
                   <option value="Texto simples">Texto simples</option>
@@ -748,7 +750,7 @@
             <div class="nb-card p-5 space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                   <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
                 </div>
                 <label class="nb-toggle">
@@ -766,7 +768,7 @@
               </div>
             </div>
 
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
           </div>
@@ -775,7 +777,7 @@
           <div id="nb-pay-panel-approved" class="hidden space-y-5">
             <div class="nb-card p-5 space-y-4">
               <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#eab308]">*</span></label>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
                 <textarea id="nb-pay-app-msg" rows="6" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
                 <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-app-counter">0/4000 caracteres</div>
               </div>
@@ -820,7 +822,7 @@
               </div>
             </div>
 
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
           </div>
@@ -829,35 +831,25 @@
       </div>
     </div>
 
-    <!-- DOCK INFERIOR FLUTUANTE FIEL AOS PRINTS -->
-    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#14130f]/95 border border-[#29271d] shadow-2xl backdrop-blur">
+    <!-- DOCK INFERIOR FLUTUANTE RICOBOT -->
+    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#140d0f]/95 border border-[#2e1d20] shadow-2xl backdrop-blur">
       <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Visão Geral">
         <i class="fa-solid fa-border-all"></i>
       </button>
       <div class="relative">
-        <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl bg-[#eab308] text-black flex items-center justify-center text-sm font-bold shadow-md transition" title="Meus Bots">
+        <button onclick="nbBackToBotsList()" class="w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition" title="Meus Bots">
           <i class="fa-solid fa-robot"></i>
         </button>
-        <span class="w-1 h-1 rounded-full bg-[#eab308] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span class="w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
       <button onclick="nbOpenGatewayModal()" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Carteira / Gateway PIX">
         <i class="fa-solid fa-wallet"></i>
-      </button>
-      <button onclick="switchWorkspace('ai'); navigateTab('memoria');" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Leads & Vendas">
-        <i class="fa-regular fa-credit-card"></i>
-      </button>
-      <button onclick="switchWorkspace('ai')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-[#eab308] hover:bg-white/5 flex items-center justify-center text-sm transition" title="Meus Fluxos (Modo IA)">
-        <i class="fa-solid fa-user-gear"></i>
-      </button>
-      <div class="h-5 w-[1px] bg-[#29271d] mx-1"></div>
-      <button onclick="switchWorkspace('ai')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Alternar para Modo IA">
-        <i class="fa-solid fa-arrow-right-from-bracket"></i>
       </button>
     </div>
 
     <!-- MODAL: ADICIONAR / EDITAR BOT -->
     <div id="nb-modal-bot" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#333022]">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#382125]">
         <div class="flex items-center justify-between">
           <h3 id="nb-modal-bot-title" class="text-sm font-bold text-white">Conectar Bot do Telegram</h3>
           <button onclick="nbCloseBotModal()" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
@@ -873,10 +865,10 @@
               <select id="nb-inp-bot-folder" class="nb-input"></select>
             </div>
             <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">MODO DE OPERAÇÃO</label>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">SEÇÃO / MODO DE OPERAÇÃO</label>
               <select id="nb-inp-bot-mode" class="nb-input">
-                <option value="flow">Fluxo de Botões (NeurotBot)</option>
-                <option value="ai">Modo IA Conversacional</option>
+                <option value="flow">Fluxo de Botões (Padrão)</option>
+                <option value="ai">Fluxo de IA Conversacional</option>
               </select>
             </div>
           </div>
@@ -886,8 +878,8 @@
             <i class="fa-regular fa-trash-can mr-1"></i> Excluir bot
           </button>
           <div class="flex items-center gap-2 ml-auto">
-            <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#181711] text-xs text-zinc-300 hover:text-white">Cancelar</button>
-            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black">Salvar e Conectar</button>
+            <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300 hover:text-white">Cancelar</button>
+            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar e Abrir Seção</button>
           </div>
         </div>
       </div>
@@ -895,7 +887,7 @@
 
     <!-- MODAL: GATEWAY PIX -->
     <div id="nb-modal-gateway" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#333022]">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#382125]">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-white">Configurar Gateway PIX</h3>
           <button onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
@@ -918,8 +910,8 @@
           </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
-          <button type="button" onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-[#181711] text-xs text-zinc-300">Fechar</button>
-          <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black">Salvar Gateway</button>
+          <button type="button" onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300">Fechar</button>
+          <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white">Salvar Gateway</button>
         </div>
       </div>
     </div>
@@ -927,61 +919,72 @@
   </div>
 
   <!-- =========================================================
-       WORKSPACE 2: MODO IA (SHARKBOT) — ACESSADO VIA MEUS BOTS / MEUS FLUXOS
+       WORKSPACE 2: SEÇÃO FLUXO DE IA (RICOBOT) — DENTRO DO BOT SELECIONADO
   ========================================================== -->
   <div id="workspace-ai-mode" class="hidden h-screen flex flex-col w-full">
 
-  <!-- TOP HEADER BAR FIEL AO SHARKBOT -->
-  <header class="h-16 bg-[#08090d] border-b border-[#141722] px-5 flex items-center justify-between shrink-0 z-20">
+  <!-- TOP HEADER BAR RICOBOT (SEÇÃO FLUXO DE IA DO BOT) -->
+  <header class="h-16 bg-[#090707] border-b border-[#24181a] px-5 flex items-center justify-between shrink-0 z-20 gap-3">
     <div class="flex items-center gap-3.5">
-      <button onclick="switchWorkspace('neurotbot')" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#0e1017] border border-[#1e2333] hover:border-[#eab308] flex items-center justify-center gap-2 text-slate-300 hover:text-[#eab308] text-xs font-semibold transition">
-        <i class="fa-solid fa-chevron-left text-xs"></i>
-        <span>Meus Bots</span>
+      <button onclick="switchWorkspace('neurotbot')" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
+        <i class="fa-solid fa-chevron-left text-xs text-[#ef4444]"></i>
+        <span>Voltar</span>
       </button>
       <div>
         <div class="flex items-center gap-1.5 mb-0.5">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-[#38bdf8]">MODO IA</span>
-          <span class="text-[11px] text-slate-500">•</span>
-          <span id="unsaved-indicator" class="text-[11px] font-medium uppercase tracking-wider text-slate-400">TUDO SALVO</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-[#ef4444]">RICOBOT • FLUXO DE IA</span>
+          <span class="text-[11px] text-zinc-500">•</span>
+          <span id="unsaved-indicator" class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">TUDO SALVO</span>
         </div>
         <div class="flex items-baseline gap-2">
           <h1 id="header-flow-name" class="text-base font-bold text-white leading-none">bot</h1>
         </div>
-        <p class="text-xs text-slate-400 leading-none mt-1">Configure a conversa, teste e publique no Telegram</p>
+      </div>
+
+      <!-- SELETOR POR SEÇÃO DENTRO DO BOT (ALTERNAR ENTRE BOTÕES E IA) -->
+      <div class="inline-flex p-1 rounded-xl bg-[#140e10] border border-[#2b1d20] ml-2">
+        <button type="button" onclick="nbSwitchBotModeSection('flow')" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-list-check text-[10px]"></i>
+          <span>Seção: Fluxo de Botões</span>
+        </button>
+        <button type="button" onclick="nbSwitchBotModeSection('ai')" class="px-3 py-1.5 rounded-lg bg-[#ef4444] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+          <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+          <span>Seção: Fluxo de IA</span>
+        </button>
       </div>
     </div>
 
     <!-- BARRA CENTRAL: LISTA DE CONFIGURAÇÕES SALVAS (PERSISTENTE) -->
-    <div class="flex items-center gap-2 bg-[#0b0d14] border border-[#1b2030] rounded-xl px-3 py-1.5">
-      <i class="fa-solid fa-bookmark text-[#8b5cf6] text-xs"></i>
-      <select id="sel-saved-profiles" class="bg-[#07090e] border border-[#1e2333] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#8b5cf6] min-w-[180px] max-w-[230px]">
+    <div class="hidden xl:flex items-center gap-2 bg-[#110c0d] border border-[#261b1d] rounded-xl px-3 py-1.5">
+      <i class="fa-solid fa-bookmark text-[#ef4444] text-xs"></i>
+      <select id="sel-saved-profiles" class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#ef4444] min-w-[160px] max-w-[210px]">
         <option value="">Configurações salvas (0)</option>
       </select>
       <button type="button" onclick="applySelectedProfile()" id="btn-apply-profile" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center gap-1.5" title="Carregar e aplicar esta configuração no bot">
         <i class="fa-solid fa-check text-[10px]"></i>
         <span>Aplicar</span>
       </button>
-      <div class="h-4 w-[1px] bg-[#1e2333] mx-0.5"></div>
-      <input type="text" id="inp-new-profile-name" placeholder="Nome da config..." class="bg-[#07090e] border border-[#1e2333] text-xs text-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#38bdf8] w-32">
-      <button type="button" onclick="saveCurrentToProfileList()" class="px-3 py-1.5 rounded-lg bg-[#151c2c] hover:bg-[#1e2940] border border-[#26324d] text-[#38bdf8] text-xs font-bold transition flex items-center gap-1.5" title="Salvar a configuração atual na lista">
+      <div class="h-4 w-[1px] bg-[#281c1f] mx-0.5"></div>
+      <input type="text" id="inp-new-profile-name" placeholder="Nome da config..." class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#ef4444] w-28">
+      <button type="button" onclick="saveCurrentToProfileList()" class="px-3 py-1.5 rounded-lg bg-[#1c1013] hover:bg-[#291519] border border-[#3d1e24] text-[#ef4444] text-xs font-bold transition flex items-center gap-1.5" title="Salvar a configuração atual na lista">
         <i class="fa-solid fa-plus text-[10px]"></i>
         <span>Salvar na lista</span>
       </button>
-      <button type="button" onclick="deleteSelectedProfile()" class="px-2 py-1.5 rounded-lg bg-[#141722] hover:bg-rose-950/60 border border-[#1e2333] hover:border-rose-800/50 text-slate-400 hover:text-rose-300 text-xs transition" title="Excluir configuração selecionada da lista">
+      <button type="button" onclick="deleteSelectedProfile()" class="px-2 py-1.5 rounded-lg bg-[#140e10] hover:bg-rose-950/60 border border-[#281c1f] hover:border-rose-800/50 text-zinc-400 hover:text-rose-300 text-xs transition" title="Excluir configuração selecionada da lista">
         <i class="fa-regular fa-trash-can text-[11px]"></i>
       </button>
     </div>
 
-    <div class="flex items-center gap-3">
-      <button onclick="navigateTab('saldo')" class="px-3.5 py-2 rounded-xl bg-[#0e1017] border border-[#1e2333] text-xs font-medium text-slate-200 flex items-center gap-2 hover:border-slate-600 transition">
-        <span class="w-4 h-4 rounded-full border border-slate-500 flex items-center justify-center text-[9px] text-slate-400 font-bold">%</span>
+    <div class="flex items-center gap-2.5">
+      <button onclick="navigateTab('saldo')" class="px-3 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#ef4444]/60 transition">
+        <span class="w-4 h-4 rounded-full border border-zinc-500 flex items-center justify-center text-[9px] text-zinc-400 font-bold">%</span>
         <span id="header-balance">R$ 0,00</span>
       </button>
-      <button onclick="navigateTab('testar')" class="px-4 py-2 rounded-xl bg-[#0e1017] border border-[#1e2333] text-xs font-medium text-slate-200 flex items-center gap-2 hover:border-slate-600 transition">
-        <i class="fa-regular fa-eye text-slate-400 text-xs"></i>
+      <button onclick="navigateTab('testar')" class="px-3.5 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#ef4444]/60 transition">
+        <i class="fa-regular fa-eye text-zinc-400 text-xs"></i>
         <span>Visualizar</span>
       </button>
-      <button onclick="saveFullState()" id="btn-save-top" class="px-5 py-2 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-xs font-semibold text-white flex items-center gap-2 shadow-lg shadow-blue-900/30 transition">
+      <button onclick="saveFullState()" id="btn-save-top" class="px-5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition">
         <i class="fa-regular fa-floppy-disk text-xs"></i>
         <span>Salvar</span>
       </button>
@@ -1162,7 +1165,7 @@
           <span id="sidebar-prep-count" class="font-semibold text-white">2/5</span>
         </div>
         <div class="w-full h-1.5 bg-[#171b28] rounded-full overflow-hidden">
-          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-[#38bdf8] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
+          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-[#ef4444] via-[#818cf8] to-[#f87171] rounded-full" style="width: 40%"></div>
         </div>
         <div class="flex justify-between items-center text-[11px] pt-1">
           <span class="text-slate-400">Configuração</span>
@@ -1186,18 +1189,18 @@
         ========================================================== -->
         <section id="sec-resumo" class="tab-section space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">COMEÇAR</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">COMEÇAR</span>
             <h1 class="text-2xl font-bold text-white mt-1">Resumo do atendimento</h1>
             <p class="text-sm text-slate-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
           </div>
 
           <!-- HERO BANNER "EM PREPARAÇÃO" -->
-          <div class="rounded-2xl p-6 border border-[#2e1e4a] bg-gradient-to-br from-[#1c122e] via-[#120e21] to-[#0c0a14] relative overflow-hidden">
+          <div class="rounded-2xl p-6 border border-[#451a20] bg-gradient-to-br from-[#2b1014] via-[#1a0b0e] to-[#0f0809] relative overflow-hidden">
             <div class="flex justify-between items-start">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#2a1c4a] text-[#c084fc] border border-[#4c2d82]">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#c084fc]"></span> EM PREPARAÇÃO
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#381318] text-[#f87171] border border-[#6e212b]">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#f87171]"></span> EM PREPARAÇÃO
               </span>
-              <div class="w-10 h-10 rounded-xl bg-[#2a1c4a]/50 border border-[#4c2d82] flex items-center justify-center text-[#c084fc]">
+              <div class="w-10 h-10 rounded-xl bg-[#381318]/50 border border-[#6e212b] flex items-center justify-center text-[#f87171]">
                 <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
             </div>
@@ -1211,12 +1214,12 @@
                 <span id="hero-prep-label" class="text-slate-300 font-medium">2 de 5 concluídos</span>
               </div>
               <div class="w-full h-1.5 bg-[#1f1a33] rounded-full overflow-hidden">
-                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-[#38bdf8] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
+                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-[#ef4444] via-[#818cf8] to-[#f87171] rounded-full" style="width: 40%"></div>
               </div>
             </div>
 
             <div class="flex items-center gap-3.5 mt-6">
-              <button onclick="navigateTab('ofertas')" class="px-5 py-2.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
+              <button onclick="navigateTab('ofertas')" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
                 <span>Cadastrar as ofertas</span>
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </button>
@@ -1581,7 +1584,7 @@
         ========================================================== -->
         <section id="sec-persona" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Persona e identidade</h1>
             <p class="text-sm text-slate-400 mt-1">Defina quem conversa: nome, história e personalidade.</p>
           </div>
@@ -1618,7 +1621,7 @@
                 <div onclick="selectGender('Feminina', 'Fala e se apresenta no feminino.')" data-val="Feminina" class="sb-radio-card selected !p-4 !rounded-xl">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Feminina</span>
-                    <span class="gender-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center">
+                    <span class="gender-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center">
                       <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
                     </span>
                   </div>
@@ -1697,7 +1700,7 @@
         ========================================================== -->
         <section id="sec-ofertas" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Negócio e ofertas</h1>
             <p class="text-sm text-slate-400 mt-1">Explique o VIP, cadastre preços e responda dúvidas comuns.</p>
           </div>
@@ -1804,7 +1807,7 @@
             <div class="flex justify-between items-center">
               <div>
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                  <i class="fa-regular fa-circle-question text-[#38bdf8] text-xs"></i> Dúvidas que a IA já sabe responder
+                  <i class="fa-regular fa-circle-question text-[#ef4444] text-xs"></i> Dúvidas que a IA já sabe responder
                 </h3>
                 <p class="text-xs text-slate-400 mt-1">Cadastre perguntas comuns e a resposta correta para cada uma.</p>
               </div>
@@ -1841,7 +1844,7 @@
         ========================================================== -->
         <section id="sec-conversa" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Jeito de conversar</h1>
             <p class="text-sm text-slate-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
           </div>
@@ -1849,7 +1852,7 @@
           <!-- CARD 1: HUMANIZAÇÃO DA VENDA -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#f87171] shrink-0">
                 <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
               <div>
@@ -1866,7 +1869,7 @@
                 <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Conexão primeiro')" data-val="Conexão primeiro" class="sb-radio-card selected !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Conexão primeiro</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <p class="text-xs text-slate-400 mt-2 leading-relaxed">Conversa e entende o interesse antes de vender.</p>
                 </div>
@@ -1901,7 +1904,7 @@
 
                   <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Leve</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
 
                   <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Explícito')" data-val="Explícito" class="sb-radio-card !p-4">
@@ -1924,7 +1927,7 @@
 
                   <div onclick="selectRadioGroup('rg-slang', 'slang', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Natural</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
 
                   <div onclick="selectRadioGroup('rg-slang', 'slang', 'Marcante')" data-val="Marcante" class="sb-radio-card !p-4 flex justify-between items-center">
@@ -1951,7 +1954,7 @@
                 <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Natural</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <p class="text-xs text-slate-400 mt-2 leading-relaxed">Alterna reação, pergunta e próximo passo.</p>
                 </div>
@@ -2010,7 +2013,7 @@
               <div class="grid grid-cols-4 gap-3" id="rg-tone">
                 <div onclick="selectRadioGroup('rg-tone', 'tone', 'Acolhedor')" data-val="Acolhedor" class="sb-radio-card selected !p-4 flex justify-between items-center">
                   <span class="text-xs font-bold text-white">Acolhedor</span>
-                  <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                  <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                 </div>
                 <div onclick="selectRadioGroup('rg-tone', 'tone', 'Direto')" data-val="Direto" class="sb-radio-card !p-4 flex justify-between items-center">
                   <span class="text-xs font-bold text-white">Direto</span>
@@ -2034,7 +2037,7 @@
                 <div class="grid grid-cols-2 gap-3" id="rg-length">
                   <div onclick="selectRadioGroup('rg-length', 'length', 'Curta')" data-val="Curta" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Curta</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <div onclick="selectRadioGroup('rg-length', 'length', 'Média')" data-val="Média" class="sb-radio-card !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Média</span>
@@ -2056,7 +2059,7 @@
                   </div>
                   <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Leve</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Moderado')" data-val="Moderado" class="sb-radio-card !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Moderado</span>
@@ -2168,7 +2171,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         ========================================================== -->
         <section id="sec-midias" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONTEÚDO E AUTOMAÇÕES</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONTEÚDO E AUTOMAÇÕES</span>
             <h1 class="text-2xl font-bold text-white mt-1">Mídias da conversa</h1>
             <p class="text-sm text-slate-400 mt-1">Adicione fotos, vídeos, GIFs e áudios com contexto de uso.</p>
           </div>
@@ -2176,7 +2179,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <!-- BANNER CARD: CONTEÚDO NO MOMENTO CERTO -->
           <div class="rounded-2xl p-6 border border-[#231d3d] bg-gradient-to-r from-[#0b0d14] via-[#111022] to-[#1a1236] flex items-center justify-between gap-4">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#f87171] shrink-0">
                 <i class="fa-regular fa-images text-sm"></i>
               </div>
               <div>
@@ -2184,7 +2187,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
                 <p class="text-xs text-slate-400 mt-0.5 max-w-lg leading-relaxed">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
               </div>
             </div>
-            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-5 py-2.5 rounded-xl bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-semibold flex items-center gap-2 shrink-0 shadow-lg shadow-purple-950/50 transition">
+            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs font-semibold flex items-center gap-2 shrink-0 shadow-lg shadow-purple-950/50 transition">
               <i class="fa-solid fa-plus text-[10px]"></i> Adicionar mídias
             </button>
           </div>
@@ -2199,7 +2202,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <div class="flex items-center justify-between">
             <div class="flex gap-2" id="media-filter-pills">
               <button onclick="setMediaFilter('Todas')" data-filter="Todas" class="px-3.5 py-1.5 rounded-xl bg-[#17122b] border border-[#3d286b] text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#c084fc]"></i> Todas
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#f87171]"></i> Todas
               </button>
               <button onclick="setMediaFilter('Fotos')" data-filter="Fotos" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
                 <i class="fa-regular fa-image text-[11px]"></i> Fotos
@@ -2245,7 +2248,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         ========================================================== -->
         <section id="sec-downsell" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#38bdf8]">CONTEÚDO E AUTOMAÇÕES</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONTEÚDO E AUTOMAÇÕES</span>
             <h1 class="text-2xl font-bold text-white mt-1">Downsell</h1>
             <p class="text-sm text-slate-400 mt-1">Organize mensagens, mídias e ofertas para quem deixou de responder.</p>
           </div>
@@ -2253,7 +2256,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <!-- CARD TOPO: RETOME A CONVERSA, NO TEMPO CERTO -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-3.5">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-[#38bdf8]">Downsell • sem resposta</span>
+              <span class="text-xs font-bold text-[#ef4444]">Downsell • sem resposta</span>
               <label class="toggle-switch">
                 <input type="checkbox" id="chk-downsell-enabled" onchange="onDownsellToggle()">
                 <span class="toggle-slider"></span>
@@ -2287,7 +2290,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
 
             <div class="col-span-8 sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
               <div class="pb-4 border-b border-[#181c28]">
-                <span class="text-xs font-bold text-[#38bdf8] block" id="ds-editor-badge">Etapa 1</span>
+                <span class="text-xs font-bold text-[#ef4444] block" id="ds-editor-badge">Etapa 1</span>
                 <h4 class="text-base font-bold text-white mt-0.5" id="ds-editor-title">Primeiro contato após o silêncio</h4>
               </div>
 
@@ -2317,7 +2320,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
                 </div>
 
                 <p class="text-[11px] text-slate-500 pt-0.5">De 30 segundos a 7 dias de espera nesta etapa.</p>
-                <p id="ds-forecast-text" class="text-xs text-[#38bdf8] leading-relaxed">Esta etapa está prevista para ~1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
+                <p id="ds-forecast-text" class="text-xs text-[#ef4444] leading-relaxed">Esta etapa está prevista para ~1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
                 <p id="ds-short-warning" class="text-xs text-amber-300/90 leading-relaxed">Intervalo curto: esta mensagem pode chegar enquanto a pessoa ainda lê sua resposta. Para uma conversa mais tranquila, experimente 5 ou 15 minutos.</p>
               </div>
 
@@ -2444,11 +2447,11 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div id="menu-upsell-origin" class="hidden mt-1.5 w-full rounded-xl border border-[#1e2333] bg-[#0e111a] p-1.5 shadow-2xl space-y-1">
                   <button type="button" onclick="selectUpsellOrigin('Usar plano já cadastrado', event)" data-origin="Usar plano já cadastrado" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-[#2563eb] bg-[#111624] text-white font-semibold">
                     <span>Usar plano já cadastrado</span>
-                    <i class="fa-solid fa-check text-[#38bdf8] text-[11px] origin-check"></i>
+                    <i class="fa-solid fa-check text-[#ef4444] text-[11px] origin-check"></i>
                   </button>
                   <button type="button" onclick="selectUpsellOrigin('Criar nova oferta exclusiva', event)" data-origin="Criar nova oferta exclusiva" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-transparent text-slate-300 hover:bg-[#141824]">
                     <span>Criar nova oferta exclusiva</span>
-                    <i class="fa-solid fa-check text-[#38bdf8] text-[11px] origin-check hidden"></i>
+                    <i class="fa-solid fa-check text-[#ef4444] text-[11px] origin-check hidden"></i>
                   </button>
                 </div>
               </div>
@@ -2661,7 +2664,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <!-- CARD 2: BOT DO ATENDIMENTO (COM CAMPO DE TOKEN SEMPRE VISÍVEL) -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#38bdf8] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#ef4444] shrink-0">
                 <i class="fa-solid fa-robot text-sm"></i>
               </div>
               <div>
@@ -2675,7 +2678,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <select id="sel-bot-available" class="sb-input flex-1 !bg-[#0b0d14] !border-[#1e3a8a] text-slate-300">
                   <option value="">Escolha um bot disponível</option>
                 </select>
-                <button type="button" onclick="document.getElementById('inp-bot-token').focus()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#7c3aed] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
+                <button type="button" onclick="document.getElementById('inp-bot-token').focus()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#dc2626] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[11px]"></i> Vincular bot
                 </button>
               </div>
@@ -2805,14 +2808,14 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <i class="fa-solid fa-link text-emerald-400 text-xs"></i>
                     <span>Link de acesso</span>
                   </span>
-                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check"></i>
+                  <i class="fa-solid fa-check text-[#ef4444] text-[11px] dtype-check"></i>
                 </button>
                 <button type="button" onclick="selectDeliveryType('Mensagem no bot', event)" data-dtype="Mensagem no bot" class="delivery-type-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition text-slate-200 hover:bg-[#141824]">
                   <span class="flex items-center gap-2.5">
                     <i class="fa-regular fa-comment-dots text-[#a78bfa] text-xs"></i>
                     <span>Mensagem no bot</span>
                   </span>
-                  <i class="fa-solid fa-check text-[#38bdf8] text-[11px] dtype-check hidden"></i>
+                  <i class="fa-solid fa-check text-[#ef4444] text-[11px] dtype-check hidden"></i>
                 </button>
               </div>
 
@@ -3393,7 +3396,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const dot = card.querySelector('.gender-dot');
         if (dot) {
           if (isSel) {
-            dot.className = "gender-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center";
+            dot.className = "gender-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center";
             dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
           } else {
             dot.className = "gender-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center";
@@ -3640,7 +3643,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const dot = card.querySelector('.radio-dot');
         if (dot) {
           if (isSel) {
-            dot.className = "radio-dot w-4 h-4 rounded-full bg-[#8b5cf6] flex items-center justify-center shrink-0";
+            dot.className = "radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0";
             dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
           } else {
             dot.className = "radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0";
@@ -3993,7 +3996,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const isSel = idx === SELECTED_DOWNSELL_IDX;
         return `
         <div onclick="selectDownsellStep(${idx})" class="rounded-2xl p-4 border ${isSel ? 'border-[#1e3a8a] bg-[#0e1526]' : 'border-[#181c28] bg-[#0b0d14] hover:border-slate-700'} cursor-pointer flex items-center gap-3.5 transition">
-          <span class="w-7 h-7 rounded-full ${isSel ? 'bg-[#38bdf8] text-[#050507]' : 'bg-[#181c28] text-slate-300'} text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+          <span class="w-7 h-7 rounded-full ${isSel ? 'bg-[#ef4444] text-[#050507]' : 'bg-[#181c28] text-slate-300'} text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
           <div class="overflow-hidden flex-1">
             <div class="flex items-center justify-between">
               <p class="text-xs font-bold text-white truncate">${s.title}</p>
@@ -4002,7 +4005,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
             <p class="text-[11px] text-slate-400 mt-0.5">Espera ${s.delay_label} • 0 mídia(s)</p>
-            <p class="text-[11px] text-[#38bdf8] mt-0.5">~${s.delay_label} desde o início</p>
+            <p class="text-[11px] text-[#ef4444] mt-0.5">~${s.delay_label} desde o início</p>
           </div>
         </div>
       `}).join('');
@@ -4150,7 +4153,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         <div class="rounded-2xl border border-[#181c28] bg-[#090b10] p-4 space-y-3.5">
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-2.5">
-              <i class="fa-regular fa-image text-[#38bdf8] text-xs"></i>
+              <i class="fa-regular fa-image text-[#ef4444] text-xs"></i>
               <div>
                 <p class="text-xs font-bold text-white">${idx + 1}. ${m.name}</p>
                 <p class="text-[11px] text-slate-400">Exclusiva desta automação</p>
@@ -4161,7 +4164,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </button>
           </div>
 
-          <button type="button" onclick="toggleUpsellMediaCaption(${idx})" class="w-full text-left px-3 py-2.5 rounded-xl bg-[#0b0d14] border ${isExp ? 'border-[#38bdf8]' : 'border-[#181c28]'} text-xs text-slate-300 flex items-center gap-1.5 transition">
+          <button type="button" onclick="toggleUpsellMediaCaption(${idx})" class="w-full text-left px-3 py-2.5 rounded-xl bg-[#0b0d14] border ${isExp ? 'border-[#ef4444]' : 'border-[#181c28]'} text-xs text-slate-300 flex items-center gap-1.5 transition">
             <span class="text-[10px]">${isExp ? '▾' : '▸'}</span>
             <span>Visualizar e editar legenda</span>
           </button>
@@ -4291,7 +4294,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div onclick="showLeadDetail(${realIdx})" class="rounded-xl border border-[#181c28] bg-[#07090e] p-3 cursor-pointer hover:border-[#2563eb] flex justify-between items-center gap-2 transition">
             <div class="min-w-0">
               <p class="text-xs font-bold text-white truncate">${l.first_name} <span class="text-slate-500 font-normal">${l.username || ''}</span></p>
-              <span class="text-[11px] text-[#38bdf8]">${normStage}</span>
+              <span class="text-[11px] text-[#ef4444]">${normStage}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-[10px] text-slate-500">${l.last_interaction || ''}</span>
@@ -4574,7 +4577,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           elRecBox.innerHTML = `
             <div class="rounded-xl border border-[#1e3a8a]/60 bg-[#090d18] p-3.5 flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <p class="text-xs font-bold text-[#38bdf8]">${recTitle}</p>
+                <p class="text-xs font-bold text-[#ef4444]">${recTitle}</p>
                 <p class="text-[11px] text-slate-300 mt-0.5">${recDetail}</p>
               </div>
               <button type="button" onclick="approveLearningSnapshot('${recTitle.replace(/'/g, '')}')" class="px-3 py-1.5 rounded-xl bg-[#1e3a8a]/40 hover:bg-[#1e3a8a]/70 border border-[#3b82f6]/40 text-xs font-bold text-white transition shrink-0">
@@ -4741,7 +4744,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('full-sim-messages');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#7c3aed] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]">${text}</div>
+          <div class="bg-[#dc2626] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]">${text}</div>
         </div>
       `;
       input.value = '';
@@ -4798,7 +4801,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('preview-chat-bubbles');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#7c3aed] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${text}</div>
+          <div class="bg-[#dc2626] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${text}</div>
         </div>
       `;
       inp.value = '';
@@ -5745,7 +5748,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const allFolders = ["Todas", ...(STATE.bot_folders || [])];
       pillsEl.innerHTML = allFolders.map(f => {
         const isSel = NB_SELECTED_FOLDER === f;
-        return `<button type="button" onclick="nbSelectFolder('${f.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition ${isSel ? 'bg-[#eab308] text-black shadow-sm' : 'bg-[#15140f] text-zinc-400 hover:text-white border border-[#28261c]'}">${f}</button>`;
+        return `<button type="button" onclick="nbSelectFolder('${f.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition ${isSel ? 'bg-[#ef4444] text-white shadow-sm' : 'bg-[#140e10] text-zinc-400 hover:text-white border border-[#2b1d20]'}">${f}</button>`;
       }).join('');
 
       const bots = (STATE.flow_bots || []).filter(b => {
@@ -5755,20 +5758,23 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const cardsHtml = bots.map(b => {
         const isAct = b.active !== false;
+        const isAi = b.mode === 'ai';
         const sales = Number(b.sales_today || 0);
         const rev = Number(b.revenue_today || 0).toFixed(2).replace('.', ',');
         const folderLabel = (b.folder || "").trim() ? b.folder.toUpperCase() : "SEM PASTA";
-        const modeTag = b.mode === 'ai' ? '<span class="ml-1.5 px-1.5 py-0.5 rounded bg-purple-950/80 border border-purple-700/40 text-[9px] text-purple-300 font-bold">IA</span>' : '';
+        const modeTag = isAi
+          ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-red-950/90 border border-[#ef4444]/50 text-[10px] text-[#ef4444] font-bold">FLUXO IA</span>'
+          : '<span class="ml-2 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700/60 text-[10px] text-zinc-300 font-bold">BOTÕES</span>';
         return `
-          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#3d3926] transition group min-h-[178px]">
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#ef4444]/60 transition group min-h-[225px]">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#1f1c10] border border-[#332e19] text-[#eab308] flex items-center justify-center text-sm shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-sm shrink-0">
                   <i class="fa-solid fa-robot"></i>
                 </div>
                 <div>
-                  <div class="flex items-center">
-                    <h3 class="text-sm font-bold text-white group-hover:text-[#eab308] transition">${b.username || '@bot'}</h3>
+                  <div class="flex items-center flex-wrap">
+                    <h3 class="text-sm font-bold text-white group-hover:text-[#ef4444] transition">${b.username || '@bot'}</h3>
                     ${modeTag}
                   </div>
                   <span class="inline-flex items-center gap-1.5 text-[11px] ${isAct ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">
@@ -5782,7 +5788,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
 
-            <div class="border-t border-[#1e1d15] my-3.5 pt-3.5 flex items-baseline justify-between">
+            <div class="border-t border-[#24181a] my-3 pt-3 flex items-baseline justify-between">
               <div>
                 <span class="text-base font-bold text-white block">${sales} vendas</span>
                 <span class="text-[11px] text-zinc-500">hoje</span>
@@ -5793,7 +5799,22 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-1" onclick="event.stopPropagation()">
+            <!-- ESCOLHER SEÇÃO DE OPERAÇÃO DIRETO NO BOT -->
+            <div class="pb-3 mb-2.5 border-b border-[#24181a]" onclick="event.stopPropagation()">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">SELECIONAR SEÇÃO DO BOT:</span>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="nbOpenBotDetail('${b.id}', 'flow')" class="px-2.5 py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition ${!isAi ? 'bg-[#ef4444] text-white shadow-sm shadow-red-950/50' : 'bg-[#160f11] text-zinc-400 hover:text-white border border-[#2b1d20]'}">
+                  <i class="fa-solid fa-list-check text-[10px]"></i>
+                  <span>Fluxo Botões</span>
+                </button>
+                <button type="button" onclick="nbOpenBotDetail('${b.id}', 'ai')" class="px-2.5 py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition ${isAi ? 'bg-[#ef4444] text-white shadow-sm shadow-red-950/50' : 'bg-[#160f11] text-zinc-400 hover:text-white border border-[#2b1d20]'}">
+                  <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                  <span>Fluxo de IA</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-0.5" onclick="event.stopPropagation()">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">${folderLabel}</span>
               <label class="nb-toggle">
                 <input type="checkbox" ${isAct ? 'checked' : ''} onchange="nbToggleBotFromCard('${b.id}', this.checked)">
@@ -5805,8 +5826,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }).join('');
 
       const addCardHtml = `
-        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#3d3926] transition min-h-[178px] bg-[#0e0d0a]/60">
-          <div class="w-10 h-10 rounded-xl bg-[#191812] border border-[#2a281d] text-zinc-400 flex items-center justify-center text-sm">
+        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#ef4444]/60 transition min-h-[225px] bg-[#0d090a]/60">
+          <div class="w-10 h-10 rounded-xl bg-[#1a1113] border border-[#2e1e21] text-[#ef4444] flex items-center justify-center text-sm">
             <i class="fa-solid fa-plus"></i>
           </div>
           <span class="text-xs font-bold text-white">Adicionar bot</span>
@@ -5907,6 +5928,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         } catch (e) {}
       }
 
+      let targetBotId = NB_EDITING_BOT_ID;
       if (NB_EDITING_BOT_ID) {
         const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
         if (b) {
@@ -5918,6 +5940,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             b.username = botInfo.username;
             b.first_name = botInfo.first_name;
           }
+          targetBotId = b.id;
         }
       } else {
         const newBot = nbBuildDefaultBotObj({
@@ -5930,17 +5953,18 @@ quer que eu te mostre as opções de acesso?</textarea>
         newBot.folder = folder;
         newBot.mode = mode;
         STATE.flow_bots.push(newBot);
-        NB_CURRENT_BOT_ID = newBot.id;
+        targetBotId = newBot.id;
       }
 
-      btn.textContent = "Salvar e Conectar";
+      NB_CURRENT_BOT_ID = targetBotId;
+      btn.textContent = "Salvar e Abrir Seção";
       nbCloseBotModal();
       nbSyncActiveBotToPublish();
       nbRenderBotsList();
-      if (!document.getElementById('nb-view-bot-detail').classList.contains('hidden') && NB_CURRENT_BOT_ID) {
-        nbOpenBotDetail(NB_CURRENT_BOT_ID);
-      }
       await saveFullState();
+      if (targetBotId) {
+        nbOpenBotDetail(targetBotId, mode);
+      }
     }
 
     async function nbDeleteEditingBot() {
@@ -5955,7 +5979,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       const b = (STATE.flow_bots || []).find(x => x.id === botId);
       if (!b) return;
       if (isChecked) {
-        // Garante que este bot assuma o polling ativo se possuir token
         b.active = true;
       } else {
         b.active = false;
@@ -5966,7 +5989,10 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbSyncActiveBotToPublish() {
-      const activeBot = (STATE.flow_bots || []).find(b => b.active && b.token) || (STATE.flow_bots || [])[0];
+      const current = nbGetCurrentBot();
+      const activeBot = (current && current.active && current.token)
+        ? current
+        : ((STATE.flow_bots || []).find(b => b.active && b.token) || (STATE.flow_bots || [])[0]);
       if (activeBot && activeBot.token) {
         STATE.publish.bot_token = activeBot.token;
         STATE.publish.bot_username = activeBot.username || STATE.publish.bot_username;
@@ -5975,19 +6001,30 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbBackToBotsList() {
+      switchWorkspace('neurotbot');
       document.getElementById('nb-view-bot-detail').classList.add('hidden');
       document.getElementById('nb-view-bots-list').classList.remove('hidden');
       nbRenderBotsList();
     }
 
-    function nbOpenBotInAiMode() {
+    async function nbSwitchBotModeSection(targetMode) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      b.mode = targetMode;
+      nbSyncActiveBotToPublish();
+      await saveFullState();
+      nbOpenBotDetail(b.id, targetMode);
+    }
+
+    function nbOpenBotInAiMode(botId = null) {
+      if (botId) NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
       if (b) {
         b.mode = "ai";
         if (b.token) {
           STATE.publish.bot_token = b.token;
           STATE.publish.bot_username = b.username || "";
-          STATE.publish.is_live = true;
+          STATE.publish.is_live = b.active !== false;
         }
         STATE.flow_name = (b.username || "bot").replace("@", "");
         syncStateToInputs();
@@ -5996,12 +6033,25 @@ quer que eu te mostre as opções de acesso?</textarea>
       navigateTab('resumo');
     }
 
-    function nbOpenBotDetail(botId) {
+    async function nbOpenBotDetail(botId, forceMode = null) {
       NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
       if (!b) return;
 
-      // Se o bot foi marcado como modo IA, mas o usuário clicou no card, abre a tela de gerenciamento (e permite ir para Meus Fluxos)
+      if (forceMode && b.mode !== forceMode) {
+        b.mode = forceMode;
+        nbSyncActiveBotToPublish();
+        saveFullState();
+      }
+
+      // Roteamento por Seção: Se o bot estiver em Modo IA, abre direto a Seção Fluxo de IA!
+      if (b.mode === 'ai') {
+        nbOpenBotInAiMode(b.id);
+        return;
+      }
+
+      // Caso contrário, abre a Seção Fluxo de Botões (5 abas):
+      switchWorkspace('neurotbot');
       document.getElementById('nb-view-bots-list').classList.add('hidden');
       document.getElementById('nb-view-bot-detail').classList.remove('hidden');
 
@@ -6138,7 +6188,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           const colorTabs = colors.map(c => {
             const active = (p.button_color || "Padrão") === c.label;
             return `
-              <button type="button" onclick="nbSetPlanField(${idx}, 'button_color', '${c.label}')" class="px-3 py-2 flex items-center gap-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 hover:text-white border-b-2 border-transparent'}">
+              <button type="button" onclick="nbSetPlanField(${idx}, 'button_color', '${c.label}')" class="px-3 py-2 flex items-center gap-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 hover:text-white border-b-2 border-transparent'}">
                 <span class="w-2 h-2 rounded-full ${c.dot}"></span>
                 <span>${c.label}</span>
               </button>
@@ -6148,7 +6198,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           const destTypes = ["Herdar do fluxo", "Canal ou grupo", "Link externo"];
           const destTabs = destTypes.map(dt => {
             const active = (p.delivery_dest_type || "Canal ou grupo") === dt;
-            return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
+            return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
           }).join('');
 
           let deliveryBody = '';
@@ -6168,8 +6218,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="space-y-3 pt-2">
                 <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#eab308]">*</span></span>
-                  <button type="button" onclick="nbSyncPlanChannel(${idx})" class="text-[11px] text-zinc-400 hover:text-[#eab308] flex items-center gap-1">
+                  <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#ef4444]">*</span></span>
+                  <button type="button" onclick="nbSyncPlanChannel(${idx})" class="text-[11px] text-zinc-400 hover:text-[#ef4444] flex items-center gap-1">
                     <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
                   </button>
                 </div>
@@ -6192,7 +6242,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           }
 
           return `
-            <div class="rounded-xl bg-[#0e0d0a] border border-[#232119] ${isExp ? 'border-l-2 border-l-[#eab308]' : ''} overflow-hidden">
+            <div class="rounded-xl bg-[#0e0d0a] border border-[#232119] ${isExp ? 'border-l-2 border-l-[#ef4444]' : ''} overflow-hidden">
               <div onclick="nbTogglePlanExpand(${idx})" class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-white/[0.02]">
                 <div class="flex items-center gap-3">
                   <div class="flex flex-col text-[9px] text-zinc-500 leading-none gap-0.5" onclick="event.stopPropagation()">
@@ -6248,7 +6298,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
 
                 <div class="flex items-center justify-between pt-2">
-                  <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2 rounded-lg bg-[#eab308] hover:bg-[#ca8a04] text-xs font-bold text-black transition">
+                  <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
                     Salvar alterações
                   </button>
                   <button type="button" onclick="nbRemovePlan(${idx})" class="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1.5">
@@ -6264,8 +6314,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       // Coluna Direita: Fallback + Variação de Preço
       const fb = b.fallback_delivery || (b.fallback_delivery = { dest_type: "Canal ou grupo", channel_id: "-1003939135982", channel_name: "Rocha VENDAS", external_url: "", last_verified: "hoje" });
       const isExt = fb.dest_type === "Link externo";
-      document.getElementById('nb-fb-tab-channel').className = !isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
-      document.getElementById('nb-fb-tab-external').className = isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#eab308]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
+      document.getElementById('nb-fb-tab-channel').className = !isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
+      document.getElementById('nb-fb-tab-external').className = isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
       document.getElementById('nb-fb-channel-box').classList.toggle('hidden', isExt);
       document.getElementById('nb-fb-external-box').classList.toggle('hidden', !isExt);
       document.getElementById('nb-fb-ch-name').textContent = fb.channel_name || "Rocha VENDAS";
@@ -6472,7 +6522,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="nb-card p-5 space-y-4">
             <div class="flex items-center justify-between border-b border-[#1e1d15] pb-3">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#eab308]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
                 <h4 class="text-xs font-bold text-white">Sequência ${sIdx + 1}</h4>
               </div>
               <div class="flex items-center gap-3 text-xs text-zinc-500">
@@ -6503,7 +6553,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
 
             <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-[#eab308]">*</span></label>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-[#ef4444]">*</span></label>
               <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${msg}</textarea>
               <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
             </div>
@@ -6529,7 +6579,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
                 ${(seq.medias || []).map((m, mIdx) => `
                   <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-                    <i class="fa-regular fa-image text-[#eab308]"></i> ${m.name || 'Mídia'}
+                    <i class="fa-regular fa-image text-[#ef4444]"></i> ${m.name || 'Mídia'}
                     <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
                   </span>
                 `).join('')}
@@ -6636,7 +6686,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
             <div>
               <span class="text-xs font-bold text-white">${ob.title || 'Order Bump'}</span>
-              <span class="text-xs text-[#eab308] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
+              <span class="text-xs text-[#ef4444] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
               <p class="text-[11px] text-zinc-500 truncate max-w-md">${ob.description || ''}</p>
             </div>
           </div>
@@ -6661,14 +6711,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       const rejEl = document.getElementById('nb-ob-reject-colors');
       if (accEl) {
         accEl.innerHTML = colors.map(c => `
-          <button type="button" onclick="NB_OB_ACCEPT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_ACCEPT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 border-b-2 border-transparent'}">
+          <button type="button" onclick="NB_OB_ACCEPT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_ACCEPT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 border-b-2 border-transparent'}">
             <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
           </button>
         `).join('');
       }
       if (rejEl) {
         rejEl.innerHTML = colors.map(c => `
-          <button type="button" onclick="NB_OB_REJECT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_REJECT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#eab308]' : 'text-zinc-400 border-b-2 border-transparent'}">
+          <button type="button" onclick="NB_OB_REJECT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_REJECT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 border-b-2 border-transparent'}">
             <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
           </button>
         `).join('');
@@ -6769,10 +6819,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_PAYMENT_SUBTAB = sub;
       const isGen = sub === 'generated';
       document.getElementById('nb-pay-pill-gen').className = isGen
-        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition"
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition"
         : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
       document.getElementById('nb-pay-pill-app').className = !isGen
-        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#eab308]/50 transition"
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition"
         : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
       document.getElementById('nb-pay-panel-generated').classList.toggle('hidden', !isGen);
       document.getElementById('nb-pay-panel-approved').classList.toggle('hidden', isGen);
@@ -6870,7 +6920,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!listEl) return;
       listEl.innerHTML = (medias || []).map((m, idx) => `
         <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-          <i class="fa-regular fa-image text-[#eab308]"></i> ${m.name || 'Mídia'}
+          <i class="fa-regular fa-image text-[#ef4444]"></i> ${m.name || 'Mídia'}
           <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
         </span>
       `).join('');
