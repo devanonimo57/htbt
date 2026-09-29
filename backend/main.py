@@ -172,6 +172,13 @@ def redirect_to_dashboard():
 def health_ping():
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
+import asyncio as _asyncio
+
+_STATE_CACHE: Optional[Dict[str, Any]] = None
+_DB_LOCK = _asyncio.Lock()
+MAX_ACTIVE_LEADS = 500
+MAX_HISTORY_PER_LEAD = 60
+
 def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     pub = state.setdefault("publish", {})
     if pub.get("gateway_secret") and pub.get("gateway_provider") in ("pushinpay", "suitpay", "", None):
@@ -180,7 +187,14 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     key = (acc.get("ai_api_key") or "").strip()
     if key.startswith("sk-") and len(key) == 35 and acc.get("ai_provider") in ("openai", "", None):
         acc["ai_provider"] = "deepseek"
-    for lead in state.get("memory", {}).get("leads", []):
+
+    memory = state.setdefault("memory", {"leads": []})
+    leads = memory.get("leads", [])
+    if len(leads) > MAX_ACTIVE_LEADS:
+        memory["leads"] = leads[:MAX_ACTIVE_LEADS]
+        leads = memory["leads"]
+
+    for lead in leads:
         if lead.get("stage") in ("Em conversa", "", None):
             lead["stage"] = "Conversando"
         hist = lead.setdefault("stage_history", ["Conversando"])
@@ -188,40 +202,55 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
             hist.insert(0, "Conversando")
         if lead["stage"] not in hist:
             hist.append(lead["stage"])
+        msg_hist = lead.get("history")
+        if isinstance(msg_hist, list) and len(msg_hist) > MAX_HISTORY_PER_LEAD:
+            lead["history"] = msg_hist[-MAX_HISTORY_PER_LEAD:]
     return state
 
 async def _read_state_from_db() -> Dict[str, Any]:
-    async with async_session() as session:
-        result = await session.execute(select(BotConfig))
-        config = result.scalars().first()
-        if not config or not config.full_state_json or config.full_state_json == "{}":
-            return dict(DEFAULT_SHARKBOT_STATE)
-        try:
-            saved = json.loads(config.full_state_json)
-            merged = {**DEFAULT_SHARKBOT_STATE, **saved}
-            return _normalize_providers(merged)
-        except Exception:
-            return dict(DEFAULT_SHARKBOT_STATE)
+    global _STATE_CACHE
+    if _STATE_CACHE is not None:
+        return _STATE_CACHE
+    async with _DB_LOCK:
+        if _STATE_CACHE is not None:
+            return _STATE_CACHE
+        async with async_session() as session:
+            result = await session.execute(select(BotConfig))
+            config = result.scalars().first()
+            if not config or not config.full_state_json or config.full_state_json == "{}":
+                _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
+                return _STATE_CACHE
+            try:
+                saved = json.loads(config.full_state_json)
+                merged = {**DEFAULT_SHARKBOT_STATE, **saved}
+                _STATE_CACHE = _normalize_providers(merged)
+                return _STATE_CACHE
+            except Exception:
+                _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
+                return _STATE_CACHE
 
 async def _write_state_to_db(state: Dict[str, Any]) -> Dict[str, Any]:
-    state = _normalize_providers(state)
-    async with async_session() as session:
-        result = await session.execute(select(BotConfig))
-        config = result.scalars().first()
-        if not config:
-            config = BotConfig()
-            session.add(config)
+    global _STATE_CACHE
+    async with _DB_LOCK:
+        state = _normalize_providers(state)
+        _STATE_CACHE = state
+        async with async_session() as session:
+            result = await session.execute(select(BotConfig))
+            config = result.scalars().first()
+            if not config:
+                config = BotConfig()
+                session.add(config)
 
-        config.full_state_json = json.dumps(state, ensure_ascii=False)
-        publish = state.get("publish", {})
-        config.is_active = bool(publish.get("is_live", False))
-        config.telegram_bot_token = publish.get("bot_token", "")
-        config.vip_channel_id = publish.get("delivery_destination", "")
-        config.media_cache_channel_id = publish.get("cache_channel_id", "")
-        config.support_username = publish.get("support_username", "")
-        config.pushin_pay_token = publish.get("pushin_pay_token", "")
-        await session.commit()
-    return state
+            config.full_state_json = json.dumps(state, ensure_ascii=False)
+            publish = state.get("publish", {})
+            config.is_active = bool(publish.get("is_live", False))
+            config.telegram_bot_token = publish.get("bot_token", "")
+            config.vip_channel_id = publish.get("delivery_destination", "")
+            config.media_cache_channel_id = publish.get("cache_channel_id", "")
+            config.support_username = publish.get("support_username", "")
+            config.pushin_pay_token = publish.get("pushin_pay_token", "")
+            await session.commit()
+        return _STATE_CACHE
 
 async def init_db():
     async with engine.begin() as conn:

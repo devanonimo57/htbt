@@ -38,8 +38,21 @@ class ActiveBotManager:
         self.current_token: str = ""
         self.downsell_tasks: Dict[str, asyncio.Task] = {}
         self.active_tx_map: Dict[str, int] = {}
+        self.lead_locks: Dict[str, asyncio.Lock] = {}
         self.state_getter = None
         self.state_saver = None
+
+    def _get_lead_lock(self, uid: str) -> asyncio.Lock:
+        if len(self.lead_locks) > 1000:
+            # Limpa locks ociosos para não acumular na RAM
+            idle_keys = [k for k, lk in self.lead_locks.items() if not lk.locked()][:500]
+            for k in idle_keys:
+                self.lead_locks.pop(k, None)
+        lock = self.lead_locks.get(uid)
+        if not lock:
+            lock = asyncio.Lock()
+            self.lead_locks[uid] = lock
+        return lock
 
     async def configure_and_start(self, state_getter, state_saver):
         self.state_getter = state_getter
@@ -430,120 +443,130 @@ class ActiveBotManager:
                 await handle_start(message)
                 return
 
-            state = await self.state_getter()
-            lead = await self._get_or_create_lead(state, message.from_user)
-            self._cancel_downsell(str(message.from_user.id))
+            uid = str(message.from_user.id)
+            async with self._get_lead_lock(uid):
+                state = await self.state_getter()
+                lead = await self._get_or_create_lead(state, message.from_user)
+                self._cancel_downsell(uid)
 
-            lead.setdefault("history", []).append({"role": "user", "content": user_text})
-            self._update_lead_insights(state, lead, user_text=user_text)
+                lead.setdefault("history", []).append({"role": "user", "content": user_text})
+                self._update_lead_insights(state, lead, user_text=user_text)
 
-            # Verifica se o usuário já tinha visto os planos e declarou escolha por texto
-            lower_txt = user_text.lower()
-            if "Viu os planos" in lead.get("stage_history", []):
-                if any(w in lower_txt for w in ("quero esse", "vou querer", "fechado", "manda o pix", "quero assinar", "quero entrar")):
-                    if lead.get("stage") in ("Recebeu upsell", "Escolheu upsell"):
-                        self._advance_stage(lead, "Escolheu upsell")
+                # Verifica se o usuário já tinha visto os planos e declarou escolha por texto
+                lower_txt = user_text.lower()
+                if "Viu os planos" in lead.get("stage_history", []):
+                    if any(w in lower_txt for w in ("quero esse", "vou querer", "fechado", "manda o pix", "quero assinar", "quero entrar")):
+                        if lead.get("stage") in ("Recebeu upsell", "Escolheu upsell"):
+                            self._advance_stage(lead, "Escolheu upsell")
+                        else:
+                            self._advance_stage(lead, "Escolheu um plano")
+
+                # Verifica palavras de encaminhamento para suporte humano
+                handoff_words = [
+                    w.strip().lower()
+                    for w in state.get("style", {}).get("handoff_words", "").split(",")
+                    if w.strip()
+                ]
+                if any(hw in lower_txt for hw in handoff_words):
+                    support = state.get("publish", {}).get("support_username", "@suporte")
+                    reply = f"Vou te passar o contato do suporte oficial para resolver isso rapidinho: {support} 💜"
+                    await message.answer(reply)
+                    lead["history"].append({"role": "assistant", "content": reply})
+                    await self.state_saver(state)
+                    return
+
+                delay = self._get_cadence_delay(state)
+                await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+                await asyncio.sleep(delay)
+
+                ai_res = await generate_ai_reply(
+                    state,
+                    lead["history"],
+                    user_text,
+                    lead_name=lead.get("first_name", "")
+                )
+                reply_text = ai_res.get("reply", "")
+
+                # Reobtém a referência atualizada em RAM caso outro lead ou o painel tenha salvo durante os segundos da IA
+                state = await self.state_getter()
+                lead = await self._get_or_create_lead(state, message.from_user)
+
+                # Se houver mídia acionada pelo contexto (suporta URL http e upload Base64)
+                media = ai_res.get("media")
+                if media and media.get("url"):
+                    try:
+                        photo_input = self._build_input_file(media["url"], f"{media.get('name', 'media')}.jpg")
+                        if photo_input:
+                            raw_cap = (media.get("caption") or "").replace("{nome}", lead.get("first_name", "")).strip()
+                            await self.bot.send_photo(
+                                chat_id=message.chat.id,
+                                photo=photo_input,
+                                caption=raw_cap or None,
+                                has_spoiler=bool(media.get("spoiler", False))
+                            )
+                    except Exception as e:
+                        logger.warning(f"Falha ao enviar mídia de prévia: {e}")
+
+                offer_card = ai_res.get("offer_card")
+                is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
+                markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
+
+                if offer_card:
+                    if is_upsell_ctx:
+                        self._advance_stage(lead, "Recebeu upsell")
                     else:
-                        self._advance_stage(lead, "Escolheu um plano")
+                        self._advance_stage(lead, "Viu os planos")
+                        if offer_card.get("discounted"):
+                            self._advance_stage(lead, "Escolheu um plano")
 
-            # Verifica palavras de encaminhamento para suporte humano
-            handoff_words = [
-                w.strip().lower()
-                for w in state.get("style", {}).get("handoff_words", "").split(",")
-                if w.strip()
-            ]
-            if any(hw in lower_txt for hw in handoff_words):
-                support = state.get("publish", {}).get("support_username", "@suporte")
-                reply = f"Vou te passar o contato do suporte oficial para resolver isso rapidinho: {support} 💜"
-                await message.answer(reply)
-                lead["history"].append({"role": "assistant", "content": reply})
-                await self.state_saver(state)
-                return
-
-            delay = self._get_cadence_delay(state)
-            await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
-            await asyncio.sleep(delay)
-
-            ai_res = await generate_ai_reply(
-                state,
-                lead["history"],
-                user_text,
-                lead_name=lead.get("first_name", "")
-            )
-            reply_text = ai_res.get("reply", "")
-
-            # Se houver mídia acionada pelo contexto (suporta URL http e upload Base64)
-            media = ai_res.get("media")
-            if media and media.get("url"):
                 try:
-                    photo_input = self._build_input_file(media["url"], f"{media.get('name', 'media')}.jpg")
-                    if photo_input:
-                        raw_cap = (media.get("caption") or "").replace("{nome}", lead.get("first_name", "")).strip()
-                        await self.bot.send_photo(
-                            chat_id=message.chat.id,
-                            photo=photo_input,
-                            caption=raw_cap or None,
-                            has_spoiler=bool(media.get("spoiler", False))
-                        )
+                    await message.answer(reply_text, reply_markup=markup)
                 except Exception as e:
-                    logger.warning(f"Falha ao enviar mídia de prévia: {e}")
-
-            offer_card = ai_res.get("offer_card")
-            is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
-            markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
-
-            if offer_card:
-                if is_upsell_ctx:
-                    self._advance_stage(lead, "Recebeu upsell")
-                else:
-                    self._advance_stage(lead, "Viu os planos")
-                    if offer_card.get("discounted"):
-                        self._advance_stage(lead, "Escolheu um plano")
-
-            try:
-                await message.answer(reply_text, reply_markup=markup)
-            except Exception as e:
-                logger.warning(f"Fallback envio de mensagem sem markup: {e}")
-                await message.answer(reply_text)
-            lead["history"].append({"role": "assistant", "content": reply_text})
-            await self.state_saver(state)
+                    logger.warning(f"Fallback envio de mensagem sem markup: {e}")
+                    await message.answer(reply_text)
+                lead["history"].append({"role": "assistant", "content": reply_text})
+                await self.state_saver(state)
 
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
 
         @self.dp.message(F.voice | F.audio | F.photo | F.sticker | F.video)
         async def handle_non_text(message: types.Message):
-            state = await self.state_getter()
-            lead = await self._get_or_create_lead(state, message.from_user)
-            self._cancel_downsell(str(message.from_user.id))
+            uid = str(message.from_user.id)
+            async with self._get_lead_lock(uid):
+                state = await self.state_getter()
+                lead = await self._get_or_create_lead(state, message.from_user)
+                self._cancel_downsell(uid)
 
-            if message.voice or message.audio:
-                synthetic_msg = "[Visitante enviou um áudio — diga de forma simpática que não consegue ouvir áudio agora e peça para ele escrever por texto]"
-            elif message.sticker:
-                synthetic_msg = f"[Visitante enviou uma figurinha {message.sticker.emoji or '😈'}]"
-            else:
-                synthetic_msg = "[Visitante enviou uma foto/vídeo]"
+                if message.voice or message.audio:
+                    synthetic_msg = "[Visitante enviou um áudio — diga de forma simpática que não consegue ouvir áudio agora e peça para ele escrever por texto]"
+                elif message.sticker:
+                    synthetic_msg = f"[Visitante enviou uma figurinha {message.sticker.emoji or '😈'}]"
+                else:
+                    synthetic_msg = "[Visitante enviou uma foto/vídeo]"
 
-            lead.setdefault("history", []).append({"role": "user", "content": synthetic_msg})
-            delay = self._get_cadence_delay(state)
-            await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
-            await asyncio.sleep(delay)
+                lead.setdefault("history", []).append({"role": "user", "content": synthetic_msg})
+                delay = self._get_cadence_delay(state)
+                await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+                await asyncio.sleep(delay)
 
-            ai_res = await generate_ai_reply(
-                state,
-                lead["history"],
-                synthetic_msg,
-                lead_name=lead.get("first_name", "")
-            )
-            reply_text = ai_res.get("reply", "")
-            offer_card = ai_res.get("offer_card")
-            is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
-            markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
-            if offer_card and not is_upsell_ctx:
-                self._advance_stage(lead, "Viu os planos")
+                ai_res = await generate_ai_reply(
+                    state,
+                    lead["history"],
+                    synthetic_msg,
+                    lead_name=lead.get("first_name", "")
+                )
+                reply_text = ai_res.get("reply", "")
+                state = await self.state_getter()
+                lead = await self._get_or_create_lead(state, message.from_user)
+                offer_card = ai_res.get("offer_card")
+                is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
+                markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
+                if offer_card and not is_upsell_ctx:
+                    self._advance_stage(lead, "Viu os planos")
 
-            await message.answer(reply_text, reply_markup=markup)
-            lead["history"].append({"role": "assistant", "content": reply_text})
-            await self.state_saver(state)
+                await message.answer(reply_text, reply_markup=markup)
+                lead["history"].append({"role": "assistant", "content": reply_text})
+                await self.state_saver(state)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
 
         @self.dp.callback_query(F.data.startswith("buy:"))
