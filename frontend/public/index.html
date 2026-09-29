@@ -202,33 +202,22 @@
         </div>
         <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#ef4444]">Bot</span></span>
       </div>
-
-      <div class="flex items-center gap-3">
-        <button onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#171012] hover:bg-[#241619] border border-[#332024] text-xs font-semibold text-zinc-200 hover:text-white flex items-center gap-2 transition" title="Configurar Gateway PIX">
-          <i class="fa-solid fa-key text-[11px] text-[#ef4444]"></i>
-          <span>Gateway PIX</span>
-        </button>
-      </div>
     </header>
 
     <!-- ÁREA CENTRAL ROLÁVEL -->
     <div class="flex-1 overflow-y-auto pb-28">
 
       <!-- =====================================================
-           TELA 1 (PRINT 1): MEUS BOTS — BOTS CONECTADOS
+           TELA 1: MEUS BOTS — BOTS CONECTADOS (LIMPA, SEM REPETIÇÕES)
       ====================================================== -->
       <div id="nb-view-bots-list" class="max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
             <span class="text-[10px] font-bold uppercase tracking-widest text-[#ef4444] block">MEUS BOTS</span>
             <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
-            <p class="text-xs text-zinc-400 mt-1">Clique no bot para gerenciar e escolha a seção de operação (Fluxo de Botões ou Fluxo de IA).</p>
+            <p class="text-xs text-zinc-400 mt-1">Clique em um bot para escolher o modo de operação e configurar seu fluxo.</p>
           </div>
           <div class="flex items-center gap-2.5">
-            <button onclick="nbOpenFolderModal()" class="px-4 py-2 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2e1f22] text-xs font-medium text-zinc-200 flex items-center gap-2 transition">
-              <i class="fa-regular fa-folder-open text-xs text-zinc-400"></i>
-              <span>Nova pasta</span>
-            </button>
             <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-red-950/40 transition">
               <i class="fa-solid fa-plus text-[11px]"></i>
               <span>Adicionar bot</span>
@@ -236,22 +225,83 @@
           </div>
         </div>
 
-        <!-- PILLS DE PASTAS -->
-        <div id="nb-folder-pills" class="flex items-center gap-2 flex-wrap pt-1"></div>
-
         <!-- GRADE DE CARDS DOS BOTS CONECTADOS -->
         <div id="nb-bots-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1"></div>
       </div>
 
       <!-- =====================================================
-           TELA 2 (PRINTS 2 A 12): GERENCIAR O BOT SELECIONADO (SEÇÃO FLUXO DE BOTÕES)
+           TELA 1.5: SELEÇÃO DE MODO DO BOT (ABRE AO CLICAR NO BOT)
+      ====================================================== -->
+      <div id="nb-view-bot-mode-select" class="hidden max-w-[860px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
+              <i class="fa-solid fa-chevron-left text-[10px]"></i>
+              <span>Voltar</span>
+            </button>
+            <h2 id="nb-modesel-username" class="text-xl font-bold text-white">@bot</h2>
+            <span id="nb-modesel-botid" class="text-xs text-zinc-500 font-mono">ID</span>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-widest text-[#ef4444] block">MODO DE OPERAÇÃO</span>
+          <h3 class="text-lg font-bold text-white mt-1">Escolha como este bot vai atender no Telegram</h3>
+          <p class="text-xs text-zinc-400 mt-1">Selecione abaixo a seção que deseja configurar e ativar neste bot.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+          <!-- CARD 1: FLUXO DE BOTÕES -->
+          <div id="nb-modecard-flow" onclick="nbEnterBotSection('flow')" class="nb-card p-6 flex flex-col justify-between cursor-pointer hover:border-[#ef4444] transition group min-h-[230px]">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="w-11 h-11 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-base">
+                  <i class="fa-solid fa-list-check"></i>
+                </div>
+                <span id="nb-modebadge-flow" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"></span>
+              </div>
+              <h4 class="text-base font-bold text-white group-hover:text-[#ef4444] transition">Fluxo de Botões</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Envia boas-vindas com mídia e botões de planos logo no /start, seguido de Order Bump, Downsell automático e PIX direto.
+              </p>
+            </div>
+            <div class="pt-5 mt-4 border-t border-[#24181a] flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-[#ef4444] transition">Configurar Fluxo de Botões</span>
+              <i class="fa-solid fa-arrow-right text-xs text-[#ef4444]"></i>
+            </div>
+          </div>
+
+          <!-- CARD 2: FLUXO DE IA -->
+          <div id="nb-modecard-ai" onclick="nbEnterBotSection('ai')" class="nb-card p-6 flex flex-col justify-between cursor-pointer hover:border-[#ef4444] transition group min-h-[230px]">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="w-11 h-11 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-base">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <span id="nb-modebadge-ai" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"></span>
+              </div>
+              <h4 class="text-base font-bold text-white group-hover:text-[#ef4444] transition">Fluxo de IA Conversacional</h4>
+              <p class="text-xs text-zinc-400 leading-relaxed">
+                Atendimento humanizado em 1ª pessoa com Inteligência Artificial, envio de prévias e mídias na conversa, negociação e fechamento PIX.
+              </p>
+            </div>
+            <div class="pt-5 mt-4 border-t border-[#24181a] flex items-center justify-between">
+              <span class="text-xs font-bold text-white group-hover:text-[#ef4444] transition">Configurar Fluxo de IA</span>
+              <i class="fa-solid fa-arrow-right text-xs text-[#ef4444]"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           TELA 2: GERENCIAR FLUXO DE BOTÕES DO BOT
       ====================================================== -->
       <div id="nb-view-bot-detail" class="hidden max-w-[1020px] mx-auto px-8 pt-8 space-y-6">
 
-        <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) + SELETOR DE SEÇÃO -->
+        <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) -->
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
-            <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
+            <button onclick="nbOpenBotDetail(NB_CURRENT_BOT_ID)" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
               <i class="fa-solid fa-chevron-left text-[10px]"></i>
               <span>Voltar</span>
             </button>
@@ -260,27 +310,6 @@
             <span id="nb-det-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950/70 text-emerald-400 border border-emerald-800/50">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ativo
             </span>
-          </div>
-
-          <div class="flex items-center gap-2.5 flex-wrap">
-            <!-- SELETOR POR SEÇÃO DENTRO DO BOT -->
-            <div class="inline-flex p-1 rounded-xl bg-[#140e10] border border-[#2b1d20]">
-              <button type="button" onclick="nbSwitchBotModeSection('flow')" class="px-3 py-1.5 rounded-lg bg-[#ef4444] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
-                <i class="fa-solid fa-list-check text-[10px]"></i>
-                <span>Seção: Fluxo de Botões</span>
-              </button>
-              <button type="button" onclick="nbSwitchBotModeSection('ai')" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#ef4444]"></i>
-                <span>Seção: Fluxo de IA</span>
-              </button>
-            </div>
-
-            <button id="nb-det-deactivate-btn" onclick="nbToggleCurrentBotActive()" class="px-4 py-1.5 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2b1d20] text-xs font-semibold text-zinc-200 transition">
-              Desativar
-            </button>
-            <button onclick="nbOpenEditTokenModal()" class="w-8 h-8 rounded-lg bg-[#140e10] hover:bg-[#1f1518] border border-[#2b1d20] text-zinc-400 hover:text-white flex items-center justify-center text-xs transition" title="Editar Token, Modo ou Excluir Bot">
-              <i class="fa-solid fa-ellipsis-vertical"></i>
-            </button>
           </div>
         </div>
 
@@ -1230,19 +1259,6 @@
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">TOKEN DO BOT (@BotFather) *</label>
             <input type="text" id="nb-inp-bot-token" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">PASTA (OPCIONAL)</label>
-              <select id="nb-inp-bot-folder" class="nb-input"></select>
-            </div>
-            <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">SEÇÃO / MODO DE OPERAÇÃO</label>
-              <select id="nb-inp-bot-mode" class="nb-input">
-                <option value="flow">Fluxo de Botões (Padrão)</option>
-                <option value="ai">Fluxo de IA Conversacional</option>
-              </select>
-            </div>
-          </div>
         </div>
         <div class="flex items-center justify-between pt-2">
           <button type="button" id="nb-btn-delete-bot" onclick="nbDeleteEditingBot()" class="hidden text-xs font-semibold text-rose-400 hover:text-rose-300">
@@ -1250,7 +1266,7 @@
           </button>
           <div class="flex items-center gap-2 ml-auto">
             <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300 hover:text-white">Cancelar</button>
-            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar e Abrir Seção</button>
+            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar e Conectar</button>
           </div>
         </div>
       </div>
@@ -1297,7 +1313,7 @@
   <!-- TOP HEADER BAR RICOBOT (SEÇÃO FLUXO DE IA DO BOT) -->
   <header class="h-16 bg-[#090707] border-b border-[#24181a] px-5 flex items-center justify-between shrink-0 z-20 gap-3">
     <div class="flex items-center gap-3.5">
-      <button onclick="switchWorkspace('neurotbot')" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
+      <button onclick="nbOpenBotDetail(NB_CURRENT_BOT_ID)" title="Voltar para o Bot" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
         <i class="fa-solid fa-chevron-left text-xs text-[#ef4444]"></i>
         <span>Voltar</span>
       </button>
@@ -1310,18 +1326,6 @@
         <div class="flex items-baseline gap-2">
           <h1 id="header-flow-name" class="text-base font-bold text-white leading-none">bot</h1>
         </div>
-      </div>
-
-      <!-- SELETOR POR SEÇÃO DENTRO DO BOT (ALTERNAR ENTRE BOTÕES E IA) -->
-      <div class="inline-flex p-1 rounded-xl bg-[#140e10] border border-[#2b1d20] ml-2">
-        <button type="button" onclick="nbSwitchBotModeSection('flow')" class="px-3 py-1.5 rounded-lg text-zinc-400 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
-          <i class="fa-solid fa-list-check text-[10px]"></i>
-          <span>Seção: Fluxo de Botões</span>
-        </button>
-        <button type="button" onclick="nbSwitchBotModeSection('ai')" class="px-3 py-1.5 rounded-lg bg-[#ef4444] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
-          <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-          <span>Seção: Fluxo de IA</span>
-        </button>
       </div>
     </div>
 
@@ -6112,32 +6116,21 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbRenderBotsList() {
-      const pillsEl = document.getElementById('nb-folder-pills');
       const gridEl = document.getElementById('nb-bots-grid');
-      if (!pillsEl || !gridEl) return;
+      if (!gridEl) return;
 
-      const allFolders = ["Todas", ...(STATE.bot_folders || [])];
-      pillsEl.innerHTML = allFolders.map(f => {
-        const isSel = NB_SELECTED_FOLDER === f;
-        return `<button type="button" onclick="nbSelectFolder('${f.replace(/'/g, "\\'")}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition ${isSel ? 'bg-[#ef4444] text-white shadow-sm' : 'bg-[#140e10] text-zinc-400 hover:text-white border border-[#2b1d20]'}">${f}</button>`;
-      }).join('');
-
-      const bots = (STATE.flow_bots || []).filter(b => {
-        if (NB_SELECTED_FOLDER === "Todas") return true;
-        return (b.folder || "") === NB_SELECTED_FOLDER;
-      });
+      const bots = STATE.flow_bots || [];
 
       const cardsHtml = bots.map(b => {
         const isAct = b.active !== false;
         const isAi = b.mode === 'ai';
         const sales = Number(b.sales_today || 0);
         const rev = Number(b.revenue_today || 0).toFixed(2).replace('.', ',');
-        const folderLabel = (b.folder || "").trim() ? b.folder.toUpperCase() : "SEM PASTA";
         const modeTag = isAi
           ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-red-950/90 border border-[#ef4444]/50 text-[10px] text-[#ef4444] font-bold">FLUXO IA</span>'
           : '<span class="ml-2 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700/60 text-[10px] text-zinc-300 font-bold">BOTÕES</span>';
         return `
-          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#ef4444]/60 transition group min-h-[225px]">
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#ef4444]/60 transition group min-h-[195px]">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-sm shrink-0">
@@ -6154,7 +6147,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                   </span>
                 </div>
               </div>
-              <button type="button" onclick="event.stopPropagation(); nbOpenEditBotModal('${b.id}')" class="w-7 h-7 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-white flex items-center justify-center text-xs transition" title="Configurações do Bot">
+              <button type="button" onclick="event.stopPropagation(); nbOpenEditBotModal('${b.id}')" class="w-7 h-7 rounded-lg hover:bg-white/5 text-zinc-500 hover:text-white flex items-center justify-center text-xs transition" title="Configurar Token do Bot">
                 <i class="fa-solid fa-ellipsis-vertical"></i>
               </button>
             </div>
@@ -6170,24 +6163,9 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
             </div>
 
-            <!-- ESCOLHER SEÇÃO DE OPERAÇÃO DIRETO NO BOT -->
-            <div class="pb-3 mb-2.5 border-b border-[#24181a]" onclick="event.stopPropagation()">
-              <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">SELECIONAR SEÇÃO DO BOT:</span>
-              <div class="grid grid-cols-2 gap-2">
-                <button type="button" onclick="nbOpenBotDetail('${b.id}', 'flow')" class="px-2.5 py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition ${!isAi ? 'bg-[#ef4444] text-white shadow-sm shadow-red-950/50' : 'bg-[#160f11] text-zinc-400 hover:text-white border border-[#2b1d20]'}">
-                  <i class="fa-solid fa-list-check text-[10px]"></i>
-                  <span>Fluxo Botões</span>
-                </button>
-                <button type="button" onclick="nbOpenBotDetail('${b.id}', 'ai')" class="px-2.5 py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition ${isAi ? 'bg-[#ef4444] text-white shadow-sm shadow-red-950/50' : 'bg-[#160f11] text-zinc-400 hover:text-white border border-[#2b1d20]'}">
-                  <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
-                  <span>Fluxo de IA</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between pt-0.5" onclick="event.stopPropagation()">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">${folderLabel}</span>
-              <label class="nb-toggle">
+            <div class="flex items-center justify-between pt-2 border-t border-[#24181a]" onclick="event.stopPropagation()">
+              <span class="text-[11px] font-medium text-zinc-400">${isAct ? 'Bot ligado' : 'Bot desligado'}</span>
+              <label class="nb-toggle" title="Ligar ou desligar este bot">
                 <input type="checkbox" ${isAct ? 'checked' : ''} onchange="nbToggleBotFromCard('${b.id}', this.checked)">
                 <span class="nb-toggle-slider"></span>
               </label>
@@ -6197,7 +6175,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       }).join('');
 
       const addCardHtml = `
-        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#ef4444]/60 transition min-h-[225px] bg-[#0d090a]/60">
+        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#ef4444]/60 transition min-h-[195px] bg-[#0d090a]/60">
           <div class="w-10 h-10 rounded-xl bg-[#1a1113] border border-[#2e1e21] text-[#ef4444] flex items-center justify-center text-sm">
             <i class="fa-solid fa-plus"></i>
           </div>
@@ -6208,37 +6186,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       gridEl.innerHTML = cardsHtml + addCardHtml;
     }
 
-    function nbSelectFolder(folder) {
-      NB_SELECTED_FOLDER = folder;
-      nbRenderBotsList();
-    }
-
-    function nbOpenFolderModal() {
-      const name = prompt("Digite o nome da nova pasta para organizar seus bots:");
-      if (!name || !name.trim()) return;
-      const clean = name.trim();
-      if (!Array.isArray(STATE.bot_folders)) STATE.bot_folders = [];
-      if (!STATE.bot_folders.includes(clean)) {
-        STATE.bot_folders.push(clean);
-      }
-      NB_SELECTED_FOLDER = clean;
-      nbRenderBotsList();
-      saveFullState();
-    }
-
-    function nbPopulateFolderSelect(selectedVal = "") {
-      const sel = document.getElementById('nb-inp-bot-folder');
-      if (!sel) return;
-      const folders = STATE.bot_folders || [];
-      sel.innerHTML = `<option value="">Sem pasta</option>` + folders.map(f => `<option value="${f}" ${f === selectedVal ? 'selected' : ''}>${f}</option>`).join('');
-    }
-
     function nbOpenAddBotModal() {
       NB_EDITING_BOT_ID = null;
-      document.getElementById('nb-modal-bot-title').textContent = "Adicionar Novo Bot";
+      document.getElementById('nb-modal-bot-title').textContent = "Conectar Novo Bot";
       document.getElementById('nb-inp-bot-token').value = "";
-      nbPopulateFolderSelect("");
-      document.getElementById('nb-inp-bot-mode').value = "flow";
       document.getElementById('nb-btn-delete-bot').classList.add('hidden');
       document.getElementById('nb-modal-bot').classList.remove('hidden');
     }
@@ -6247,10 +6198,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       const b = (STATE.flow_bots || []).find(x => x.id === botId);
       if (!b) return;
       NB_EDITING_BOT_ID = botId;
-      document.getElementById('nb-modal-bot-title').textContent = `Configurar ${b.username || 'Bot'}`;
+      document.getElementById('nb-modal-bot-title').textContent = `Token de ${b.username || 'Bot'}`;
       document.getElementById('nb-inp-bot-token').value = b.token || "";
-      nbPopulateFolderSelect(b.folder || "");
-      document.getElementById('nb-inp-bot-mode').value = b.mode || "flow";
       document.getElementById('nb-btn-delete-bot').classList.toggle('hidden', (STATE.flow_bots || []).length <= 1);
       document.getElementById('nb-modal-bot').classList.remove('hidden');
     }
@@ -6265,8 +6214,6 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbSubmitBotModal() {
       const tok = document.getElementById('nb-inp-bot-token').value.trim();
-      const folder = document.getElementById('nb-inp-bot-folder').value;
-      const mode = document.getElementById('nb-inp-bot-mode').value;
       const btn = document.getElementById('nb-btn-save-bot-modal');
       btn.textContent = "Verificando...";
 
@@ -6300,12 +6247,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       let targetBotId = NB_EDITING_BOT_ID;
+      const isNewBot = !NB_EDITING_BOT_ID;
       if (NB_EDITING_BOT_ID) {
         const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
         if (b) {
           b.token = tok;
-          b.folder = folder;
-          b.mode = mode;
           if (tok) {
             b.bot_id = botInfo.bot_id;
             b.username = botInfo.username;
@@ -6321,20 +6267,19 @@ quer que eu te mostre as opções de acesso?</textarea>
           is_live: true
         });
         newBot.bot_id = botInfo.bot_id;
-        newBot.folder = folder;
-        newBot.mode = mode;
+        newBot.mode = "flow";
         STATE.flow_bots.push(newBot);
         targetBotId = newBot.id;
       }
 
       NB_CURRENT_BOT_ID = targetBotId;
-      btn.textContent = "Salvar e Abrir Seção";
+      btn.textContent = "Salvar e Conectar";
       nbCloseBotModal();
       nbSyncActiveBotToPublish();
       nbRenderBotsList();
       await saveFullState();
-      if (targetBotId) {
-        nbOpenBotDetail(targetBotId, mode);
+      if (isNewBot && targetBotId) {
+        nbOpenBotDetail(targetBotId);
       }
     }
 
@@ -6349,11 +6294,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function nbToggleBotFromCard(botId, isChecked) {
       const b = (STATE.flow_bots || []).find(x => x.id === botId);
       if (!b) return;
-      if (isChecked) {
-        b.active = true;
-      } else {
-        b.active = false;
-      }
+      b.active = Boolean(isChecked);
       nbSyncActiveBotToPublish();
       nbRenderBotsList();
       await saveFullState();
@@ -6375,15 +6316,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbSwitchMainView('bots');
     }
 
-    async function nbSwitchBotModeSection(targetMode) {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      b.mode = targetMode;
-      nbSyncActiveBotToPublish();
-      await saveFullState();
-      nbOpenBotDetail(b.id, targetMode);
-    }
-
     function nbOpenBotInAiMode(botId = null) {
       if (botId) NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
@@ -6401,26 +6333,60 @@ quer que eu te mostre as opções de acesso?</textarea>
       navigateTab('resumo');
     }
 
-    async function nbOpenBotDetail(botId, forceMode = null) {
-      NB_CURRENT_BOT_ID = botId;
+    // Ao clicar no Bot na tela inicial, abre a tela de Escolha de Modo daquele Bot:
+    function nbOpenBotDetail(botId) {
+      if (botId) NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
       if (!b) return;
 
-      if (forceMode && b.mode !== forceMode) {
-        b.mode = forceMode;
-        nbSyncActiveBotToPublish();
-        saveFullState();
-      }
+      nbSwitchMainView('modesel');
 
-      // Roteamento por Seção: Se o bot estiver em Modo IA, abre direto a Seção Fluxo de IA!
-      if (b.mode === 'ai') {
+      const uEl = document.getElementById('nb-modesel-username');
+      const idEl = document.getElementById('nb-modesel-botid');
+      if (uEl) uEl.textContent = b.username || "@bot";
+      if (idEl) idEl.textContent = `ID ${b.bot_id || ''}`;
+
+      const isAi = b.mode === 'ai';
+      const flowCard = document.getElementById('nb-modecard-flow');
+      const aiCard = document.getElementById('nb-modecard-ai');
+      const flowBadge = document.getElementById('nb-modebadge-flow');
+      const aiBadge = document.getElementById('nb-modebadge-ai');
+
+      if (flowCard) {
+        flowCard.className = `nb-card p-6 flex flex-col justify-between cursor-pointer transition group min-h-[230px] ${!isAi ? 'border-[#ef4444] ring-1 ring-[#ef4444]/40' : 'hover:border-[#ef4444]'}`;
+      }
+      if (aiCard) {
+        aiCard.className = `nb-card p-6 flex flex-col justify-between cursor-pointer transition group min-h-[230px] ${isAi ? 'border-[#ef4444] ring-1 ring-[#ef4444]/40' : 'hover:border-[#ef4444]'}`;
+      }
+      if (flowBadge) {
+        flowBadge.className = !isAi
+          ? "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ef4444] text-white"
+          : "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#1a1113] text-zinc-400 border border-[#2e1e21]";
+        flowBadge.textContent = !isAi ? "Modo Ativo" : "Selecionar";
+      }
+      if (aiBadge) {
+        aiBadge.className = isAi
+          ? "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ef4444] text-white"
+          : "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#1a1113] text-zinc-400 border border-[#2e1e21]";
+        aiBadge.textContent = isAi ? "Modo Ativo" : "Selecionar";
+      }
+    }
+
+    // Ao clicar em um dos 2 cards na tela de Modo de Operação, ativa o modo e entra na seção:
+    async function nbEnterBotSection(mode) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+
+      b.mode = mode;
+      nbSyncActiveBotToPublish();
+      saveFullState();
+
+      if (mode === 'ai') {
         nbOpenBotInAiMode(b.id);
         return;
       }
 
-      // Caso contrário, abre a Seção Fluxo de Botões (5 abas):
       nbSwitchMainView('detail');
-
       document.getElementById('nb-det-username').textContent = b.username || "@rocha7_bot";
       document.getElementById('nb-det-botid').textContent = `ID ${b.bot_id || '8686296179'}`;
       nbUpdateDetailHeaderStatus(b);
@@ -7326,6 +7292,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const views = {
         bots: document.getElementById('nb-view-bots-list'),
+        modesel: document.getElementById('nb-view-bot-mode-select'),
         detail: document.getElementById('nb-view-bot-detail'),
         dashboard: document.getElementById('nb-view-dashboard'),
         finance: document.getElementById('nb-view-finance'),
@@ -7338,7 +7305,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       ['dashboard', 'bots', 'finance', 'gateways'].forEach(k => {
         const btn = document.getElementById('nb-dock-btn-' + k);
         const dot = document.getElementById('nb-dock-dot-' + k);
-        const isAct = (view === k) || (view === 'detail' && k === 'bots');
+        const isAct = (view === k) || ((view === 'detail' || view === 'modesel') && k === 'bots');
         if (btn) {
           btn.className = isAct
             ? "w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition"
