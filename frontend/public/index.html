@@ -4577,6 +4577,53 @@ quer que eu te mostre as opções de acesso?</textarea>
       'Comprou upsell'
     ];
 
+    function escapeHtml(val) {
+      if (val === null || val === undefined) return '';
+      return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getAdminToken() {
+      try {
+        return (localStorage.getItem('RICOBOT_ADMIN_TOKEN') || '').trim();
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function setAdminToken(tok) {
+      try {
+        if (tok) localStorage.setItem('RICOBOT_ADMIN_TOKEN', tok.trim());
+      } catch (e) {}
+    }
+
+    async function adminFetch(url, options = {}) {
+      const opts = { ...options };
+      const headers = { ...(opts.headers || {}) };
+      const tok = getAdminToken();
+      if (tok) {
+        headers['X-Admin-Token'] = tok;
+        headers['Authorization'] = `Bearer ${tok}`;
+      }
+      opts.headers = headers;
+      let res = await fetch(url, opts);
+      if (res.status === 401 || res.status === 403) {
+        const entered = window.prompt('Painel protegido — digite o Token Administrativo (ADMIN_TOKEN ou backend/.admin_token):', tok || '');
+        if (entered && entered.trim()) {
+          setAdminToken(entered.trim());
+          headers['X-Admin-Token'] = entered.trim();
+          headers['Authorization'] = `Bearer ${entered.trim()}`;
+          opts.headers = headers;
+          res = await fetch(url, opts);
+        }
+      }
+      return res;
+    }
+
     function normalizeLeadStage(s) {
       if (!s || s === 'Em conversa') return 'Conversando';
       return s;
@@ -4623,18 +4670,19 @@ quer que eu te mostre as opções de acesso?</textarea>
       box.innerHTML = leads.map((l) => {
         const realIdx = allLeads.findIndex(item => String(item.telegram_id) === String(l.telegram_id));
         const normStage = normalizeLeadStage(l.stage);
+        const safeTid = escapeHtml(l.telegram_id);
         return `
           <div onclick="showLeadDetail(${realIdx})" class="rounded-xl border border-[#181c28] bg-[#07090e] p-3 cursor-pointer hover:border-[#2563eb] flex justify-between items-center gap-2 transition">
             <div class="min-w-0">
-              <p class="text-xs font-bold text-white truncate">${l.first_name} <span class="text-slate-500 font-normal">${l.username || ''}</span></p>
-              <span class="text-[11px] text-[#ef4444]">${normStage}</span>
+              <p class="text-xs font-bold text-white truncate">${escapeHtml(l.first_name)} <span class="text-slate-500 font-normal">${escapeHtml(l.username || '')}</span></p>
+              <span class="text-[11px] text-[#ef4444]">${escapeHtml(normStage)}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-[10px] text-slate-500">${l.last_interaction || ''}</span>
-              <button type="button" onclick="resetLeadHistory('${l.telegram_id}', event)" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
+              <span class="text-[10px] text-slate-500">${escapeHtml(l.last_interaction || '')}</span>
+              <button type="button" onclick="resetLeadHistory('${safeTid}', event)" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
-              <button type="button" onclick="deleteLead('${l.telegram_id}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-[10px] text-red-300 hover:text-white transition">
+              <button type="button" onclick="deleteLead('${safeTid}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-[10px] text-red-300 hover:text-white transition">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
             </div>
@@ -4663,25 +4711,26 @@ quer que eu te mostre as opções de acesso?</textarea>
         const icon = isCurrent
           ? '<i class="fa-solid fa-circle-dot text-[9px] text-emerald-400"></i>'
           : (isDone ? '<i class="fa-solid fa-check text-[9px] text-blue-400"></i>' : '<i class="fa-regular fa-circle text-[9px] text-slate-600"></i>');
-        return `<span class="px-2 py-1 rounded-lg border text-[10px] flex items-center gap-1.5 ${cls}">${icon} ${st}</span>`;
+        return `<span class="px-2 py-1 rounded-lg border text-[10px] flex items-center gap-1.5 ${cls}">${icon} ${escapeHtml(st)}</span>`;
       }).join('');
 
       const hist = (lead.history || []).map(h => `
         <div class="${h.role==='user'?'text-right':'text-left'}">
-          <span class="inline-block px-3 py-1.5 rounded-xl text-xs ${h.role==='user'?'bg-purple-600 text-white':'bg-[#171721] text-zinc-200'}">${h.content}</span>
+          <span class="inline-block px-3 py-1.5 rounded-xl text-xs ${h.role==='user'?'bg-purple-600 text-white':'bg-[#171721] text-zinc-200'}">${escapeHtml(h.content)}</span>
         </div>
       `).join('');
+      const safeTid = escapeHtml(lead.telegram_id);
       box.innerHTML = `
         <div class="border-b border-[#1c1c26] pb-3 flex justify-between items-center gap-3 flex-wrap">
           <div>
-            <h4 class="text-sm font-bold text-white">${lead.first_name} (${lead.username})</h4>
-            <p class="text-[11px] text-zinc-400">Telegram ID: ${lead.telegram_id} • Etapa atual: <strong class="text-emerald-400">${currStage}</strong></p>
+            <h4 class="text-sm font-bold text-white">${escapeHtml(lead.first_name)} (${escapeHtml(lead.username)})</h4>
+            <p class="text-[11px] text-zinc-400">Telegram ID: ${safeTid} • Etapa atual: <strong class="text-emerald-400">${escapeHtml(currStage)}</strong></p>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="resetLeadHistory('${lead.telegram_id}', event)" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
+            <button type="button" onclick="resetLeadHistory('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
               <i class="fa-solid fa-rotate-left text-[11px]"></i> Reiniciar conversa
             </button>
-            <button type="button" onclick="deleteLead('${lead.telegram_id}', event)" class="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-xs font-bold text-red-300 flex items-center gap-1.5 transition">
+            <button type="button" onclick="deleteLead('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-xs font-bold text-red-300 flex items-center gap-1.5 transition">
               <i class="fa-regular fa-trash-can text-[11px]"></i> Excluir conversa
             </button>
           </div>
@@ -4695,11 +4744,11 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="grid grid-cols-2 gap-2.5 pt-1">
             <div class="rounded-xl border border-[#181c28] bg-[#07090e] px-3 py-2">
               <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Preferências</p>
-              <p class="text-xs text-slate-200 mt-0.5">${lead.preferences || 'Iniciou conversa no bot'}</p>
+              <p class="text-xs text-slate-200 mt-0.5">${escapeHtml(lead.preferences || 'Iniciou conversa no bot')}</p>
             </div>
             <div class="rounded-xl border border-[#181c28] bg-[#07090e] px-3 py-2">
               <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Objeções</p>
-              <p class="text-xs text-slate-200 mt-0.5">${lead.objections || 'Nenhuma identificada'}</p>
+              <p class="text-xs text-slate-200 mt-0.5">${escapeHtml(lead.objections || 'Nenhuma identificada')}</p>
             </div>
           </div>
         </div>
@@ -4723,7 +4772,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       saveLocalBackup();
       renderMemoryLeads();
       try {
-        const res = await fetch(`/api/leads/${encodeURIComponent(telegramId)}/reset`, { method: 'POST' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}/reset`, { method: 'POST' });
         if (res.ok) {
           const data = await res.json();
           if (data.state) STATE = data.state;
@@ -4745,7 +4794,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderMemoryLeads();
       renderLearningKpis();
       try {
-        const res = await fetch(`/api/leads/${encodeURIComponent(telegramId)}`, { method: 'DELETE' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}`, { method: 'DELETE' });
         if (res.ok) {
           const data = await res.json();
           if (data.state) STATE = data.state;
@@ -4768,7 +4817,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderMemoryLeads();
       renderLearningKpis();
       try {
-        const res = await fetch('/api/leads', { method: 'DELETE' });
+        const res = await adminFetch('/api/leads', { method: 'DELETE' });
         if (res.ok) {
           const data = await res.json();
           if (data.state) STATE = data.state;
@@ -4853,8 +4902,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         } else {
           elObjBox.innerHTML = `<div class="space-y-1.5 pt-1">${objections.slice(0, 4).map(o => `
             <div class="flex justify-between items-center text-xs">
-              <span class="text-slate-200 truncate pr-2">${o.name}</span>
-              <span class="px-2 py-0.5 rounded-md bg-[#141824] border border-[#232a3d] text-[10px] font-bold text-amber-400 shrink-0">${o.count}x</span>
+              <span class="text-slate-200 truncate pr-2">${escapeHtml(o.name)}</span>
+              <span class="px-2 py-0.5 rounded-md bg-[#141824] border border-[#232a3d] text-[10px] font-bold text-amber-400 shrink-0">${Number(o.count || 0)}x</span>
             </div>
           `).join('')}</div>`;
         }
@@ -4879,8 +4928,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         } else {
           elPlansBox.innerHTML = `<div class="space-y-1.5 pt-1">${topPlans.slice(0, 4).map(p => `
             <div class="flex justify-between items-center text-xs">
-              <span class="text-slate-200 truncate pr-2">${p.name}</span>
-              <span class="px-2 py-0.5 rounded-md bg-emerald-950/50 border border-emerald-800/40 text-[10px] font-bold text-emerald-300 shrink-0">${p.count}x</span>
+              <span class="text-slate-200 truncate pr-2">${escapeHtml(p.name)}</span>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-950/50 border border-emerald-800/40 text-[10px] font-bold text-emerald-300 shrink-0">${Number(p.count || 0)}x</span>
             </div>
           `).join('')}</div>`;
         }
@@ -5037,7 +5086,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> Testando...`;
       const box = document.getElementById('full-sim-messages');
       try {
-        const res = await fetch('/api/diagnostics', {
+        const res = await adminFetch('/api/diagnostics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: STATE })
@@ -5046,17 +5095,17 @@ quer que eu te mostre as opções de acesso?</textarea>
         const rows = (data.checks || []).map(c => `
           <div class="p-2.5 rounded-xl bg-[#0b0d14] border border-[#1e2333] space-y-1">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-white">${c.name}</span>
+              <span class="text-xs font-bold text-white">${escapeHtml(c.name)}</span>
               <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${c.ok ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/50' : 'bg-amber-950/70 text-amber-300 border border-amber-800/50'}">${c.ok ? 'OK ✓' : 'AVISO'}</span>
             </div>
-            <p class="text-[11px] text-slate-300 leading-relaxed">${c.detail}</p>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(c.detail)}</p>
           </div>
         `).join('');
         box.innerHTML += `
           <div class="rounded-2xl border border-emerald-700/40 bg-[#0d121d] p-4 space-y-2.5">
             <div class="flex items-center justify-between border-b border-[#1e2333] pb-2">
               <span class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-circle-check mr-1"></i> Diagnóstico Completo da Persona & Integrações</span>
-              <span class="text-[10px] text-slate-400">Bot: ${data.bot_running ? 'ONLINE (' + (data.bot_username || '') + ')' : 'PAUSADO'} • ${data.gateway_msg || ''}</span>
+              <span class="text-[10px] text-slate-400">Bot: ${data.bot_running ? 'ONLINE (' + escapeHtml(data.bot_username || '') + ')' : 'PAUSADO'} • ${escapeHtml(data.gateway_msg || '')}</span>
             </div>
             <div class="space-y-2">${rows}</div>
           </div>
@@ -5077,7 +5126,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('full-sim-messages');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#dc2626] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]">${text}</div>
+          <div class="bg-[#dc2626] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]]">${escapeHtml(text)}</div>
         </div>
       `;
       input.value = '';
@@ -5086,7 +5135,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       TEST_HISTORY.push({ role: "user", content: text });
 
       try {
-        const res = await fetch("/api/simulate-chat", {
+        const res = await adminFetch("/api/simulate-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, history: TEST_HISTORY, state: STATE })
@@ -5098,16 +5147,16 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (data.media) {
           extraHtml += `
             <div class="mt-2 rounded-xl overflow-hidden border border-purple-500/30 max-w-[220px]">
-              <img src="${data.media.url}" class="w-full h-36 object-cover">
-              <div class="p-2 bg-[#12121a] text-[10px] text-purple-300">📸 Mídia enviada: ${data.media.name}</div>
+              <img src="${escapeHtml(data.media.url)}" class="w-full h-36 object-cover">
+              <div class="p-2 bg-[#12121a] text-[10px] text-purple-300">📸 Mídia enviada: ${escapeHtml(data.media.name)}</div>
             </div>
           `;
         }
         if (data.offer_card) {
           extraHtml += `
             <div class="mt-2">
-              <button onclick="triggerPixCheckout('${data.offer_card.name}', ${data.offer_card.price})" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2">
-                <span>${data.offer_card.emoji || '💎'} Liberar ${data.offer_card.name} — R$ ${Number(data.offer_card.price).toFixed(2)}</span>
+              <button onclick="triggerPixCheckout('${escapeHtml(data.offer_card.name)}', ${Number(data.offer_card.price)})" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2">
+                <span>${escapeHtml(data.offer_card.emoji || '💎')} Liberar ${escapeHtml(data.offer_card.name)} — R$ ${Number(data.offer_card.price).toFixed(2)}</span>
               </button>
             </div>
           `;
@@ -5115,7 +5164,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
         box.innerHTML += `
           <div class="space-y-1">
-            <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-4 py-2.5 rounded-2xl text-xs w-fit max-w-[80%] whitespace-pre-line">${data.reply}</div>
+            <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-4 py-2.5 rounded-2xl text-xs w-fit max-w-[80%] whitespace-pre-line">${escapeHtml(data.reply)}</div>
             ${extraHtml}
           </div>
         `;
@@ -5134,21 +5183,21 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('preview-chat-bubbles');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#dc2626] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${text}</div>
+          <div class="bg-[#dc2626] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${escapeHtml(text)}</div>
         </div>
       `;
       inp.value = '';
       box.scrollTop = box.scrollHeight;
 
       try {
-        const res = await fetch("/api/simulate-chat", {
+        const res = await adminFetch("/api/simulate-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, history: TEST_HISTORY, state: STATE })
         });
         const data = await res.json();
         box.innerHTML += `
-          <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] whitespace-pre-line">${data.reply}</div>
+          <div class="bg-[#12151f] border border-[#1e2333] text-slate-100 px-3 py-2 rounded-2xl rounded-tl-sm text-xs w-fit max-w-[85%] whitespace-pre-line">${escapeHtml(data.reply)}</div>
         `;
         box.scrollTop = box.scrollHeight;
       } catch (err) {}
@@ -5156,7 +5205,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function triggerPixCheckout(offerName, amount) {
       const box = document.getElementById('full-sim-messages');
-      const res = await fetch("/api/create-pix", {
+      const res = await adminFetch("/api/create-pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ offer_name: offerName, amount: amount })
@@ -5165,7 +5214,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       box.innerHTML += `
         <div class="sb-subcard p-3.5 max-w-[85%] border-emerald-500/40 space-y-2">
           <span class="text-[10px] font-bold uppercase text-emerald-400 block">PIX COPIA E COLA GERADO (${data.real ? (data.provider === 'syncpay' ? 'SYNC PAY REAL' : 'GATEWAY PIX REAL') : 'MODO TESTE'})</span>
-          <input type="text" readonly value="${data.qr_code}" class="sb-input !text-[10px] font-mono">
+          <input type="text" readonly value="${escapeHtml(data.qr_code || '')}" class="sb-input !text-[10px] font-mono">
           <p class="text-[10px] text-zinc-400">Assim que o pagamento é confirmado, o bot entrega o link único do VIP e agenda o Upsell!</p>
         </div>
       `;
@@ -5687,164 +5736,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       };
     }
 
-    async function startBrowserTelegramFallbackIfNeeded() {
-      // Desativado para evitar conflito (TelegramConflictError) com o backend rodando na VPS
-      return;
-      if (BACKEND_ONLINE) return; // Se o backend Python (Render) está ativo, o servidor cuida do polling 24/7
-      const token = (STATE.publish?.bot_token || '').trim();
-      if (!token || !token.includes(':') || !STATE.publish?.is_live) {
-        BROWSER_POLL_ACTIVE_TOKEN = "";
-        return;
-      }
-      if (BROWSER_POLL_ACTIVE_TOKEN === token) return;
-      BROWSER_POLL_ACTIVE_TOKEN = token;
-
-      try {
-        await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=false`);
-      } catch (e) {}
-
-      const pollLoop = async () => {
-        if (BACKEND_ONLINE || BROWSER_POLL_ACTIVE_TOKEN !== token || !STATE.publish?.is_live) return;
-        try {
-          const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${BROWSER_POLL_OFFSET}&timeout=10`);
-          const data = await res.json();
-          if (data && data.ok && Array.isArray(data.result)) {
-            for (const upd of data.result) {
-              BROWSER_POLL_OFFSET = upd.update_id + 1;
-              handleBrowserTelegramUpdate(token, upd);
-            }
-          }
-        } catch (err) {}
-        if (!BACKEND_ONLINE && BROWSER_POLL_ACTIVE_TOKEN === token && STATE.publish?.is_live) {
-          BROWSER_POLL_TIMER = setTimeout(pollLoop, 1200);
-        }
-      };
-      pollLoop();
-    }
-
-    async function handleBrowserTelegramUpdate(token, upd) {
-      const apiBase = `https://api.telegram.org/bot${token}`;
-      if (upd.message && upd.message.text) {
-        const chatId = upd.message.chat.id;
-        const text = upd.message.text.trim();
-        const user = upd.message.from || {};
-
-        // Registra lead na memória
-        if (!STATE.memory) STATE.memory = { leads: [] };
-        let lead = STATE.memory.leads.find(l => String(l.telegram_id) === String(user.id));
-        if (!lead) {
-          lead = {
-            telegram_id: String(user.id || chatId),
-            first_name: user.first_name || 'Visitante',
-            username: user.username ? `@${user.username}` : 'Sem @user',
-            stage: 'Conversando',
-            last_interaction: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            history: []
-          };
-          STATE.memory.leads.unshift(lead);
-          STATE.learning.evaluated_results = STATE.memory.leads.length;
-        }
-
-        if (text.startsWith('/start') || ['/reset', '/reiniciar', '/limpar'].includes(text.toLowerCase())) {
-          lead.history = [];
-          lead.stage = 'Conversando';
-          const rawOpen = STATE.style?.opening_messages || ['oii 💜', 'chegou agora por aqui?'];
-          const lines = Array.isArray(rawOpen) ? rawOpen : String(rawOpen).split('\n').filter(Boolean);
-          for (const line of (lines.length ? lines : ['oii 💜', 'chegou agora por aqui?'])) {
-            await fetch(`${apiBase}/sendChatAction`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) });
-            await new Promise(r => setTimeout(r, 900));
-            await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: line }) });
-            lead.history.push({ role: 'assistant', content: line });
-          }
-          saveLocalBackup();
-          return;
-        }
-
-        lead.history.push({ role: 'user', content: text });
-        await fetch(`${apiBase}/sendChatAction`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, action: 'typing' }) });
-        await new Promise(r => setTimeout(r, 1100));
-
-        const aiRes = await browserGenerateAiReply(STATE, lead.history, text);
-        if (aiRes.media && aiRes.media.url && aiRes.media.url.startsWith('http')) {
-          try {
-            await fetch(`${apiBase}/sendPhoto`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ chat_id: chatId, photo: aiRes.media.url, caption: aiRes.media.caption || undefined, has_spoiler: !!aiRes.media.spoiler })
-            });
-          } catch (e) {}
-        }
-
-        const payload = { chat_id: chatId, text: aiRes.reply };
-        const offers = (STATE.business?.offers || []).filter(o => o.visible !== false);
-        if (aiRes.offer_card || offers.length) {
-          const listToShow = aiRes.offer_card ? [aiRes.offer_card] : offers;
-          if (aiRes.offer_card) {
-            payload.reply_markup = {
-              inline_keyboard: listToShow.map((o, i) => ([{
-                text: `${o.emoji || '💎'} ${o.name || 'Acesso VIP'} — R$ ${Number(o.price || 19.90).toFixed(2).replace('.', ',')}`,
-                callback_data: `buy:${o.id || 'o' + i}:${Number(o.price || 19.90).toFixed(2)}`
-              }]))
-            };
-          }
-        }
-
-        await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        lead.history.push({ role: 'assistant', content: aiRes.reply });
-        saveLocalBackup();
-      } else if (upd.callback_query) {
-        const cb = upd.callback_query;
-        const chatId = cb.message?.chat?.id;
-        const data = cb.data || '';
-        await fetch(`${apiBase}/answerCallbackQuery`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: cb.id }) });
-
-        if (data.startsWith('buy:')) {
-          const parts = data.split(':');
-          const price = parseFloat(parts[2] || '19.90');
-          const cents = Math.round(price * 100);
-          let pixCode = `00020126580014br.gov.bcb.pix0136sharkbot-${cents}5204000053039865405${price.toFixed(2)}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD`;
-          const gwToken = (STATE.publish?.pushin_pay_token || '').trim();
-          if (gwToken && (STATE.publish?.gateway_provider || 'pushinpay') === 'pushinpay') {
-            try {
-              const r = await fetch('https://api.pushinpay.com.br/api/pix/cashIn', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${gwToken}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ value: cents })
-              });
-              const d = await r.json();
-              if (d.qr_code) pixCode = d.qr_code;
-            } catch (e) {}
-          }
-          await fetch(`${apiBase}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: chatId,
-              text: `🔒 <b>Pagamento Seguro via PIX</b>\n\nValor: <b>R$ ${price.toFixed(2).replace('.', ',')}</b>\n\nCopie o código PIX Copia e Cola abaixo e pague no app do seu banco:\n\n<code>${pixCode}</code>\n\nAssim que concluir, clique abaixo para liberar seu acesso:`,
-              parse_mode: 'HTML',
-              reply_markup: { inline_keyboard: [[{ text: '✅ Já paguei / Liberar acesso', callback_data: 'checkpix:ok' }]] }
-            })
-          });
-        } else if (data.startsWith('checkpix:')) {
-          const dest = (STATE.publish?.delivery_destination || 'https://t.me/+link_exclusivo_vip').trim();
-          if (STATE.publish?.delivery_type === 'Mensagem no bot' && !dest.startsWith('http')) {
-            await fetch(`${apiBase}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: `💜 Pagamento confirmado!\n\n${dest}` }) });
-          } else {
-            await fetch(`${apiBase}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: `💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:`,
-                parse_mode: 'HTML',
-                reply_markup: { inline_keyboard: [[{ text: '🔥 ENTRAR NO MEU VIP AGORA', url: dest.startsWith('http') ? dest : 'https://t.me/' }]] }
-              })
-            });
-          }
-        }
-      }
-    }
-
     async function saveFullState() {
       STATE.account.ai_provider = document.getElementById('sel-ai-provider').value;
       STATE.account.ai_api_key = document.getElementById('inp-ai-key').value;
@@ -5872,7 +5763,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       saveLocalBackup();
 
       try {
-        const res = await fetch("/api/state", {
+        const res = await adminFetch("/api/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(STATE)
@@ -5891,7 +5782,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       } finally {
         syncStateToInputs();
         markSaved();
-        startBrowserTelegramFallbackIfNeeded();
         btn.innerHTML = `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`;
       }
     }
@@ -5904,32 +5794,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (e) {}
 
       try {
-        const res = await fetch("/api/state");
+        const res = await adminFetch("/api/state");
         if (res.ok) {
           BACKEND_ONLINE = true;
           const serverState = await res.json();
           const mergedProfiles = getMergedSavedProfiles(serverState.saved_profiles);
-          const localTs = Number(localBackup?.updated_at_ms || 0);
-          const serverTs = Number(serverState?.updated_at_ms || 0);
-
-          // Se o Render reiniciou (voltou para o seed sem updated_at_ms ou com timestamp mais antigo que o navegador),
-          // restaura automaticamente a configuração salva no navegador e reenvia para o Render!
-          if (localBackup && (localTs > serverTs || (localBackup.publish?.bot_token && !serverState.publish?.bot_token))) {
-            STATE = { ...serverState, ...localBackup, saved_profiles: mergedProfiles };
-            if (Array.isArray(serverState.memory?.leads) && serverState.memory.leads.length > (localBackup.memory?.leads?.length || 0)) {
-              STATE.memory = serverState.memory;
-              STATE.learning = serverState.learning || STATE.learning;
-            }
-            saveLocalBackup();
-            await fetch("/api/state", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(STATE)
-            });
-          } else {
-            STATE = { ...STATE, ...serverState, saved_profiles: mergedProfiles };
-            saveLocalBackup();
-          }
+          STATE = { ...STATE, ...serverState, saved_profiles: mergedProfiles };
+          saveLocalBackup();
         }
       } catch (e) {
         BACKEND_ONLINE = false;
@@ -5949,7 +5820,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       syncStateToInputs();
       nbInitNeurotBot();
       markSaved();
-      startBrowserTelegramFallbackIfNeeded();
     }
 
     // =========================================================
@@ -6214,7 +6084,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       if (tok) {
         try {
-          const r = await fetch("/api/flow-bots/verify-token", {
+          const r = await adminFetch("/api/flow-bots/verify-token", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token: tok })
@@ -6700,7 +6570,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!b) return;
       const chId = b.fallback_delivery?.channel_id || "-1003939135982";
       try {
-        const res = await fetch("/api/flow-bots/verify-channel", {
+        const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
@@ -6728,7 +6598,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!b || !b.plans[idx]) return;
       const chId = b.plans[idx].delivery_channel_id || "-1003939135982";
       try {
-        const res = await fetch("/api/flow-bots/verify-channel", {
+        const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
@@ -7301,12 +7171,12 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="flex items-center gap-3">
                 <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <div>
-                  <span class="font-bold text-white">${l.first_name || 'Lead'}</span>
-                  <span class="text-zinc-500 ml-1">${l.username || ''}</span>
-                  <span class="ml-2 px-2 py-0.5 rounded bg-[#1c1114] border border-[#331d21] text-[10px] text-zinc-300">${l.stage || 'Iniciou /start'}</span>
+                  <span class="font-bold text-white">${escapeHtml(l.first_name || 'Lead')}</span>
+                  <span class="text-zinc-500 ml-1">${escapeHtml(l.username || '')}</span>
+                  <span class="ml-2 px-2 py-0.5 rounded bg-[#1c1114] border border-[#331d21] text-[10px] text-zinc-300">${escapeHtml(l.stage || 'Iniciou /start')}</span>
                 </div>
               </div>
-              <span class="text-zinc-500 font-mono text-[11px]">${l.last_interaction || 'agora'}</span>
+              <span class="text-zinc-500 font-mono text-[11px]">${escapeHtml(l.last_interaction || 'agora')}</span>
             </div>
           `).join('');
         }

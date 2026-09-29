@@ -1,0 +1,29 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+.admin_token
+backend/.admin_token
+
+# Databases & local backups
+*.db
+*.db-journal
+*.db-wal
+*.sqlite
+*.sqlite3
+state_backup.json
+
+# Python bytecode & virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# OS & editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
