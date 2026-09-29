@@ -230,70 +230,6 @@
       </div>
 
       <!-- =====================================================
-           TELA 1.5: SELEÇÃO DE MODO DO BOT (ABRE AO CLICAR NO BOT)
-      ====================================================== -->
-      <div id="nb-view-bot-mode-select" class="hidden max-w-[860px] mx-auto px-8 pt-10 space-y-6">
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
-              <i class="fa-solid fa-chevron-left text-[10px]"></i>
-              <span>Voltar</span>
-            </button>
-            <h2 id="nb-modesel-username" class="text-xl font-bold text-white">@bot</h2>
-            <span id="nb-modesel-botid" class="text-xs text-zinc-500 font-mono">ID</span>
-          </div>
-        </div>
-
-        <div>
-          <span class="text-[10px] font-bold uppercase tracking-widest text-[#ef4444] block">MODO DE OPERAÇÃO</span>
-          <h3 class="text-lg font-bold text-white mt-1">Escolha como este bot vai atender no Telegram</h3>
-          <p class="text-xs text-zinc-400 mt-1">Selecione abaixo a seção que deseja configurar e ativar neste bot.</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-          <!-- CARD 1: FLUXO DE BOTÕES -->
-          <div id="nb-modecard-flow" onclick="nbEnterBotSection('flow')" class="nb-card p-6 flex flex-col justify-between cursor-pointer hover:border-[#ef4444] transition group min-h-[230px]">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <div class="w-11 h-11 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-base">
-                  <i class="fa-solid fa-list-check"></i>
-                </div>
-                <span id="nb-modebadge-flow" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"></span>
-              </div>
-              <h4 class="text-base font-bold text-white group-hover:text-[#ef4444] transition">Fluxo de Botões</h4>
-              <p class="text-xs text-zinc-400 leading-relaxed">
-                Envia boas-vindas com mídia e botões de planos logo no /start, seguido de Order Bump, Downsell automático e PIX direto.
-              </p>
-            </div>
-            <div class="pt-5 mt-4 border-t border-[#24181a] flex items-center justify-between">
-              <span class="text-xs font-bold text-white group-hover:text-[#ef4444] transition">Configurar Fluxo de Botões</span>
-              <i class="fa-solid fa-arrow-right text-xs text-[#ef4444]"></i>
-            </div>
-          </div>
-
-          <!-- CARD 2: FLUXO DE IA -->
-          <div id="nb-modecard-ai" onclick="nbEnterBotSection('ai')" class="nb-card p-6 flex flex-col justify-between cursor-pointer hover:border-[#ef4444] transition group min-h-[230px]">
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <div class="w-11 h-11 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-base">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i>
-                </div>
-                <span id="nb-modebadge-ai" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"></span>
-              </div>
-              <h4 class="text-base font-bold text-white group-hover:text-[#ef4444] transition">Fluxo de IA Conversacional</h4>
-              <p class="text-xs text-zinc-400 leading-relaxed">
-                Atendimento humanizado em 1ª pessoa com Inteligência Artificial, envio de prévias e mídias na conversa, negociação e fechamento PIX.
-              </p>
-            </div>
-            <div class="pt-5 mt-4 border-t border-[#24181a] flex items-center justify-between">
-              <span class="text-xs font-bold text-white group-hover:text-[#ef4444] transition">Configurar Fluxo de IA</span>
-              <i class="fa-solid fa-arrow-right text-xs text-[#ef4444]"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- =====================================================
            TELA 2: GERENCIAR FLUXO DE BOTÕES DO BOT
       ====================================================== -->
       <div id="nb-view-bot-detail" class="hidden max-w-[1020px] mx-auto px-8 pt-8 space-y-6">
@@ -301,7 +237,7 @@
         <!-- CABEÇALHO DO BOT (< Voltar  @rocha7_bot  ID ...  • ativo) -->
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
-            <button onclick="nbOpenBotDetail(NB_CURRENT_BOT_ID)" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
+            <button onclick="nbBackToBotsList()" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 transition mr-1">
               <i class="fa-solid fa-chevron-left text-[10px]"></i>
               <span>Voltar</span>
             </button>
@@ -1247,17 +1183,39 @@
       </div>
     </div>
 
-    <!-- MODAL: ADICIONAR / EDITAR BOT -->
+    <!-- MODAL: ADICIONAR / EDITAR BOT (3 PONTINHOS DO BOT) -->
     <div id="nb-modal-bot" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#382125]">
         <div class="flex items-center justify-between">
-          <h3 id="nb-modal-bot-title" class="text-sm font-bold text-white">Conectar Bot do Telegram</h3>
+          <h3 id="nb-modal-bot-title" class="text-sm font-bold text-white">Configurar Bot</h3>
           <button onclick="nbCloseBotModal()" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="space-y-3">
+        <div class="space-y-4">
           <div>
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">TOKEN DO BOT (@BotFather) *</label>
             <input type="text" id="nb-inp-bot-token" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MODO DE OPERAÇÃO DO BOT</label>
+            <input type="hidden" id="nb-inp-bot-mode" value="flow">
+            <div class="grid grid-cols-2 gap-2.5">
+              <button type="button" id="nb-modal-modebtn-flow" onclick="nbSelectModalBotMode('flow')" class="p-3 rounded-xl border text-left transition flex flex-col gap-1">
+                <div class="flex items-center justify-between">
+                  <i class="fa-solid fa-list-check text-xs text-[#ef4444]"></i>
+                  <span id="nb-modal-modedot-flow" class="w-2 h-2 rounded-full"></span>
+                </div>
+                <span class="text-xs font-bold text-white block mt-1">Fluxo de Botões</span>
+                <span class="text-[10px] text-zinc-400 leading-tight">Planos, Order Bump e Downsell em botões</span>
+              </button>
+              <button type="button" id="nb-modal-modebtn-ai" onclick="nbSelectModalBotMode('ai')" class="p-3 rounded-xl border text-left transition flex flex-col gap-1">
+                <div class="flex items-center justify-between">
+                  <i class="fa-solid fa-wand-magic-sparkles text-xs text-[#ef4444]"></i>
+                  <span id="nb-modal-modedot-ai" class="w-2 h-2 rounded-full"></span>
+                </div>
+                <span class="text-xs font-bold text-white block mt-1">Fluxo de IA</span>
+                <span class="text-[10px] text-zinc-400 leading-tight">Conversa humanizada em 1ª pessoa + PIX</span>
+              </button>
+            </div>
           </div>
         </div>
         <div class="flex items-center justify-between pt-2">
@@ -1266,7 +1224,7 @@
           </button>
           <div class="flex items-center gap-2 ml-auto">
             <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300 hover:text-white">Cancelar</button>
-            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar e Conectar</button>
+            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar</button>
           </div>
         </div>
       </div>
@@ -1313,7 +1271,7 @@
   <!-- TOP HEADER BAR RICOBOT (SEÇÃO FLUXO DE IA DO BOT) -->
   <header class="h-16 bg-[#090707] border-b border-[#24181a] px-5 flex items-center justify-between shrink-0 z-20 gap-3">
     <div class="flex items-center gap-3.5">
-      <button onclick="nbOpenBotDetail(NB_CURRENT_BOT_ID)" title="Voltar para o Bot" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
+      <button onclick="nbBackToBotsList()" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
         <i class="fa-solid fa-chevron-left text-xs text-[#ef4444]"></i>
         <span>Voltar</span>
       </button>
@@ -6186,10 +6144,39 @@ quer que eu te mostre as opções de acesso?</textarea>
       gridEl.innerHTML = cardsHtml + addCardHtml;
     }
 
+    function nbSelectModalBotMode(mode) {
+      const m = mode === 'ai' ? 'ai' : 'flow';
+      const inp = document.getElementById('nb-inp-bot-mode');
+      if (inp) inp.value = m;
+
+      const btnFlow = document.getElementById('nb-modal-modebtn-flow');
+      const btnAi = document.getElementById('nb-modal-modebtn-ai');
+      const dotFlow = document.getElementById('nb-modal-modedot-flow');
+      const dotAi = document.getElementById('nb-modal-modedot-ai');
+
+      if (btnFlow) {
+        btnFlow.className = m === 'flow'
+          ? "p-3 rounded-xl border border-[#ef4444] bg-[#211013]/80 ring-1 ring-[#ef4444]/40 text-left transition flex flex-col gap-1"
+          : "p-3 rounded-xl border border-[#2b1d20] bg-[#120c0e] hover:border-[#ef4444]/50 text-left transition flex flex-col gap-1";
+      }
+      if (btnAi) {
+        btnAi.className = m === 'ai'
+          ? "p-3 rounded-xl border border-[#ef4444] bg-[#211013]/80 ring-1 ring-[#ef4444]/40 text-left transition flex flex-col gap-1"
+          : "p-3 rounded-xl border border-[#2b1d20] bg-[#120c0e] hover:border-[#ef4444]/50 text-left transition flex flex-col gap-1";
+      }
+      if (dotFlow) {
+        dotFlow.className = m === 'flow' ? "w-2.5 h-2.5 rounded-full bg-[#ef4444]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
+      }
+      if (dotAi) {
+        dotAi.className = m === 'ai' ? "w-2.5 h-2.5 rounded-full bg-[#ef4444]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
+      }
+    }
+
     function nbOpenAddBotModal() {
       NB_EDITING_BOT_ID = null;
       document.getElementById('nb-modal-bot-title').textContent = "Conectar Novo Bot";
       document.getElementById('nb-inp-bot-token').value = "";
+      nbSelectModalBotMode('flow');
       document.getElementById('nb-btn-delete-bot').classList.add('hidden');
       document.getElementById('nb-modal-bot').classList.remove('hidden');
     }
@@ -6198,8 +6185,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       const b = (STATE.flow_bots || []).find(x => x.id === botId);
       if (!b) return;
       NB_EDITING_BOT_ID = botId;
-      document.getElementById('nb-modal-bot-title').textContent = `Token de ${b.username || 'Bot'}`;
+      document.getElementById('nb-modal-bot-title').textContent = `Configurar ${b.username || 'Bot'}`;
       document.getElementById('nb-inp-bot-token').value = b.token || "";
+      nbSelectModalBotMode(b.mode || 'flow');
       document.getElementById('nb-btn-delete-bot').classList.toggle('hidden', (STATE.flow_bots || []).length <= 1);
       document.getElementById('nb-modal-bot').classList.remove('hidden');
     }
@@ -6214,8 +6202,9 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbSubmitBotModal() {
       const tok = document.getElementById('nb-inp-bot-token').value.trim();
+      const mode = (document.getElementById('nb-inp-bot-mode')?.value === 'ai') ? 'ai' : 'flow';
       const btn = document.getElementById('nb-btn-save-bot-modal');
-      btn.textContent = "Verificando...";
+      btn.textContent = "Salvando...";
 
       let botInfo = {
         bot_id: tok.includes(":") ? tok.split(":")[0] : String(Math.floor(1000000000 + Math.random() * 900000000)),
@@ -6247,11 +6236,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       let targetBotId = NB_EDITING_BOT_ID;
-      const isNewBot = !NB_EDITING_BOT_ID;
       if (NB_EDITING_BOT_ID) {
         const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
         if (b) {
           b.token = tok;
+          b.mode = mode;
           if (tok) {
             b.bot_id = botInfo.bot_id;
             b.username = botInfo.username;
@@ -6267,20 +6256,17 @@ quer que eu te mostre as opções de acesso?</textarea>
           is_live: true
         });
         newBot.bot_id = botInfo.bot_id;
-        newBot.mode = "flow";
+        newBot.mode = mode;
         STATE.flow_bots.push(newBot);
         targetBotId = newBot.id;
       }
 
       NB_CURRENT_BOT_ID = targetBotId;
-      btn.textContent = "Salvar e Conectar";
+      btn.textContent = "Salvar";
       nbCloseBotModal();
       nbSyncActiveBotToPublish();
       nbRenderBotsList();
       await saveFullState();
-      if (isNewBot && targetBotId) {
-        nbOpenBotDetail(targetBotId);
-      }
     }
 
     async function nbDeleteEditingBot() {
@@ -6333,55 +6319,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       navigateTab('resumo');
     }
 
-    // Ao clicar no Bot na tela inicial, abre a tela de Escolha de Modo daquele Bot:
+    // Ao clicar no Bot na tela inicial, abre DIRETO o modo que está definido nos 3 pontinhos:
     function nbOpenBotDetail(botId) {
       if (botId) NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
       if (!b) return;
 
-      nbSwitchMainView('modesel');
-
-      const uEl = document.getElementById('nb-modesel-username');
-      const idEl = document.getElementById('nb-modesel-botid');
-      if (uEl) uEl.textContent = b.username || "@bot";
-      if (idEl) idEl.textContent = `ID ${b.bot_id || ''}`;
-
-      const isAi = b.mode === 'ai';
-      const flowCard = document.getElementById('nb-modecard-flow');
-      const aiCard = document.getElementById('nb-modecard-ai');
-      const flowBadge = document.getElementById('nb-modebadge-flow');
-      const aiBadge = document.getElementById('nb-modebadge-ai');
-
-      if (flowCard) {
-        flowCard.className = `nb-card p-6 flex flex-col justify-between cursor-pointer transition group min-h-[230px] ${!isAi ? 'border-[#ef4444] ring-1 ring-[#ef4444]/40' : 'hover:border-[#ef4444]'}`;
-      }
-      if (aiCard) {
-        aiCard.className = `nb-card p-6 flex flex-col justify-between cursor-pointer transition group min-h-[230px] ${isAi ? 'border-[#ef4444] ring-1 ring-[#ef4444]/40' : 'hover:border-[#ef4444]'}`;
-      }
-      if (flowBadge) {
-        flowBadge.className = !isAi
-          ? "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ef4444] text-white"
-          : "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#1a1113] text-zinc-400 border border-[#2e1e21]";
-        flowBadge.textContent = !isAi ? "Modo Ativo" : "Selecionar";
-      }
-      if (aiBadge) {
-        aiBadge.className = isAi
-          ? "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#ef4444] text-white"
-          : "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#1a1113] text-zinc-400 border border-[#2e1e21]";
-        aiBadge.textContent = isAi ? "Modo Ativo" : "Selecionar";
-      }
-    }
-
-    // Ao clicar em um dos 2 cards na tela de Modo de Operação, ativa o modo e entra na seção:
-    async function nbEnterBotSection(mode) {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-
-      b.mode = mode;
-      nbSyncActiveBotToPublish();
-      saveFullState();
-
-      if (mode === 'ai') {
+      if (b.mode === 'ai') {
         nbOpenBotInAiMode(b.id);
         return;
       }
