@@ -5352,6 +5352,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function startBrowserTelegramFallbackIfNeeded() {
+      // Desativado para evitar conflito (TelegramConflictError) com o backend rodando na VPS
+      return;
       if (BACKEND_ONLINE) return; // Se o backend Python (Render) está ativo, o servidor cuida do polling 24/7
       const token = (STATE.publish?.bot_token || '').trim();
       if (!token || !token.includes(':') || !STATE.publish?.is_live) {

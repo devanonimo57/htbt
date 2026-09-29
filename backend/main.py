@@ -281,6 +281,12 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
         pub["bot_username"] = active_fb.get("username", pub.get("bot_username", ""))
         pub["is_live"] = True
 
+    # Evita que a instância antiga do Render roube o getUpdates da VPS dedicada
+    if os.getenv("RENDER"):
+        pub["is_live"] = False
+        for b in flow_bots:
+            b["active"] = False
+
     memory = state.setdefault("memory", {"leads": []})
     leads = memory.get("leads", [])
     if len(leads) > MAX_ACTIVE_LEADS:
