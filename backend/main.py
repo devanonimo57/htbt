@@ -280,16 +280,26 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
 def _preserve_media_file_ids(inc_medias: Any, ex_medias: Any) -> None:
     if not isinstance(inc_medias, list) or not isinstance(ex_medias, list):
         return
-    ex_by_key: Dict[str, str] = {}
+    ex_by_id: Dict[str, Dict[str, Any]] = {}
+    ex_by_key: Dict[str, Dict[str, Any]] = {}
     for m in ex_medias:
         if isinstance(m, dict) and m.get("telegram_file_id"):
-            key = f"{m.get('id', '')}|{m.get('url', '')}"
-            ex_by_key[key] = str(m["telegram_file_id"])
+            mid = str(m.get("id") or "").strip()
+            if mid:
+                ex_by_id[mid] = m
+            key = f"{mid}|{m.get('url', '')}"
+            ex_by_key[key] = m
     for m in inc_medias:
         if isinstance(m, dict) and not m.get("telegram_file_id"):
-            key = f"{m.get('id', '')}|{m.get('url', '')}"
-            if key in ex_by_key:
-                m["telegram_file_id"] = ex_by_key[key]
+            mid = str(m.get("id") or "").strip()
+            key = f"{mid}|{m.get('url', '')}"
+            matched = ex_by_key.get(key) or (ex_by_id.get(mid) if mid else None)
+            if matched and matched.get("telegram_file_id"):
+                m["telegram_file_id"] = str(matched["telegram_file_id"])
+                if matched.get("cached_channel_id"):
+                    m["cached_channel_id"] = str(matched["cached_channel_id"])
+                if str(matched.get("url") or "").startswith("tg://"):
+                    m["url"] = matched["url"]
 
 
 def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
@@ -338,6 +348,26 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
                 if isinstance(fb.get("payments"), dict) and isinstance(old_bot.get("payments"), dict):
                     _preserve_media_file_ids(fb["payments"].get("generated_medias"), old_bot["payments"].get("generated_medias"))
                     _preserve_media_file_ids(fb["payments"].get("approved_medias"), old_bot["payments"].get("approved_medias"))
+                for ds_key in ("downsell_general", "downsell_pix"):
+                    inc_ds = fb.get(ds_key)
+                    old_ds = old_bot.get(ds_key)
+                    if isinstance(inc_ds, dict) and isinstance(old_ds, dict):
+                        old_seqs = {str(s.get("id")): s for s in (old_ds.get("sequences") or []) if isinstance(s, dict)}
+                        for s_idx, inc_seq in enumerate(inc_ds.get("sequences") or []):
+                            if isinstance(inc_seq, dict):
+                                old_seq = old_seqs.get(str(inc_seq.get("id")))
+                                if not old_seq and s_idx < len(old_ds.get("sequences") or []):
+                                    old_seq = old_ds["sequences"][s_idx]
+                                if isinstance(old_seq, dict):
+                                    _preserve_media_file_ids(inc_seq.get("medias"), old_seq.get("medias"))
+                old_bumps = {str(ob.get("id")): ob for ob in (old_bot.get("order_bumps") or []) if isinstance(ob, dict)}
+                for b_idx, inc_ob in enumerate(fb.get("order_bumps") or []):
+                    if isinstance(inc_ob, dict):
+                        old_ob = old_bumps.get(str(inc_ob.get("id")))
+                        if not old_ob and b_idx < len(old_bot.get("order_bumps") or []):
+                            old_ob = old_bot["order_bumps"][b_idx]
+                        if isinstance(old_ob, dict):
+                            _preserve_media_file_ids(inc_ob.get("medias"), old_ob.get("medias"))
 
     return incoming
 
@@ -620,6 +650,12 @@ async def save_full_state(state: Dict[str, Any]):
     await _write_state_to_db(state, preserve_runtime=True)
     bot_status = await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
     updated_state = await _read_state_from_db()
+    try:
+        warmed = await bot_manager.warm_all_state_medias(updated_state)
+        if warmed > 0:
+            updated_state = await _write_state_to_db(updated_state)
+    except Exception:
+        pass
     return {
         "status": "success",
         "bot_status": bot_status,
@@ -938,6 +974,67 @@ async def verify_flow_channel(req: VerifyChannelRequest):
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+    finally:
+        if temp_bot:
+            try:
+                await temp_bot.session.close()
+            except Exception:
+                pass
+
+
+class CacheMediaRequest(BaseModel):
+    bot_id: Optional[str] = ""
+    channel_id: Optional[str] = ""
+    media: Dict[str, Any]
+
+
+@app.post("/api/flow-bots/cache-media", dependencies=[Depends(verify_admin_auth)])
+async def cache_flow_media(req: CacheMediaRequest):
+    from aiogram import Bot
+    state = await _read_state_from_db()
+    fb = None
+    for b in (state.get("flow_bots") or []):
+        if isinstance(b, dict) and (not req.bot_id or str(b.get("id")) == str(req.bot_id)):
+            fb = b
+            break
+    if not fb:
+        fb = bot_manager._get_active_flow_bot(state)
+
+    tok = ((fb.get("token") if isinstance(fb, dict) else "") or state.get("publish", {}).get("bot_token") or "").strip()
+    if not tok or tok == REDACTED_SECRET_MASK:
+        return {"status": "error", "message": "Token do bot não configurado"}
+
+    media_copy = dict(req.media or {})
+    if req.channel_id and isinstance(fb, dict) and not fb.get("cache_channel_id"):
+        fb["cache_channel_id"] = req.channel_id.strip()
+
+    temp_bot = None
+    bot_to_use = bot_manager.bot if (bot_manager.bot and bot_manager.active_token == tok) else None
+    if not bot_to_use:
+        try:
+            temp_bot = Bot(token=tok)
+            bot_to_use = temp_bot
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    try:
+        fid = await bot_manager.warm_media_item_in_channel(
+            media_copy,
+            state,
+            fb=fb,
+            bot_instance=bot_to_use
+        )
+        if not fid:
+            return {
+                "status": "error",
+                "message": "Não foi possível enviar ao canal de vendas/cache. Verifique se o bot é administrador do canal com permissão de postar mensagens."
+            }
+        return {
+            "status": "ok",
+            "telegram_file_id": fid,
+            "cached_channel_id": media_copy.get("cached_channel_id", ""),
+            "media": media_copy
+        }
     finally:
         if temp_bot:
             try:

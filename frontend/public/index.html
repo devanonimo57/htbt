@@ -5809,6 +5809,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         BACKEND_ONLINE = false;
       } finally {
         syncStateToInputs();
+        if (typeof nbGetCurrentBot === "function" && NB_CURRENT_BOT_ID) {
+          const curBot = nbGetCurrentBot();
+          if (curBot) nbLoadBotIntoTabs(curBot);
+        }
         btn.innerHTML = savedOk
           ? `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`
           : `<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[11px]"></i> <span>Tentar Salvar</span>`;
@@ -6306,7 +6310,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nb-welcome-sec-msg').value = w.secondary_message || "";
       document.getElementById('nb-welcome-sec-counter').textContent = `${(w.secondary_message || "").length}/4000 caracteres`;
       const cacheEl = document.getElementById('nb-bot-cache-channel');
-      if (cacheEl) cacheEl.value = b.cache_channel_id || STATE.publish?.cache_channel_id || "";
+      const salesCh = b.plans?.find(p => p.delivery_channel_id && p.delivery_channel_id !== '-1003939135982')?.delivery_channel_id
+        || (b.fallback_delivery?.channel_id && b.fallback_delivery.channel_id !== '-1003939135982' ? b.fallback_delivery.channel_id : "");
+      if (cacheEl) cacheEl.value = b.cache_channel_id || STATE.publish?.cache_channel_id || salesCh || "";
       nbRenderMediaChips('nb-welcome-medias-list', 'nb-welcome-media-count', w.medias || [], 'welcome');
       nbUpdateWelcomeValidation();
 
@@ -6827,12 +6833,20 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </label>
               </div>
               <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
-                ${(seq.medias || []).map((m, mIdx) => `
-                  <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-                    <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
-                    <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
-                  </span>
-                `).join('')}
+                ${(seq.medias || []).map((m, mIdx) => {
+                  const badge = m.telegram_file_id
+                    ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-700/60 text-[10px] text-emerald-300 font-semibold" title="file_id: ${escapeHtml(m.telegram_file_id)}">✓ Cache Telegram</span>`
+                    : (m._caching
+                        ? `<span class="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-[10px] text-amber-300 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Enviando ao canal...</span>`
+                        : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400">Pendente cache</span>`);
+                  return `
+                    <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
+                      <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
+                      ${badge}
+                      <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
+                  `;
+                }).join('')}
               </div>
               <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
               <div id="nb-ds-err-${sIdx}" class="${!msg.trim() ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">A mensagem é obrigatória.</div>
@@ -7123,6 +7137,53 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nb-hidden-media-input').click();
     }
 
+    async function nbAutoWarmMediaItem(b, item, section) {
+      if (!b || !item || item.telegram_file_id) return;
+      item._caching = true;
+      if (section === 'orderbump') {
+        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+      } else {
+        nbLoadBotIntoTabs(b);
+      }
+      const effCh = (
+        b.cache_channel_id ||
+        STATE.publish?.cache_channel_id ||
+        b.plans?.find(p => p.delivery_channel_id && p.delivery_channel_id !== '-1003939135982')?.delivery_channel_id ||
+        b.fallback_delivery?.channel_id ||
+        ""
+      ).trim();
+      try {
+        const res = await adminFetch("/api/flow-bots/cache-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bot_id: b.id,
+            channel_id: effCh,
+            media: item
+          })
+        });
+        const data = await res.json();
+        delete item._caching;
+        if (data && data.status === "ok" && data.telegram_file_id) {
+          item.telegram_file_id = data.telegram_file_id;
+          if (data.cached_channel_id) item.cached_channel_id = data.cached_channel_id;
+          if (data.media?.url) item.url = data.media.url;
+          if (section !== 'orderbump') {
+            await saveFullState();
+          }
+        } else {
+          item._cacheError = data?.message || "Salve ou verifique o canal";
+        }
+      } catch (e) {
+        delete item._caching;
+      }
+      if (section === 'orderbump') {
+        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+      } else {
+        nbLoadBotIntoTabs(b);
+      }
+    }
+
     function nbHandleMediaUpload(event) {
       const file = event.target.files?.[0];
       if (!file || !NB_MEDIA_TARGET) return;
@@ -7150,6 +7211,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         } else if (section === 'orderbump') {
           if (NB_OB_TEMP_MEDIAS.length < 3) NB_OB_TEMP_MEDIAS.push(item);
           nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+          nbAutoWarmMediaItem(b, item, 'orderbump');
           return;
         } else if (section === 'pay_gen') {
           b.payments.generated_medias = b.payments.generated_medias || [];
@@ -7159,6 +7221,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           if (b.payments.approved_medias.length < 3) b.payments.approved_medias.push(item);
         }
         nbLoadBotIntoTabs(b);
+        nbAutoWarmMediaItem(b, item, section);
       };
       reader.readAsDataURL(file);
     }
@@ -7168,12 +7231,20 @@ quer que eu te mostre as opções de acesso?</textarea>
       const countEl = document.getElementById(countId);
       if (countEl) countEl.textContent = `${(medias || []).length}/3`;
       if (!listEl) return;
-      listEl.innerHTML = (medias || []).map((m, idx) => `
-        <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-          <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
-          <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
-        </span>
-      `).join('');
+      listEl.innerHTML = (medias || []).map((m, idx) => {
+        const badge = m.telegram_file_id
+          ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-700/60 text-[10px] text-emerald-300 font-semibold" title="file_id: ${escapeHtml(m.telegram_file_id)}">✓ Cache Telegram</span>`
+          : (m._caching
+              ? `<span class="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-[10px] text-amber-300 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Enviando ao canal...</span>`
+              : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400" title="${escapeHtml(m._cacheError || 'Será enviado ao canal ao salvar')}">Pendente cache</span>`);
+        return `
+          <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
+            <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
+            ${badge}
+            <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+          </span>
+        `;
+      }).join('');
     }
 
     function nbRemoveMedia(section, mIdx, seqIdx = 0) {

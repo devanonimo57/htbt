@@ -449,6 +449,187 @@ class ActiveBotManager:
             ])
         return InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
 
+    def _get_candidate_cache_channels(
+        self,
+        state: Optional[Dict[str, Any]],
+        fb: Optional[Dict[str, Any]] = None
+    ) -> List[Any]:
+        if not isinstance(state, dict):
+            return []
+        if fb is None:
+            fb = self._get_active_flow_bot(state)
+
+        raw_candidates: List[str] = []
+        if isinstance(fb, dict):
+            if fb.get("cache_channel_id"):
+                raw_candidates.append(str(fb["cache_channel_id"]).strip())
+            for p in (fb.get("plans") or []):
+                if isinstance(p, dict) and p.get("delivery_channel_id"):
+                    raw_candidates.append(str(p["delivery_channel_id"]).strip())
+            fb_deliv = fb.get("fallback_delivery")
+            if isinstance(fb_deliv, dict) and fb_deliv.get("channel_id"):
+                raw_candidates.append(str(fb_deliv["channel_id"]).strip())
+
+        pub = state.get("publish") if isinstance(state.get("publish"), dict) else {}
+        if pub.get("cache_channel_id"):
+            raw_candidates.append(str(pub["cache_channel_id"]).strip())
+        dest = str(pub.get("delivery_destination") or "").strip()
+        if dest.startswith("-100") or dest.startswith("@"):
+            raw_candidates.append(dest)
+
+        primary: List[Any] = []
+        fallback_placeholder: List[Any] = []
+        seen = set()
+        for ch_str in raw_candidates:
+            if not ch_str or ch_str in seen:
+                continue
+            seen.add(ch_str)
+            parsed = int(ch_str) if ch_str.lstrip("-").isdigit() else ch_str
+            if ch_str == "-1003939135982":
+                fallback_placeholder.append(parsed)
+            else:
+                primary.append(parsed)
+
+        return primary if primary else fallback_placeholder
+
+    async def warm_media_item_in_channel(
+        self,
+        m: Dict[str, Any],
+        state: Optional[Dict[str, Any]],
+        fb: Optional[Dict[str, Any]] = None,
+        bot_instance: Optional[Bot] = None,
+        exclude_chat_id: Optional[int] = None
+    ) -> Optional[str]:
+        if not isinstance(m, dict):
+            return None
+        existing_fid = (m.get("telegram_file_id") or "").strip()
+        if existing_fid:
+            return existing_fid
+
+        url = m.get("url")
+        if not url or str(url).startswith("tg://"):
+            return None
+
+        target_bot = bot_instance or self.bot
+        if not target_bot:
+            return None
+
+        mtype = (m.get("type") or "").lower()
+        is_video = "video" in mtype or "vídeo" in mtype or str(url).startswith("data:video")
+        channels = self._get_candidate_cache_channels(state, fb)
+
+        for cache_ch in channels:
+            if exclude_chat_id is not None and str(cache_ch) == str(exclude_chat_id):
+                continue
+            try:
+                inp_cache = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+                if not inp_cache:
+                    return None
+                if is_video:
+                    sent_cache = await target_bot.send_video(
+                        chat_id=cache_ch,
+                        video=inp_cache,
+                        caption=f"📦 Cache Mídia: {m.get('name') or 'video'}",
+                        disable_notification=True,
+                    )
+                    vid_obj = getattr(sent_cache, "video", None)
+                    fid = getattr(vid_obj, "file_id", None) if vid_obj else None
+                else:
+                    sent_cache = await target_bot.send_photo(
+                        chat_id=cache_ch,
+                        photo=inp_cache,
+                        caption=f"📦 Cache Mídia: {m.get('name') or 'photo'}",
+                        disable_notification=True,
+                    )
+                    photos = getattr(sent_cache, "photo", None)
+                    fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
+                if fid:
+                    m["telegram_file_id"] = str(fid)
+                    m["cached_channel_id"] = str(cache_ch)
+                    if str(url).startswith("data:video") or len(str(url)) > 350000:
+                        m["url"] = f"tg://file_id/{fid}"
+                    logger.info(f"Mídia '{m.get('name')}' salva em cache no canal {cache_ch} -> file_id={fid[:18]}...")
+                    return str(fid)
+            except Exception as e:
+                logger.warning(f"Upload de cache no canal ({cache_ch}) falhou: {e}")
+
+        return None
+
+    async def warm_all_state_medias(self, state: Dict[str, Any]) -> int:
+        if not isinstance(state, dict):
+            return 0
+        warmed = 0
+        for fb in (state.get("flow_bots") or []):
+            if not isinstance(fb, dict):
+                continue
+            tok = (fb.get("token") or state.get("publish", {}).get("bot_token") or "").strip()
+            if not tok or tok == "***configured***":
+                continue
+
+            temp_bot = None
+            bot_to_use = self.bot if (self.bot and self.active_token == tok) else None
+            if not bot_to_use:
+                try:
+                    temp_bot = Bot(token=tok)
+                    bot_to_use = temp_bot
+                except Exception:
+                    continue
+
+            try:
+                media_lists: List[List[Dict[str, Any]]] = []
+                if isinstance(fb.get("welcome"), dict) and isinstance(fb["welcome"].get("medias"), list):
+                    media_lists.append(fb["welcome"]["medias"])
+                for ds_key in ("downsell_general", "downsell_pix"):
+                    ds_obj = fb.get(ds_key)
+                    if isinstance(ds_obj, dict):
+                        for seq in (ds_obj.get("sequences") or []):
+                            if isinstance(seq, dict) and isinstance(seq.get("medias"), list):
+                                media_lists.append(seq["medias"])
+                for ob in (fb.get("order_bumps") or []):
+                    if isinstance(ob, dict) and isinstance(ob.get("medias"), list):
+                        media_lists.append(ob["medias"])
+                if isinstance(fb.get("payments"), dict):
+                    if isinstance(fb["payments"].get("generated_medias"), list):
+                        media_lists.append(fb["payments"]["generated_medias"])
+                    if isinstance(fb["payments"].get("approved_medias"), list):
+                        media_lists.append(fb["payments"]["approved_medias"])
+
+                for mlist in media_lists:
+                    for m in mlist:
+                        if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip() and m.get("url"):
+                            fid = await self.warm_media_item_in_channel(m, state, fb=fb, bot_instance=bot_to_use)
+                            if fid:
+                                warmed += 1
+            finally:
+                if temp_bot:
+                    try:
+                        await temp_bot.session.close()
+                    except Exception:
+                        pass
+
+        # Mídias do modo IA (apenas uploads locais data: ou mídias ativas)
+        active_fb = self._get_active_flow_bot(state)
+        bot_for_ai = self.bot
+        if bot_for_ai:
+            for m in (state.get("medias") or []):
+                if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip():
+                    u = str(m.get("url") or "")
+                    if u.startswith("data:") or m.get("active"):
+                        fid = await self.warm_media_item_in_channel(m, state, fb=active_fb, bot_instance=bot_for_ai)
+                        if fid:
+                            warmed += 1
+            upsell = state.get("upsell")
+            if isinstance(upsell, dict):
+                for m in (upsell.get("medias") or []):
+                    if isinstance(m, dict) and not (m.get("telegram_file_id") or "").strip():
+                        u = str(m.get("url") or "")
+                        if u.startswith("data:") or upsell.get("enabled"):
+                            fid = await self.warm_media_item_in_channel(m, state, fb=active_fb, bot_instance=bot_for_ai)
+                            if fid:
+                                warmed += 1
+
+        return warmed
+
     async def _send_single_media_cached(
         self,
         chat_id: int,
@@ -473,55 +654,36 @@ class ActiveBotManager:
             except Exception:
                 m.pop("telegram_file_id", None)
 
-        if not url:
+        if not url or str(url).startswith("tg://"):
             return None
 
-        cache_ch = None
+        state = None
+        fb = None
         try:
-            state = await self.state_getter()
-            fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
-            raw_ch = (
-                (fb.get("cache_channel_id") if isinstance(fb, dict) else "")
-                or (state.get("publish", {}).get("cache_channel_id") if isinstance(state, dict) else "")
-                or ""
-            ).strip()
-            if raw_ch:
-                cache_ch = int(raw_ch) if raw_ch.lstrip("-").isdigit() else raw_ch
+            if self.state_getter:
+                state = await self.state_getter()
+                fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
         except Exception:
-            cache_ch = None
+            state = None
 
-        fid = None
-        if cache_ch and str(cache_ch) != str(chat_id):
-            try:
-                inp_cache = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
-                if inp_cache:
-                    if is_video:
-                        sent_cache = await self.bot.send_video(
-                            chat_id=cache_ch,
-                            video=inp_cache,
-                            caption=f"📦 Cache: {m.get('name') or 'video'}",
-                            disable_notification=True,
-                        )
-                        vid_obj = getattr(sent_cache, "video", None)
-                        fid = getattr(vid_obj, "file_id", None) if vid_obj else None
-                    else:
-                        sent_cache = await self.bot.send_photo(
-                            chat_id=cache_ch,
-                            photo=inp_cache,
-                            caption=f"📦 Cache: {m.get('name') or 'photo'}",
-                            disable_notification=True,
-                        )
-                        photos = getattr(sent_cache, "photo", None)
-                        fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
-                    if fid:
-                        m["telegram_file_id"] = str(fid)
-                        if is_video:
-                            await self.bot.send_video(chat_id=chat_id, video=str(fid), caption=caption, has_spoiler=has_spoiler)
-                        else:
-                            await self.bot.send_photo(chat_id=chat_id, photo=str(fid), caption=caption, has_spoiler=has_spoiler)
-                        return str(fid)
-            except Exception as e:
-                logger.warning(f"Upload via canal de cache ({cache_ch}) falhou, enviando direto: {e}")
+        fid = await self.warm_media_item_in_channel(
+            m,
+            state,
+            fb=fb,
+            bot_instance=self.bot,
+            exclude_chat_id=chat_id
+        )
+        if fid:
+            if state and self.state_saver:
+                try:
+                    await self.state_saver(state)
+                except Exception:
+                    pass
+            if is_video:
+                await self.bot.send_video(chat_id=chat_id, video=str(fid), caption=caption, has_spoiler=has_spoiler)
+            else:
+                await self.bot.send_photo(chat_id=chat_id, photo=str(fid), caption=caption, has_spoiler=has_spoiler)
+            return str(fid)
 
         inp = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
         if not inp:
@@ -538,6 +700,13 @@ class ActiveBotManager:
 
         if fid:
             m["telegram_file_id"] = str(fid)
+            if str(url).startswith("data:video") or len(str(url)) > 350000:
+                m["url"] = f"tg://file_id/{fid}"
+            if state and self.state_saver:
+                try:
+                    await self.state_saver(state)
+                except Exception:
+                    pass
             return str(fid)
         return None
 
