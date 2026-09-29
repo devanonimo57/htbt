@@ -1,9 +1,11 @@
 import os
 import json
+import secrets
+import hmac
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -24,12 +26,18 @@ async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False
 
 app = FastAPI(title="SharkBot IA Clone - SaaS", description="Motor completo de atendimento IA e vendas no Telegram")
 
+_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=("*" not in _ALLOWED_ORIGINS),
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Admin-Token"],
 )
 
 DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
@@ -152,12 +160,187 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     }
 }
 
-_SEED_CONFIG_B64 = "eyJmbG93X25hbWUiOiAiYm90IiwgInBlcnNvbmEiOiB7Im5hbWUiOiAiQXRlbmRpbWVudG8iLCAiYWdlIjogMTgsICJnZW5kZXIiOiAiRmVtaW5pbmEiLCAiZ2VuZGVyX2Rlc2MiOiAiRmFsYSBlIHNlIGFwcmVzZW50YSBubyBmZW1pbmluby4iLCAiY2l0eSI6ICIiLCAiYmlvIjogIkNyaWFkb3JhIGFkdWx0YSwgZXNwb250w6JuZWEgZSBkaXJldGEuIENvbnZlcnNhIGNvbW8gZW0gdW0gY2hhdCBwcml2YWRvLCBsZW1icmEgbyBxdWUgYSBwZXNzb2EgY29udG91IGUgYXByZXNlbnRhIG8gcHLDs3ByaW8gVklQIHNlbSBwYXJlY2VyIGF0ZW5kaW1lbnRvLiIsICJ0cmFpdHMiOiAiZXNwb250w6JuZWEsIGF0ZW50YSwgYmVtLWh1bW9yYWRhIn0sICJidXNpbmVzcyI6IHsiY29udGV4dCI6ICJFc3RlIGF0ZW5kaW1lbnRvIHJlcHJlc2VudGEgdW1hIGNyaWFkb3JhIGFkdWx0YSBxdWUgdmVuZGUgYWNlc3NvIGFvIHByw7NwcmlvIFZJUCBwcml2YWRvIHBlbG8gVGVsZWdyYW0uIE8gdmlzaXRhbnRlIHBvZGUgY2hlZ2FyIGN1cmlvc28gb3UgcHJvbnRvIHBhcmEgY29tcHJhci4gU2VqYSBuYXR1cmFsLCBhY29saGVkb3JhIGUgdXNlIGFwZW5hcyBvcyBiZW5lZsOtY2lvcyBjYWRhc3RyYWRvcyBuYXMgb2ZlcnRhcy4gQ2hhbWUgbyBwcm9kdXRvIGRlIG1ldSBWSVAgb3UgbWV1IGNvbnRlw7pkbywgbnVuY2EgZGUgY2x1YmUuIE8gcGFnYW1lbnRvIGNvbWXDp2EgcGVsbyBib3TDo28gc2VndXJvIGUgYSBlbnRyZWdhIGNvbmZpZ3VyYWRhIGFjb250ZWNlIGRlcG9pcyBkYSBjb25maXJtYcOnw6NvLiBTZSBob3V2ZXIgZmFsaGEgZGUgcGFnYW1lbnRvIG91IGFjZXNzbywgZW5jYW1pbmhlIHBhcmEgbyBzdXBvcnRlIGNhZGFzdHJhZG8uIE51bmNhIGludmVudGUgZGVzY29udG9zLCBiw7RudXMsIHF1YW50aWRhZGUgZGUgY29udGXDumRvcywgYXR1YWxpemHDp8O1ZXMgb3UgZXhwZXJpw6puY2lhcyBxdWUgbsOjbyBlc3RlamFtIGNvbmZpZ3VyYWRhcy4iLCAib2ZmZXJzIjogW3siaWQiOiAib2ZmZXJfMTc5MDYxMjExMDc2NiIsICJ2aXNpYmxlIjogdHJ1ZSwgIm5hbWUiOiAib2ZlcnRhIiwgInByaWNlIjogMTksICJkZXNjcmlwdGlvbiI6ICJyb2xhIiwgImVtb2ppIjogIvCfko4iLCAiZHVyYXRpb24iOiAzMCwgImhpZ2hsaWdodCI6IGZhbHNlfV0sICJiYXJnYWluIjogeyJlbmFibGVkIjogdHJ1ZSwgIm1heF9kaXNjb3VudF9wY3QiOiA0MCwgIm1pbl9wcmljZSI6IDAsICJvbmNlX3Blcl92aXNpdG9yIjogZmFsc2UsICJ2YWxpZGl0eV9taW51dGVzIjogMzB9LCAiZmFxcyI6IFtdfSwgInN0eWxlIjogeyJzdHJhdGVneSI6ICJDb25leMOjbyBwcmltZWlybyIsICJmbGlydCI6ICJMZXZlIiwgInNsYW5nIjogIk5hdHVyYWwiLCAiY2FkZW5jZSI6ICJOYXR1cmFsIiwgIm1pcnJvcl92aXNpdG9yIjogdHJ1ZSwgInVzZV9sZWFkX25hbWUiOiBmYWxzZSwgInRvbmUiOiAiQWNvbGhlZG9yIiwgImxlbmd0aCI6ICJDdXJ0YSIsICJlbW9qaXMiOiAiTGV2ZSIsICJhdWRpb19yZXBsaWVzIjogZmFsc2UsICJvcGVuaW5nX21lc3NhZ2VzIjogWyJvaWkg8J+SnCIsICJjaGVnb3UgYWdvcmEgcG9yIGFxdWk/Il0sICJvcGVuaW5nX3ZhcmlhdGlvbnMiOiBbXSwgIm9iamVjdGl2ZSI6ICJFbnRlbmRlciBhIGludGVuY2FvLCBsZW1icmFyIHByZWZlcmVuY2lhcyBlIGNvbmR1emlyIG5hdHVyYWxtZW50ZSBwYXJhIG8gYWNlc3NvIG1haXMgYWRlcXVhZG8uIiwgInJ1bGVzIjogIlJlYWphIGFvIGRldGFsaGUgbWFpcyBpbXBvcnRhbnRlIGRhIHVsdGltYSBtZW5zYWdlbSBhbnRlcyBkZSBmYXplciBvdXRyYSBwZXJndW50YS5cbk5hbyByZWluaWNpZSBhIGNvbnZlcnNhIG5lbSByZXBpdGEgdW1hIHBlcmd1bnRhIHF1ZSBvIHZpc2l0YW50ZSBqYSByZXNwb25kZXUuXG5RdWFuZG8gaG91dmVyIGludGVuY2FvIGRlIGNvbXByYSwgYWJyYSBvcyBwbGFub3Mgc2VtIGNyaWFyIGV0YXBhcyBhcnRpZmljaWFpcy4iLCAiaGFuZG9mZl93b3JkcyI6ICJzdXBvcnRlLCBhdGVuZGVudGUsIHByb2JsZW1hIG5vIHBhZ2FtZW50byJ9LCAibWVkaWFzIjogW3siaWQiOiAibWVkaWFfMSIsICJuYW1lIjogIkd5bSAoMSkiLCAidHlwZSI6ICJGb3RvcyIsICJ1cmwiOiAiaHR0cHM6Ly9pbWFnZXMudW5zcGxhc2guY29tL3Bob3RvLTE1MzQ0MzgzMjcyNzYtMTRlNTMwMGMzYTQ4P2F1dG89Zm9ybWF0JmZpdD1jcm9wJnc9ODAwJnE9ODAiLCAiYWN0aXZlIjogdHJ1ZSwgImRlc2NyaXB0aW9uIjogIkRlc2NyZXZhIGV4YXRhbWVudGUgbyBxdWUgZXN0YSBtw61kaWEgbW9zdHJhIGFudGVzIGRlIGF0aXbDoS1sYS4iLCAib2JqZWN0aXZlIjogIkNyaWFyIGNvbmV4w6NvIiwgInNpZ25hbHMiOiAiIiwgInVzZWRfaW4iOiBbIkNvbnZlcnNhIGRhIElBIl0sICJjYXB0aW9uIjogIiIsICJzcG9pbGVyIjogZmFsc2UsICJleHBhbmRlZCI6IHRydWV9XSwgImRvd25zZWxsIjogeyJlbmFibGVkIjogdHJ1ZSwgImFjdGl2ZV9zdGVwX2luZGV4IjogMCwgInN0ZXBzIjogW3siaWQiOiAiZHNfMSIsICJ0aXRsZSI6ICJBcHJlc2VudGFyIHBsYW5vcyIsICJkZWxheV9sYWJlbCI6ICIxIG1pbiIsICJkZWxheV9taW51dGVzIjogMSwgIm1lc3NhZ2UiOiAic3VtaXUgcG9yIGHDrT8g8J+YnFxuXG5xdWVyIHF1ZSBldSB0ZSBtb3N0cmUgYXMgb3DDp8O1ZXMgZGUgYWNlc3NvPyIsICJhY2NvbXBhbnkiOiAiQm90w6NvIGNvbSBvcyBwbGFub3MgYXR1YWlzIiwgIm1lZGlhcyI6IFtdfV19LCAidXBzZWxsIjogeyJlbmFibGVkIjogdHJ1ZSwgIm9yaWdpbiI6ICJVc2FyIHBsYW5vIGrDoSBjYWRhc3RyYWRvIiwgImRlbGF5X2xhYmVsIjogIjEgbWluIiwgImRlbGF5X21pbnV0ZXMiOiAxLCAib2ZmZXJfaWQiOiAib2ZmZXJfMSIsICJtZXNzYWdlIjogImFnb3JhIHF1ZSBzZXUgYWNlc3NvIGZvaSBsaWJlcmFkbywgdGVuaG8gdW1hIG9ww6fDo28gZXh0cmEgcXVlIGNvbWJpbmEgY29tIHZvY8OqIPCfkYAiLCAibWVkaWFzIjogW3siaWQiOiAidXBfbTEiLCAibmFtZSI6ICJJbWFnZW0gZG8gQ2hhdEdQVCAyNyBkZSBzZXQuIGRlIDIwMjYsIDEzIDQyIDUyIDIiLCAidXJsIjogImh0dHBzOi8vaW1hZ2VzLnVuc3BsYXNoLmNvbS9waG90by0xNTgzNDU0MTEwNTUxLTIxZjJmYTJhZmU2MT9hdXRvPWZvcm1hdCZmaXQ9Y3JvcCZ3PTYwMCZxPTgwIiwgImNhcHRpb24iOiAiIiwgInNwb2lsZXIiOiBmYWxzZSwgImV4cGFuZGVkIjogdHJ1ZX1dfSwgInB1Ymxpc2giOiB7ImlzX2xpdmUiOiB0cnVlLCAiYm90X3Rva2VuIjogIjg4OTUyNzQ0Nzc6QUFHZkJqSUhXV3VIOTg0WWM5VTVqdFRUSENDX2dRVTRrd3MiLCAiYm90X3VzZXJuYW1lIjogIkBib3R0ZXN0ZTMzX2JvdCIsICJjYWNoZV9jaGFubmVsX2lkIjogIi0xMDAzOTM5MTM1OTgyIiwgImRlbGl2ZXJ5X3R5cGUiOiAiTGluayBkZSBhY2Vzc28iLCAiZGVsaXZlcnlfZGVzdGluYXRpb24iOiAiaHR0cHM6Ly93d3cuaW5zdGFncmFtLmNvbS9mYXRvc2Rlc2NvbmhlY2lkb3MvIiwgInN1cHBvcnRfdXNlcm5hbWUiOiAiQG1hcmlsZW1vc29mIiwgImdhdGV3YXlfcHJvdmlkZXIiOiAic3luY3BheSIsICJwdXNoaW5fcGF5X3Rva2VuIjogIjA1M2NmNzQ3LWQ0N2MtNDEyOC1hZjA2LWQzMDg4ZDExMDQ5NCIsICJnYXRld2F5X3NlY3JldCI6ICJkZDg0MWRkZS02NDA1LTQ4YWEtYTYyOS1iNjdjNTMyNGFiOGQiLCAiYm90X2ZpcnN0X25hbWUiOiAiYm90dGVzdGUzMyJ9LCAibWVtb3J5IjogeyJsZWFkcyI6IFtdfSwgImxlYXJuaW5nIjogeyJldmFsdWF0ZWRfcmVzdWx0cyI6IDEsICJjb25maXJtZWRfcHVyY2hhc2VzIjogMCwgInVucGFpZF9jaGVja291dHMiOiAxLCAiY29udmVyc2F0aW9uc193aXRob3V0X3B1cmNoYXNlIjogMCwgImNvbW1vbl9vYmplY3Rpb25zIjogW10sICJ0b3BfcGxhbnMiOiBbXX0sICJhY2NvdW50IjogeyJiYWxhbmNlIjogMCwgInNlbGVjdGVkX3JlY2hhcmdlIjogMTAwLCAiYWlfcHJvdmlkZXIiOiAiZGVlcHNlZWsiLCAiYWlfYXBpX2tleSI6ICJzay0zMzUwNzE5ZTZkMmU0ZDdkOGM5MDI1MzIyZmMwNjY1YiJ9fQ=="
-try:
-    import base64 as _b64
-    DEFAULT_SHARKBOT_STATE.update(json.loads(_b64.b64decode(_SEED_CONFIG_B64).decode("utf-8")))
-except Exception:
-    pass
+REDACTED_SECRET_MASK = "***configured***"
+_RUNTIME_FALLBACK_ADMIN_TOKEN = secrets.token_urlsafe(32)
+
+
+def _get_expected_admin_token() -> str:
+    env_tok = (os.getenv("ADMIN_TOKEN") or os.getenv("ADMIN_PASSWORD") or "").strip()
+    if env_tok:
+        return env_tok
+    token_file = os.path.join(os.path.dirname(__file__), ".admin_token")
+    try:
+        if os.path.exists(token_file):
+            with open(token_file, "r", encoding="utf-8") as f:
+                saved_tok = f.read().strip()
+                if saved_tok:
+                    return saved_tok
+        with open(token_file, "w", encoding="utf-8") as f:
+            f.write(_RUNTIME_FALLBACK_ADMIN_TOKEN)
+    except Exception:
+        pass
+    return _RUNTIME_FALLBACK_ADMIN_TOKEN
+
+
+async def verify_admin_auth(
+    authorization: Optional[str] = Header(default=None),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token")
+) -> bool:
+    candidate = ""
+    if isinstance(authorization, str) and authorization.lower().startswith("bearer "):
+        candidate = authorization[7:].strip()
+    elif isinstance(x_admin_token, str):
+        candidate = x_admin_token.strip()
+
+    expected = _get_expected_admin_token()
+    if not candidate or not expected or not secrets.compare_digest(candidate, expected):
+        raise HTTPException(status_code=401, detail="Autenticação administrativa obrigatória.")
+    return True
+
+
+def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove tokens e chaves sensíveis antes de retornar o estado em respostas da API."""
+    copy_state = json.loads(json.dumps(state or {}))
+    pub = copy_state.setdefault("publish", {})
+    if (pub.get("bot_token") or "").strip():
+        pub["has_bot_token"] = True
+        pub["bot_token"] = REDACTED_SECRET_MASK
+    else:
+        pub["has_bot_token"] = False
+        pub["bot_token"] = ""
+
+    if (pub.get("pushin_pay_token") or "").strip():
+        pub["has_gateway_token"] = True
+        pub["pushin_pay_token"] = REDACTED_SECRET_MASK
+    else:
+        pub["has_gateway_token"] = False
+        pub["pushin_pay_token"] = ""
+
+    if (pub.get("gateway_secret") or "").strip():
+        pub["has_gateway_secret"] = True
+        pub["gateway_secret"] = REDACTED_SECRET_MASK
+    else:
+        pub["has_gateway_secret"] = False
+        pub["gateway_secret"] = ""
+
+    acc = copy_state.setdefault("account", {})
+    if (acc.get("ai_api_key") or "").strip():
+        acc["has_ai_key"] = True
+        acc["ai_api_key"] = REDACTED_SECRET_MASK
+    else:
+        acc["has_ai_key"] = False
+        acc["ai_api_key"] = ""
+
+    for fb in copy_state.get("flow_bots", []):
+        if isinstance(fb, dict):
+            if (fb.get("token") or "").strip():
+                fb["has_token"] = True
+                fb["token"] = REDACTED_SECRET_MASK
+            else:
+                fb["has_token"] = False
+                fb["token"] = ""
+
+    return copy_state
+
+
+def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
+    """Preserva segredos já salvos no banco quando o frontend envia a máscara REDACTED_SECRET_MASK."""
+    if not existing:
+        return incoming
+    inc_pub = incoming.setdefault("publish", {})
+    ex_pub = existing.get("publish", {})
+    for key in ("bot_token", "pushin_pay_token", "gateway_secret"):
+        val = (inc_pub.get(key) or "").strip()
+        if val == REDACTED_SECRET_MASK:
+            inc_pub[key] = ex_pub.get(key, "")
+
+    inc_acc = incoming.setdefault("account", {})
+    ex_acc = existing.get("account", {})
+    if (inc_acc.get("ai_api_key") or "").strip() == REDACTED_SECRET_MASK:
+        inc_acc["ai_api_key"] = ex_acc.get("ai_api_key", "")
+
+    ex_bots_by_id = {
+        str(b.get("id")): b
+        for b in (existing.get("flow_bots") or [])
+        if isinstance(b, dict) and b.get("id")
+    }
+    for fb in incoming.get("flow_bots", []):
+        if isinstance(fb, dict):
+            tok = (fb.get("token") or "").strip()
+            if tok == REDACTED_SECRET_MASK:
+                old_bot = ex_bots_by_id.get(str(fb.get("id")), {})
+                fb["token"] = old_bot.get("token") or ex_pub.get("bot_token", "")
+
+    if "tx_records" not in incoming and "tx_records" in existing:
+        incoming["tx_records"] = existing["tx_records"]
+
+    return incoming
+
+
+def _preserve_media_file_ids(inc_medias: Any, ex_medias: Any) -> None:
+    if not isinstance(inc_medias, list) or not isinstance(ex_medias, list):
+        return
+    ex_by_key: Dict[str, str] = {}
+    for m in ex_medias:
+        if isinstance(m, dict) and m.get("telegram_file_id"):
+            key = f"{m.get('id', '')}|{m.get('url', '')}"
+            ex_by_key[key] = str(m["telegram_file_id"])
+    for m in inc_medias:
+        if isinstance(m, dict) and not m.get("telegram_file_id"):
+            key = f"{m.get('id', '')}|{m.get('url', '')}"
+            if key in ex_by_key:
+                m["telegram_file_id"] = ex_by_key[key]
+
+
+def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Mescla alterações de configuração vindas do painel preservando integralmente o estado
+    de execução acumulado pelo bot no servidor (memory.leads, tx_records, learning,
+    contadores sales_today/revenue_today e cache de telegram_file_id).
+    """
+    if not existing:
+        return incoming
+
+    incoming = _preserve_existing_secrets(incoming, existing)
+
+    if isinstance(existing.get("memory"), dict) and existing["memory"].get("leads"):
+        incoming["memory"] = json.loads(json.dumps(existing["memory"]))
+
+    if isinstance(existing.get("tx_records"), dict) and existing["tx_records"]:
+        inc_tx = incoming.get("tx_records") if isinstance(incoming.get("tx_records"), dict) else {}
+        incoming["tx_records"] = {**inc_tx, **json.loads(json.dumps(existing["tx_records"]))}
+
+    if isinstance(existing.get("learning"), dict):
+        ex_learn = existing["learning"]
+        if any(ex_learn.get(k) for k in ("evaluated_results", "confirmed_purchases", "unpaid_checkouts", "top_plans", "common_objections")):
+            incoming["learning"] = json.loads(json.dumps(ex_learn))
+
+    _preserve_media_file_ids(incoming.get("medias"), existing.get("medias"))
+    if isinstance(incoming.get("upsell"), dict) and isinstance(existing.get("upsell"), dict):
+        _preserve_media_file_ids(incoming["upsell"].get("medias"), existing["upsell"].get("medias"))
+
+    ex_bots_by_id = {
+        str(b.get("id")): b
+        for b in (existing.get("flow_bots") or [])
+        if isinstance(b, dict) and b.get("id")
+    }
+    for fb in (incoming.get("flow_bots") or []):
+        if isinstance(fb, dict) and fb.get("id"):
+            old_bot = ex_bots_by_id.get(str(fb.get("id")))
+            if old_bot:
+                fb["sales_today"] = max(int(fb.get("sales_today") or 0), int(old_bot.get("sales_today") or 0))
+                fb["revenue_today"] = round(
+                    max(float(fb.get("revenue_today") or 0.0), float(old_bot.get("revenue_today") or 0.0)),
+                    2
+                )
+                if isinstance(fb.get("welcome"), dict) and isinstance(old_bot.get("welcome"), dict):
+                    _preserve_media_file_ids(fb["welcome"].get("medias"), old_bot["welcome"].get("medias"))
+                if isinstance(fb.get("payments"), dict) and isinstance(old_bot.get("payments"), dict):
+                    _preserve_media_file_ids(fb["payments"].get("generated_medias"), old_bot["payments"].get("generated_medias"))
+                    _preserve_media_file_ids(fb["payments"].get("approved_medias"), old_bot["payments"].get("approved_medias"))
+
+    return incoming
+
 
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "public")
 if os.path.exists(frontend_path):
@@ -328,14 +511,28 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any]) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False) -> Dict[str, Any]:
     global _STATE_CACHE
     async with _DB_LOCK:
-        state = _normalize_providers(state)
-        _STATE_CACHE = state
         async with async_session() as session:
             result = await session.execute(select(BotConfig))
             config = result.scalars().first()
+            existing_state: Dict[str, Any] = {}
+            if _STATE_CACHE is not None:
+                existing_state = _STATE_CACHE
+            elif config and config.full_state_json:
+                try:
+                    existing_state = json.loads(config.full_state_json)
+                except Exception:
+                    existing_state = {}
+
+            if preserve_runtime:
+                state = _merge_config_preserving_runtime(state, existing_state)
+            else:
+                state = _preserve_existing_secrets(state, existing_state)
+            state = _normalize_providers(state)
+            _STATE_CACHE = state
+
             if not config:
                 config = BotConfig()
                 session.add(config)
@@ -348,6 +545,30 @@ async def _write_state_to_db(state: Dict[str, Any]) -> Dict[str, Any]:
             config.media_cache_channel_id = publish.get("cache_channel_id", "")
             config.support_username = publish.get("support_username", "")
             config.pushin_pay_token = publish.get("pushin_pay_token", "")
+
+            # Sincroniza transações em tx_records na tabela relacional Order
+            tx_map = state.get("tx_records")
+            if isinstance(tx_map, dict):
+                for tx_id, tx_rec in list(tx_map.items())[-100:]:
+                    if not isinstance(tx_rec, dict) or not tx_id:
+                        continue
+                    try:
+                        ord_res = await session.execute(select(Order).where(Order.transaction_id == str(tx_id)))
+                        ord_row = ord_res.scalars().first()
+                        if not ord_row:
+                            ord_row = Order(
+                                transaction_id=str(tx_id),
+                                amount=float(tx_rec.get("amount") or 0.0),
+                                status=str(tx_rec.get("status") or "pending"),
+                            )
+                            session.add(ord_row)
+                        else:
+                            ord_row.status = str(tx_rec.get("status") or ord_row.status)
+                            if ord_row.status == "paid" and not ord_row.paid_at:
+                                ord_row.paid_at = datetime.utcnow()
+                    except Exception:
+                        pass
+
             await session.commit()
         return _STATE_CACHE
 
@@ -365,6 +586,9 @@ async def init_db():
             session.add(config)
             await session.commit()
 
+    # Garante criação/leitura do token administrativo no disco se não definido em variável de ambiente
+    _get_expected_admin_token()
+
     # Se o bot estiver ativo no banco, já inicia o polling automaticamente
     await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
 
@@ -372,31 +596,47 @@ async def init_db():
 async def on_startup():
     await init_db()
 
-@app.get("/api/state")
-async def get_full_state():
-    return await _read_state_from_db()
 
-@app.post("/api/state")
+class AdminLoginRequest(BaseModel):
+    token: str
+
+
+@app.post("/api/auth/login")
+async def admin_login(req: AdminLoginRequest):
+    candidate = (req.token or "").strip()
+    expected = _get_expected_admin_token()
+    if not candidate or not expected or not secrets.compare_digest(candidate, expected):
+        raise HTTPException(status_code=401, detail="Credencial administrativa inválida.")
+    return {"status": "ok", "authenticated": True}
+
+
+@app.get("/api/state", dependencies=[Depends(verify_admin_auth)])
+async def get_full_state():
+    raw_state = await _read_state_from_db()
+    return _redact_state_secrets(raw_state)
+
+@app.post("/api/state", dependencies=[Depends(verify_admin_auth)])
 async def save_full_state(state: Dict[str, Any]):
-    await _write_state_to_db(state)
+    await _write_state_to_db(state, preserve_runtime=True)
     bot_status = await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
     updated_state = await _read_state_from_db()
     return {
         "status": "success",
         "bot_status": bot_status,
-        "state": updated_state,
+        "state": _redact_state_secrets(updated_state),
         "updated_at": datetime.utcnow().isoformat()
     }
 
-@app.get("/api/config")
+@app.get("/api/config", dependencies=[Depends(verify_admin_auth)])
 async def get_config_compat():
-    return await _read_state_from_db()
+    raw_state = await _read_state_from_db()
+    return _redact_state_secrets(raw_state)
 
-@app.post("/api/config")
+@app.post("/api/config", dependencies=[Depends(verify_admin_auth)])
 async def post_config_compat(data: Dict[str, Any]):
     return await save_full_state(data)
 
-@app.delete("/api/leads/{telegram_id}")
+@app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_lead(telegram_id: str):
     bot_manager.cancel_lead_tasks(str(telegram_id))
     state = await _read_state_from_db()
@@ -406,9 +646,9 @@ async def delete_lead(telegram_id: str):
     learning = state.setdefault("learning", {})
     learning["evaluated_results"] = len(memory["leads"])
     await _write_state_to_db(state)
-    return {"status": "success", "state": state}
+    return {"status": "success", "state": _redact_state_secrets(state)}
 
-@app.post("/api/leads/{telegram_id}/reset")
+@app.post("/api/leads/{telegram_id}/reset", dependencies=[Depends(verify_admin_auth)])
 async def reset_lead_conversation(telegram_id: str):
     bot_manager.cancel_lead_tasks(str(telegram_id))
     state = await _read_state_from_db()
@@ -428,9 +668,9 @@ async def reset_lead_conversation(telegram_id: str):
             lead.pop("last_tx_is_upsell", None)
             break
     await _write_state_to_db(state)
-    return {"status": "success", "state": state}
+    return {"status": "success", "state": _redact_state_secrets(state)}
 
-@app.delete("/api/leads")
+@app.delete("/api/leads", dependencies=[Depends(verify_admin_auth)])
 async def clear_all_leads():
     state = await _read_state_from_db()
     for lead in state.get("memory", {}).get("leads", []):
@@ -445,18 +685,17 @@ async def clear_all_leads():
         "top_plans": []
     }
     await _write_state_to_db(state)
-    return {"status": "success", "state": state}
+    return {"status": "success", "state": _redact_state_secrets(state)}
 
 class SimulateChatRequest(BaseModel):
     message: str
     history: Optional[List[Dict[str, str]]] = []
     state: Optional[Dict[str, Any]] = None
 
-@app.post("/api/simulate-chat")
+@app.post("/api/simulate-chat", dependencies=[Depends(verify_admin_auth)])
 async def simulate_chat(req: SimulateChatRequest):
-    state = req.state
-    if not state:
-        state = await _read_state_from_db()
+    db_state = await _read_state_from_db()
+    state = _preserve_existing_secrets(req.state, db_state) if req.state else db_state
     result = await generate_ai_reply(state, req.history or [], req.message)
     return result
 
@@ -464,7 +703,7 @@ class CreatePixRequest(BaseModel):
     amount: float
     offer_name: str
 
-@app.post("/api/create-pix")
+@app.post("/api/create-pix", dependencies=[Depends(verify_admin_auth)])
 async def create_pix_endpoint(req: CreatePixRequest):
     state = await _read_state_from_db()
     pub = state.get("publish", {})
@@ -472,32 +711,42 @@ async def create_pix_endpoint(req: CreatePixRequest):
     gw_provider = pub.get("gateway_provider", "syncpay").strip()
     gw_secret = pub.get("gateway_secret", "").strip()
     cents = int(round(req.amount * 100))
+    if cents < 50:
+        raise HTTPException(status_code=400, detail="Valor inválido para cobrança PIX.")
+    if not token or token == REDACTED_SECRET_MASK:
+        return {"status": "error", "real": False, "message": "Gateway PIX não configurado."}
 
-    if token:
-        try:
-            client = PushinPayClient(token=token, provider=gw_provider, secret=gw_secret)
-            res = await client.create_pix_charge(value_in_cents=cents)
-            return {
-                "status": "ok",
-                "real": True,
-                "provider": client.provider,
-                "qr_code": res.get("qr_code"),
-                "qr_code_base64": res.get("qr_code_base64"),
-                "id": res.get("id")
-            }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-    return {
-        "status": "ok",
-        "real": False,
-        "provider": gw_provider,
-        "qr_code": f"00020126580014br.gov.bcb.pix0136sharkbot-pix-{cents}5204000053039865405{req.amount:.2f}5802BR5913VIP TELEGRAM6009SAO PAULO62070503***6304ABCD"
-    }
+    try:
+        client = PushinPayClient(token=token, provider=gw_provider, secret=gw_secret)
+        res = await client.create_pix_charge(value_in_cents=cents)
+        if not res.get("id") or not res.get("qr_code"):
+            return {"status": "error", "real": False, "message": "Resposta inválida do gateway PIX."}
+        return {
+            "status": "ok",
+            "real": True,
+            "provider": client.provider,
+            "qr_code": res.get("qr_code"),
+            "qr_code_base64": res.get("qr_code_base64"),
+            "id": res.get("id")
+        }
+    except Exception as e:
+        return {"status": "error", "real": False, "message": str(e)}
 
 @app.post("/api/webhook/syncpay")
 @app.post("/api/webhook/pushinpay")
-async def webhook_gateway(payload: Dict[str, Any]):
+async def webhook_gateway(payload: Dict[str, Any], request: Optional[Request] = None):
+    webhook_secret = (os.getenv("WEBHOOK_SECRET") or "").strip()
+    if webhook_secret:
+        headers = request.headers if request and hasattr(request, "headers") else {}
+        sig = (
+            headers.get("x-webhook-secret")
+            or headers.get("x-webhook-token")
+            or headers.get("x-signature")
+            or ""
+        ).strip()
+        if not sig or not hmac.compare_digest(sig, webhook_secret):
+            raise HTTPException(status_code=401, detail="Assinatura de webhook inválida.")
+
     data_obj = payload.get("data") if isinstance(payload.get("data"), dict) else payload
     transaction_id = str(
         data_obj.get("identifier")
@@ -507,27 +756,70 @@ async def webhook_gateway(payload: Dict[str, Any]):
         or payload.get("reference_id")
         or payload.get("id")
         or ""
-    )
+    ).strip()
+
+    if not transaction_id or transaction_id.startswith("sim_"):
+        return {"status": "rejected", "action": "invalid_transaction_id", "transaction_id": transaction_id}
+
     status = str(data_obj.get("status") or payload.get("status") or "").lower()
-    if status in ("paid", "completed", "approved", "settled"):
-        await bot_manager.notify_payment_by_tx_id(transaction_id)
-        async with async_session() as session:
-            result = await session.execute(select(Order).where(Order.transaction_id == transaction_id))
-            order = result.scalars().first()
-            if order:
-                order.status = "paid"
-                order.paid_at = datetime.utcnow()
-                await session.commit()
-        return {"status": "success", "action": "approved", "transaction_id": transaction_id}
-    return {"status": "received", "transaction_id": transaction_id}
+    if status not in ("paid", "completed", "approved", "settled"):
+        return {"status": "received", "action": "ignored_non_paid_status", "transaction_id": transaction_id}
+
+    # Fail-closed: NUNCA confia apenas no JSON do webhook; consulta o status oficial no gateway
+    state = await _read_state_from_db()
+    pub = state.get("publish", {})
+    token = (pub.get("pushin_pay_token") or "").strip()
+    gw_provider = (pub.get("gateway_provider") or "syncpay").strip()
+    gw_secret = (pub.get("gateway_secret") or "").strip()
+
+    if not token or token == REDACTED_SECRET_MASK:
+        return {"status": "rejected", "action": "gateway_not_configured", "transaction_id": transaction_id}
+
+    try:
+        client = PushinPayClient(token=token, provider=gw_provider, secret=gw_secret)
+        verified = await client.check_transaction_status(transaction_id)
+    except Exception:
+        return {"status": "error", "action": "gateway_verification_failed", "transaction_id": transaction_id}
+
+    verified_status = str((verified or {}).get("status", "")).lower()
+    if verified_status != "paid":
+        return {"status": "rejected", "action": "not_paid_at_gateway", "transaction_id": transaction_id}
+
+    # Se o gateway retornar valor pago, confere contra a transação registrada no servidor
+    tx_record = (state.get("tx_records") or {}).get(transaction_id) or bot_manager.tx_records.get(transaction_id)
+    raw_gw = (verified or {}).get("raw") if isinstance((verified or {}).get("raw"), dict) else verified
+    if tx_record and isinstance(raw_gw, dict):
+        expected_amount = float(tx_record.get("amount") or 0)
+        if "amount" in raw_gw and raw_gw["amount"] is not None:
+            paid_amount = float(raw_gw["amount"])
+            if paid_amount + 0.01 < expected_amount:
+                return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+        elif "value" in raw_gw and raw_gw["value"] is not None:
+            paid_cents = int(raw_gw["value"])
+            if paid_cents < int(tx_record.get("cents") or round(expected_amount * 100)):
+                return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+
+    delivered = await bot_manager.notify_payment_by_tx_id(transaction_id)
+    if not delivered:
+        return {"status": "rejected", "action": "unknown_or_already_delivered_tx", "transaction_id": transaction_id}
+
+    async with async_session() as session:
+        result = await session.execute(select(Order).where(Order.transaction_id == transaction_id))
+        order = result.scalars().first()
+        if order:
+            order.status = "paid"
+            order.paid_at = datetime.utcnow()
+            await session.commit()
+    return {"status": "success", "action": "approved", "transaction_id": transaction_id}
 
 class DiagnosticsRequest(BaseModel):
     state: Optional[Dict[str, Any]] = None
 
-@app.post("/api/diagnostics")
+@app.post("/api/diagnostics", dependencies=[Depends(verify_admin_auth)])
 async def run_persona_diagnostics(req: DiagnosticsRequest):
     import asyncio
-    state = req.state or await _read_state_from_db()
+    db_state = await _read_state_from_db()
+    state = _preserve_existing_secrets(req.state, db_state) if req.state else db_state
     t1 = generate_ai_reply(state, [], "Oi! Qual é o seu nome e quantos anos você tem?", lead_name="Mari")
     t2 = generate_ai_reply(state, [], "Quero entrar no seu VIP, quanto custa?", lead_name="Mari")
     t3 = generate_ai_reply(state, [], "Achei meio caro, consegue fazer um desconto pra eu pagar agora no Pix?", lead_name="Mari")
@@ -589,10 +881,13 @@ async def run_persona_diagnostics(req: DiagnosticsRequest):
 class VerifyTokenRequest(BaseModel):
     token: str
 
-@app.post("/api/flow-bots/verify-token")
+@app.post("/api/flow-bots/verify-token", dependencies=[Depends(verify_admin_auth)])
 async def verify_flow_bot_token(req: VerifyTokenRequest):
     from aiogram import Bot
     tok = (req.token or "").strip()
+    if tok == REDACTED_SECRET_MASK:
+        state = await _read_state_from_db()
+        tok = (state.get("publish", {}).get("bot_token") or "").strip()
     if not tok:
         return {"status": "error", "message": "Token vazio"}
     temp_bot = None
@@ -619,21 +914,18 @@ class VerifyChannelRequest(BaseModel):
     token: Optional[str] = ""
     channel_id: str
 
-@app.post("/api/flow-bots/verify-channel")
+@app.post("/api/flow-bots/verify-channel", dependencies=[Depends(verify_admin_auth)])
 async def verify_flow_channel(req: VerifyChannelRequest):
     from aiogram import Bot
     state = await _read_state_from_db()
-    tok = (req.token or state.get("publish", {}).get("bot_token") or "").strip()
+    tok = (req.token or "").strip()
+    if not tok or tok == REDACTED_SECRET_MASK:
+        tok = (state.get("publish", {}).get("bot_token") or "").strip()
     ch_id = (req.channel_id or "").strip()
     if not ch_id:
         return {"status": "error", "message": "ID do canal vazio"}
     if not tok:
-        return {
-            "status": "ok",
-            "channel_id": ch_id,
-            "title": f"Canal ({ch_id})",
-            "verified_at": datetime.now().strftime("%d/%m, %H:%M")
-        }
+        return {"status": "error", "message": "Token do bot não configurado"}
     temp_bot = None
     try:
         temp_bot = Bot(token=tok)

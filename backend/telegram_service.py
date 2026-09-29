@@ -12,7 +12,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, URLInputFile, BufferedInputFile
 
 from pushin_pay import PushinPayClient
-from ai_engine import generate_ai_reply
+from ai_engine import generate_ai_reply, _compute_effective_min_price
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("SharkBotTelegram")
@@ -37,7 +37,10 @@ class ActiveBotManager:
         self.polling_task: Optional[asyncio.Task] = None
         self.current_token: str = ""
         self.downsell_tasks: Dict[str, asyncio.Task] = {}
+        self.pix_poll_tasks: Dict[str, asyncio.Task] = {}
+        self.upsell_tasks: Dict[str, asyncio.Task] = {}
         self.active_tx_map: Dict[str, int] = {}
+        self.tx_records: Dict[str, Dict[str, Any]] = {}
         self.lead_locks: Dict[str, asyncio.Lock] = {}
         self.state_getter = None
         self.state_saver = None
@@ -90,13 +93,45 @@ class ActiveBotManager:
         self.dp = Dispatcher()
         self._register_handlers()
         self.polling_task = asyncio.create_task(self._run_polling())
+        self._resume_pending_pix_polls(state)
         logger.info(f"Bot iniciado em produção: @{me.username}")
         return {"status": "running", "bot_username": f"@{me.username}"}
+
+    def _resume_pending_pix_polls(self, state: Dict[str, Any]):
+        pub = state.get("publish", {})
+        pushin_token = (pub.get("pushin_pay_token") or "").strip()
+        gw_provider = (pub.get("gateway_provider") or "syncpay").strip()
+        gw_secret = (pub.get("gateway_secret") or "").strip()
+        if not pushin_token:
+            return
+        now = datetime.utcnow()
+        for tx_id, rec in (state.get("tx_records") or {}).items():
+            if not isinstance(rec, dict) or rec.get("status") != "pending":
+                continue
+            uid = int(rec.get("user_id") or 0)
+            if not uid or not tx_id or str(tx_id).startswith("sim_"):
+                continue
+            try:
+                created_dt = datetime.fromisoformat(str(rec.get("created_at") or ""))
+                if (now - created_dt) > timedelta(minutes=30):
+                    continue
+            except Exception:
+                pass
+            self.tx_records[str(tx_id)] = rec
+            self._start_pix_poll_task(uid, str(tx_id), pushin_token, gw_provider, gw_secret)
 
     async def stop(self):
         for t in self.downsell_tasks.values():
             t.cancel()
         self.downsell_tasks.clear()
+
+        for t in self.pix_poll_tasks.values():
+            t.cancel()
+        self.pix_poll_tasks.clear()
+
+        for t in self.upsell_tasks.values():
+            t.cancel()
+        self.upsell_tasks.clear()
 
         if self.polling_task and not self.polling_task.done():
             self.polling_task.cancel()
@@ -414,19 +449,55 @@ class ActiveBotManager:
             ])
         return InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
 
+    async def _send_single_media_cached(
+        self,
+        chat_id: int,
+        m: Dict[str, Any],
+        caption: Optional[str] = None,
+        has_spoiler: bool = False
+    ) -> Optional[str]:
+        if not isinstance(m, dict):
+            return None
+        url = m.get("url")
+        cached_fid = (m.get("telegram_file_id") or "").strip()
+        mtype = (m.get("type") or "").lower()
+        is_video = "video" in mtype or "vídeo" in mtype or str(url or "").startswith("data:video")
+
+        if cached_fid:
+            try:
+                if is_video:
+                    await self.bot.send_video(chat_id=chat_id, video=cached_fid, caption=caption, has_spoiler=has_spoiler)
+                else:
+                    await self.bot.send_photo(chat_id=chat_id, photo=cached_fid, caption=caption, has_spoiler=has_spoiler)
+                return cached_fid
+            except Exception:
+                m.pop("telegram_file_id", None)
+
+        if not url:
+            return None
+
+        inp = self._build_input_file(url, m.get("name") or ("media.mp4" if is_video else "media.jpg"))
+        if not inp:
+            return None
+
+        if is_video:
+            sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler)
+            vid_obj = getattr(sent, "video", None)
+            fid = getattr(vid_obj, "file_id", None) if vid_obj else None
+        else:
+            sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler)
+            photos = getattr(sent, "photo", None)
+            fid = getattr(photos[-1], "file_id", None) if (photos and len(photos) > 0) else None
+
+        if fid:
+            m["telegram_file_id"] = str(fid)
+            return str(fid)
+        return None
+
     async def _send_flow_medias(self, chat_id: int, medias: List[Dict[str, Any]]):
         for m in (medias or [])[:3]:
-            url = m.get("url")
-            if not url:
-                continue
             try:
-                inp = self._build_input_file(url, m.get("name") or "media.jpg")
-                if inp:
-                    mtype = (m.get("type") or "").lower()
-                    if "video" in mtype or str(url).startswith("data:video"):
-                        await self.bot.send_video(chat_id=chat_id, video=inp)
-                    else:
-                        await self.bot.send_photo(chat_id=chat_id, photo=inp)
+                await self._send_single_media_cached(chat_id, m)
             except Exception as e:
                 logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
 
@@ -471,10 +542,16 @@ class ActiveBotManager:
                     return
                 await self._send_flow_medias(user.id, seq.get("medias", []))
                 txt = self._render_flow_vars(msg_tmpl, user, fb)
+                disc_str = seq.get("discount", "Sem desconto")
+                disc_pct = self._parse_discount_pct(disc_str)
+                if disc_pct > 0:
+                    auth_discounts = lead.setdefault("authorized_flow_discounts", [])
+                    if disc_pct not in auth_discounts:
+                        auth_discounts.append(disc_pct)
                 kb = self._build_flow_plans_kb(
                     fb,
                     filter_plan_ids=seq.get("plan_ids") or None,
-                    discount_str=seq.get("discount", "Sem desconto")
+                    discount_str=disc_str
                 )
                 await self.bot.send_message(chat_id=user.id, text=txt, parse_mode="HTML", reply_markup=kb)
                 lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
@@ -551,8 +628,20 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro no Downsell worker: {e}")
 
+    def _cancel_upsell(self, user_id: str):
+        task = self.upsell_tasks.pop(str(user_id), None)
+        if task and not task.done():
+            task.cancel()
+
     def cancel_lead_tasks(self, user_id: str):
-        self._cancel_downsell(str(user_id))
+        uid = str(user_id)
+        self._cancel_downsell(uid)
+        self._cancel_upsell(uid)
+        for tx_id, owner_id in list(self.active_tx_map.items()):
+            if str(owner_id) == uid:
+                pt = self.pix_poll_tasks.pop(tx_id, None)
+                if pt and not pt.done():
+                    pt.cancel()
 
     def _register_handlers(self):
         @self.dp.message(CommandStart())
@@ -560,6 +649,7 @@ class ActiveBotManager:
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, message.from_user)
             self._cancel_downsell(str(message.from_user.id))
+            self._cancel_upsell(str(message.from_user.id))
 
             # Ao enviar /start, reinicia o histórico, etapa e downsells do lead para permitir novo ciclo limpo
             lead["history"] = []
@@ -571,6 +661,10 @@ class ActiveBotManager:
             lead["objections"] = "Nenhuma identificada"
             lead.pop("accepted_bump_deliverable", None)
             lead.pop("flow_plan_id", None)
+            lead.pop("authorized_flow_discounts", None)
+            lead.pop("authorized_discount_offer_id", None)
+            lead.pop("authorized_discount_price", None)
+            lead.pop("authorized_discount_expires_at", None)
             self._update_lead_insights(state, lead)
 
             flow_bot = self._get_active_flow_bot(state)
@@ -677,19 +771,21 @@ class ActiveBotManager:
                 state = await self.state_getter()
                 lead = await self._get_or_create_lead(state, message.from_user)
 
-                # Se houver mídia acionada pelo contexto (suporta URL http e upload Base64)
+                # Se houver mídia acionada pelo contexto (suporta URL http, upload Base64 e cache de telegram_file_id)
                 media = ai_res.get("media")
-                if media and media.get("url"):
+                if media and (media.get("url") or media.get("telegram_file_id")):
                     try:
-                        photo_input = self._build_input_file(media["url"], f"{media.get('name', 'media')}.jpg")
-                        if photo_input:
-                            raw_cap = (media.get("caption") or "").replace("{nome}", lead.get("first_name", "")).strip()
-                            await self.bot.send_photo(
-                                chat_id=message.chat.id,
-                                photo=photo_input,
-                                caption=raw_cap or None,
-                                has_spoiler=bool(media.get("spoiler", False))
-                            )
+                        raw_cap = (media.get("caption") or "").replace("{nome}", lead.get("first_name", "")).strip()
+                        fid = await self._send_single_media_cached(
+                            message.chat.id,
+                            media,
+                            caption=raw_cap or None,
+                            has_spoiler=bool(media.get("spoiler", False))
+                        )
+                        if fid and media.get("id"):
+                            for sm in state.get("medias", []):
+                                if isinstance(sm, dict) and sm.get("id") == media.get("id"):
+                                    sm["telegram_file_id"] = fid
                     except Exception as e:
                         logger.warning(f"Falha ao enviar mídia de prévia: {e}")
 
@@ -704,6 +800,11 @@ class ActiveBotManager:
                         self._advance_stage(lead, "Viu os planos")
                         if offer_card.get("discounted"):
                             self._advance_stage(lead, "Escolheu um plano")
+                            bargain_cfg = state.get("business", {}).get("bargain") or state.get("bargain") or {}
+                            val_mins = max(1, int(bargain_cfg.get("validity_minutes") or 30))
+                            lead["authorized_discount_offer_id"] = str(offer_card.get("id", ""))[:20]
+                            lead["authorized_discount_price"] = float(offer_card.get("price", 0))
+                            lead["authorized_discount_expires_at"] = (datetime.utcnow() + timedelta(minutes=val_mins)).isoformat()
 
                 try:
                     await message.answer(reply_text, reply_markup=markup)
@@ -763,20 +864,50 @@ class ActiveBotManager:
                 pass
             parts = callback.data.split(":")
             oid = parts[1] if len(parts) > 1 else ""
-            price = float(parts[2]) if len(parts) > 2 else 19.0
             has_up_flag = len(parts) > 3 and parts[3] == "up"
 
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, callback.from_user)
             self._cancel_downsell(str(callback.from_user.id))
 
-            # Identifica o nome da oferta escolhida
-            chosen_offer_name = f"Oferta R$ {price:.2f}".replace(".", ",")
+            # Preço SEMPRE calculado no servidor a partir do cadastro de ofertas (ignora parts[2] do callback)
+            matched_offer = None
             for idx, o in enumerate(state.get("business", {}).get("offers", [])):
                 cand_id = str(o.get("id", f"offer_{idx}"))[:20]
                 if cand_id == oid:
-                    chosen_offer_name = o.get("name", chosen_offer_name)
+                    matched_offer = o
                     break
+            if not matched_offer:
+                offers_list = state.get("business", {}).get("offers", [])
+                if not offers_list:
+                    await callback.answer("Nenhuma oferta disponível no momento.", show_alert=True)
+                    return
+                matched_offer = offers_list[0]
+                oid = str(matched_offer.get("id", "offer_0"))[:20]
+
+            base_price = float(matched_offer.get("price", 19.0))
+            price = base_price
+            bargain = state.get("business", {}).get("bargain") or state.get("bargain") or {}
+            exp_str = lead.get("authorized_discount_expires_at")
+            discount_not_expired = True
+            if exp_str:
+                try:
+                    discount_not_expired = datetime.utcnow() <= datetime.fromisoformat(str(exp_str))
+                except Exception:
+                    discount_not_expired = False
+
+            if (
+                bargain.get("enabled")
+                and discount_not_expired
+                and str(lead.get("authorized_discount_offer_id", "")) == oid
+                and lead.get("authorized_discount_price") is not None
+            ):
+                eff_min = _compute_effective_min_price([matched_offer], bargain)
+                auth_p = float(lead.get("authorized_discount_price"))
+                if eff_min <= auth_p <= base_price:
+                    price = round(auth_p, 2)
+
+            chosen_offer_name = matched_offer.get("name", f"Oferta R$ {price:.2f}".replace(".", ","))
 
             is_upsell = has_up_flag or lead.get("stage") in (
                 "Entrega concluída",
@@ -797,33 +928,65 @@ class ActiveBotManager:
 
             self._update_lead_insights(state, lead, chosen_plan=chosen_offer_name)
 
-            learning = state.setdefault("learning", {})
-            learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
-
             pub = state.get("publish", {})
             pushin_token = pub.get("pushin_pay_token", "").strip()
             gw_provider = pub.get("gateway_provider", "syncpay").strip()
             gw_secret = pub.get("gateway_secret", "").strip()
-            cents = int(round(price * 100))
-            pix_code = f"00020126580014br.gov.bcb.pix0136sharkbot-{cents}5204000053039865405{price:.2f}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD"
-            tx_id = f"sim_{int(datetime.utcnow().timestamp())}"
+            cents = max(50, int(round(price * 100)))
+            target_chat_id = callback.message.chat.id if callback.message else callback.from_user.id
 
-            if pushin_token:
-                try:
-                    client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-                    res = await client.create_pix_charge(
-                        value_in_cents=cents,
-                        client_name=callback.from_user.first_name or "Cliente VIP"
-                    )
-                    pix_code = res.get("qr_code") or pix_code
-                    tx_id = str(res.get("id") or tx_id)
-                except Exception as e:
-                    logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
+            # Fail-closed: nunca gera transação sim_ nem PIX falso se o gateway falhar ou não estiver configurado
+            if not pushin_token:
+                await self.state_saver(state)
+                await self.bot.send_message(
+                    chat_id=target_chat_id,
+                    text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
+                )
+                return
+
+            try:
+                client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
+                res = await client.create_pix_charge(
+                    value_in_cents=cents,
+                    client_name=callback.from_user.first_name or "Cliente VIP"
+                )
+                pix_code = (res or {}).get("qr_code") or ""
+                tx_id = str((res or {}).get("id") or "").strip()
+                if not pix_code or not tx_id or tx_id.startswith("sim_"):
+                    raise ValueError("Gateway não retornou id ou qr_code válidos")
+            except Exception as e:
+                logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
+                await self.state_saver(state)
+                await self.bot.send_message(
+                    chat_id=target_chat_id,
+                    text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
+                )
+                return
+
+            learning = state.setdefault("learning", {})
+            learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
 
             if is_upsell:
                 self._advance_stage(lead, "Checkout de upsell")
             else:
                 self._advance_stage(lead, "Gerou checkout")
+
+            tx_record = {
+                "tx_id": tx_id,
+                "user_id": int(callback.from_user.id),
+                "mode": "ai",
+                "offer_id": oid,
+                "offer_name": chosen_offer_name,
+                "amount": round(price, 2),
+                "cents": cents,
+                "is_upsell": bool(is_upsell),
+                "delivery_type": pub.get("delivery_type", "Link de acesso"),
+                "delivery_destination": pub.get("delivery_destination", "").strip(),
+                "status": "pending",
+                "created_at": datetime.utcnow().isoformat(),
+            }
+            self.tx_records[tx_id] = tx_record
+            state.setdefault("tx_records", {})[tx_id] = tx_record
 
             lead["last_tx_id"] = tx_id
             lead["last_tx_is_upsell"] = is_upsell
@@ -843,7 +1006,6 @@ class ActiveBotManager:
                 [InlineKeyboardButton(text="✅ Já paguei / Liberar acesso", callback_data=safe_cb)]
             ])
 
-            target_chat_id = callback.message.chat.id if callback.message else callback.from_user.id
             safe_pix_html = html.escape(pix_code)
             try:
                 await self.bot.send_message(
@@ -874,36 +1036,42 @@ class ActiveBotManager:
                     reply_markup=confirm_kb
                 )
 
-            if pushin_token and not tx_id.startswith("sim_"):
-                asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret))
+            self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
 
         @self.dp.callback_query(F.data.startswith("checkpix:"))
         async def handle_check_pix(callback: types.CallbackQuery):
             parts = callback.data.split(":")
-            tx_id = parts[1] if len(parts) > 1 else ""
+            tx_id = (parts[1] if len(parts) > 1 else "").strip()
+            if not tx_id or tx_id.startswith("sim_"):
+                await callback.answer("Cobrança inválida ou expirada.", show_alert=True)
+                return
+
             state = await self.state_getter()
+            tx_record = (state.get("tx_records") or {}).get(tx_id) or self.tx_records.get(tx_id)
+            if tx_record and int(tx_record.get("user_id", 0)) != int(callback.from_user.id):
+                await callback.answer("Esta cobrança não pertence ao seu usuário.", show_alert=True)
+                return
+
             pub = state.get("publish", {})
             pushin_token = pub.get("pushin_pay_token", "").strip()
             gw_provider = pub.get("gateway_provider", "syncpay").strip()
             gw_secret = pub.get("gateway_secret", "").strip()
 
-            if pushin_token and not tx_id.startswith("sim_"):
-                try:
-                    client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-                    status_data = await client.check_transaction_status(tx_id)
-                    if str(status_data.get("status", "")).lower() == "paid":
-                        await callback.answer("Pagamento confirmado! 💜")
-                        await self.deliver_purchase_and_upsell(callback.from_user.id)
-                        return
-                    else:
-                        await callback.answer("Ainda aguardando confirmação do banco. Assim que pagar, tente novamente!", show_alert=True)
-                        return
-                except Exception:
-                    pass
+            if not pushin_token:
+                await callback.answer("Gateway de pagamento não configurado.", show_alert=True)
+                return
 
-            # Modo de demonstração caso não tenha token real configurado
-            await callback.answer("Pagamento de teste aprovado!")
-            await self.deliver_purchase_and_upsell(callback.from_user.id)
+            try:
+                client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
+                status_data = await client.check_transaction_status(tx_id)
+                if str((status_data or {}).get("status", "")).lower() == "paid":
+                    await callback.answer("Pagamento confirmado! 💜")
+                    await self.deliver_purchase_and_upsell(callback.from_user.id, tx_id=tx_id)
+                    return
+                await callback.answer("Ainda aguardando confirmação do banco. Assim que pagar, tente novamente!", show_alert=True)
+            except Exception as e:
+                logger.warning(f"Erro ao verificar status PIX ({tx_id}): {e}")
+                await callback.answer("Não foi possível consultar o banco agora. Tente novamente em instantes.", show_alert=True)
 
         @self.dp.callback_query(F.data.startswith("fplan:"))
         async def handle_flow_plan_click(callback: types.CallbackQuery):
@@ -919,6 +1087,11 @@ class ActiveBotManager:
             fb = self._get_active_flow_bot(state)
             if not fb:
                 return
+
+            lead = await self._get_or_create_lead(state, callback.from_user)
+            auth_discounts = lead.get("authorized_flow_discounts") or []
+            if disc_pct not in auth_discounts:
+                disc_pct = 0
 
             active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
             if active_bumps:
@@ -943,6 +1116,10 @@ class ActiveBotManager:
             if not fb:
                 return
             lead = await self._get_or_create_lead(state, callback.from_user)
+            auth_discounts = lead.get("authorized_flow_discounts") or []
+            if disc_pct not in auth_discounts:
+                disc_pct = 0
+
             accepted_list = lead.setdefault("accepted_bump_indices", [])
             if bump_idx == 0 and decision == "no" and not accepted_list:
                 pass
@@ -1006,6 +1183,11 @@ class ActiveBotManager:
         lead = await self._get_or_create_lead(state, callback.from_user)
         self._cancel_downsell(str(callback.from_user.id))
 
+        # Valida desconto contra descontos efetivamente autorizados pelo downsell no servidor
+        auth_discounts = lead.get("authorized_flow_discounts") or []
+        if disc_pct not in auth_discounts:
+            disc_pct = 0
+
         plan = None
         for idx, p in enumerate(fb.get("plans", [])):
             if str(p.get("id", f"plan_{idx+1}"))[:20] == plan_id:
@@ -1023,11 +1205,13 @@ class ActiveBotManager:
         if fb.get("price_variation", False):
             total_price = round(total_price + random.randint(1, 9) / 100.0, 2)
 
+        bump_deliverable_str = ""
         if accepted_bumps:
             bump_titles = " + ".join(b.get("title") or "Adicional" for b in accepted_bumps)
             full_plan_label = f"{plan_name} (+ {bump_titles})"
             deliverables = [b.get("deliverable", "").strip() for b in accepted_bumps if (b.get("deliverable") or "").strip()]
-            lead["accepted_bump_deliverable"] = "\n\n".join(deliverables)
+            bump_deliverable_str = "\n\n".join(deliverables)
+            lead["accepted_bump_deliverable"] = bump_deliverable_str
         else:
             full_plan_label = plan_name
             lead.pop("accepted_bump_deliverable", None)
@@ -1036,31 +1220,76 @@ class ActiveBotManager:
         lead["flow_plan_price"] = total_price
         lead["chosen_plan"] = full_plan_label
         self._advance_stage(lead, "Escolheu um plano")
-        self._advance_stage(lead, "Gerou checkout")
         self._update_lead_insights(state, lead, chosen_plan=full_plan_label)
-
-        learning = state.setdefault("learning", {})
-        learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
 
         pub = state.get("publish", {})
         pushin_token = pub.get("pushin_pay_token", "").strip()
         gw_provider = pub.get("gateway_provider", "syncpay").strip()
         gw_secret = pub.get("gateway_secret", "").strip()
         cents = max(50, int(round(total_price * 100)))
-        pix_code = f"00020126580014br.gov.bcb.pix0136neurotbot-{cents}5204000053039865405{total_price:.2f}5802BR5913VIP PRIVADO6009SAO PAULO62070503***6304ABCD"
-        tx_id = f"sim_{int(datetime.utcnow().timestamp())}"
+        chat_id = callback.message.chat.id if callback.message else callback.from_user.id
 
-        if pushin_token:
-            try:
-                client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-                res = await client.create_pix_charge(
-                    value_in_cents=cents,
-                    client_name=callback.from_user.first_name or "Cliente VIP"
-                )
-                pix_code = res.get("qr_code") or pix_code
-                tx_id = str(res.get("id") or tx_id)
-            except Exception as e:
-                logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
+        # Fail-closed: nunca cria PIX sim_ caso o gateway falhe ou não esteja configurado
+        if not pushin_token:
+            await self.state_saver(state)
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
+            )
+            return
+
+        try:
+            client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
+            res = await client.create_pix_charge(
+                value_in_cents=cents,
+                client_name=callback.from_user.first_name or "Cliente VIP"
+            )
+            pix_code = (res or {}).get("qr_code") or ""
+            tx_id = str((res or {}).get("id") or "").strip()
+            if not pix_code or not tx_id or tx_id.startswith("sim_"):
+                raise ValueError("Gateway não retornou id ou qr_code válidos")
+        except Exception as e:
+            logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
+            await self.state_saver(state)
+            await self.bot.send_message(
+                chat_id=chat_id,
+                text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
+            )
+            return
+
+        self._advance_stage(lead, "Gerou checkout")
+        learning = state.setdefault("learning", {})
+        learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) + 1
+
+        fb_deliv = fb.get("fallback_delivery", {})
+        dest_type = (plan.get("delivery_dest_type") if plan else "Herdar do fluxo") or "Herdar do fluxo"
+        if dest_type == "Herdar do fluxo":
+            eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
+            ch_target = (fb_deliv.get("channel_id") or "").strip()
+            ext_url = (fb_deliv.get("external_url") or "").strip()
+        else:
+            eff_type = dest_type
+            ch_target = ((plan.get("delivery_channel_id") if plan else "") or fb_deliv.get("channel_id") or "").strip()
+            ext_url = ((plan.get("delivery_external_url") if plan else "") or fb_deliv.get("external_url") or "").strip()
+
+        tx_record = {
+            "tx_id": tx_id,
+            "user_id": int(callback.from_user.id),
+            "mode": "flow",
+            "plan_id": str(plan.get("id") if plan else plan_id),
+            "offer_name": full_plan_label,
+            "amount": round(total_price, 2),
+            "cents": cents,
+            "is_upsell": False,
+            "deliverable": bump_deliverable_str,
+            "delivery_dest_type": eff_type,
+            "delivery_channel_id": ch_target,
+            "delivery_external_url": ext_url,
+            "status": "pending",
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self.tx_records[tx_id] = tx_record
+        state.setdefault("tx_records", {})[tx_id] = tx_record
 
         lead["last_tx_id"] = tx_id
         lead["last_tx_is_upsell"] = False
@@ -1091,7 +1320,6 @@ class ActiveBotManager:
             pix_code_fmt=pix_code_formatted
         )
 
-        chat_id = callback.message.chat.id if callback.message else callback.from_user.id
         await self._send_flow_medias(chat_id, pay_cfg.get("generated_medias", []))
 
         safe_cb = f"checkpix:{tx_id[:50]}"
@@ -1122,8 +1350,25 @@ class ActiveBotManager:
         await self.state_saver(state)
 
         self._schedule_flow_downsell(callback.from_user, track="pix")
-        if pushin_token and not tx_id.startswith("sim_"):
-            asyncio.create_task(self._poll_pix_payment(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret))
+        self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
+
+    def _start_pix_poll_task(
+        self,
+        user_id: int,
+        tx_id: str,
+        pushin_token: str,
+        gw_provider: str = "syncpay",
+        gw_secret: str = ""
+    ):
+        if not tx_id or str(tx_id).startswith("sim_"):
+            return
+        old_t = self.pix_poll_tasks.pop(tx_id, None)
+        if old_t and not old_t.done():
+            old_t.cancel()
+        self.active_tx_map[tx_id] = user_id
+        self.pix_poll_tasks[tx_id] = asyncio.create_task(
+            self._poll_pix_payment(user_id, tx_id, pushin_token, gw_provider, gw_secret)
+        )
 
     def _build_input_file(self, url_or_b64: str, filename: str = "media.jpg"):
         if not url_or_b64:
@@ -1139,44 +1384,125 @@ class ActiveBotManager:
         return URLInputFile(url_or_b64)
 
     async def notify_payment_by_tx_id(self, tx_id: str) -> bool:
-        if not tx_id:
+        if not tx_id or str(tx_id).startswith("sim_"):
             return False
-        uid = self.active_tx_map.get(tx_id)
-        if not uid and self.state_getter:
-            state = await self.state_getter()
-            for lead in state.get("memory", {}).get("leads", []):
-                if str(lead.get("last_tx_id")) == str(tx_id):
-                    uid = int(lead.get("telegram_id"))
-                    break
-        if uid:
-            await self.deliver_purchase_and_upsell(uid)
-            return True
-        return False
+        state = await self.state_getter() if self.state_getter else {}
+        tx_record = (state.get("tx_records") or {}).get(tx_id) or self.tx_records.get(tx_id)
+        if not tx_record:
+            return False
+        if tx_record.get("status") == "paid":
+            return False
+        uid = int(tx_record.get("user_id") or 0)
+        if not uid:
+            return False
+        await self.deliver_purchase_and_upsell(uid, tx_id=tx_id)
+        return True
 
     async def _poll_pix_payment(self, user_id: int, tx_id: str, pushin_token: str, gw_provider: str = "syncpay", gw_secret: str = ""):
+        if not tx_id or str(tx_id).startswith("sim_"):
+            return
         client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-        for _ in range(90):
-            await asyncio.sleep(8)
-            try:
-                data = await client.check_transaction_status(tx_id)
-                if str(data.get("status", "")).lower() == "paid":
-                    await self.deliver_purchase_and_upsell(user_id)
-                    return
-            except Exception:
-                pass
+        try:
+            for _ in range(90):
+                await asyncio.sleep(8)
+                try:
+                    data = await client.check_transaction_status(tx_id)
+                    if str((data or {}).get("status", "")).lower() == "paid":
+                        await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id)
+                        return
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self.pix_poll_tasks.pop(tx_id, None)
 
-    async def deliver_purchase_and_upsell(self, user_id: int):
+    def _schedule_upsell(self, user_id: int):
+        uid = str(user_id)
+        self._cancel_upsell(uid)
+        self.upsell_tasks[uid] = asyncio.create_task(self._upsell_worker(user_id))
+
+    async def _upsell_worker(self, user_id: int):
+        try:
+            state = await self.state_getter()
+            upsell = state.get("upsell", {})
+            if not upsell.get("enabled", False):
+                return
+            delay_mins = max(1, int(upsell.get("delay_minutes", 1)))
+            await asyncio.sleep(max(5, delay_mins * 60))
+
+            state = await self.state_getter()
+            upsell = state.get("upsell", {})
+            if not upsell.get("enabled", False):
+                return
+            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
+            for m in upsell.get("medias", []):
+                if isinstance(m, dict) and (m.get("url") or m.get("telegram_file_id")):
+                    try:
+                        await self._send_single_media_cached(
+                            user_id,
+                            m,
+                            caption=m.get("caption") or None,
+                            has_spoiler=bool(m.get("spoiler", False))
+                        )
+                    except Exception:
+                        pass
+            upsell_msg = upsell.get("message", "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀")
+            target_up_id = str(upsell.get("offer_id", ""))
+            matched_up_offer = None
+            for o in state.get("business", {}).get("offers", []):
+                if str(o.get("id")) == target_up_id:
+                    matched_up_offer = {**o, "specific_match": True}
+                    break
+            await self.bot.send_message(
+                chat_id=user_id,
+                text=upsell_msg,
+                reply_markup=self._build_offers_keyboard(state, only_offer=matched_up_offer, is_upsell=True)
+            )
+            self._advance_stage(lead, "Recebeu upsell")
+            lead.setdefault("history", []).append({
+                "role": "assistant",
+                "content": f"[Upsell] {upsell_msg}"
+            })
+            await self.state_saver(state)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"Erro no Upsell worker: {e}")
+        finally:
+            self.upsell_tasks.pop(str(user_id), None)
+
+    async def deliver_purchase_and_upsell(self, user_id: int, tx_id: Optional[str] = None):
         state = await self.state_getter()
         lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
         self._cancel_downsell(str(user_id))
 
-        is_upsell_payment = bool(lead.get("last_tx_is_upsell")) or lead.get("stage") in (
-            "Escolheu upsell",
-            "Checkout de upsell",
-        )
+        tx_record = None
+        if tx_id:
+            poll_t = self.pix_poll_tasks.pop(tx_id, None)
+            if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
+                poll_t.cancel()
+            tx_record = (state.setdefault("tx_records", {})).get(tx_id) or self.tx_records.get(tx_id)
+            if tx_record:
+                if tx_record.get("status") == "paid":
+                    return
+                tx_record["status"] = "paid"
+                tx_record["paid_at"] = datetime.utcnow().isoformat()
+                self.tx_records[tx_id] = tx_record
+                state["tx_records"][tx_id] = tx_record
+
+        if tx_record is not None:
+            is_upsell_payment = bool(tx_record.get("is_upsell"))
+        else:
+            is_upsell_payment = bool(lead.get("last_tx_is_upsell")) or lead.get("stage") in (
+                "Escolheu upsell",
+                "Checkout de upsell",
+            )
 
         if is_upsell_payment:
-            if lead.get("stage") == "Comprou upsell":
+            if lead.get("stage") == "Comprou upsell" and tx_record is None:
                 return
             self._advance_stage(lead, "Comprou upsell")
             learning = state.setdefault("learning", {})
@@ -1196,7 +1522,7 @@ class ActiveBotManager:
             await self.state_saver(state)
             return
 
-        if lead.get("stage") in ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Recebeu upsell", "Comprou upsell"):
+        if tx_record is None and lead.get("stage") in ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Recebeu upsell", "Comprou upsell"):
             return
 
         self._advance_stage(lead, "Pagamento aprovado")
@@ -1207,29 +1533,36 @@ class ActiveBotManager:
         self._update_lead_insights(state, lead)
 
         flow_bot = self._get_active_flow_bot(state)
-        if flow_bot:
-            paid_val = float(lead.get("flow_plan_price") or 9.90)
+        is_flow_tx = (tx_record and tx_record.get("mode") == "flow") or (tx_record is None and flow_bot is not None)
+        if is_flow_tx and flow_bot:
+            paid_val = float(tx_record.get("amount") if tx_record else (lead.get("flow_plan_price") or 9.90))
             flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
             flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
 
-            plan_obj = None
-            for p in flow_bot.get("plans", []):
-                if str(p.get("id")) == str(lead.get("flow_plan_id")):
-                    plan_obj = p
-                    break
-            if not plan_obj and flow_bot.get("plans"):
-                plan_obj = flow_bot["plans"][0]
-
-            fb_deliv = flow_bot.get("fallback_delivery", {})
-            dest_type = (plan_obj.get("delivery_dest_type") if plan_obj else "Herdar do fluxo") or "Herdar do fluxo"
-            if dest_type == "Herdar do fluxo":
-                eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
-                ch_target = (fb_deliv.get("channel_id") or "").strip()
-                ext_url = (fb_deliv.get("external_url") or "").strip()
+            if tx_record and tx_record.get("delivery_dest_type"):
+                eff_type = tx_record.get("delivery_dest_type", "Canal ou grupo")
+                ch_target = (tx_record.get("delivery_channel_id") or "").strip()
+                ext_url = (tx_record.get("delivery_external_url") or "").strip()
             else:
-                eff_type = dest_type
-                ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
-                ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
+                target_plan_id = str(tx_record.get("plan_id") if tx_record else lead.get("flow_plan_id"))
+                plan_obj = None
+                for p in flow_bot.get("plans", []):
+                    if str(p.get("id")) == target_plan_id:
+                        plan_obj = p
+                        break
+                if not plan_obj and flow_bot.get("plans"):
+                    plan_obj = flow_bot["plans"][0]
+
+                fb_deliv = flow_bot.get("fallback_delivery", {})
+                dest_type = (plan_obj.get("delivery_dest_type") if plan_obj else "Herdar do fluxo") or "Herdar do fluxo"
+                if dest_type == "Herdar do fluxo":
+                    eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
+                    ch_target = (fb_deliv.get("channel_id") or "").strip()
+                    ext_url = (fb_deliv.get("external_url") or "").strip()
+                else:
+                    eff_type = dest_type
+                    ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
+                    ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
 
             invite_url = "https://t.me/+link_exclusivo_vip"
             if eff_type == "Link externo" and ext_url:
@@ -1258,16 +1591,18 @@ class ActiveBotManager:
                 "Parabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n"
                 "🎉 Você já tem acesso ao conteúdo!"
             )
+            plan_label = (tx_record.get("offer_name") if tx_record else None) or lead.get("chosen_plan") or "Plano VIP"
             rendered_app = self._render_flow_vars(
                 app_tmpl,
                 fake_user,
                 flow_bot,
-                plan_name=lead.get("chosen_plan") or "Plano VIP",
+                plan_name=plan_label,
                 valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
             )
             await self.bot.send_message(chat_id=user_id, text=rendered_app, parse_mode="HTML", reply_markup=kb)
 
-            bump_deliv = (lead.get("accepted_bump_deliverable") or "").strip()
+            bump_deliv = (tx_record.get("deliverable") if tx_record is not None else lead.get("accepted_bump_deliverable")) or ""
+            bump_deliv = bump_deliv.strip()
             if bump_deliv:
                 await self.bot.send_message(
                     chat_id=user_id,
@@ -1278,7 +1613,7 @@ class ActiveBotManager:
             self._advance_stage(lead, "Entrega concluída")
             lead.setdefault("history", []).append({
                 "role": "assistant",
-                "content": "[Pagamento aprovado Flow — Entrega concluída]"
+                "content": f"[Pagamento aprovado Flow ({plan_label}) — Entrega concluída]"
             })
             await self.state_saver(state)
             return
@@ -1286,8 +1621,8 @@ class ActiveBotManager:
         await self.state_saver(state)
 
         pub = state.get("publish", {})
-        dest = pub.get("delivery_destination", "").strip()
-        delivery_type = pub.get("delivery_type", "Link de acesso")
+        dest = (tx_record.get("delivery_destination") if tx_record else None) or pub.get("delivery_destination", "").strip()
+        delivery_type = (tx_record.get("delivery_type") if tx_record else None) or pub.get("delivery_type", "Link de acesso")
 
         if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
             await self.bot.send_message(
@@ -1328,44 +1663,10 @@ class ActiveBotManager:
         })
         await self.state_saver(state)
 
-        # Dispara Upsell se estiver ativo
+        # Dispara Upsell em task rastreada (sem bloquear a conclusão da entrega/webhook)
         upsell = state.get("upsell", {})
         if upsell.get("enabled", False):
-            delay_mins = int(upsell.get("delay_minutes", 1))
-            await asyncio.sleep(max(5, delay_mins * 60))
-            state = await self.state_getter()
-            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
-            for m in upsell.get("medias", []):
-                if m.get("url"):
-                    try:
-                        p_in = self._build_input_file(m["url"], f"{m.get('name', 'upsell')}.jpg")
-                        if p_in:
-                            await self.bot.send_photo(
-                                chat_id=user_id,
-                                photo=p_in,
-                                caption=m.get("caption") or None,
-                                has_spoiler=bool(m.get("spoiler", False))
-                            )
-                    except Exception:
-                        pass
-            upsell_msg = upsell.get("message", "agora que seu acesso foi liberado, tenho uma opção extra que combina com você 👀")
-            target_up_id = str(upsell.get("offer_id", ""))
-            matched_up_offer = None
-            for o in state.get("business", {}).get("offers", []):
-                if str(o.get("id")) == target_up_id:
-                    matched_up_offer = {**o, "specific_match": True}
-                    break
-            await self.bot.send_message(
-                chat_id=user_id,
-                text=upsell_msg,
-                reply_markup=self._build_offers_keyboard(state, only_offer=matched_up_offer, is_upsell=True)
-            )
-            self._advance_stage(lead, "Recebeu upsell")
-            lead.setdefault("history", []).append({
-                "role": "assistant",
-                "content": f"[Upsell] {upsell_msg}"
-            })
-            await self.state_saver(state)
+            self._schedule_upsell(user_id)
 
 
 bot_manager = ActiveBotManager()
