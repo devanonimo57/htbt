@@ -241,6 +241,17 @@ class PushinPayClient:
                 st = str(data.get("charge", {}).get("status", "")).upper()
                 return {"status": "paid" if st == "COMPLETED" else st.lower()}
 
+        if self.provider == "asaas":
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(
+                    f"https://api.asaas.com/v3/payments/{transaction_id}",
+                    headers={"access_token": self.token}
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                st = str(data.get("status", "")).upper()
+                return {"status": "paid" if st in ("RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH") else st.lower()}
+
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
                 f"{self.BASE_URL}/transactions/{transaction_id}",
@@ -248,3 +259,4 @@ class PushinPayClient:
             )
             response.raise_for_status()
             return response.json()
+

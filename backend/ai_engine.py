@@ -7,11 +7,11 @@ from typing import Dict, Any, List, Optional
 
 def _compute_effective_min_price(offers: List[Dict[str, Any]], bargain: Dict[str, Any]) -> float:
     base_price = float(offers[0].get("price", 19.0)) if offers else 19.0
-    max_pct = float(bargain.get("max_discount_pct", 40) or 0)
+    max_pct = max(0.0, min(90.0, float(bargain.get("max_discount_pct", 40) or 0)))
     configured_min = float(bargain.get("min_price", 0) or 0)
     pct_floor = round(base_price * max(0.1, (100.0 - max_pct) / 100.0), 2)
     if configured_min > 0:
-        return max(5.0, min(base_price, configured_min))
+        return max(5.0, pct_floor, min(base_price, configured_min))
     return max(5.0, pct_floor)
 
 
@@ -518,7 +518,7 @@ async def generate_ai_reply(
         }
 
     if wants_discount and offers:
-        if bargain.get("enabled"):
+        if bargain.get("enabled") and not (bargain.get("once_per_visitor") and already_discounted):
             eff_min = _compute_effective_min_price(offers, bargain)
             disc_offer = dict(offers[0])
             disc_offer["price"] = eff_min
