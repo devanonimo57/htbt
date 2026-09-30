@@ -1869,9 +1869,20 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
 
     rec["access_status"] = resolved_status
     if resolved_status == "Removido":
-        ch_target = (rec.get("delivery_channel_id") or "").strip()
+        fb_match = next(
+            (b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == str(rec.get("bot_id") or "")),
+            None
+        )
+        ch_target = (
+            str(rec.get("delivery_channel_id") or "").strip()
+            or (str((fb_match.get("fallback_delivery") or {}).get("channel_id") or "").strip() if isinstance(fb_match, dict) else "")
+        )
         uid = int(rec.get("user_id") or 0)
-        tok = (rec.get("bot_token") or state.get("publish", {}).get("bot_token") or "").strip()
+        tok = (
+            str(rec.get("bot_token") or "").strip()
+            or (str(fb_match.get("token") or "").strip() if isinstance(fb_match, dict) else "")
+            or str(state.get("publish", {}).get("bot_token") or "").strip()
+        )
         if ch_target and uid and tok and tok != REDACTED_SECRET_MASK:
             temp_bot = None
             try:
@@ -1921,14 +1932,29 @@ async def handle_lead_action(req: LeadActionRequest):
         if not txt:
             return {"status": "error", "message": "Mensagem vazia."}
         fb = None
+        lead_bot_id = str(target_lead.get("bot_id") or "").strip()
+        lead_bot_uname = str(target_lead.get("bot_username") or "").strip().lower()
         for b in (state.get("flow_bots") or []):
-            if isinstance(b, dict) and str(b.get("id")) == str(target_lead.get("bot_id") or ""):
+            if not isinstance(b, dict):
+                continue
+            if (lead_bot_id and str(b.get("id")) == lead_bot_id) or (lead_bot_uname and str(b.get("username") or "").strip().lower() == lead_bot_uname):
                 fb = b
                 break
+        tx_bot_tok = ""
+        if not fb:
+            for rec in reversed(list((state.get("tx_records") or {}).values())):
+                if isinstance(rec, dict) and str(rec.get("user_id") or "") == tid:
+                    rec_bid = str(rec.get("bot_id") or "").strip()
+                    tx_bot_tok = str(rec.get("bot_token") or "").strip()
+                    if rec_bid:
+                        fb = next((b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == rec_bid), None)
+                    if fb or tx_bot_tok:
+                        break
         if not fb:
             fb = bot_manager._get_active_flow_bot(state)
         tok = (
             (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
+            or tx_bot_tok
             or str(state.get("publish", {}).get("bot_token") or "").strip()
         )
         if not tok or tok == REDACTED_SECRET_MASK:
@@ -1936,7 +1962,10 @@ async def handle_lead_action(req: LeadActionRequest):
         temp_bot = None
         try:
             temp_bot = _create_bot_instance(tok)
-            await temp_bot.send_message(chat_id=int(tid), text=txt, parse_mode="HTML")
+            try:
+                await temp_bot.send_message(chat_id=int(tid), text=txt, parse_mode="HTML")
+            except Exception:
+                await temp_bot.send_message(chat_id=int(tid), text=txt)
             target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
             state = await _write_state_to_db(state, preserve_runtime=False)
             return {"status": "ok", "state": _redact_state_secrets(state)}
@@ -1979,6 +2008,10 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     include_buttons = bool(camp.get("include_plans", camp.get("include_plan_buttons", True)))
     msg_tmpl = (camp.get("message") or req.message or "").strip()
 
+    flow_bots_list = [b for b in (state.get("flow_bots") or []) if isinstance(b, dict)]
+    target_bot_obj = next((b for b in flow_bots_list if str(b.get("id")) == target_bot_id), None) if target_bot_id != "all" else None
+    target_bot_uname = str(target_bot_obj.get("username") or "").strip().lower() if target_bot_obj else ""
+
     leads = (state.get("memory") or {}).get("leads") or []
     paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
     pending_stages = ("Gerou checkout", "Escolheu um plano", "Escolheu upsell")
@@ -1987,8 +2020,13 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     for l in leads:
         if not isinstance(l, dict) or l.get("blocked"):
             continue
-        if target_bot_id != "all" and l.get("bot_id") and str(l.get("bot_id")) != target_bot_id:
-            continue
+        if target_bot_id != "all":
+            l_bid = str(l.get("bot_id") or "").strip()
+            l_buname = str(l.get("bot_username") or "").strip().lower()
+            if l_bid and l_bid != target_bot_id:
+                continue
+            if not l_bid and target_bot_uname and l_buname and l_buname != target_bot_uname:
+                continue
         st = str(l.get("stage") or "Conversando")
         is_paid = st in paid_stages or bool(l.get("purchased"))
         is_pend = st in pending_stages or "pix" in st.lower() or "aguardando" in st.lower()
@@ -2002,49 +2040,68 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
             continue
         matched_leads.append(l)
 
-    fb = None
-    if target_bot_id != "all":
-        fb = next((b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == target_bot_id), None)
-    if not fb:
-        fb = bot_manager._get_active_flow_bot(state) or ((state.get("flow_bots") or [None])[0])
-
-    tok = (
-        (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
+    default_fb = target_bot_obj or bot_manager._get_active_flow_bot(state) or (flow_bots_list[0] if flow_bots_list else None)
+    default_tok = (
+        (str(default_fb.get("token") or "").strip() if isinstance(default_fb, dict) else "")
         or str(state.get("publish", {}).get("bot_token") or "").strip()
     )
-    if not tok or tok == REDACTED_SECRET_MASK:
+    if not default_tok or default_tok == REDACTED_SECRET_MASK:
         return {"status": "error", "message": "Token do bot não configurado."}
 
-    temp_bot = None
+    temp_bots: Dict[str, Any] = {}
     sent_ok = 0
+    disc_pct = bot_manager._parse_discount_pct(discount_str)
     try:
-        temp_bot = _create_bot_instance(tok)
-        kb = None
-        disc_pct = bot_manager._parse_discount_pct(discount_str)
-        if include_buttons and isinstance(fb, dict):
-            kb = bot_manager._build_flow_plans_kb(fb, discount_str=discount_str)
-
         for l in matched_leads:
             uid_str = str(l.get("telegram_id") or l.get("user_id") or "").strip()
             if not uid_str.lstrip("-").isdigit():
                 continue
             uid = int(uid_str)
+
+            lead_fb = target_bot_obj
+            if not lead_fb:
+                l_bid = str(l.get("bot_id") or "").strip()
+                l_buname = str(l.get("bot_username") or "").strip().lower()
+                for b in flow_bots_list:
+                    if (l_bid and str(b.get("id")) == l_bid) or (l_buname and str(b.get("username") or "").strip().lower() == l_buname):
+                        lead_fb = b
+                        break
+            if not lead_fb:
+                lead_fb = default_fb
+
+            lead_tok = (
+                (str(lead_fb.get("token") or "").strip() if isinstance(lead_fb, dict) else "")
+                or default_tok
+            )
+            if not lead_tok or lead_tok == REDACTED_SECRET_MASK:
+                continue
+
+            bot_inst = temp_bots.get(lead_tok)
+            if not bot_inst:
+                bot_inst = _create_bot_instance(lead_tok)
+                temp_bots[lead_tok] = bot_inst
+
+            kb = bot_manager._build_flow_plans_kb(lead_fb, discount_str=discount_str) if (include_buttons and isinstance(lead_fb, dict)) else None
             try:
                 if disc_pct > 0:
                     auth_d = l.setdefault("authorized_flow_discounts", [])
                     if disc_pct not in auth_d:
                         auth_d.append(disc_pct)
                 fake_user = types.User(id=uid, is_bot=False, first_name=l.get("first_name") or "Cliente")
-                rendered = bot_manager._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você!", fake_user, fb or {})
-                await temp_bot.send_message(chat_id=uid, text=rendered, parse_mode="HTML", reply_markup=kb)
+                rendered = bot_manager._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você!", fake_user, lead_fb or {})
+                try:
+                    await bot_inst.send_message(chat_id=uid, text=rendered, parse_mode="HTML", reply_markup=kb)
+                except Exception:
+                    await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
+                l["from_remarketing"] = True
                 l.setdefault("history", []).append({"role": "assistant", "content": f"[Remarketing: {camp.get('name', 'Campanha')}] {rendered}"})
                 sent_ok += 1
             except Exception:
                 pass
     finally:
-        if temp_bot:
+        for b_inst in temp_bots.values():
             try:
-                await temp_bot.session.close()
+                await b_inst.session.close()
             except Exception:
                 pass
 

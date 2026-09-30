@@ -7302,7 +7302,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         // 1. Start node
         const startNode = nbFlowNode(
           '1. Início · /start',
-          `${b.username || '@bot'} (${b.display_name || 'Bot Telegram'})`,
+          `${b.username || '@bot'} (${b.first_name || b.display_name || 'Bot Telegram'})`,
           'purple',
           '',
           `nbJumpFromFlowToBotTab('${b.id}', 'config')`,
@@ -7423,7 +7423,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           const dpSeqs = Array.isArray(b.downsell_pix?.sequences) ? b.downsell_pix.sequences : [];
 
           const appMedias = Array.isArray(b.payments?.approved_medias) ? b.payments.approved_medias.filter(Boolean) : [];
-          const appBtnText = b.payments?.approved_button_text || 'Acessar conteúdo VIP';
+          const appBtnText = b.payments?.access_button_text || b.payments?.approved_button_text || 'Acessar conteúdo';
           const paidExtraHtml = `
             ${nbFormatMediaSummary(appMedias, 'Sem mídia na aprovação')}
             <div class="mt-2 text-[10px] text-emerald-300 font-semibold">Botão de acesso: "${escapeHtml(appBtnText)}"</div>
@@ -7432,6 +7432,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
           if (dgEnabled || dpEnabled) {
             let localDsError = null;
+            const validPlanIds = new Set(plans.map(p => String(p.id)));
             const renderSeqList = (seqs, label) => {
               if (!seqs.length) {
                 localDsError = `${label} está ativado, mas não possui nenhuma sequência criada.`;
@@ -7449,7 +7450,8 @@ quer que eu te mostre as opções de acesso?</textarea>
                   const discStr = (s.discount && s.discount !== 'Sem desconto')
                     ? s.discount
                     : (Number(s.discount_pct || 0) > 0 ? `-${Number(s.discount_pct)}% OFF` : 'Sem desconto');
-                  const planCnt = Array.isArray(s.plan_ids) ? s.plan_ids.length : plans.length;
+                  const matchedPlanIds = Array.isArray(s.plan_ids) ? s.plan_ids.filter(pid => validPlanIds.has(String(pid))) : [];
+                  const planCnt = Array.isArray(s.plan_ids) ? (matchedPlanIds.length || plans.length) : plans.length;
                   return `<div class="px-3 py-2 rounded-lg bg-black/35 border ${hasContent ? 'border-[#3b2357]' : 'border-rose-500/80'} text-[10px] text-zinc-300 text-center space-y-0.5">
                     <div>
                       <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-purple-300 font-bold">${Number(s.delay_minutes || 1)} min</span>
@@ -8405,7 +8407,26 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbRemovePlan(idx) {
       const b = nbGetCurrentBot();
       if (!b || !b.plans) return;
-      b.plans.splice(idx, 1);
+      const removed = b.plans.splice(idx, 1)[0];
+      const removedId = removed ? String(removed.id || '') : '';
+      if (removedId) {
+        [b.downsell_general?.sequences, b.downsell_pix?.sequences].forEach(seqs => {
+          if (Array.isArray(seqs)) {
+            seqs.forEach(s => {
+              if (Array.isArray(s.plan_ids)) {
+                s.plan_ids = s.plan_ids.filter(pid => String(pid) !== removedId);
+              }
+            });
+          }
+        });
+        if (Array.isArray(b.order_bumps)) {
+          b.order_bumps.forEach(ob => {
+            if (Array.isArray(ob.plan_ids)) {
+              ob.plan_ids = ob.plan_ids.filter(pid => String(pid) !== removedId);
+            }
+          });
+        }
+      }
       nbRenderPlansTab(b);
     }
 
@@ -9213,7 +9234,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbMatchesDateFilter(isoStr, periodKey) {
-      if (!periodKey || periodKey === "Tudo" || periodKey === "all") return true;
+      if (!periodKey || periodKey === "Tudo" || periodKey === "Total" || periodKey === "all") return true;
       if (!isoStr) return true;
       const dt = new Date(isoStr);
       if (isNaN(dt.getTime())) return true;
@@ -9228,7 +9249,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         yest.setDate(now.getDate() - 1);
         return dt.toDateString() === yest.toDateString();
       }
-      if (periodKey === "Semana" || periodKey === "7d") {
+      if (periodKey === "Semana" || periodKey === "7 dias" || periodKey === "7d") {
         return diffDays <= 7;
       }
       if (periodKey === "Mês" || periodKey === "30d") {
@@ -10080,29 +10101,40 @@ quer que eu te mostre as opções de acesso?</textarea>
       const allowedBotIds = new Set(filteredBots.map(b => b.id));
       const allowedBotNames = new Set(filteredBots.map(b => b.username));
 
+      const hasBumpLead = l => Boolean(l.has_order_bump || l.accepted_bump_deliverable || (Array.isArray(l.accepted_bump_indices) && l.accepted_bump_indices.length > 0) || String(l.chosen_plan || '').includes('(+'));
+      const hasDownsellLead = l => Boolean(l.from_downsell || (Array.isArray(l.sent_downsell_steps) && l.sent_downsell_steps.length > 0) || (Array.isArray(l.authorized_flow_discounts) && l.authorized_flow_discounts.length > 0));
+
       const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived).filter(l => {
         if (filterBot !== 'all' && l.bot_id !== filterBot && l.bot_username !== (bots.find(x => x.id === filterBot)?.username)) return false;
         if (filterFlow !== 'all' && l.bot_id && !allowedBotIds.has(l.bot_id) && !allowedBotNames.has(l.bot_username)) return false;
         if (filterGw !== 'all' && l.gateway && String(l.gateway).toLowerCase() !== filterGw) return false;
         if (filterSrc === 'remarketing' && !l.from_remarketing) return false;
-        if (filterType === 'upsell' && !l.has_order_bump) return false;
+        if (filterType === 'upsell' && !hasBumpLead(l)) return false;
+        if (filterType === 'downsell' && !hasDownsellLead(l)) return false;
+        const leadDateStr = l.paid_at || l.created_at || l.last_interaction || '';
+        if (NB_ANA_SELECTED_DATE) {
+          if (leadDateStr && !String(leadDateStr).startsWith(NB_ANA_SELECTED_DATE)) return false;
+        } else if (!nbMatchesDateFilter(leadDateStr, NB_DASH_PERIOD)) {
+          return false;
+        }
         return true;
       });
 
       const isPaidLead = l => {
         const s = String(l.stage || '').toLowerCase();
-        return s.includes('pago') || s.includes('aprovado') || s.includes('comprou') || s.includes('vip');
+        return Boolean(l.purchased) || s.includes('pago') || s.includes('aprovad') || s.includes('comprou') || s.includes('vip');
       };
       const isPixLead = l => {
         const s = String(l.stage || '').toLowerCase();
-        return isPaidLead(l) || s.includes('pix') || s.includes('aguardando') || s.includes('pendente');
+        return isPaidLead(l) || s.includes('pix') || s.includes('checkout') || s.includes('aguardando') || s.includes('pendente');
       };
 
       const paidLeads = allLeads.filter(isPaidLead);
       const pixLeads = allLeads.filter(isPixLead);
 
-      const botSalesSum = filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
-      const botRevSum = filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
+      const useBotAggregate = !NB_ANA_SELECTED_DATE && filterSrc === 'all' && filterType === 'all' && filterGw === 'all';
+      const botSalesSum = useBotAggregate ? filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0) : 0;
+      const botRevSum = useBotAggregate ? filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0) : 0;
 
       const startsCount = allLeads.length;
       const visitsCount = Math.max(startsCount, Math.round(startsCount * 1.18));
@@ -10114,8 +10146,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         return allPrices.length ? (allPrices.reduce((a, b) => a + b, 0) / allPrices.length) : 19.90;
       })();
 
-      const confirmedRev = botRevSum > 0 ? botRevSum : paidLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0);
-      const generatedRev = Math.max(confirmedRev, pixLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0));
+      const getLeadPrice = l => Number(l.amount || l.flow_plan_price || l.plan_price || avgPlanPrice);
+      const confirmedRev = botRevSum > 0 ? botRevSum : paidLeads.reduce((acc, l) => acc + getLeadPrice(l), 0);
+      const generatedRev = Math.max(confirmedRev, pixLeads.reduce((acc, l) => acc + getLeadPrice(l), 0));
       const avgTicket = paidSalesCount > 0 ? (confirmedRev / paidSalesCount) : (pixGenCount > 0 ? (generatedRev / pixGenCount) : 0);
 
       const visitsToStartPct = visitsCount > 0 ? ((startsCount / visitsCount) * 100).toFixed(1) : "0.0";
@@ -10127,7 +10160,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // 0. Bloco Original Restaurado (Receita Hero, Vendas, Ticket Médio, Taxa de Conversão, Pendentes, Starts por Venda, Receita últimos dias, Status, Últimas atualizações)
       const pendingOnlyLeads = pixLeads.filter(l => !isPaidLead(l));
-      const pendingVal = pendingOnlyLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0);
+      const pendingVal = pendingOnlyLeads.reduce((acc, l) => acc + getLeadPrice(l), 0);
       setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
@@ -10378,8 +10411,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
 
       // 8. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
-      const bumpAccepted = allLeads.filter(l => l.has_order_bump).length;
-      const downsellRec = allLeads.filter(l => l.from_downsell && isPaidLead(l)).length;
+      const bumpAccepted = allLeads.filter(hasBumpLead).length;
+      const downsellRec = allLeads.filter(l => hasDownsellLead(l) && isPaidLead(l)).length;
       const pendingCount = Math.max(0, pixGenCount - paidSalesCount);
       const setRateCard = (key, num, den, subSuffix) => {
         const pct = den > 0 ? Math.min(100, (num / den) * 100) : 0;
@@ -10466,6 +10499,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       const allTxList = Object.entries(txMap).map(([tid, rec]) => ({ tx_id: tid, ...(rec || {}) })).reverse();
       const filteredTx = allTxList.filter(tx => {
         if (selectedBotId !== "all" && tx.bot_id && tx.bot_id !== selectedBotId) return false;
+        const txDateIso = tx.paid_at || tx.created_at || "";
+        if (!nbMatchesDateFilter(txDateIso, NB_FIN_PERIOD)) return false;
         const isPaid = tx.status === "paid" || Boolean(tx.delivered);
         if (NB_FIN_STATUS === "Pago" && !isPaid) return false;
         if (NB_FIN_STATUS === "Pendente" && tx.status !== "pending") return false;
@@ -10475,7 +10510,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       });
 
       const pendingTotal = allTxList
-        .filter(tx => (selectedBotId === "all" || !tx.bot_id || tx.bot_id === selectedBotId) && tx.status === "pending" && !tx.delivered)
+        .filter(tx => (selectedBotId === "all" || !tx.bot_id || tx.bot_id === selectedBotId) && tx.status === "pending" && !tx.delivered && nbMatchesDateFilter(tx.created_at || "", NB_FIN_PERIOD))
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
       document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;

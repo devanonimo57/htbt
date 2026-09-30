@@ -658,6 +658,7 @@ class ActiveBotManager:
         rep = {
             "{saudacao}": saudacao,
             "{nome}": nome,
+            "{primeiro_nome}": nome,
             "{estado}": "São Paulo",
             "{uf}": "SP",
             "{cidade}": "São Paulo",
@@ -672,6 +673,22 @@ class ActiveBotManager:
         for k, v in rep.items():
             out = out.replace(k, str(v))
         return out
+
+    async def _safe_send_html(
+        self,
+        chat_id: Any,
+        text: str,
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        bot_instance: Optional[Bot] = None
+    ):
+        target_bot = bot_instance or self.bot
+        if not target_bot:
+            return None
+        extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
+        try:
+            return await target_bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", **extra_kw)
+        except Exception:
+            return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
 
     def _parse_discount_pct(self, disc_str: str) -> int:
         if not disc_str or "sem" in disc_str.lower():
@@ -1393,15 +1410,17 @@ class ActiveBotManager:
     def _schedule_flow_downsell(self, user: types.User, track: str = "general"):
         uid = str(user.id)
         self._cancel_downsell(uid)
-        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track))
+        bot_token = self.active_token
+        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=bot_token))
 
-    async def _flow_downsell_worker(self, user: types.User, track: str):
+    async def _flow_downsell_worker(self, user: types.User, track: str, bot_token: str = ""):
         paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
         try:
             state = await self.state_getter()
-            fb = self._get_active_flow_bot(state)
+            fb = self._get_active_flow_bot(state, bot_token=bot_token)
             if not fb:
                 return
+            bot_id = str(fb.get("id") or "")
             ds_cfg = fb.get("downsell_pix" if track == "pix" else "downsell_general", {})
             if not ds_cfg.get("enabled", False):
                 return
@@ -1431,9 +1450,16 @@ class ActiveBotManager:
                 if track == "general" and lead.get("stage") == "Gerou checkout":
                     return
 
-                fb = self._get_active_flow_bot(state)
+                fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
                 if not fb:
                     return
+                eff_tok = (str(fb.get("token") or "").strip() or bot_token or self.current_token).strip()
+                if eff_tok:
+                    _CURRENT_BOT_TOKEN_CTX.set(eff_tok)
+                    live_bot = self._get_bot_by_token(eff_tok)
+                    if live_bot:
+                        _CURRENT_BOT_CTX.set(live_bot)
+
                 disc_str = seq.get("discount", "Sem desconto")
                 disc_pct = self._parse_discount_pct(disc_str)
                 if disc_pct > 0:
@@ -1445,15 +1471,16 @@ class ActiveBotManager:
                     filter_plan_ids=seq.get("plan_ids") or None,
                     discount_str=disc_str
                 )
+                lead["from_downsell"] = True
                 if not msg_tmpl and has_seq_medias:
                     attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb)
                     if not attached_kb and kb:
-                        await self.bot.send_message(chat_id=user.id, text="👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
+                        await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} — Mídia]"})
                 else:
                     await self._send_flow_medias(user.id, seq_medias)
                     txt = self._render_flow_vars(msg_tmpl, user, fb)
-                    await self.bot.send_message(chat_id=user.id, text=txt, parse_mode="HTML", reply_markup=kb)
+                    await self._safe_send_html(user.id, txt, reply_markup=kb)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
                 await self.state_saver(state)
         except asyncio.CancelledError:
@@ -1531,14 +1558,15 @@ class ActiveBotManager:
                 filter_plan_ids=seq.get("plan_ids") or None,
                 discount_str=disc_str
             )
+            lead["from_downsell"] = True
             if not msg_tmpl and has_seq_medias:
                 attached_kb = await self._send_flow_medias(message.chat.id, seq_medias, reply_markup=kb)
                 if not attached_kb and kb:
-                    await self.bot.send_message(chat_id=message.chat.id, text="👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
+                    await self._safe_send_html(message.chat.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb)
             else:
                 await self._send_flow_medias(message.chat.id, seq_medias)
                 txt = self._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você:", message.from_user, fb)
-                await self.bot.send_message(chat_id=message.chat.id, text=txt, parse_mode="HTML", reply_markup=kb)
+                await self._safe_send_html(message.chat.id, txt, reply_markup=kb)
             await self.state_saver(state)
             return True
 
@@ -1682,6 +1710,7 @@ class ActiveBotManager:
                 await self.bot.send_message(chat_id=user_id, text=msg_text, reply_markup=markup)
                 if has_plans:
                     self._advance_stage(lead, "Viu os planos")
+                lead["from_downsell"] = True
                 lead.setdefault("sent_downsell_steps", []).append(next_step.get("id"))
                 lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell] {msg_text}"})
                 await self.state_saver(state)
@@ -1722,6 +1751,9 @@ class ActiveBotManager:
             lead["preferences"] = "Iniciou conversa no bot"
             lead["objections"] = "Nenhuma identificada"
             lead.pop("accepted_bump_deliverable", None)
+            lead.pop("accepted_bump_indices", None)
+            lead.pop("has_order_bump", None)
+            lead.pop("from_downsell", None)
             lead.pop("flow_plan_id", None)
             lead.pop("authorized_flow_discounts", None)
             lead.pop("authorized_discount_offer_id", None)
@@ -1745,7 +1777,10 @@ class ActiveBotManager:
                 if not raw_main_msg and has_welcome_medias:
                     if sec_enabled and sec_msg:
                         await self._send_flow_medias(message.chat.id, welcome_medias)
-                        await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        try:
+                            await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        except Exception:
+                            await message.answer(sec_msg, reply_markup=kb)
                         lead.setdefault("history", []).append({"role": "assistant", "content": f"[Mídia de boas-vindas]\n\n{sec_msg}"})
                     else:
                         attached_kb = await self._send_flow_medias(message.chat.id, welcome_medias, reply_markup=kb)
@@ -1760,11 +1795,20 @@ class ActiveBotManager:
                         flow_bot
                     )
                     if sec_enabled and sec_msg:
-                        await message.answer(main_msg, parse_mode="HTML")
-                        await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        try:
+                            await message.answer(main_msg, parse_mode="HTML")
+                        except Exception:
+                            await message.answer(main_msg)
+                        try:
+                            await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        except Exception:
+                            await message.answer(sec_msg, reply_markup=kb)
                         lead.setdefault("history", []).append({"role": "assistant", "content": f"{main_msg}\n\n{sec_msg}"})
                     else:
-                        await message.answer(main_msg, parse_mode="HTML", reply_markup=kb)
+                        try:
+                            await message.answer(main_msg, parse_mode="HTML", reply_markup=kb)
+                        except Exception:
+                            await message.answer(main_msg, reply_markup=kb)
                         lead.setdefault("history", []).append({"role": "assistant", "content": main_msg})
 
                 self._advance_stage(lead, "Viu os planos")
@@ -2182,12 +2226,16 @@ class ActiveBotManager:
                 return
 
             lead = await self._get_or_create_lead(state, callback.from_user)
+            self._cancel_downsell(str(callback.from_user.id))
+            self._advance_stage(lead, "Escolheu um plano")
+            lead["accepted_bump_indices"] = []
             auth_discounts = lead.get("authorized_flow_discounts") or []
             if disc_pct not in auth_discounts:
                 disc_pct = 0
 
             active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
             if active_bumps:
+                await self.state_saver(state)
                 await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=0)
             else:
                 await self._generate_flow_checkout(callback, fb, state, plan_id, disc_pct, accepted_bumps=[])
@@ -2214,8 +2262,8 @@ class ActiveBotManager:
                 disc_pct = 0
 
             accepted_list = lead.setdefault("accepted_bump_indices", [])
-            if bump_idx == 0 and decision == "no" and not accepted_list:
-                pass
+            if bump_idx == 0:
+                accepted_list.clear()
             if decision == "yes" and bump_idx not in accepted_list:
                 accepted_list.append(bump_idx)
             await self.state_saver(state)
@@ -2275,8 +2323,16 @@ class ActiveBotManager:
             title = bump.get("title") or "Oferta Especial"
             desc = bump.get("description") or ""
             offer_msg = f"🎁 <b>{html.escape(title)}</b> (+{val_fmt})\n\n{html.escape(desc)}"
+        else:
+            offer_msg = self._render_flow_vars(
+                offer_msg,
+                callback.from_user,
+                fb,
+                plan_name=str(bump.get("title") or "Oferta Especial"),
+                valor_str=val_fmt
+            )
 
-        await self.bot.send_message(chat_id=chat_id, text=offer_msg, parse_mode="HTML", reply_markup=kb)
+        await self._safe_send_html(chat_id, offer_msg, reply_markup=kb)
 
     async def _generate_flow_checkout(
         self,
@@ -2319,9 +2375,11 @@ class ActiveBotManager:
             deliverables = [b.get("deliverable", "").strip() for b in accepted_bumps if (b.get("deliverable") or "").strip()]
             bump_deliverable_str = "\n\n".join(deliverables)
             lead["accepted_bump_deliverable"] = bump_deliverable_str
+            lead["has_order_bump"] = True
         else:
             full_plan_label = plan_name
             lead.pop("accepted_bump_deliverable", None)
+            lead["has_order_bump"] = False
 
         lead["flow_plan_id"] = plan.get("id") if plan else ""
         lead["flow_plan_price"] = total_price
@@ -2446,10 +2504,7 @@ class ActiveBotManager:
             [InlineKeyboardButton(text="✅ Verificar pagamento", callback_data=safe_cb)]
         ])
 
-        try:
-            await self.bot.send_message(chat_id=chat_id, text=rendered_gen, parse_mode="HTML", reply_markup=confirm_kb)
-        except Exception:
-            await self.bot.send_message(chat_id=chat_id, text=rendered_gen, reply_markup=confirm_kb)
+        await self._safe_send_html(chat_id, rendered_gen, reply_markup=confirm_kb)
 
         if pay_cfg.get("secondary_enabled") and (pay_cfg.get("secondary_message") or "").strip():
             sec_txt = self._render_flow_vars(
@@ -2460,7 +2515,7 @@ class ActiveBotManager:
                 valor_str=valor_str,
                 pix_code_fmt=pix_code_formatted
             )
-            await self.bot.send_message(chat_id=chat_id, text=sec_txt, parse_mode="HTML")
+            await self._safe_send_html(chat_id, sec_txt)
 
         lead.setdefault("history", []).append({
             "role": "assistant",
@@ -2624,7 +2679,14 @@ class ActiveBotManager:
 
             tx_bot_token = str(tx_record.get("bot_token") or "").strip()
             tx_bot_id = str(tx_record.get("bot_id") or "").strip()
-            if tx_bot_token and not _CURRENT_BOT_TOKEN_CTX.get():
+            if (not tx_bot_token or tx_bot_token == "***configured***") and tx_bot_id:
+                for fb_cand in (state.get("flow_bots") or []):
+                    if isinstance(fb_cand, dict) and str(fb_cand.get("id") or "") == tx_bot_id:
+                        cand_tok = str(fb_cand.get("token") or "").strip()
+                        if cand_tok and cand_tok != "***configured***":
+                            tx_bot_token = cand_tok
+                            break
+            if tx_bot_token and tx_bot_token != "***configured***":
                 _CURRENT_BOT_TOKEN_CTX.set(tx_bot_token)
                 resolved_bot = self._get_bot_by_token(tx_bot_token)
                 if resolved_bot:
@@ -2745,14 +2807,13 @@ class ActiveBotManager:
                     plan_name=plan_label,
                     valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
                 )
-                await self.bot.send_message(chat_id=user_id, text=rendered_app, parse_mode="HTML", reply_markup=kb)
+                await self._safe_send_html(user_id, rendered_app, reply_markup=kb)
 
                 bump_deliv = (tx_record.get("deliverable") or "").strip()
                 if bump_deliv:
-                    await self.bot.send_message(
-                        chat_id=user_id,
-                        text=f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
-                        parse_mode="HTML"
+                    await self._safe_send_html(
+                        user_id,
+                        f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}"
                     )
 
                 dur_str = str(tx_record.get("plan_duration") or "Vitalício")
