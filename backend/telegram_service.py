@@ -2675,7 +2675,7 @@ class ActiveBotManager:
                         ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
                         ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
 
-                invite_url = "https://t.me/+link_exclusivo_vip"
+                invite_url = ""
                 if eff_type == "Link externo" and ext_url:
                     invite_url = ext_url
                 elif ch_target and self.bot:
@@ -2685,9 +2685,19 @@ class ActiveBotManager:
                             member_limit=1,
                             expire_date=datetime.utcnow() + timedelta(minutes=15)
                         )
-                        invite_url = invite.invite_link
+                        invite_url = (invite.invite_link or "").strip()
                     except Exception as e:
                         logger.warning(f"Erro gerando link de convite no canal {ch_target}: {e}")
+                        invite_url = ""
+
+                if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+                    logger.error(f"Entrega abortada para tx_id={tx_id}: link de convite válido não pôde ser gerado.")
+                    tx_record["access_status"] = "Pendente"
+                    tx_record["delivered"] = False
+                    self.tx_records[tx_id] = tx_record
+                    state["tx_records"][tx_id] = tx_record
+                    await self.state_saver(state)
+                    return False
 
                 pay_cfg = flow_bot.get("payments", {})
                 await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []))
@@ -2779,7 +2789,7 @@ class ActiveBotManager:
                     parse_mode="HTML"
                 )
             else:
-                invite_url = "https://t.me/+link_exclusivo_vip"
+                invite_url = ""
                 if dest.startswith("http"):
                     invite_url = dest
                 elif dest and self.bot:
@@ -2789,9 +2799,19 @@ class ActiveBotManager:
                             member_limit=1,
                             expire_date=datetime.utcnow() + timedelta(days=1)
                         )
-                        invite_url = invite.invite_link
+                        invite_url = (invite.invite_link or "").strip()
                     except Exception as e:
                         logger.warning(f"Não foi possível criar link único no canal {dest}: {e}")
+                        invite_url = ""
+
+                if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+                    logger.error(f"Entrega abortada para tx_id={tx_id}: link de convite válido não pôde ser gerado.")
+                    tx_record["access_status"] = "Pendente"
+                    tx_record["delivered"] = False
+                    self.tx_records[tx_id] = tx_record
+                    state["tx_records"][tx_id] = tx_record
+                    await self.state_saver(state)
+                    return False
 
                 kb = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]

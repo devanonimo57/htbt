@@ -423,9 +423,116 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         finally:
             _CURRENT_BOT_TOKEN_CTX.reset(t2)
 
+    async def test_8_audit_round2_fixes(self):
+        # 1. Redação e preservação de tx_records[].bot_token
+        self.server_state["tx_records"]["tx_live_1001"]["bot_token"] = "123456:SECRET_TX_BOT_TOKEN"
+        redacted = app_main._redact_state_secrets(self.server_state)
+        self.assertEqual(
+            redacted["tx_records"]["tx_live_1001"]["bot_token"],
+            app_main.REDACTED_SECRET_MASK,
+        )
+        restored = app_main._preserve_existing_secrets(redacted, self.server_state)
+        self.assertEqual(
+            restored["tx_records"]["tx_live_1001"]["bot_token"],
+            "123456:SECRET_TX_BOT_TOKEN",
+        )
+
+        # 2. Alterar status aceita tanto `status` quanto `access_status`
+        with patch.object(app_main, "_read_state_from_db", AsyncMock(return_value=self.server_state)), \
+             patch.object(app_main, "_write_state_to_db", AsyncMock(side_effect=lambda s, **kw: s)):
+            req_status = app_main.AccessStatusUpdateRequest(tx_id="tx_live_1001", status="Ativo")
+            res_status = await app_main.update_vip_access_status(req_status)
+            self.assertEqual(res_status["status"], "ok")
+            self.assertEqual(self.server_state["tx_records"]["tx_live_1001"]["access_status"], "Ativo")
+
+        # 3. Reenvio explícito NÃO envia para transação pendente (não paga)
+        self.server_state["tx_records"]["tx_unpaid_999"] = {
+            "tx_id": "tx_unpaid_999",
+            "user_id": 9999,
+            "bot_id": "bot_flow_1",
+            "bot_token": "123456:MOCK_BOT_TOKEN_FOR_TEST",
+            "offer_name": "Plano Básico",
+            "delivery_channel_id": "-100111111",
+            "status": "pending",
+            "delivered": False,
+        }
+        self.server_state["tx_records"]["tx_paid_2002"] = {
+            "tx_id": "tx_paid_2002",
+            "user_id": 2002,
+            "bot_id": "bot_flow_1",
+            "bot_token": "123456:MOCK_BOT_TOKEN_FOR_TEST",
+            "offer_name": "Plano Básico",
+            "delivery_channel_id": "-100111111",
+            "status": "paid",
+            "delivered": True,
+        }
+        self.server_state["tx_records"]["tx_paid_3003"] = {
+            "tx_id": "tx_paid_3003",
+            "user_id": 3003,
+            "bot_id": "bot_flow_1",
+            "bot_token": "123456:MOCK_BOT_TOKEN_FOR_TEST",
+            "offer_name": "Plano Básico",
+            "delivery_channel_id": "-100111111",
+            "status": "paid",
+            "delivered": True,
+        }
+
+        fake_bot = MagicMock()
+        fake_invite = MagicMock()
+        fake_invite.invite_link = "https://t.me/+real_unique_invite_123"
+        fake_bot.create_chat_invite_link = AsyncMock(return_value=fake_invite)
+        fake_bot.send_message = AsyncMock()
+        fake_bot.session = MagicMock()
+        fake_bot.session.close = AsyncMock()
+
+        with patch.object(app_main, "_read_state_from_db", AsyncMock(return_value=self.server_state)), \
+             patch.object(app_main, "_write_state_to_db", AsyncMock(side_effect=lambda s, **kw: s)), \
+             patch.object(tg_srv, "_create_bot_instance", return_value=fake_bot):
+            # Tentativa de reenvio em transação não paga com tx_ids explícito -> sent_count == 0
+            req_unpaid = app_main.AccessResendRequest(tx_ids=["tx_unpaid_999"])
+            res_unpaid = await app_main.resend_vip_access(req_unpaid)
+            self.assertEqual(res_unpaid["sent_count"], 0)
+            self.assertEqual(fake_bot.send_message.call_count, 0)
+
+            # Reenvio unitário via tx_id singular -> envia APENAS para tx_paid_2002 (não dispara para tx_paid_3003)
+            req_single = app_main.AccessResendRequest(tx_id="tx_paid_2002")
+            res_single = await app_main.resend_vip_access(req_single)
+            self.assertEqual(res_single["sent_count"], 1)
+            self.assertEqual(fake_bot.send_message.call_count, 1)
+
+        # 4. Falha ao gerar link de convite NÃO usa link fictício nem marca delivered=True
+        self.server_state["tx_records"]["tx_fail_invite"] = {
+            "tx_id": "tx_fail_invite",
+            "user_id": 4004,
+            "mode": "flow",
+            "bot_id": "bot_flow_1",
+            "bot_token": "123456:MOCK_BOT_TOKEN_FOR_TEST",
+            "offer_name": "Plano Básico",
+            "delivery_channel_id": "-100111111",
+            "amount": 19.90,
+            "status": "pending",
+            "delivered": False,
+        }
+        mgr = await self._setup_manager()
+        mgr.bot.create_chat_invite_link = AsyncMock(side_effect=RuntimeError("Bot is not an administrator"))
+        mgr.bot.send_message = AsyncMock()
+        ok = await mgr.deliver_purchase_and_upsell(4004, "tx_fail_invite")
+        self.assertFalse(ok)
+        self.assertFalse(self.server_state["tx_records"]["tx_fail_invite"]["delivered"])
+        self.assertEqual(mgr.bot.send_message.call_count, 0)
+
+        # 5. Verificação de XSS escapado em renderOffers e persistência no render.yaml
+        with open(FRONTEND_HTML, "r", encoding="utf-8") as f:
+            html_src = f.read()
+        self.assertIn('value="${escapeHtml(o.name || \'\')}"', html_src)
+        self.assertIn('>${escapeHtml(o.description || \'\')}</textarea>', html_src)
+
+        render_yaml_path = os.path.abspath(os.path.join(BACKEND_DIR, "..", "render.yaml"))
+        with open(render_yaml_path, "r", encoding="utf-8") as f:
+            render_src = f.read()
+        self.assertIn("mountPath: /var/data", render_src)
+        self.assertIn("sqlite+aiosqlite:////var/data/hotbot.db", render_src)
+
 
 if __name__ == "__main__":
     unittest.main()
-
-
-

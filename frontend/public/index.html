@@ -4363,22 +4363,22 @@ quer que eu te mostre as opções de acesso?</textarea>
 
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-9">
-                <input type="text" value="${o.name}" oninput="updateOfferField(${idx}, 'name', this.value)" placeholder="Nova oferta" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+                <input type="text" value="${escapeHtml(o.name || '')}" oninput="updateOfferField(${idx}, 'name', this.value)" placeholder="Nova oferta" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
               </div>
               <div class="col-span-3 relative">
                 <span class="absolute left-3.5 top-2.5 text-xs text-slate-500">R$</span>
-                <input type="number" step="1" min="0.01" value="${o.price}" oninput="updateOfferField(${idx}, 'price', parseFloat(this.value)||0)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] !pl-9">
+                <input type="number" step="1" min="0.01" value="${Number(o.price) || 0}" oninput="updateOfferField(${idx}, 'price', parseFloat(this.value)||0)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] !pl-9">
               </div>
             </div>
 
             <div>
-              <textarea rows="2" oninput="updateOfferField(${idx}, 'description', this.value)" placeholder="O que está incluso e como funciona..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">${o.description || ''}</textarea>
+              <textarea rows="2" oninput="updateOfferField(${idx}, 'description', this.value)" placeholder="O que está incluso e como funciona..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y">${escapeHtml(o.description || '')}</textarea>
             </div>
 
             <div class="grid grid-cols-12 gap-3 items-end">
               <div class="col-span-2">
                 <label class="text-xs font-semibold text-slate-300 block mb-1.5">Emoji</label>
-                <input type="text" value="${o.emoji || '💎'}" oninput="updateOfferField(${idx}, 'emoji', this.value)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] text-center">
+                <input type="text" value="${escapeHtml(o.emoji || '💎')}" oninput="updateOfferField(${idx}, 'emoji', this.value)" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] text-center">
               </div>
               <div class="col-span-6">
                 <label class="text-xs font-semibold text-slate-300 block">Duração do acesso</label>
@@ -8212,6 +8212,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           group_name: chName,
           plan_name: tx.offer_name || "Plano VIP",
           status: accStatus,
+          is_paid: isPaid,
           expires_label: expLabel,
           date_iso: tx.paid_at || tx.created_at || ""
         };
@@ -8251,6 +8252,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         }
         return true;
       });
+      window.NB_FILTERED_ACC_TX_IDS = filteredAcc.filter(r => r.is_paid && r.tx_id).map(r => r.tx_id);
 
       const tbodyAcc = document.getElementById('nb-acc-table-body');
       if (tbodyAcc) {
@@ -8402,33 +8404,61 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function nbResendAccess(txIdOrAll) {
       const banner = document.getElementById('nb-acc-feedback-banner');
       const btn = document.getElementById('nb-btn-bulk-resend-access');
+      const isSingle = Boolean(txIdOrAll && txIdOrAll !== "all");
+      const filteredPaidTxIds = Array.isArray(window.NB_FILTERED_ACC_TX_IDS) ? window.NB_FILTERED_ACC_TX_IDS : [];
+      const targetTxIds = isSingle ? [String(txIdOrAll)] : filteredPaidTxIds;
+
+      if (!isSingle && targetTxIds.length === 0) {
+        if (banner) {
+          banner.classList.remove('hidden');
+          banner.textContent = "Nenhum cliente com pagamento confirmado nos filtros atuais para reenviar acesso.";
+          setTimeout(() => { if (banner) banner.classList.add('hidden'); }, 4500);
+        }
+        return;
+      }
+
       if (btn) btn.disabled = true;
       if (banner) {
         banner.classList.remove('hidden');
         banner.textContent = "Reenviando link(s) de acesso VIP no Telegram...";
       }
       try {
+        const grpVal = document.getElementById('nb-acc-filter-group')?.value || "all";
+        const planVal = document.getElementById('nb-acc-filter-plan')?.value || "all";
         const res = await adminFetch("/api/flow-bots/access/resend", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            tx_id: txIdOrAll || "all",
-            bot_id: document.getElementById('nb-acc-filter-group')?.value === "all" ? "all" : "all"
+            tx_id: isSingle ? String(txIdOrAll) : "all",
+            tx_ids: targetTxIds,
+            group_id: isSingle ? "all" : grpVal,
+            plan_name: isSingle ? "all" : planVal
           })
         });
         const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.detail || "Falha na requisição de reenvio.");
+        }
         if (data && data.state) {
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
         }
         if (banner) {
-          banner.textContent = `✓ Acesso VIP reenviado com sucesso para ${Number(data.sent_count || 0)} cliente(s)!`;
+          const sentCount = Number(data.sent_count || 0);
+          if (sentCount > 0) {
+            banner.textContent = `✓ Acesso VIP reenviado com sucesso para ${sentCount} cliente(s)!`;
+          } else {
+            banner.textContent = "Não foi possível enviar o link (verifique se o pagamento está aprovado e o bot é admin do canal VIP).";
+          }
           setTimeout(() => { if (banner) banner.classList.add('hidden'); }, 4500);
         }
         nbRenderClientsView();
       } catch (e) {
-        if (banner) banner.textContent = "Erro ao reenviar acessos.";
+        if (banner) {
+          banner.classList.remove('hidden');
+          banner.textContent = e?.message || "Erro ao reenviar acessos.";
+        }
       } finally {
         if (btn) btn.disabled = false;
       }
@@ -8436,20 +8466,34 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbUpdateAccessStatus(txId, newStatus) {
       if (!txId || !newStatus) return;
+      const banner = document.getElementById('nb-acc-feedback-banner');
       try {
         const res = await adminFetch("/api/flow-bots/access/update-status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tx_id: txId, status: newStatus })
+          body: JSON.stringify({ tx_id: txId, access_status: newStatus, status: newStatus })
         });
         const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.detail || "Falha ao atualizar status de acesso.");
+        }
         if (data && data.state) {
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
         }
+        if (banner) {
+          banner.classList.remove('hidden');
+          banner.textContent = `✓ Status do acesso atualizado para "${newStatus}".`;
+          setTimeout(() => { if (banner) banner.classList.add('hidden'); }, 3500);
+        }
         nbRenderClientsView();
-      } catch (e) {}
+      } catch (e) {
+        if (banner) {
+          banner.classList.remove('hidden');
+          banner.textContent = e?.message || "Erro ao alterar status de acesso.";
+        }
+      }
     }
 
     // =========================================================

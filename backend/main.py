@@ -19,7 +19,8 @@ from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply
 from telegram_service import bot_manager
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./hotbot.db")
+_DEFAULT_DB_PATH = "/var/data/hotbot.db" if os.path.isdir("/var/data") and os.access("/var/data", os.W_OK) else "./hotbot.db"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{_DEFAULT_DB_PATH}")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -240,6 +241,15 @@ def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
                 fb["has_token"] = False
                 fb["token"] = ""
 
+    tx_recs = copy_state.get("tx_records")
+    if isinstance(tx_recs, dict):
+        for rec in tx_recs.values():
+            if isinstance(rec, dict) and "bot_token" in rec:
+                if (str(rec.get("bot_token") or "")).strip():
+                    rec["bot_token"] = REDACTED_SECRET_MASK
+                else:
+                    rec["bot_token"] = ""
+
     return copy_state
 
 
@@ -301,6 +311,13 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
 
     if "tx_records" not in incoming and "tx_records" in existing:
         incoming["tx_records"] = existing["tx_records"]
+    elif isinstance(incoming.get("tx_records"), dict) and isinstance(existing.get("tx_records"), dict):
+        ex_tx = existing["tx_records"]
+        for tid, rec in incoming["tx_records"].items():
+            if isinstance(rec, dict) and rec.get("bot_token") == REDACTED_SECRET_MASK:
+                old_rec = ex_tx.get(tid)
+                if isinstance(old_rec, dict):
+                    rec["bot_token"] = old_rec.get("bot_token", "")
 
     return incoming
 
@@ -1469,8 +1486,11 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
 
 
 class AccessResendRequest(BaseModel):
+    tx_id: Optional[str] = ""
     tx_ids: Optional[List[str]] = None
     bot_id: Optional[str] = ""
+    group_id: Optional[str] = ""
+    plan_name: Optional[str] = ""
 
 
 @app.post("/api/flow-bots/access/resend", dependencies=[Depends(verify_admin_auth)])
@@ -1481,16 +1501,39 @@ async def resend_vip_access(req: AccessResendRequest):
 
     state = await _read_state_from_db()
     tx_map = state.get("tx_records") or {}
-    target_ids = req.tx_ids if isinstance(req.tx_ids, list) and len(req.tx_ids) > 0 else [
-        tid for tid, rec in tx_map.items()
-        if isinstance(rec, dict) and (rec.get("status") == "paid" or rec.get("delivered"))
-        and (not req.bot_id or req.bot_id == "all" or str(rec.get("bot_id") or "") == req.bot_id)
-    ]
+
+    single_tid = (req.tx_id or "").strip()
+    if isinstance(req.tx_ids, list):
+        candidate_ids = [str(x).strip() for x in req.tx_ids if str(x).strip()]
+    elif single_tid and single_tid != "all":
+        candidate_ids = [single_tid]
+    else:
+        candidate_ids = [
+            tid for tid, rec in tx_map.items()
+            if isinstance(rec, dict)
+            and (not req.bot_id or req.bot_id == "all" or str(rec.get("bot_id") or "") == req.bot_id)
+            and (
+                not req.group_id
+                or req.group_id == "all"
+                or str(rec.get("delivery_channel_id") or "") == req.group_id
+                or str(rec.get("delivery_channel_name") or "") == req.group_id
+            )
+            and (
+                not req.plan_name
+                or req.plan_name == "all"
+                or str(rec.get("offer_name") or "") == req.plan_name
+            )
+        ]
 
     sent_count = 0
-    for tid in target_ids:
+    skipped_unpaid = 0
+    for tid in candidate_ids:
         rec = tx_map.get(tid)
         if not isinstance(rec, dict):
+            continue
+        # Regra estrita: apenas transações efetivamente pagas podem receber link de acesso
+        if not (rec.get("status") == "paid" or rec.get("delivered")):
+            skipped_unpaid += 1
             continue
         uid = int(rec.get("user_id") or 0)
         if not uid:
@@ -1516,7 +1559,8 @@ async def resend_vip_access(req: AccessResendRequest):
             eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
             ch_target = (rec.get("delivery_channel_id") or "").strip()
             ext_url = (rec.get("delivery_external_url") or "").strip()
-            invite_url = rec.get("invite_url") or "https://t.me/+link_exclusivo_vip"
+            saved_url = (rec.get("invite_url") or "").strip()
+            invite_url = ""
 
             if eff_type == "Link externo" and ext_url:
                 invite_url = ext_url
@@ -1528,9 +1572,15 @@ async def resend_vip_access(req: AccessResendRequest):
                         member_limit=1,
                         expire_date=datetime.utcnow() + timedelta(minutes=15)
                     )
-                    invite_url = inv.invite_link
+                    invite_url = (inv.invite_link or "").strip()
                 except Exception:
-                    pass
+                    invite_url = ""
+
+            if not invite_url and saved_url and saved_url != "https://t.me/+link_exclusivo_vip":
+                invite_url = saved_url
+
+            if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+                continue
 
             btn_txt = ((fb.get("payments") or {}).get("access_button_text") if isinstance(fb, dict) else None) or "Acessar conteúdo"
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -1544,6 +1594,7 @@ async def resend_vip_access(req: AccessResendRequest):
                 reply_markup=kb
             )
             rec["invite_url"] = invite_url
+            rec["delivered"] = True
             rec["access_status"] = "Ativo"
             sent_count += 1
         except Exception:
@@ -1557,12 +1608,18 @@ async def resend_vip_access(req: AccessResendRequest):
 
     if sent_count > 0:
         state = await _write_state_to_db(state, preserve_runtime=False)
-    return {"status": "ok", "sent_count": sent_count, "state": _redact_state_secrets(state)}
+    return {
+        "status": "ok",
+        "sent_count": sent_count,
+        "skipped_unpaid": skipped_unpaid,
+        "state": _redact_state_secrets(state)
+    }
 
 
 class AccessStatusUpdateRequest(BaseModel):
     tx_id: str
-    access_status: str
+    access_status: Optional[str] = ""
+    status: Optional[str] = ""
 
 
 @app.post("/api/flow-bots/access/update-status", dependencies=[Depends(verify_admin_auth)])
@@ -1574,8 +1631,12 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
     if not isinstance(rec, dict):
         raise HTTPException(status_code=404, detail="Registro de acesso não encontrado.")
 
-    rec["access_status"] = req.access_status
-    if req.access_status == "Removido":
+    resolved_status = (req.access_status or req.status or "").strip()
+    if not resolved_status:
+        raise HTTPException(status_code=400, detail="Informe o novo status de acesso.")
+
+    rec["access_status"] = resolved_status
+    if resolved_status == "Removido":
         ch_target = (rec.get("delivery_channel_id") or "").strip()
         uid = int(rec.get("user_id") or 0)
         tok = (rec.get("bot_token") or state.get("publish", {}).get("bot_token") or "").strip()
@@ -1595,7 +1656,7 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
                         pass
 
     state = await _write_state_to_db(state, preserve_runtime=False)
-    return {"status": "ok", "state": _redact_state_secrets(state)}
+    return {"status": "ok", "access_status": resolved_status, "state": _redact_state_secrets(state)}
 
 
 class LeadActionRequest(BaseModel):
