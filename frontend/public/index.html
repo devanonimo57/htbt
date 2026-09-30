@@ -297,8 +297,8 @@
 
           <div class="nb-card p-5 space-y-4">
             <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
-              <textarea id="nb-welcome-msg" rows="4" maxlength="4000" oninput="nbOnWelcomeInput()" placeholder="Digite a mensagem de boas-vindas..." class="nb-input resize-y"></textarea>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-zinc-500 font-normal normal-case">(opcional se houver mídia anexada)</span></label>
+              <textarea id="nb-welcome-msg" rows="4" maxlength="4000" oninput="nbOnWelcomeInput()" placeholder="Digite a mensagem de boas-vindas (ou deixe em branco para enviar apenas a mídia com os botões)..." class="nb-input resize-y"></textarea>
               <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-welcome-counter">0/4000 caracteres</div>
             </div>
 
@@ -384,7 +384,7 @@
             <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
-            <span id="nb-welcome-validation" class="text-xs text-rose-400">A mensagem de boas-vindas é obrigatória.</span>
+            <span id="nb-welcome-validation" class="text-xs text-rose-400"></span>
           </div>
         </div>
 
@@ -405,7 +405,7 @@
               </div>
 
               <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
-                <p class="text-xs text-zinc-400">Configure até 10 planos com entregas personalizadas.</p>
+                <p class="text-xs text-zinc-400">Configure até 10 planos com entregas personalizadas (Canal/Grupo VIP ou Link Externo).</p>
                 <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[10px]"></i>
                   <span>Novo plano</span>
@@ -416,67 +416,8 @@
               <div id="nb-plans-accordion" class="space-y-3 pt-1"></div>
             </div>
 
-            <!-- COLUNA DIREITA: ENTREGA PADRÃO (FALLBACK) + VARIAÇÃO DE PREÇO (4 COLUNAS) -->
+            <!-- COLUNA DIREITA: VARIAÇÃO DE PREÇO (4 COLUNAS) -->
             <div class="lg:col-span-4 space-y-4">
-              <div class="nb-card p-5 space-y-4">
-                <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
-                  <h3 class="text-xs font-bold text-white">Entrega padrão (fallback)</h3>
-                </div>
-
-                <p class="text-[11px] text-zinc-400 flex items-center gap-1.5">
-                  <i class="fa-solid fa-cube text-[10px] text-zinc-500"></i>
-                  <span>Usada quando o plano está em "Herdar do fluxo".</span>
-                </p>
-
-                <div>
-                  <label class="text-[11px] font-semibold text-zinc-300 block mb-1.5">Destino da entrega <span class="text-[#ef4444]">*</span></label>
-                  <div class="flex border-b border-[#25231a] text-xs">
-                    <button type="button" id="nb-fb-tab-channel" onclick="nbSetFallbackType('Canal ou grupo')" class="px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]">Canal ou grupo</button>
-                    <button type="button" id="nb-fb-tab-external" onclick="nbSetFallbackType('Link externo')" class="px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent">Link externo</button>
-                  </div>
-                </div>
-
-                <div id="nb-fb-channel-box" class="space-y-3">
-                  <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#ef4444]">*</span></span>
-                    <button type="button" onclick="nbSyncFallbackChannel()" class="text-[11px] text-zinc-400 hover:text-[#ef4444] flex items-center gap-1 transition">
-                      <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
-                    </button>
-                  </div>
-
-                  <div class="p-3 rounded-lg bg-[#16150f] border border-[#2e2b1d] flex items-center justify-between">
-                    <div>
-                      <div class="flex items-center gap-1.5 text-xs font-bold text-white">
-                        <i class="fa-solid fa-bullhorn text-[11px] text-zinc-400"></i>
-                        <span id="nb-fb-ch-name">Rocha VENDAS</span>
-                        <i class="fa-solid fa-check text-emerald-400 text-[10px]"></i>
-                      </div>
-                      <span id="nb-fb-ch-id" class="text-[11px] text-zinc-500 font-mono block mt-0.5">Canal · -1003939135982</span>
-                    </div>
-                  </div>
-
-                  <p id="nb-fb-verified-at" class="text-[11px] text-zinc-500">Última verificação: hoje</p>
-
-                  <button type="button" onclick="nbPromptFallbackChannelId()" class="px-3 py-1.5 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-plus text-[10px]"></i> Adicionar por ID
-                  </button>
-
-                  <p class="text-[11px] text-zinc-500 leading-relaxed">O bot precisa ser administrador com permissão de convidar. O link enviado é de uso único e expira em 15 minutos.</p>
-                </div>
-
-                <div id="nb-fb-external-box" class="hidden space-y-2">
-                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">URL DE ENTREGA EXTERNA</label>
-                  <input type="text" id="nb-fb-ext-url" oninput="nbOnFallbackUrlInput()" placeholder="https://t.me/+seu_link" class="nb-input">
-                </div>
-
-                <div class="p-3 rounded-lg bg-[#0e0d0a] border border-[#222018] text-[11px] text-zinc-400 flex items-start gap-2">
-                  <i class="fa-solid fa-circle-info text-zinc-500 mt-0.5"></i>
-                  <span>Vale para todo plano marcado como "Herdar do fluxo". Cada plano pode ter a própria entrega personalizada.</span>
-                </div>
-              </div>
-
               <!-- VARIAÇÃO DE PREÇO -->
               <div class="nb-card p-5 space-y-3">
                 <div class="flex items-center gap-2">
@@ -6474,8 +6415,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       const valEl = document.getElementById('nb-welcome-validation');
       if (!b || !valEl) return;
       const hasMsg = Boolean((b.welcome?.message || "").trim());
-      if (!hasMsg) {
-        valEl.textContent = "A mensagem de boas-vindas é obrigatória.";
+      const hasMedias = Array.isArray(b.welcome?.medias) && b.welcome.medias.length > 0;
+      const hasSec = Boolean(b.welcome?.secondary_enabled && (b.welcome?.secondary_message || "").trim());
+      if (!hasMsg && !hasMedias && !hasSec) {
+        valEl.textContent = "Adicione uma mensagem ou ao menos 1 mídia de boas-vindas.";
         valEl.className = "text-xs text-rose-400";
       } else {
         valEl.textContent = "";
@@ -6487,6 +6430,23 @@ quer que eu te mostre as opções de acesso?</textarea>
     // =========================================================
     function nbRenderPlansTab(b) {
       const plans = b.plans || (b.plans = []);
+      const fb = b.fallback_delivery || {};
+
+      // Migração transparente: qualquer plano que estivesse em "Herdar do fluxo" ou com canal placeholder
+      // passa a exibir diretamente o canal/link configurado no bot, eliminando a duplicidade.
+      plans.forEach(p => {
+        if (p.delivery_dest_type === "Herdar do fluxo" || !p.delivery_dest_type) {
+          p.delivery_dest_type = (fb.dest_type === "Link externo") ? "Link externo" : "Canal ou grupo";
+        }
+        if ((!p.delivery_channel_id || p.delivery_channel_id === "-1003939135982") && fb.channel_id && fb.channel_id !== "-1003939135982") {
+          p.delivery_channel_id = fb.channel_id;
+          p.delivery_channel_name = fb.channel_name || p.delivery_channel_name;
+        }
+        if (!p.delivery_external_url && fb.external_url) {
+          p.delivery_external_url = fb.external_url;
+        }
+      });
+
       const countEl = document.getElementById('nb-plans-count-badge');
       if (countEl) countEl.textContent = `${String(plans.length).padStart(2, '0')} / 10`;
 
@@ -6513,7 +6473,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             `;
           }).join('');
 
-          const destTypes = ["Herdar do fluxo", "Canal ou grupo", "Link externo"];
+          const destTypes = ["Canal ou grupo", "Link externo"];
           const destTabs = destTypes.map(dt => {
             const active = (p.delivery_dest_type || "Canal ou grupo") === dt;
             return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
@@ -6523,12 +6483,10 @@ quer que eu te mostre as opções de acesso?</textarea>
           if ((p.delivery_dest_type || "Canal ou grupo") === "Link externo") {
             deliveryBody = `
               <div class="pt-2 space-y-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">LINK EXTERNO DE ENTREGA *</label>
-                <input type="text" value="${(p.delivery_external_url || '').replace(/"/g, '&quot;')}" oninput="nbUpdatePlanQuiet(${idx}, 'delivery_external_url', this.value)" placeholder="https://t.me/+link_do_canal" class="nb-input">
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">LINK EXTERNO DE ENTREGA (CANAL OU OUTRO BOT) *</label>
+                <input type="text" value="${(p.delivery_external_url || '').replace(/"/g, '&quot;')}" oninput="nbUpdatePlanQuiet(${idx}, 'delivery_external_url', this.value)" placeholder="https://t.me/+link_do_canal ou https://t.me/OutroBot?start=vip" class="nb-input">
               </div>
             `;
-          } else if (p.delivery_dest_type === "Herdar do fluxo") {
-            deliveryBody = `<p class="text-[11px] text-zinc-500 pt-2">Este plano usará a Entrega padrão (fallback) configurada na coluna ao lado.</p>`;
           } else {
             const chName = p.delivery_channel_name || b.fallback_delivery?.channel_name || "Rocha VENDAS";
             const chId = p.delivery_channel_id || b.fallback_delivery?.channel_id || "-1003939135982";
@@ -6629,18 +6587,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         }).join('');
       }
 
-      // Coluna Direita: Fallback + Variação de Preço
-      const fb = b.fallback_delivery || (b.fallback_delivery = { dest_type: "Canal ou grupo", channel_id: "-1003939135982", channel_name: "Rocha VENDAS", external_url: "", last_verified: "hoje" });
-      const isExt = fb.dest_type === "Link externo";
-      document.getElementById('nb-fb-tab-channel').className = !isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
-      document.getElementById('nb-fb-tab-external').className = isExt ? "px-3 py-2 font-semibold text-white border-b-2 border-[#ef4444]" : "px-3 py-2 font-medium text-zinc-500 border-b-2 border-transparent";
-      document.getElementById('nb-fb-channel-box').classList.toggle('hidden', isExt);
-      document.getElementById('nb-fb-external-box').classList.toggle('hidden', !isExt);
-      document.getElementById('nb-fb-ch-name').textContent = fb.channel_name || "Rocha VENDAS";
-      document.getElementById('nb-fb-ch-id').textContent = `Canal · ${fb.channel_id || '-1003939135982'}`;
-      document.getElementById('nb-fb-verified-at').textContent = `Última verificação: ${fb.last_verified || 'hoje'}`;
-      document.getElementById('nb-fb-ext-url').value = fb.external_url || "";
-      document.getElementById('nb-price-variation').checked = Boolean(b.price_variation);
+      const pvEl = document.getElementById('nb-price-variation');
+      if (pvEl) pvEl.checked = Boolean(b.price_variation);
     }
 
     function nbUpdatePlanQuiet(idx, field, val) {
@@ -6674,16 +6622,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!Array.isArray(b.plans)) b.plans = [];
       if (b.plans.length >= 10) return;
       b.plans.forEach(p => p.expanded = false);
+      const refPlan = b.plans[0] || {};
       b.plans.push({
         id: "plan_" + Date.now(),
         name: "Novo Plano VIP",
         price: 19.90,
         duration: "Vitalício",
         button_color: "Padrão",
-        delivery_dest_type: "Herdar do fluxo",
-        delivery_channel_id: b.fallback_delivery?.channel_id || "-1003939135982",
-        delivery_channel_name: b.fallback_delivery?.channel_name || "Rocha VENDAS",
-        delivery_external_url: "",
+        delivery_dest_type: refPlan.delivery_dest_type || "Canal ou grupo",
+        delivery_channel_id: refPlan.delivery_channel_id || b.fallback_delivery?.channel_id || b.cache_channel_id || "-1003939135982",
+        delivery_channel_name: refPlan.delivery_channel_name || b.fallback_delivery?.channel_name || "Rocha VENDAS",
+        delivery_external_url: refPlan.delivery_external_url || "",
         expanded: true
       });
       nbRenderPlansTab(b);
@@ -6707,53 +6656,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderPlansTab(b);
     }
 
-    function nbSetFallbackType(dt) {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      b.fallback_delivery = b.fallback_delivery || {};
-      b.fallback_delivery.dest_type = dt;
-      nbRenderPlansTab(b);
-    }
-
-    function nbOnFallbackUrlInput() {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      b.fallback_delivery = b.fallback_delivery || {};
-      b.fallback_delivery.external_url = document.getElementById('nb-fb-ext-url').value;
-    }
-
     function nbOnPriceVariationToggle() {
       const b = nbGetCurrentBot();
       if (!b) return;
       b.price_variation = document.getElementById('nb-price-variation').checked;
-    }
-
-    async function nbPromptFallbackChannelId() {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      const chId = prompt("Digite o ID do Canal ou Grupo (ex: -1003939135982):", b.fallback_delivery?.channel_id || "-100");
-      if (!chId || !chId.trim()) return;
-      b.fallback_delivery.channel_id = chId.trim();
-      await nbSyncFallbackChannel();
-    }
-
-    async function nbSyncFallbackChannel() {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      const chId = b.fallback_delivery?.channel_id || "-1003939135982";
-      try {
-        const res = await adminFetch("/api/flow-bots/verify-channel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bot_id: b.id || "", token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          b.fallback_delivery.channel_name = data.title;
-          b.fallback_delivery.last_verified = data.verified_at;
-        }
-      } catch (e) {}
-      nbRenderPlansTab(b);
     }
 
     async function nbPromptPlanChannelId(idx) {
@@ -6778,6 +6684,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         const data = await res.json();
         if (data.status === "ok") {
           b.plans[idx].delivery_channel_name = data.title;
+          b.fallback_delivery = b.fallback_delivery || {};
+          b.fallback_delivery.channel_id = chId;
+          b.fallback_delivery.channel_name = data.title;
+          b.fallback_delivery.last_verified = data.verified_at;
         }
       } catch (e) {}
       nbRenderPlansTab(b);
@@ -6823,7 +6733,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       let hasInvalid = false;
       container.innerHTML = seqs.map((seq, sIdx) => {
         const msg = seq.message || "";
-        if (!msg.trim()) hasInvalid = true;
+        const hasMedias = Array.isArray(seq.medias) && seq.medias.length > 0;
+        if (!msg.trim() && !hasMedias) hasInvalid = true;
         const selectedIds = Array.isArray(seq.plan_ids) ? seq.plan_ids : plans.map(p => p.id);
         const planChips = plans.map(p => {
           const isSel = selectedIds.includes(p.id);
@@ -6871,7 +6782,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
 
             <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-[#ef4444]">*</span></label>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-zinc-500 font-normal normal-case">(opcional se houver mídia)</span></label>
               <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${escapeHtml(msg)}</textarea>
               <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
             </div>
@@ -6911,7 +6822,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 }).join('')}
               </div>
               <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
-              <div id="nb-ds-err-${sIdx}" class="${!msg.trim() ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">A mensagem é obrigatória.</div>
+              <div id="nb-ds-err-${sIdx}" class="${(!msg.trim() && !hasMedias) ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">Adicione uma mensagem ou mídia.</div>
             </div>
           </div>
         `;
@@ -6919,7 +6830,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const valEl = document.getElementById('nb-ds-validation');
       if (valEl) {
-        valEl.textContent = hasInvalid && seqs.length > 0 ? "Há sequências incompletas ou inválidas." : "";
+        valEl.textContent = hasInvalid && seqs.length > 0 ? "Há sequências sem mensagem e sem mídia." : "";
       }
     }
 
@@ -6940,9 +6851,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         const cEl = document.getElementById(`nb-ds-counter-${sIdx}`);
         if (cEl) cEl.textContent = `${val.length}/4000 caracteres`;
         const errEl = document.getElementById(`nb-ds-err-${sIdx}`);
-        if (errEl) errEl.className = !val.trim() ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden';
-        const anyInvalid = ds.sequences.some(s => !(s.message || "").trim());
-        document.getElementById('nb-ds-validation').textContent = anyInvalid ? "Há sequências incompletas ou inválidas." : "";
+        const hasMedias = Array.isArray(ds.sequences[sIdx].medias) && ds.sequences[sIdx].medias.length > 0;
+        if (errEl) errEl.className = (!val.trim() && !hasMedias) ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden';
+        const anyInvalid = ds.sequences.some(s => !(s.message || "").trim() && !(Array.isArray(s.medias) && s.medias.length > 0));
+        document.getElementById('nb-ds-validation').textContent = anyInvalid ? "Há sequências sem mensagem e sem mídia." : "";
       }
     }
 
@@ -7617,7 +7529,12 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       await saveFullState();
       const valEl = document.getElementById('nb-welcome-validation');
-      if (valEl && (b?.welcome?.message || "").trim()) {
+      const hasWelcomeContent = Boolean(
+        (b?.welcome?.message || "").trim() ||
+        (Array.isArray(b?.welcome?.medias) && b.welcome.medias.length > 0) ||
+        (b?.welcome?.secondary_enabled && (b?.welcome?.secondary_message || "").trim())
+      );
+      if (valEl && hasWelcomeContent) {
         valEl.textContent = "✓ Alterações salvas e mídias sincronizadas com o cache!";
         valEl.className = "text-xs text-emerald-400 font-semibold";
         setTimeout(() => { if (valEl) valEl.textContent = ""; }, 3000);

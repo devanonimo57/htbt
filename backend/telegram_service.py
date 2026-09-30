@@ -747,24 +747,26 @@ class ActiveBotManager:
         fid: str,
         send_as: str,
         caption: Optional[str] = None,
-        has_spoiler: bool = False
+        has_spoiler: bool = False,
+        reply_markup: Optional[InlineKeyboardMarkup] = None
     ):
+        extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
         if send_as == "document":
-            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
         if send_as == "animation":
             try:
-                return await bot_instance.send_animation(chat_id=chat_id, animation=fid, caption=caption, has_spoiler=has_spoiler)
+                return await bot_instance.send_animation(chat_id=chat_id, animation=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
             except Exception:
-                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler)
+                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
         if send_as == "video":
             try:
-                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler)
+                return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
             except Exception:
-                return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+                return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
         try:
-            return await bot_instance.send_photo(chat_id=chat_id, photo=fid, caption=caption, has_spoiler=has_spoiler)
+            return await bot_instance.send_photo(chat_id=chat_id, photo=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
         except Exception:
-            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption)
+            return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
 
     async def warm_media_item_in_channel(
         self,
@@ -1145,7 +1147,8 @@ class ActiveBotManager:
         chat_id: int,
         m: Dict[str, Any],
         caption: Optional[str] = None,
-        has_spoiler: bool = False
+        has_spoiler: bool = False,
+        reply_markup: Optional[InlineKeyboardMarkup] = None
     ) -> Optional[str]:
         if not isinstance(m, dict):
             return None
@@ -1154,6 +1157,7 @@ class ActiveBotManager:
         is_video = self._is_video_media(m)
         fname = str(m.get("name") or "")
         send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
+        extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
 
         if cached_fid:
             try:
@@ -1163,7 +1167,8 @@ class ActiveBotManager:
                     fid=cached_fid,
                     send_as=send_as,
                     caption=caption,
-                    has_spoiler=has_spoiler
+                    has_spoiler=has_spoiler,
+                    reply_markup=reply_markup
                 )
                 return cached_fid
             except Exception:
@@ -1201,7 +1206,8 @@ class ActiveBotManager:
                 fid=str(fid),
                 send_as=eff_send_as,
                 caption=caption,
-                has_spoiler=has_spoiler
+                has_spoiler=has_spoiler,
+                reply_markup=reply_markup
             )
             return str(fid)
 
@@ -1213,13 +1219,13 @@ class ActiveBotManager:
         sent = None
         try:
             if is_video:
-                sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler)
+                sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
             else:
-                sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler)
+                sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
         except Exception as primary_err:
             if hasattr(self.bot, "send_document"):
                 inp_doc = self._build_input_file(url, default_fn)
-                sent = await self.bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption)
+                sent = await self.bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption, **extra_kw)
             else:
                 raise primary_err
 
@@ -1237,22 +1243,31 @@ class ActiveBotManager:
             return str(fid)
         return None
 
-    async def _send_flow_medias(self, chat_id: int, medias: List[Dict[str, Any]]):
+    async def _send_flow_medias(
+        self,
+        chat_id: int,
+        medias: List[Dict[str, Any]],
+        reply_markup: Optional[InlineKeyboardMarkup] = None
+    ) -> bool:
         valid_items = [
             m for m in (medias or [])[:3]
             if isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
         ]
         if not valid_items:
-            return
+            return False
 
-        # Se houver apenas 1 mídia, envia individualmente via cache
+        # Se houver apenas 1 mídia, envia individualmente via cache (podendo anexar reply_markup diretamente na mídia)
         if len(valid_items) == 1 or not hasattr(self.bot, "send_media_group"):
-            for m in valid_items:
+            attached = False
+            for idx, m in enumerate(valid_items):
                 try:
-                    await self._send_single_media_cached(chat_id, m)
+                    rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
+                    await self._send_single_media_cached(chat_id, m, reply_markup=rm)
+                    if rm is not None:
+                        attached = True
                 except Exception as e:
                     logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
-            return
+            return attached
 
         # Quando há 2 ou 3 mídias, envia LADO A LADO (Álbum / send_media_group)
         state = None
@@ -1327,15 +1342,20 @@ class ActiveBotManager:
                                 await self.state_saver(state)
                             except Exception:
                                 pass
-                    return
+                    return False
             except Exception as retry_err:
                 logger.warning(f"Fallback para envio individual após falha no álbum: {retry_err}")
 
-        for m in valid_items:
+        attached = False
+        for idx, m in enumerate(valid_items):
             try:
-                await self._send_single_media_cached(chat_id, m)
+                rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
+                await self._send_single_media_cached(chat_id, m, reply_markup=rm)
+                if rm is not None:
+                    attached = True
             except Exception as e:
                 logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
+        return attached
 
     def _schedule_flow_downsell(self, user: types.User, track: str = "general"):
         uid = str(user.id)
@@ -1359,7 +1379,12 @@ class ActiveBotManager:
             elapsed_mins = 0
             for seq in sequences:
                 msg_tmpl = (seq.get("message") or "").strip()
-                if not msg_tmpl:
+                seq_medias = seq.get("medias") or []
+                has_seq_medias = any(
+                    isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+                    for m in seq_medias[:3]
+                )
+                if not msg_tmpl and not has_seq_medias:
                     continue
                 target_mins = max(1, int(seq.get("delay_minutes") or 1))
                 wait_mins = max(1, target_mins - elapsed_mins)
@@ -1376,8 +1401,6 @@ class ActiveBotManager:
                 fb = self._get_active_flow_bot(state)
                 if not fb:
                     return
-                await self._send_flow_medias(user.id, seq.get("medias", []))
-                txt = self._render_flow_vars(msg_tmpl, user, fb)
                 disc_str = seq.get("discount", "Sem desconto")
                 disc_pct = self._parse_discount_pct(disc_str)
                 if disc_pct > 0:
@@ -1389,8 +1412,16 @@ class ActiveBotManager:
                     filter_plan_ids=seq.get("plan_ids") or None,
                     discount_str=disc_str
                 )
-                await self.bot.send_message(chat_id=user.id, text=txt, parse_mode="HTML", reply_markup=kb)
-                lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
+                if not msg_tmpl and has_seq_medias:
+                    attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb)
+                    if not attached_kb and kb:
+                        await self.bot.send_message(chat_id=user.id, text="👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
+                    lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} — Mídia]"})
+                else:
+                    await self._send_flow_medias(user.id, seq_medias)
+                    txt = self._render_flow_vars(msg_tmpl, user, fb)
+                    await self.bot.send_message(chat_id=user.id, text=txt, parse_mode="HTML", reply_markup=kb)
+                    lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
                 await self.state_saver(state)
         except asyncio.CancelledError:
             pass
@@ -1510,23 +1541,40 @@ class ActiveBotManager:
             flow_bot = self._get_active_flow_bot(state)
             if flow_bot:
                 welcome = flow_bot.get("welcome", {})
-                await self._send_flow_medias(message.chat.id, welcome.get("medias", []))
-                kb = self._build_flow_plans_kb(flow_bot)
-                main_msg = self._render_flow_vars(
-                    welcome.get("message") or "Olá {saudacao}, {nome}! Escolha seu plano abaixo:",
-                    message.from_user,
-                    flow_bot
+                welcome_medias = welcome.get("medias", [])
+                has_welcome_medias = any(
+                    isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+                    for m in (welcome_medias or [])[:3]
                 )
+                kb = self._build_flow_plans_kb(flow_bot)
+                raw_main_msg = (welcome.get("message") or "").strip()
                 sec_enabled = bool(welcome.get("secondary_enabled", False))
                 sec_msg = self._render_flow_vars(welcome.get("secondary_message") or "", message.from_user, flow_bot).strip()
 
-                if sec_enabled and sec_msg:
-                    await message.answer(main_msg, parse_mode="HTML")
-                    await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
-                    lead.setdefault("history", []).append({"role": "assistant", "content": f"{main_msg}\n\n{sec_msg}"})
+                if not raw_main_msg and has_welcome_medias:
+                    if sec_enabled and sec_msg:
+                        await self._send_flow_medias(message.chat.id, welcome_medias)
+                        await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        lead.setdefault("history", []).append({"role": "assistant", "content": f"[Mídia de boas-vindas]\n\n{sec_msg}"})
+                    else:
+                        attached_kb = await self._send_flow_medias(message.chat.id, welcome_medias, reply_markup=kb)
+                        if not attached_kb and kb:
+                            await message.answer("👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
+                        lead.setdefault("history", []).append({"role": "assistant", "content": "[Mídia de boas-vindas]"})
                 else:
-                    await message.answer(main_msg, parse_mode="HTML", reply_markup=kb)
-                    lead.setdefault("history", []).append({"role": "assistant", "content": main_msg})
+                    await self._send_flow_medias(message.chat.id, welcome_medias)
+                    main_msg = self._render_flow_vars(
+                        raw_main_msg or "Olá {saudacao}, {nome}! Escolha seu plano abaixo:",
+                        message.from_user,
+                        flow_bot
+                    )
+                    if sec_enabled and sec_msg:
+                        await message.answer(main_msg, parse_mode="HTML")
+                        await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
+                        lead.setdefault("history", []).append({"role": "assistant", "content": f"{main_msg}\n\n{sec_msg}"})
+                    else:
+                        await message.answer(main_msg, parse_mode="HTML", reply_markup=kb)
+                        lead.setdefault("history", []).append({"role": "assistant", "content": main_msg})
 
                 self._advance_stage(lead, "Viu os planos")
                 await self.state_saver(state)
@@ -2131,7 +2179,12 @@ class ActiveBotManager:
             ext_url = (fb_deliv.get("external_url") or "").strip()
         else:
             eff_type = dest_type
-            ch_target = ((plan.get("delivery_channel_id") if plan else "") or fb_deliv.get("channel_id") or "").strip()
+            raw_plan_ch = ((plan.get("delivery_channel_id") if plan else "") or "").strip()
+            fb_ch = (fb_deliv.get("channel_id") or "").strip()
+            if (not raw_plan_ch or raw_plan_ch == "-1003939135982") and fb_ch and fb_ch != "-1003939135982":
+                ch_target = fb_ch
+            else:
+                ch_target = raw_plan_ch or fb_ch
             ext_url = ((plan.get("delivery_external_url") if plan else "") or fb_deliv.get("external_url") or "").strip()
 
         tx_record = {
