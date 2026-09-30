@@ -35,6 +35,8 @@ from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply, _compute_effective_min_price
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("SharkBotTelegram")
 
 _CURRENT_BOT_CTX: ContextVar[Optional[Bot]] = ContextVar("_CURRENT_BOT_CTX", default=None)
@@ -2224,6 +2226,12 @@ class ActiveBotManager:
     ):
         if not tx_id or str(tx_id).startswith("sim_"):
             return
+        # Cancela qualquer polling anterior ativo do mesmo lead para evitar loops duplicados
+        for old_tx, old_uid in list(self.active_tx_map.items()):
+            if int(old_uid) == int(user_id) and old_tx != tx_id:
+                prev_t = self.pix_poll_tasks.pop(old_tx, None)
+                if prev_t and not prev_t.done():
+                    prev_t.cancel()
         old_t = self.pix_poll_tasks.pop(tx_id, None)
         if old_t and not old_t.done():
             old_t.cancel()
@@ -2263,9 +2271,14 @@ class ActiveBotManager:
         if not tx_id or str(tx_id).startswith("sim_"):
             return
         client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
+        # Backoff progressivo: 8s nos primeiros 2 min (15x), 15s de 2 a 5 min (12x), 30s de 5 a 15 min (20x)
+        intervals = ([8.0] * 15) + ([15.0] * 12) + ([30.0] * 20)
         try:
-            for _ in range(90):
-                await asyncio.sleep(8)
+            for base_wait in intervals:
+                await asyncio.sleep(base_wait + random.uniform(0.0, 1.2))
+                existing_tx = self.tx_records.get(tx_id)
+                if existing_tx and (existing_tx.get("status") == "paid" or existing_tx.get("delivered")):
+                    return
                 try:
                     data = await client.check_transaction_status(tx_id)
                     if str((data or {}).get("status", "")).lower() == "paid":

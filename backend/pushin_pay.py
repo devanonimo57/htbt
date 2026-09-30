@@ -1,14 +1,59 @@
+import asyncio
 import time
 import uuid
 import httpx
 from typing import Optional, Dict, Any
 
 _SYNCPAY_TOKEN_CACHE: Dict[str, Dict[str, Any]] = {}
+_SHARED_HTTP_CLIENTS: Dict[int, httpx.AsyncClient] = {}
+_TOKEN_LOCKS: Dict[int, asyncio.Lock] = {}
+_POLL_SEMAPHORES: Dict[int, asyncio.Semaphore] = {}
+
+
+def _get_loop_id() -> int:
+    try:
+        return id(asyncio.get_running_loop())
+    except RuntimeError:
+        return 0
+
+
+def _get_shared_http_client() -> httpx.AsyncClient:
+    lid = _get_loop_id()
+    client = _SHARED_HTTP_CLIENTS.get(lid)
+    if client is None or getattr(client, "is_closed", False):
+        kwargs: Dict[str, Any] = {"timeout": 25.0}
+        if hasattr(httpx, "Limits"):
+            try:
+                kwargs["limits"] = httpx.Limits(max_connections=100, max_keepalive_connections=40)
+            except Exception:
+                pass
+        client = httpx.AsyncClient(**kwargs)
+        _SHARED_HTTP_CLIENTS[lid] = client
+    return client
+
+
+def _get_token_lock() -> asyncio.Lock:
+    lid = _get_loop_id()
+    lock = _TOKEN_LOCKS.get(lid)
+    if lock is None:
+        lock = asyncio.Lock()
+        _TOKEN_LOCKS[lid] = lock
+    return lock
+
+
+def _get_poll_semaphore() -> asyncio.Semaphore:
+    lid = _get_loop_id()
+    sem = _POLL_SEMAPHORES.get(lid)
+    if sem is None:
+        sem = asyncio.Semaphore(25)
+        _POLL_SEMAPHORES[lid] = sem
+    return sem
 
 
 class PushinPayClient:
     """
     Cliente unificado para integração com Gateways PIX (Sync Pay, Pushin Pay, Mercado Pago, OpenPix, Asaas).
+    Reutiliza pool de conexões Keep-Alive para suportar alto volume de leads simultâneos.
     """
     BASE_URL = "https://api.pushinpay.com.br/api"
     SYNCPAY_BASE_URL = "https://api.syncpayments.com.br"
@@ -35,7 +80,13 @@ class PushinPayClient:
         if not force_refresh and cached and cached.get("access_token") and cached.get("expires_at", 0) > now:
             return cached["access_token"]
 
-        async with httpx.AsyncClient(timeout=25.0) as client:
+        async with _get_token_lock():
+            now = time.time()
+            cached = _SYNCPAY_TOKEN_CACHE.get(cache_key)
+            if not force_refresh and cached and cached.get("access_token") and cached.get("expires_at", 0) > now:
+                return cached["access_token"]
+
+            client = _get_shared_http_client()
             resp = await client.post(
                 f"{self.SYNCPAY_BASE_URL}/api/partner/v1/auth-token",
                 json={
@@ -68,6 +119,7 @@ class PushinPayClient:
         Retorna dict padronizado com: id, qr_code (copia e cola), qr_code_base64.
         """
         amount_float = round(value_in_cents / 100.0, 2)
+        client = _get_shared_http_client()
 
         if self.provider == "syncpay":
             bearer = await self._get_syncpay_bearer()
@@ -82,7 +134,17 @@ class PushinPayClient:
                     "phone": "11999999999"
                 }
             }
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{self.SYNCPAY_BASE_URL}/api/partner/v1/cash-in",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {bearer}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                }
+            )
+            if resp.status_code == 401:
+                bearer = await self._get_syncpay_bearer(force_refresh=True)
                 resp = await client.post(
                     f"{self.SYNCPAY_BASE_URL}/api/partner/v1/cash-in",
                     json=payload,
@@ -92,26 +154,15 @@ class PushinPayClient:
                         "Content-Type": "application/json"
                     }
                 )
-                if resp.status_code == 401:
-                    bearer = await self._get_syncpay_bearer(force_refresh=True)
-                    resp = await client.post(
-                        f"{self.SYNCPAY_BASE_URL}/api/partner/v1/cash-in",
-                        json=payload,
-                        headers={
-                            "Authorization": f"Bearer {bearer}",
-                            "Accept": "application/json",
-                            "Content-Type": "application/json"
-                        }
-                    )
-                resp.raise_for_status()
-                data = resp.json()
-                pix_code = data.get("pix_code") or data.get("data", {}).get("pix_code", "")
-                identifier = data.get("identifier") or data.get("data", {}).get("reference_id") or str(uuid.uuid4())
-                return {
-                    "id": str(identifier),
-                    "qr_code": pix_code,
-                    "qr_code_base64": ""
-                }
+            resp.raise_for_status()
+            data = resp.json()
+            pix_code = data.get("pix_code") or data.get("data", {}).get("pix_code", "")
+            identifier = data.get("identifier") or data.get("data", {}).get("reference_id") or str(uuid.uuid4())
+            return {
+                "id": str(identifier),
+                "qr_code": pix_code,
+                "qr_code_base64": ""
+            }
 
         if self.provider == "mercadopago":
             headers = {
@@ -125,16 +176,15 @@ class PushinPayClient:
                 "payment_method_id": "pix",
                 "payer": {"email": "assinante@vip.app"}
             }
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post("https://api.mercadopago.com/v1/payments", json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                tx_data = data.get("point_of_interaction", {}).get("transaction_data", {})
-                return {
-                    "id": str(data.get("id")),
-                    "qr_code": tx_data.get("qr_code", ""),
-                    "qr_code_base64": tx_data.get("qr_code_base64", "")
-                }
+            resp = await client.post("https://api.mercadopago.com/v1/payments", json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            tx_data = data.get("point_of_interaction", {}).get("transaction_data", {})
+            return {
+                "id": str(data.get("id")),
+                "qr_code": tx_data.get("qr_code", ""),
+                "qr_code_base64": tx_data.get("qr_code_base64", "")
+            }
 
         if self.provider == "openpix":
             corr_id = str(uuid.uuid4())
@@ -143,16 +193,15 @@ class PushinPayClient:
                 "Content-Type": "application/json"
             }
             payload = {"correlationID": corr_id, "value": value_in_cents, "comment": "Acesso VIP"}
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post("https://api.openpix.com.br/api/v1/charge", json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                charge = data.get("charge", {})
-                return {
-                    "id": charge.get("correlationID", corr_id),
-                    "qr_code": charge.get("brCode", data.get("brCode", "")),
-                    "qr_code_base64": ""
-                }
+            resp = await client.post("https://api.openpix.com.br/api/v1/charge", json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            charge = data.get("charge", {})
+            return {
+                "id": charge.get("correlationID", corr_id),
+                "qr_code": charge.get("brCode", data.get("brCode", "")),
+                "qr_code_base64": ""
+            }
 
         if self.provider == "asaas":
             headers = {
@@ -160,15 +209,14 @@ class PushinPayClient:
                 "Content-Type": "application/json"
             }
             payload = {"value": amount_float, "description": "Acesso VIP"}
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post("https://api.asaas.com/v3/pix/qrCodes/static", json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                return {
-                    "id": str(data.get("id", uuid.uuid4())),
-                    "qr_code": data.get("payload", ""),
-                    "qr_code_base64": data.get("encodedImage", "")
-                }
+            resp = await client.post("https://api.asaas.com/v3/pix/qrCodes/static", json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+            return {
+                "id": str(data.get("id", uuid.uuid4())),
+                "qr_code": data.get("payload", ""),
+                "qr_code_base64": data.get("encodedImage", "")
+            }
 
         # Padrão: Pushin Pay
         payload_pp: Dict[str, Any] = {
@@ -177,23 +225,23 @@ class PushinPayClient:
         if webhook_url:
             payload_pp["webhook_url"] = webhook_url
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{self.BASE_URL}/pix/cashIn",
-                json=payload_pp,
-                headers=self.headers
-            )
-            response.raise_for_status()
-            return response.json()
+        response = await client.post(
+            f"{self.BASE_URL}/pix/cashIn",
+            json=payload_pp,
+            headers=self.headers
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def check_transaction_status(self, transaction_id: str) -> Dict[str, Any]:
         """
         Consulta o status de uma transação específica no gateway configurado.
         Retorna {"status": "paid"} quando aprovado.
         """
-        if self.provider == "syncpay":
-            bearer = await self._get_syncpay_bearer()
-            async with httpx.AsyncClient(timeout=20.0) as client:
+        async with _get_poll_semaphore():
+            client = _get_shared_http_client()
+            if self.provider == "syncpay":
+                bearer = await self._get_syncpay_bearer()
                 resp = await client.get(
                     f"{self.SYNCPAY_BASE_URL}/api/partner/v1/transaction/{transaction_id}",
                     headers={
@@ -219,8 +267,7 @@ class PushinPayClient:
                     "raw": tx_data
                 }
 
-        if self.provider == "mercadopago":
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            if self.provider == "mercadopago":
                 resp = await client.get(
                     f"https://api.mercadopago.com/v1/payments/{transaction_id}",
                     headers={"Authorization": f"Bearer {self.token}"}
@@ -230,8 +277,7 @@ class PushinPayClient:
                 st = str(data.get("status", "")).lower()
                 return {"status": "paid" if st == "approved" else st}
 
-        if self.provider == "openpix":
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            if self.provider == "openpix":
                 resp = await client.get(
                     f"https://api.openpix.com.br/api/v1/charge/{transaction_id}",
                     headers={"Authorization": self.token}
@@ -241,8 +287,7 @@ class PushinPayClient:
                 st = str(data.get("charge", {}).get("status", "")).upper()
                 return {"status": "paid" if st == "COMPLETED" else st.lower()}
 
-        if self.provider == "asaas":
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            if self.provider == "asaas":
                 if str(transaction_id).startswith("pay_"):
                     resp = await client.get(
                         f"https://api.asaas.com/v3/payments/{transaction_id}",
@@ -272,7 +317,6 @@ class PushinPayClient:
                 first_st = str(payments[0].get("status", "pending")).lower() if payments else "pending"
                 return {"status": first_st, "raw": payments[0] if payments else {}}
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
                 f"{self.BASE_URL}/transactions/{transaction_id}",
                 headers=self.headers
