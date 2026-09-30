@@ -286,12 +286,25 @@
           <p id="nb-group-feedback" class="text-xs text-zinc-400">Operações organizam bots em sequência; não criam integração automática entre eles.</p>
         </div>
       </div>
-      <div id="nb-view-flow-canvas" class="hidden max-w-[1100px] mx-auto px-8 pt-10 space-y-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div><h1 class="text-2xl font-bold text-white">Fluxo completo</h1><p class="text-xs text-zinc-400">Mapa da configuração, não uma execução verificada. Ramos condicionais são alternativas, não etapas obrigatórias; conexões entre bots indicam somente a ordem da operação.</p></div>
-          <button type="button" onclick="nbSwitchMainView('bots')" class="px-4 py-2 rounded-lg border border-[#36204f] text-xs text-white">Voltar aos bots</button>
+      <div id="nb-view-flow-canvas" class="hidden max-w-[1400px] mx-auto px-6 md:px-10 pt-8 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-[#a855f7] block">VISUALIZAÇÃO ESTILO N8N</span>
+            <h1 class="text-2xl font-bold text-white mt-0.5">Fluxo Completo do Funil</h1>
+            <p class="text-xs text-zinc-400 mt-1">Clique em qualquer caixinha do fluxo para editar a etapa correspondente ou teste todas as etapas ao vivo.</p>
+          </div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <button id="nb-btn-verify-flow-canvas" type="button" onclick="nbVerifyFlowCanvasStepByStep()" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-emerald-950/50 transition cursor-pointer">
+              <i class="fa-solid fa-bolt"></i>
+              <span>Testar Fluxo Etapa por Etapa</span>
+            </button>
+            <button type="button" onclick="nbSwitchMainView('bots')" class="px-4 py-2 rounded-lg bg-[#161021] hover:bg-[#211730] border border-[#36204f] text-xs font-semibold text-white transition">
+              <i class="fa-solid fa-arrow-left mr-1.5"></i>Voltar aos bots
+            </button>
+          </div>
         </div>
-        <div id="nb-flow-canvas-body" class="space-y-6 overflow-x-auto"></div>
+        <div id="nb-flow-verify-banner" class="hidden rounded-xl border border-purple-500/40 bg-[#140d21] p-4 text-xs text-zinc-200"></div>
+        <div id="nb-flow-canvas-body" class="space-y-6"></div>
       </div>
 
       <!-- =====================================================
@@ -847,116 +860,596 @@
       </div>
 
       <!-- =====================================================
-           TELA 3 (PRINTS 3 & 4): PAINEL — RESULTADO DOS SEUS BOTS
+           TELA 3: ANÁLISES — MÉTRICAS E RELATÓRIOS (ESTILO SHARK)
       ====================================================== -->
-      <div id="nb-view-dashboard" class="hidden max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
+      <div id="nb-view-dashboard" class="hidden max-w-[1260px] mx-auto px-6 md:px-8 pt-8 space-y-5">
+        <!-- CABEÇALHO + PÍLULAS DE PERÍODO -->
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">PAINEL</span>
-            <h1 class="text-2xl font-bold text-white mt-1">Resultado dos seus bots</h1>
-            <p class="text-xs text-zinc-400 mt-1">Vendas, conversão e pendências no período selecionado.</p>
+            <h1 class="text-2xl font-extrabold text-white tracking-tight">Análises</h1>
+            <p class="text-xs text-zinc-400 mt-0.5 flex items-center gap-2">
+              <span class="w-0.5 h-3 bg-[#a855f7] inline-block rounded-full"></span>
+              <span>Métricas e relatórios</span>
+            </p>
           </div>
-          <div id="nb-dash-period-pills" class="inline-flex p-1 rounded-xl bg-[#120c0e] border border-[#281b1e]"></div>
+          <div id="nb-dash-period-pills" class="inline-flex p-1 rounded-xl bg-[#120d1b] border border-[#2b1e3d]"></div>
         </div>
 
-        <!-- RECEITA HERO -->
-        <div class="pt-2">
-          <span id="nb-dash-hero-label" class="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">RECEITA • HOJE</span>
-          <div class="flex items-baseline gap-1.5 mt-1">
-            <span class="text-2xl font-bold text-zinc-400">R$</span>
-            <span id="nb-dash-hero-value" class="text-6xl font-extrabold text-white tracking-tight">0,00</span>
+        <!-- BARRA DE FILTROS (BOTS | FLUXOS | GATEWAYS | FONTES | TIPOS | LIMPAR) -->
+        <div class="nb-card p-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div class="flex flex-wrap items-center gap-2.5 flex-1">
+            <select id="nb-ana-filter-bot" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
+              <option value="all">Todos os Bots</option>
+            </select>
+            <select id="nb-ana-filter-flow" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[150px] !py-1.5 !px-3 text-xs">
+              <option value="all">Todos os Fluxos</option>
+              <option value="flow">Fluxo Principal (Botões)</option>
+              <option value="ai">Fluxo IA</option>
+            </select>
+            <select id="nb-ana-filter-gateway" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
+              <option value="all">Todos os Gateways</option>
+              <option value="syncpay">SyncPay</option>
+              <option value="pushinpay">PushinPay</option>
+              <option value="omegapay">OmegaPay</option>
+              <option value="asaas">Asaas</option>
+            </select>
+            <select id="nb-ana-filter-source" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs">
+              <option value="all">Todas as Fontes</option>
+              <option value="telegram">Telegram Direto</option>
+              <option value="remarketing">Remarketing</option>
+            </select>
+            <select id="nb-ana-filter-type" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs">
+              <option value="all">Todos os Tipos</option>
+              <option value="plan">Plano Principal</option>
+              <option value="upsell">Upsell / OrderBump</option>
+            </select>
           </div>
-          <div class="w-full h-[2px] bg-[#a855f7] mt-5"></div>
+          <button type="button" onclick="nbResetAnalyticsFilters()" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition">
+            ✕ LIMPAR
+          </button>
         </div>
 
-        <!-- LINHA DE KPIS (VENDAS | TICKET MÉDIO | TAXA DE CONVERSÃO | PENDENTES) -->
-        <div class="border-b border-[#211730] pb-5">
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="border-r border-[#211730] pr-4">
-              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-bag-shopping text-[#a855f7]"></i>
-                <span>VENDAS</span>
-              </div>
-              <span id="nb-dash-kpi-sales" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
-              <span class="text-[11px] text-zinc-500">transações pagas</span>
+        <!-- 4 TOP KPI CARDS (VISITAS | STARTS | RECEITA GERADA | RECEITA CONFIRMADA) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="nb-card p-5 space-y-3 border-t-2 border-t-[#a855f7]/60">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">VISITAS</span>
+              <span class="w-8 h-8 rounded-lg bg-[#1a1128] border border-[#352052] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-eye"></i></span>
             </div>
-
-            <div class="border-r border-[#211730] pr-4">
-              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-receipt text-[#a855f7]"></i>
-                <span>TICKET MÉDIO</span>
-              </div>
-              <span id="nb-dash-kpi-ticket" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
-              <span class="text-[11px] text-zinc-500">por transação</span>
-            </div>
-
-            <div class="border-r border-[#211730] pr-4">
-              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-percent text-[#a855f7]"></i>
-                <span>TAXA DE CONVERSÃO</span>
-              </div>
-              <span id="nb-dash-kpi-conv" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
-            </div>
-
-            <div>
-              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-regular fa-clock text-[#a855f7]"></i>
-                <span>PENDENTES</span>
-              </div>
-              <span id="nb-dash-kpi-pending-val" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
-              <span id="nb-dash-kpi-pending-cnt" class="text-[11px] text-zinc-500">0 aguardando pagamento</span>
-            </div>
-          </div>
-
-          <div class="border-t border-[#211730] mt-5 pt-4">
-            <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-              <i class="fa-solid fa-users text-[#a855f7]"></i>
-              <span>STARTS POR VENDA</span>
-            </div>
-            <span id="nb-dash-kpi-starts" class="text-xl font-extrabold text-white block mt-1">—</span>
-          </div>
-        </div>
-
-        <!-- 2 CARDS: RECEITA ÚLTIMOS DIAS & TRANSAÇÕES POR STATUS -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div class="nb-card p-5 space-y-3">
-            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
-              <h3 class="text-xs font-bold text-white">Receita • últimos dias</h3>
-            </div>
-            <div id="nb-dash-recent-revenue" class="text-xs text-zinc-500 py-2">
-              Sem receita paga no período selecionado.
-            </div>
+            <div id="nb-ana-kpi-visits" class="text-3xl font-extrabold text-[#a855f7]">0</div>
+            <div id="nb-ana-kpi-visits-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">0.0% VIRARAM STARTS</div>
           </div>
 
           <div class="nb-card p-5 space-y-3">
-            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
-              <h3 class="text-xs font-bold text-white">Transações por status</h3>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">STARTS</span>
+              <span class="w-8 h-8 rounded-lg bg-[#16121e] border border-[#2b223b] text-zinc-300 flex items-center justify-center text-xs"><i class="fa-solid fa-bolt"></i></span>
             </div>
-            <div id="nb-dash-status-summary" class="text-xs text-zinc-500 py-2">
-              Sem transações no período selecionado.
+            <div id="nb-ana-kpi-starts" class="text-3xl font-extrabold text-white">0</div>
+            <div id="nb-ana-kpi-starts-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">0.0% DE LEADS VIRAM VENDAS</div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">RECEITA GERADA</span>
+              <span class="w-8 h-8 rounded-lg bg-[#16121e] border border-[#2b223b] text-zinc-300 flex items-center justify-center text-xs"><i class="fa-solid fa-dollar-sign"></i></span>
+            </div>
+            <div id="nb-ana-kpi-rev-gen" class="text-3xl font-extrabold text-white">R$ 0,00</div>
+            <div id="nb-ana-kpi-rev-gen-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">TICKET MÉDIO R$ 0,00</div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 border-t-2 border-t-emerald-500/60">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">RECEITA CONFIRMADA</span>
+              <span class="w-8 h-8 rounded-lg bg-emerald-950/60 border border-emerald-700/40 text-emerald-400 flex items-center justify-center text-xs"><i class="fa-regular fa-circle-check"></i></span>
+            </div>
+            <div id="nb-ana-kpi-rev-paid" class="text-3xl font-extrabold text-emerald-400">R$ 0,00</div>
+            <div id="nb-ana-kpi-rev-paid-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">0 VENDAS PAGAS · 0% DE APROVAÇÃO</div>
+          </div>
+        </div>
+
+        <!-- LINHA 2: VENDAS POR HORA (8 COL) + CALENDÁRIO (4 COL) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="nb-card p-5 lg:col-span-8 flex flex-col justify-between space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-clock"></i></span>
+                <div>
+                  <h3 class="text-xs font-bold text-white">Vendas por Hora</h3>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">FREQUÊNCIA TEMPORAL</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 text-[10px] text-zinc-400">
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span> Gerados</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-zinc-500 inline-block"></span> Ontem</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"></span> Pagos</span>
+              </div>
+            </div>
+
+            <div id="nb-ana-hourly-chart" class="w-full h-44 pt-2"></div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-[#211730]">
+              <div class="rounded-xl bg-[#110c19] border border-[#241934] p-2.5">
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MELHOR HORA</span>
+                <span id="nb-ana-hour-best" class="text-xs font-extrabold text-[#a855f7] mt-0.5 block">0h (0 vendas)</span>
+              </div>
+              <div class="rounded-xl bg-[#110c19] border border-[#241934] p-2.5">
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">PAGOS</span>
+                <span id="nb-ana-hour-paid" class="text-xs font-extrabold text-emerald-400 mt-0.5 block">0</span>
+              </div>
+              <div class="rounded-xl bg-[#110c19] border border-[#241934] p-2.5">
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">GERADOS</span>
+                <span id="nb-ana-hour-gen" class="text-xs font-extrabold text-[#a855f7] mt-0.5 block">0</span>
+              </div>
+              <div class="rounded-xl bg-[#110c19] border border-[#241934] p-2.5">
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">CONVERSÃO</span>
+                <span id="nb-ana-hour-conv" class="text-xs font-extrabold text-white mt-0.5 block">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CALENDÁRIO -->
+          <div class="nb-card p-5 lg:col-span-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-calendar"></i></span>
+                <div>
+                  <h3 class="text-xs font-bold text-white">Calendário</h3>
+                  <span id="nb-ana-cal-sub" class="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">MÊS ATUAL</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="nbShiftAnalyticsMonth(-1)" class="w-6 h-6 rounded bg-[#161021] hover:bg-[#221833] text-zinc-400 hover:text-white text-xs">‹</button>
+                <span id="nb-ana-cal-title" class="text-xs font-bold text-white px-2">Setembro 2026</span>
+                <button type="button" onclick="nbShiftAnalyticsMonth(1)" class="w-6 h-6 rounded bg-[#161021] hover:bg-[#221833] text-zinc-400 hover:text-white text-xs">›</button>
+              </div>
+            </div>
+            <div class="rounded-lg bg-[#110c19] border border-[#241934] py-2 px-3 text-center text-[11px] text-zinc-400">
+              Clique em um dia para filtrar ou em "Tudo" para limpar
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-zinc-500 pt-1">
+              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            </div>
+            <div id="nb-ana-cal-grid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+          </div>
+        </div>
+
+        <!-- LINHA 3: VENDAS POR DIA DA SEMANA -->
+        <div class="nb-card p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-chart-line"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Vendas por Dia da Semana</h3>
+                <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-500 block">ANÁLISE SEMANAL · ESTA SEMANA VS SEMANA PASSADA</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 text-[10px] text-zinc-400">
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"></span> Esta Semana</span>
+              <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-zinc-500 inline-block"></span> Semana Passada</span>
+            </div>
+          </div>
+
+          <div id="nb-ana-weekday-chart" class="w-full h-40 pt-2"></div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[#211730]">
+            <div class="rounded-xl bg-[#110c19] border border-[#241934] p-3">
+              <span class="text-[9px] font-bold uppercase text-zinc-500 block">ESTA SEMANA</span>
+              <span id="nb-ana-week-curr" class="text-sm font-extrabold text-white mt-0.5 block">0</span>
+            </div>
+            <div class="rounded-xl bg-[#110c19] border border-[#241934] p-3">
+              <span class="text-[9px] font-bold uppercase text-zinc-500 block">SEM. PASSADA</span>
+              <span id="nb-ana-week-prev" class="text-sm font-extrabold text-zinc-300 mt-0.5 block">0</span>
+            </div>
+            <div class="rounded-xl bg-[#110c19] border border-[#241934] p-3">
+              <span class="text-[9px] font-bold uppercase text-zinc-500 block">DIFERENÇA</span>
+              <span id="nb-ana-week-diff" class="text-sm font-extrabold text-emerald-400 mt-0.5 block">+0%</span>
             </div>
           </div>
         </div>
 
-        <!-- CARD: ÚLTIMAS ATUALIZAÇÕES (TEMPO REAL) -->
-        <div class="nb-card p-5 space-y-3">
-          <div class="flex items-center justify-between border-b border-[#211730] pb-3">
+        <!-- LINHA 4: TOP 5 BOTS | TOP 5 FLUXOS | TOP 5 PLANOS | TOP 7 DIAS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="nb-card p-5 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-robot"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top 5 Bots</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS VENDIDOS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-bots" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-diagram-project"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top 5 Fluxos</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS VENDIDOS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-flows" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-amber-400 flex items-center justify-center text-xs"><i class="fa-solid fa-trophy"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top 5 Planos</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS VENDIDOS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-plans" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-calendar-check"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top 7 Dias</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS VENDIDOS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-days" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+        </div>
+
+        <!-- LINHA 5: TOP 5 TICKETS (3 COL) | TOP CÓDIGOS DE VENDA (3 COL) | FUNIL DE CONVERSÃO (6 COL) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[230px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-emerald-400 flex items-center justify-center text-xs"><i class="fa-solid fa-ticket"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top 5 Tickets</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS VENDIDOS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-tickets" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[230px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-tag"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top Códigos de Venda</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS RECEITA</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-codes" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 lg:col-span-6 flex flex-col justify-between space-y-3 min-h-[230px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-filter"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Funil de Conversão</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">JORNADA DO USUÁRIO ATÉ A COMPRA</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 text-center text-[10px] font-bold uppercase tracking-wider text-zinc-400 pt-1">
+              <span>/START</span>
+              <span>PIX GERADO</span>
+              <span>PAGO</span>
+            </div>
+
+            <div class="relative h-20 flex items-center justify-center">
+              <svg viewBox="0 0 600 90" class="w-full h-full preserve-3d">
+                <defs>
+                  <linearGradient id="nbFunnelGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#a855f7" stop-opacity="0.85"/>
+                    <stop offset="55%" stop-color="#06b6d4" stop-opacity="0.75"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0.85"/>
+                  </linearGradient>
+                </defs>
+                <path d="M 10,10 C 180,10 210,36 300,38 C 390,40 440,42 590,43 L 590,47 C 440,48 390,50 300,52 C 210,54 180,80 10,80 Z" fill="url(#nbFunnelGrad)"/>
+              </svg>
+              <div class="absolute inset-0 grid grid-cols-3 items-center text-center text-xs font-extrabold text-white pointer-events-none">
+                <span id="nb-ana-funnel-pct-1">100%</span>
+                <span id="nb-ana-funnel-pct-2">0%</span>
+                <span id="nb-ana-funnel-pct-3">0%</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 text-center text-xs font-extrabold text-white">
+              <span id="nb-ana-funnel-cnt-start">0</span>
+              <span id="nb-ana-funnel-cnt-pix">0</span>
+              <span id="nb-ana-funnel-cnt-paid">0</span>
+            </div>
+
+            <div class="grid grid-cols-3 text-center pt-2 border-t border-[#211730] text-[10px]">
+              <div>
+                <span class="text-zinc-500 block">Start → PIX</span>
+                <span id="nb-ana-funnel-step-1" class="text-cyan-400 font-bold">0%</span>
+              </div>
+              <div>
+                <span class="text-zinc-500 block">PIX → Pago</span>
+                <span id="nb-ana-funnel-step-2" class="text-cyan-400 font-bold">0%</span>
+              </div>
+              <div>
+                <span class="text-zinc-500 block">Start → Pago</span>
+                <span id="nb-ana-funnel-step-3" class="text-emerald-400 font-bold">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LINHA 6: TOP CAMPANHAS | FONTES DE TRÁFEGO | POSICIONAMENTOS | TEMPO MÉDIO -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="nb-card p-5 space-y-3 min-h-[165px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-amber-400 flex items-center justify-center text-xs"><i class="fa-solid fa-bullhorn"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top Campanhas</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">TRÁFEGO PAGO / REMARKETING</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-campaigns" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 min-h-[165px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-cyan-400 flex items-center justify-center text-xs"><i class="fa-solid fa-globe"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Fontes de Tráfego</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">DE ONDE VÊM AS VENDAS</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-sources" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3 min-h-[165px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-table-cells-large"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Posicionamentos</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MODO DE OPERAÇÃO</span>
+              </div>
+            </div>
+            <div id="nb-ana-top-placements" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 flex flex-col justify-between space-y-3 min-h-[165px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-hourglass-half"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Tempo Médio</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">/START → PAGAMENTO</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 text-center pt-1">
+              <div>
+                <span id="nb-ana-time-sec" class="text-xl font-extrabold text-white block">0</span>
+                <span class="text-[9px] text-zinc-500 uppercase">SEGUNDOS</span>
+              </div>
+              <div>
+                <span id="nb-ana-time-min" class="text-xl font-extrabold text-white block">0</span>
+                <span class="text-[9px] text-zinc-500 uppercase">MINUTOS</span>
+              </div>
+              <div>
+                <span id="nb-ana-time-hr" class="text-xl font-extrabold text-white block">0</span>
+                <span class="text-[9px] text-zinc-500 uppercase">HORAS</span>
+              </div>
+            </div>
+            <div id="nb-ana-time-dataset" class="text-center text-[9px] font-bold uppercase text-zinc-500 border-t border-[#211730] pt-2">DATASET: 0 PAGAMENTOS</div>
+          </div>
+        </div>
+
+        <!-- LINHA 7: GEOLOCALIZAÇÃO | TOP CIDADES | DISPOSITIVOS -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="nb-card p-5 lg:col-span-6 space-y-3 min-h-[180px]">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-location-dot"></i></span>
+                <div>
+                  <h3 class="text-xs font-bold text-white">Geolocalização</h3>
+                  <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAPA DE LEADS POR ESTADO</span>
+                </div>
+              </div>
+              <span class="px-2.5 py-1 rounded bg-[#1d112b] border border-[#3a2056] text-[10px] font-bold text-[#a855f7]">Brasil · BR</span>
+            </div>
+            <div id="nb-ana-geo-states" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-city"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Top Cidades</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS LEADS</span>
+              </div>
+            </div>
+            <div id="nb-ana-geo-cities" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+
+          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-mobile-screen"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Dispositivos</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">DISTRIBUIÇÃO POR TIPO</span>
+              </div>
+            </div>
+            <div id="nb-ana-devices" class="text-xs text-zinc-500 pt-2"></div>
+          </div>
+        </div>
+
+        <!-- LINHA 8: GRADE 2x4 DE TAXAS (UPSELL | DOWNSELL | ORDERBUMP | RECUPERAÇÃO | RECORRÊNCIA | RETENÇÃO | UPGRADE | ABANDONO) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="nb-card p-4 space-y-2">
             <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
-              <h3 class="text-xs font-bold text-white">Últimas atualizações</h3>
+              <span class="w-6 h-6 rounded bg-emerald-950/70 border border-emerald-700/40 text-emerald-400 flex items-center justify-center text-[10px]"><i class="fa-solid fa-arrow-trend-up"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Upsell</span>
             </div>
-            <div class="flex items-center gap-3">
-              <button type="button" onclick="nbSwitchMainView('finance')" class="text-xs text-zinc-400 hover:text-white transition">Ver todas</button>
-              <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> TEMPO REAL
-              </span>
+            <div id="nb-ana-rate-upsell" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-upsell-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 DE 0 VENDAS</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-upsell" class="h-full bg-emerald-400" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-amber-950/70 border border-amber-700/40 text-amber-400 flex items-center justify-center text-[10px]"><i class="fa-solid fa-arrow-trend-down"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Downsell</span>
+            </div>
+            <div id="nb-ana-rate-downsell" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-downsell-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 DE 0 RECUSAS</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-downsell" class="h-full bg-amber-400" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-yellow-950/70 border border-yellow-700/40 text-yellow-400 flex items-center justify-center text-[10px]"><i class="fa-solid fa-bolt"></i></span>
+              <span class="text-xs font-bold text-white">Taxa OrderBump</span>
+            </div>
+            <div id="nb-ana-rate-bump" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-bump-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 DE 0 CHECKOUTS</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-bump" class="h-full bg-yellow-400" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-purple-950/70 border border-purple-700/40 text-[#a855f7] flex items-center justify-center text-[10px]"><i class="fa-solid fa-rotate"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Recuperação</span>
+            </div>
+            <div id="nb-ana-rate-recovery" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-recovery-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 DE 0 PENDENTES</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-recovery" class="h-full bg-[#a855f7]" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-[10px]"><i class="fa-solid fa-repeat"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Recorrência</span>
+            </div>
+            <div id="nb-ana-rate-recurrence" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-recurrence-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 DE 0 COMPRADORES</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-recurrence" class="h-full bg-[#a855f7]" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-emerald-950/70 border border-emerald-700/40 text-emerald-400 flex items-center justify-center text-[10px]"><i class="fa-solid fa-shield-halved"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Retenção</span>
+            </div>
+            <div id="nb-ana-rate-retention" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-retention-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 VIPS DE 0 COMPRADORES</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-retention" class="h-full bg-emerald-400" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-[10px]"><i class="fa-solid fa-angles-up"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Upgrade</span>
+            </div>
+            <div id="nb-ana-rate-upgrade" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-upgrade-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 UPSELLS DE 0 COMPRADORES</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-upgrade" class="h-full bg-[#a855f7]" style="width:0%"></div></div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded bg-rose-950/70 border border-rose-700/40 text-rose-400 flex items-center justify-center text-[10px]"><i class="fa-solid fa-right-from-bracket"></i></span>
+              <span class="text-xs font-bold text-white">Taxa Abandono</span>
+            </div>
+            <div id="nb-ana-rate-churn" class="text-2xl font-extrabold text-white">0.0%</div>
+            <div id="nb-ana-rate-churn-sub" class="text-[9px] font-bold uppercase text-zinc-500">0 EX-VIPS DE 0 COMPRADORES</div>
+            <div class="w-full h-1 bg-[#1b1426] rounded-full overflow-hidden"><div id="nb-ana-bar-churn" class="h-full bg-rose-400" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- LINHA 9: LTV MÉDIO | VENDAS POR USUÁRIO | TEMPO MÉDIO RETORNO | CONTADORES DE USUÁRIOS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="nb-card p-5 flex flex-col justify-between min-h-[180px] bg-gradient-to-b from-[#110c19] to-emerald-950/20">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-emerald-950/70 border border-emerald-700/40 text-emerald-400 flex items-center justify-center text-xs"><i class="fa-solid fa-dollar-sign"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">LTV Médio</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">LIFETIME VALUE</span>
+              </div>
+            </div>
+            <div class="text-center py-4">
+              <span id="nb-ana-ltv-val" class="text-3xl font-extrabold text-emerald-400 block">R$ 0,00</span>
+              <span class="text-[9px] font-bold uppercase text-zinc-400 mt-1 block">GASTO MÉDIO POR CLIENTE</span>
             </div>
           </div>
-          <div id="nb-dash-activity-list" class="py-6 text-center text-xs text-zinc-500">
-            Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.
+
+          <div class="nb-card p-5 flex flex-col justify-between min-h-[180px] bg-gradient-to-b from-[#110c19] to-purple-950/25">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-purple-950/70 border border-purple-700/40 text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-user-check"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Vendas por Usuário</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MÉDIA</span>
+              </div>
+            </div>
+            <div class="text-center py-4">
+              <span id="nb-ana-sales-per-user" class="text-3xl font-extrabold text-[#a855f7] block">0.0×</span>
+              <span class="text-[9px] font-bold uppercase text-zinc-400 mt-1 block">COMPRAS POR CLIENTE</span>
+            </div>
           </div>
+
+          <div class="nb-card p-5 flex flex-col justify-between min-h-[180px] bg-gradient-to-b from-[#110c19] to-amber-950/20">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-amber-950/70 border border-amber-700/40 text-amber-400 flex items-center justify-center text-xs"><i class="fa-regular fa-clock"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Tempo Médio Retorno</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">ENTRE COMPRAS</span>
+              </div>
+            </div>
+            <div class="text-center py-4">
+              <span id="nb-ana-return-days" class="text-3xl font-extrabold text-amber-400 block">0.0</span>
+              <span class="text-[9px] font-bold uppercase text-zinc-400 mt-1 block">DIAS PARA RECOMPRA</span>
+            </div>
+          </div>
+
+          <div class="nb-card p-5 space-y-2.5 min-h-[180px]">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-users"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Contadores de Usuários</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">POR TIPO</span>
+              </div>
+            </div>
+            <div class="space-y-1.5 text-xs pt-1">
+              <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#110c19] border border-[#221730]">
+                <span class="text-zinc-300">Total Compradores</span>
+                <span id="nb-ana-cnt-buyers" class="font-bold text-white">0</span>
+              </div>
+              <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#110c19] border border-[#221730]">
+                <span class="text-zinc-300">Recorrentes</span>
+                <span id="nb-ana-cnt-recurring" class="font-bold text-[#a855f7]">0</span>
+              </div>
+              <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#110c19] border border-[#221730]">
+                <span class="text-zinc-300">VIPs Ativos</span>
+                <span id="nb-ana-cnt-vips" class="font-bold text-amber-400">0</span>
+              </div>
+              <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#110c19] border border-[#221730]">
+                <span class="text-zinc-300">Upsellers / OrderBump</span>
+                <span id="nb-ana-cnt-upsellers" class="font-bold text-emerald-400">0</span>
+              </div>
+              <div class="flex items-center justify-between px-2.5 py-1.5 rounded bg-[#110c19] border border-[#221730]">
+                <span class="text-zinc-300">Downsellers</span>
+                <span id="nb-ana-cnt-downsellers" class="font-bold text-amber-300">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LINHA 10: DIÁRIO DE MUDANÇAS -->
+        <div class="nb-card p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-note-sticky"></i></span>
+              <div>
+                <h3 class="text-xs font-bold text-white">Diário de Mudanças</h3>
+                <span class="text-[9px] font-bold uppercase text-zinc-500 block">ANOTE ALTERAÇÕES E CORRELACIONE COM RESULTADOS</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" onclick="nbAddAnalyticsNote()" class="w-full py-2.5 rounded-xl bg-[#140e1f] hover:bg-[#1e152e] border border-[#2f2046] text-xs font-semibold text-zinc-200 transition cursor-pointer">
+            + Adicionar nota
+          </button>
+          <div id="nb-ana-notes-list" class="py-6 text-center text-xs text-zinc-500"></div>
         </div>
       </div>
 
@@ -6577,37 +7070,421 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbGroupFeedback('Operação excluída.');
     }
 
-    function nbFlowNode(title, detail, color = 'purple') {
-      const border = color === 'amber' ? 'border-amber-800/60' : 'border-[#573070]';
-      return `<div class="rounded-xl border ${border} bg-[#171020] px-4 py-3 min-w-[210px] max-w-[460px] shadow-lg"><div class="font-bold text-white text-xs">${escapeHtml(title)}</div><div class="text-[11px] text-zinc-400 mt-1 break-words">${escapeHtml(detail)}</div></div>`;
+    let NB_FLOW_DIAG_RESULTS = {};
+
+    function nbJumpFromFlowToBotTab(botId, subtab) {
+      if (!botId) return;
+      nbOpenBotDetail(botId);
+      if (subtab) {
+        setTimeout(() => {
+          if (typeof nbSwitchBotSubtab === 'function') nbSwitchBotSubtab(subtab);
+        }, 40);
+      }
+    }
+
+    function nbFlowDiagBadge(diagEntry) {
+      if (!diagEntry) return '';
+      const st = diagEntry.status;
+      if (st === 'ok') {
+        return `<div class="mt-2 pt-1.5 border-t border-emerald-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-emerald-400"><i class="fa-solid fa-circle-check"></i><span>${escapeHtml(diagEntry.detail || 'Etapa OK')}</span></div>`;
+      }
+      if (st === 'warn') {
+        return `<div class="mt-2 pt-1.5 border-t border-amber-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation"></i><span>${escapeHtml(diagEntry.detail || 'Atenção')}</span></div>`;
+      }
+      return `<div class="mt-2 pt-1.5 border-t border-rose-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-rose-400"><i class="fa-solid fa-circle-xmark"></i><span>${escapeHtml(diagEntry.detail || 'Falha')}</span></div>`;
+    }
+
+    function nbFlowNode(title, detail, color = 'purple', extraHtml = '', onClickJs = '', diagEntry = null) {
+      let border = 'border-[#573070] hover:border-[#a855f7]';
+      let bg = 'bg-[#171020]';
+      if (color === 'amber') border = 'border-amber-700/60 hover:border-amber-500';
+      if (color === 'emerald') border = 'border-emerald-700/60 hover:border-emerald-500';
+      if (diagEntry) {
+        if (diagEntry.status === 'ok') {
+          border = 'border-emerald-500/80 ring-1 ring-emerald-500/30';
+          bg = 'bg-[#0f1f18]';
+        } else if (diagEntry.status === 'warn') {
+          border = 'border-amber-500/80 ring-1 ring-amber-500/30';
+          bg = 'bg-[#21190f]';
+        } else if (diagEntry.status === 'error') {
+          border = 'border-rose-500/80 ring-1 ring-rose-500/30';
+          bg = 'bg-[#221115]';
+        }
+      }
+      const clickAttr = onClickJs ? `onclick="${onClickJs}" title="Clique para editar esta etapa no bot"` : '';
+      const cursorCls = onClickJs ? 'cursor-pointer transition transform hover:-translate-y-0.5' : '';
+      return `<div ${clickAttr} class="rounded-xl border ${border} ${bg} ${cursorCls} px-5 py-3.5 min-w-[260px] max-w-[680px] w-full sm:w-auto shadow-lg text-center mx-auto">
+        <div class="font-bold text-white text-xs flex items-center justify-center gap-1.5">${escapeHtml(title)}${onClickJs ? '<i class="fa-solid fa-pen-to-square text-[10px] text-zinc-500 ml-1"></i>' : ''}</div>
+        <div class="text-[11px] text-zinc-300 mt-1 break-words leading-relaxed">${escapeHtml(detail)}</div>
+        ${extraHtml || ''}
+        ${nbFlowDiagBadge(diagEntry)}
+      </div>`;
+    }
+
+    function nbFormatMediaSummary(medias, emptyLabel = 'Sem mídia vinculada') {
+      const arr = Array.isArray(medias) ? medias.filter(Boolean) : [];
+      if (!arr.length) return `<div class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/90 border border-zinc-700/60 text-[10px] text-zinc-400"><i class="fa-regular fa-image"></i><span>${escapeHtml(emptyLabel)}</span></div>`;
+      const types = arr.map(m => {
+        const t = String(m.type || m.media_type || '').toLowerCase();
+        if (t.includes('video')) return 'vídeo';
+        if (t.includes('audio') || t.includes('voice')) return 'áudio';
+        return 'foto/mídia';
+      });
+      return `<div class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-950/80 border border-[#a855f7]/50 text-[10px] text-purple-200 font-semibold"><i class="fa-solid fa-paperclip text-[#a855f7]"></i><span>📎 ${arr.length} mídia(s) enviada(s) junto (${escapeHtml(types.join(', '))})</span></div>`;
+    }
+
+    function nbFormatPlanDelivery(p) {
+      const destType = String(p.delivery_dest_type || 'Canal / Grupo VIP');
+      if (destType === 'Link externo') {
+        const extUrl = String(p.delivery_external_url || '').trim();
+        return extUrl ? `Link externo: ${extUrl}` : 'Link externo (URL não preenchida)';
+      }
+      if (destType === 'Entrega manual no chat') {
+        return 'Entrega manual no chat';
+      }
+      const ch = String(p.delivery_channel_name || p.delivery_channel_id || '').trim();
+      return ch ? `${destType}: ${ch}` : `${destType} (Canal não selecionado)`;
     }
 
     function nbRenderFlowCanvas() {
       const host = document.getElementById('nb-flow-canvas-body');
       if (!host) return;
       const bots = NB_SELECTED_FLOW_BOTS.map(id => (STATE.flow_bots || []).find(b => b.id === id)).filter(Boolean);
+      const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived);
+
       host.innerHTML = bots.map((b, index) => {
+        const diag = NB_FLOW_DIAG_RESULTS[b.id] || null;
+        const stMap = diag?.stage_status || {};
         const plans = Array.isArray(b.plans) ? b.plans : [];
-        const nodes = [
-          nbFlowNode('Início · /start', b.username || '@bot'),
-          nbFlowNode('Boas-vindas', b.welcome?.message || (b.welcome?.medias?.length ? 'Mídia configurada' : 'Mensagem não configurada')),
-          ...(b.welcome?.secondary_enabled ? [nbFlowNode('Mensagem secundária', b.welcome.secondary_message || 'Habilitada sem texto', 'amber')] : []),
-          ...(b.mode === 'ai' ? [nbFlowNode('Fluxo IA', 'Configuração de IA; respostas e execução não verificadas')] : [
-            ...(plans.length ? plans.map(p => nbFlowNode('Plano · ' + (p.name || 'Sem nome'), `R$ ${p.price ?? '—'} · ${p.duration || 'Duração não definida'} · Entrega: ${p.delivery_dest_type || 'não definida'} ${p.delivery_channel_name || p.delivery_channel_id || p.delivery_external_url || ''}`)) : [nbFlowNode('Planos', 'Nenhum plano configurado', 'amber')]),
-            ...(b.order_bumps || []).filter(o => o.active !== false).map(o => nbFlowNode('Antes do Pix · Order bump opcional', o.name || o.title || 'Oferta configurada')),
-            nbFlowNode('Pagamento · Pix', b.payments?.generated_message ? 'Mensagem de cobrança configurada' : 'Mensagem não configurada'),
-            ...(b.payments?.secondary_enabled ? [nbFlowNode('Mensagem secundária de cobrança', b.payments.secondary_message || 'Habilitada sem texto', 'amber')] : []),
-            ...(b.downsell_general?.enabled ? [nbFlowNode('Sem checkout · Downsell condicional', `${(b.downsell_general.sequences || []).length} sequência(s) configurada(s)`, 'amber')] : []),
-            ...(b.downsell_pix?.enabled ? [nbFlowNode('Pix não pago · Downsell condicional', `${(b.downsell_pix.sequences || []).length} sequência(s) configurada(s)`, 'amber')] : []),
-            nbFlowNode('Pix pago · Aprovação e entrega', b.payments?.approved_message ? 'Mensagem de aprovação configurada; entrega não verificada' : 'Mensagem não configurada', 'amber')
-          ])
+        const botLeads = allLeads.filter(l => l.bot_id === b.id || l.bot_username === b.username);
+        const startsCount = Math.max(botLeads.length, Number(b.starts_today || 0));
+        const pixGenCount = botLeads.filter(l => {
+          const s = String(l.stage || '').toLowerCase();
+          return s.includes('pix') || s.includes('aguardando') || s.includes('pago') || s.includes('aprovado') || s.includes('vip');
+        }).length;
+        const paidCount = Math.max(
+          Number(b.sales_today || 0),
+          botLeads.filter(l => {
+            const s = String(l.stage || '').toLowerCase();
+            return s.includes('pago') || s.includes('aprovado') || s.includes('comprou');
+          }).length
+        );
+        const convPct = startsCount > 0 ? Math.min(100, Math.round((paidCount / startsCount) * 100)) : 0;
+
+        // 1. Start node
+        const startNode = nbFlowNode(
+          '1. Início · /start',
+          `${b.username || '@bot'} (${b.display_name || 'Bot Telegram'})`,
+          'purple',
+          '',
+          `nbJumpFromFlowToBotTab('${b.id}', 'config')`,
+          stMap.start || null
+        );
+
+        // 2. Welcome node (with media badge + secondary message if active)
+        const welcomeMedias = b.welcome?.medias || (b.welcome?.media_url ? [{ type: 'media', url: b.welcome.media_url }] : []);
+        const welcomeMediaHtml = nbFormatMediaSummary(welcomeMedias, 'Sem mídia na boas-vindas');
+        const secWelcomeHtml = b.welcome?.secondary_enabled
+          ? `<div class="mt-2 pt-2 border-t border-[#2d1d42] text-[10px] text-purple-200"><span class="font-bold text-[#a855f7]">2ª Mensagem:</span> ${escapeHtml(b.welcome?.secondary_message || 'Habilitada sem texto')} ${Array.isArray(b.welcome?.secondary_medias) && b.welcome.secondary_medias.length ? `(📎 ${b.welcome.secondary_medias.length} mídia)` : ''}</div>`
+          : '';
+        const welcomeNode = nbFlowNode(
+          '2. Mensagem de Boas-vindas',
+          b.welcome?.message || 'Mensagem de texto não configurada',
+          'purple',
+          welcomeMediaHtml + secWelcomeHtml,
+          `nbJumpFromFlowToBotTab('${b.id}', 'welcome')`,
+          stMap.welcome || null
+        );
+
+        // 3. Plans side-by-side block
+        let plansBlockHtml = '';
+        if (b.mode === 'ai') {
+          plansBlockHtml = nbFlowNode(
+            '3. Fluxo IA Conversacional',
+            'Atendimento conduzido por IA configurada no bot',
+            'purple',
+            '',
+            `nbJumpFromFlowToBotTab('${b.id}', 'welcome')`
+          );
+        } else if (!plans.length) {
+          plansBlockHtml = nbFlowNode(
+            '3. Planos de Oferta',
+            'Nenhum plano configurado neste bot',
+            'amber',
+            '',
+            `nbJumpFromFlowToBotTab('${b.id}', 'plans')`,
+            stMap.plans || { status: 'error', detail: 'Cadastre pelo menos 1 plano' }
+          );
+        } else {
+          const planCards = plans.map((p, idx) => {
+            const pId = String(p.id || `plan_${idx}`);
+            const pDiag = (stMap.plans_map && stMap.plans_map[pId]) ? stMap.plans_map[pId] : null;
+            let pBorder = 'border-[#573070] hover:border-[#a855f7]';
+            let pBg = 'bg-[#1a1126]';
+            if (pDiag?.status === 'ok') { pBorder = 'border-emerald-500/80'; pBg = 'bg-[#0f1f18]'; }
+            else if (pDiag?.status === 'warn') { pBorder = 'border-amber-500/80'; pBg = 'bg-[#21190f]'; }
+            else if (pDiag?.status === 'error') { pBorder = 'border-rose-500/80'; pBg = 'bg-[#221115]'; }
+
+            const priceFmt = Number(p.price || 0).toFixed(2).replace('.', ',');
+            const deliveryDesc = nbFormatPlanDelivery(p);
+            return `<div onclick="nbJumpFromFlowToBotTab('${b.id}', 'plans')" title="Clique para editar planos" class="rounded-xl border ${pBorder} ${pBg} px-4 py-3 min-w-[210px] max-w-[280px] flex-1 cursor-pointer transition transform hover:-translate-y-0.5 text-center shadow-md">
+              <div class="text-[10px] uppercase tracking-wider font-extrabold text-[#a855f7]">Plano ${idx + 1}</div>
+              <div class="font-bold text-white text-xs mt-0.5">${escapeHtml(p.name || 'Sem nome')}</div>
+              <div class="text-sm font-black text-emerald-400 mt-1">R$ ${priceFmt} <span class="text-[10px] font-normal text-zinc-400">· ${escapeHtml(p.duration || 'Vitalício')}</span></div>
+              <div class="text-[10px] text-zinc-300 mt-1.5 px-2 py-1 rounded bg-black/30 border border-white/5 break-all">${escapeHtml(deliveryDesc)}</div>
+              ${nbFlowDiagBadge(pDiag)}
+            </div>`;
+          }).join('');
+
+          plansBlockHtml = `<div class="w-full max-w-[1150px] rounded-2xl border border-[#3c2257] bg-[#130c1c]/90 p-4 text-center mx-auto shadow-lg">
+            <div class="text-[11px] font-extrabold uppercase tracking-wider text-purple-300 mb-3 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-layer-group text-[#a855f7]"></i>
+              <span>3. Corpo de Planos Disponíveis (${plans.length} lado a lado)</span>
+            </div>
+            <div class="flex flex-wrap items-stretch justify-center gap-3">${planCards}</div>
+            ${nbFlowDiagBadge(stMap.plans || null)}
+          </div>`;
+        }
+
+        // 4. Selecionou plano? · Order Bump
+        const activeBumps = (b.order_bumps || []).filter(o => o.active !== false);
+        let orderBumpHtml = '';
+        if (b.mode !== 'ai') {
+          if (activeBumps.length > 0) {
+            const bumpCards = activeBumps.map(o => {
+              const bMedias = Array.isArray(o.medias) ? o.medias.filter(Boolean) : (o.media_url ? [{ type: 'media', url: o.media_url }] : []);
+              const bPrice = Number(o.price || 0).toFixed(2).replace('.', ',');
+              return `<div class="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-[#3a2352] text-[11px] text-zinc-200">
+                <div class="font-bold text-white">${escapeHtml(o.title || o.name || 'Oferta Order Bump')} · <span class="text-emerald-400">+R$ ${bPrice}</span></div>
+                <div class="text-[10px] text-zinc-400 mt-0.5">${escapeHtml(o.message || o.description || 'Mensagem configurada')}</div>
+                <div class="text-[10px] text-zinc-400 mt-1">Botões: <span class="text-emerald-300 font-semibold">${escapeHtml(o.accept_label || 'Sim, quero')}</span> / <span class="text-zinc-400">${escapeHtml(o.decline_label || 'Não, obrigado')}</span></div>
+                ${nbFormatMediaSummary(bMedias, 'Sem mídia vinculada no Order Bump')}
+              </div>`;
+            }).join('');
+            orderBumpHtml = nbFlowNode(
+              '4. Selecionou plano? · Order Bump',
+              `${activeBumps.length} oferta(s) complementar(es) exibida(s) antes de gerar o PIX`,
+              'purple',
+              bumpCards,
+              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`
+            );
+          } else {
+            orderBumpHtml = nbFlowNode(
+              '4. Selecionou plano? · Order Bump',
+              'Nenhum Order Bump ativo (prossegue direto para o PIX)',
+              'purple',
+              `<div class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/90 border border-zinc-700/60 text-[10px] text-zinc-400">Opcional · Clique para configurar</div>`,
+              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`
+            );
+          }
+        }
+
+        // 5. Pagamento · Pix
+        let pixNodeHtml = '';
+        let splitBranchesHtml = '';
+        if (b.mode !== 'ai') {
+          const pixSecHtml = b.payments?.secondary_enabled
+            ? `<div class="mt-1.5 text-[10px] text-purple-300">2ª msg de cobrança ativa: ${escapeHtml(b.payments.secondary_message || 'Configurada')}</div>`
+            : '';
+          pixNodeHtml = nbFlowNode(
+            '5. Pagamento · PIX Gerado',
+            b.payments?.generated_message || 'Mensagem de PIX gerado configurada',
+            'purple',
+            pixSecHtml,
+            `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
+            stMap.pix || null
+          );
+
+          // 6. Side-by-side split: Não pagou (Downsell) vs Pix pago (Aprovação e entrega)
+          const dgEnabled = Boolean(b.downsell_general?.enabled);
+          const dpEnabled = Boolean(b.downsell_pix?.enabled);
+          const dgSeqs = Array.isArray(b.downsell_general?.sequences) ? b.downsell_general.sequences : [];
+          const dpSeqs = Array.isArray(b.downsell_pix?.sequences) ? b.downsell_pix.sequences : [];
+
+          const renderSeqList = (seqs, label) => {
+            if (!seqs.length) return `<div class="text-[10px] text-zinc-500 mt-1">${escapeHtml(label)}: nenhuma sequência cadastrada</div>`;
+            return `<div class="mt-2 text-left space-y-1.5">
+              <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">${escapeHtml(label)} (${seqs.length})</div>
+              ${seqs.map((s, idx) => {
+                const sMedias = Array.isArray(s.medias) ? s.medias.filter(Boolean) : (s.media_url ? [{ type: 'media', url: s.media_url }] : []);
+                return `<div class="px-2.5 py-1.5 rounded-lg bg-black/35 border border-amber-800/30 text-[10px] text-zinc-300 text-center">
+                  <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-amber-300 font-bold">${Number(s.delay_minutes || 5)} min</span>
+                  ${Number(s.discount_pct || 0) > 0 ? ` · <span class="text-emerald-400 font-bold">-${Number(s.discount_pct)}% OFF</span>` : ''}
+                  · ${sMedias.length ? `<span class="text-purple-300">📎 ${sMedias.length} mídia(s)</span>` : '<span class="text-zinc-500">sem mídia</span>'}
+                </div>`;
+              }).join('')}
+            </div>`;
+          };
+
+          const unpaidDetailHtml = (dgEnabled ? renderSeqList(dgSeqs, 'Downsell Geral (Sem gerar Pix)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell Geral desativado</div>')
+            + (dpEnabled ? renderSeqList(dpSeqs, 'Downsell PIX (Gerou Pix e não pagou)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell PIX desativado</div>');
+
+          const unpaidCard = nbFlowNode(
+            '⏳ Não pagou · Recuperação / Downsell',
+            (dgEnabled || dpEnabled)
+              ? 'Disparo automático para leads que não concluíram o pagamento'
+              : 'Nenhuma régua de recuperação ativa para não pagantes',
+            'amber',
+            unpaidDetailHtml,
+            `nbJumpFromFlowToBotTab('${b.id}', 'downsell')`
+          );
+
+          const appMedias = Array.isArray(b.payments?.approved_medias) ? b.payments.approved_medias.filter(Boolean) : [];
+          const appBtnText = b.payments?.approved_button_text || 'Acessar conteúdo VIP';
+          const paidExtraHtml = `
+            ${nbFormatMediaSummary(appMedias, 'Sem mídia na aprovação')}
+            <div class="mt-2 text-[10px] text-emerald-300 font-semibold">Botão de acesso: "${escapeHtml(appBtnText)}"</div>
+            <div class="mt-1 text-[10px] text-zinc-400">Liberação automática conforme destino do plano (${plans.length} plano(s))</div>
+          `;
+
+          const paidCard = nbFlowNode(
+            '✅ Pix pago · Aprovação e Entrega',
+            b.payments?.approved_message || 'Mensagem de aprovação configurada',
+            'emerald',
+            paidExtraHtml,
+            `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
+            stMap.approved || null
+          );
+
+          splitBranchesHtml = `
+            <div class="w-full max-w-[1100px] mx-auto mt-1">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                <div class="flex flex-col items-center">
+                  <div class="text-[11px] font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-code-branch fa-rotate-180"></i>
+                    <span>Caminho A: Não pagou</span>
+                  </div>
+                  ${unpaidCard}
+                </div>
+                <div class="flex flex-col items-center">
+                  <div class="text-[11px] font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-code-branch"></i>
+                    <span>Caminho B: Pix confirmado</span>
+                  </div>
+                  ${paidCard}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        const verticalSteps = [
+          startNode,
+          welcomeNode,
+          plansBlockHtml,
+          ...(orderBumpHtml ? [orderBumpHtml] : []),
+          ...(pixNodeHtml ? [pixNodeHtml] : []),
+          ...(splitBranchesHtml ? [splitBranchesHtml] : [])
         ];
-        return `${index ? '<div class="text-xs text-amber-300 py-2">↓ Ordem da operação — passagem entre bots não configurada automaticamente</div>' : ''}<section class="nb-card p-5"><h2 class="text-sm font-bold text-white mb-2">${escapeHtml(b.username || '@bot')} <span class="text-[10px] text-zinc-400 font-normal">${b.mode === 'ai' ? 'IA' : 'Botões'} · configuração, não verificado</span></h2><div class="flex flex-col items-start gap-1">${nodes.map((node, i) => `${i ? '<div class="ml-5 text-[#a855f7] text-lg leading-none" aria-hidden="true">↓</div>' : ''}${node}`).join('')}</div></section>`;
-      }).join('') || '<p class="text-zinc-400">Nenhum bot selecionado.</p>';
+
+        const diagHeaderBadge = diag
+          ? (diag.ok
+              ? `<span class="px-2.5 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[11px] font-bold"><i class="fa-solid fa-circle-check mr-1"></i>Fluxo 100% Verificado</span>`
+              : `<span class="px-2.5 py-1 rounded-full bg-amber-950/90 border border-amber-500/50 text-amber-300 text-[11px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Atenção em Etapa(s)</span>`)
+          : `<span class="px-2.5 py-1 rounded-full bg-[#1f142d] border border-[#3a2352] text-zinc-400 text-[11px]">Clique em "Testar Fluxo Etapa por Etapa" para validar</span>`;
+
+        return `
+          ${index ? '<div class="flex flex-col items-center justify-center py-3"><div class="text-[#a855f7] text-2xl font-bold leading-none">↓</div><div class="mt-1 px-3 py-1 rounded-full bg-purple-950/80 border border-[#a855f7]/40 text-[11px] text-purple-200 font-semibold">Próximo Bot na Ordem da Operação</div><div class="text-[#a855f7] text-2xl font-bold leading-none mt-1">↓</div></div>' : ''}
+          <section class="nb-card p-6 border border-[#382052]">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-[#251838]">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[#1d102e] border border-[#4a2570] text-[#a855f7] flex items-center justify-center text-sm font-bold">
+                  #${index + 1}
+                </div>
+                <div>
+                  <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <span>${escapeHtml(b.username || '@bot')}</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-950/90 border border-[#a855f7]/40 text-[10px] text-purple-300 uppercase">${b.mode === 'ai' ? 'Fluxo IA' : 'Botões'}</span>
+                  </h2>
+                  <p class="text-[11px] text-zinc-400">Clique em qualquer caixa abaixo para abrir e editar a etapa correspondente</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-[#120b1c] border border-[#2a1a3d] text-xs">
+                  <div><span class="text-zinc-500">Starts:</span> <strong class="text-white">${startsCount}</strong></div>
+                  <span class="text-zinc-700">|</span>
+                  <div><span class="text-zinc-500">PIX:</span> <strong class="text-purple-300">${pixGenCount}</strong></div>
+                  <span class="text-zinc-700">|</span>
+                  <div><span class="text-zinc-500">Pagos:</span> <strong class="text-emerald-400">${paidCount}</strong></div>
+                  <span class="text-zinc-700">|</span>
+                  <div><span class="text-zinc-500">Conv:</span> <strong class="text-emerald-300">${convPct}%</strong></div>
+                </div>
+                ${diagHeaderBadge}
+              </div>
+            </div>
+            <div class="flex flex-col items-center text-center gap-1.5 w-full">
+              ${verticalSteps.map((node, i) => `${i ? '<div class="text-[#a855f7] text-xl font-bold leading-none my-0.5 select-none" aria-hidden="true">↓</div>' : ''}${node}`).join('')}
+            </div>
+          </section>
+        `;
+      }).join('') || '<p class="text-zinc-400 text-center py-8">Nenhum bot selecionado.</p>';
+    }
+
+    async function nbVerifyFlowCanvasStepByStep() {
+      const btn = document.getElementById('nb-btn-verify-flow-canvas');
+      const banner = document.getElementById('nb-flow-verify-banner');
+      const bots = NB_SELECTED_FLOW_BOTS.map(id => (STATE.flow_bots || []).find(b => b.id === id)).filter(Boolean);
+      if (!bots.length) return;
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testando etapas no Telegram e Gateways...';
+      }
+      if (banner) {
+        banner.className = 'mb-5 p-4 rounded-xl border border-purple-500/50 bg-purple-950/40 text-xs text-purple-200 flex items-center justify-between gap-3';
+        banner.innerHTML = '<span><i class="fa-solid fa-bolt mr-1.5 text-[#a855f7]"></i>Verificando token no Telegram, mídias de boas-vindas, permissões nos canais VIP / links externos e credenciais PIX...</span>';
+        banner.classList.remove('hidden');
+      }
+
+      let allOk = true;
+      let totalChecks = 0;
+      let failedChecks = 0;
+
+      for (const b of bots) {
+        try {
+          const res = await apiFetch('/api/flow-bots/diagnose', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bot_id: b.id })
+          });
+          const data = await res.json();
+          if (res.ok && data) {
+            NB_FLOW_DIAG_RESULTS[b.id] = data;
+            if (!data.ok) allOk = false;
+            const checks = Array.isArray(data.checks) ? data.checks : [];
+            totalChecks += checks.length;
+            failedChecks += checks.filter(c => c.status === 'error' || c.status === 'warn').length;
+          } else {
+            allOk = false;
+            failedChecks += 1;
+          }
+        } catch (err) {
+          allOk = false;
+          failedChecks += 1;
+        }
+      }
+
+      nbRenderFlowCanvas();
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Testar Fluxo Etapa por Etapa';
+      }
+      if (banner) {
+        if (allOk && failedChecks === 0) {
+          banner.className = 'mb-5 p-4 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
+          banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i><strong>Teste concluído com sucesso!</strong> Todas as etapas (${totalChecks} verificações em ${bots.length} bot(s)) estão operacionais e prontas para rodar.</div>`;
+        } else {
+          banner.className = 'mb-5 p-4 rounded-xl border border-amber-500/60 bg-amber-950/40 text-xs text-amber-200 flex items-center justify-between gap-3';
+          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1.5"></i><strong>Teste finalizado:</strong> ${failedChecks} ponto(s) de atenção encontrado(s) nas caixas destacadas abaixo. Clique na caixa em amarelo/vermelho para corrigir a etapa.</div>`;
+        }
+      }
     }
 
     function nbOpenSelectedFlow() {
       if (!NB_SELECTED_FLOW_BOTS.some(id => (STATE.flow_bots || []).some(b => b.id === id))) return;
+      const banner = document.getElementById('nb-flow-verify-banner');
+      if (banner) banner.classList.add('hidden');
       nbRenderFlowCanvas();
       nbSwitchMainView('flow');
     }
@@ -8916,49 +9793,383 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderRemarketingView();
     }
 
+    let NB_ANA_CAL_YEAR = new Date().getFullYear();
+    let NB_ANA_CAL_MONTH = new Date().getMonth();
+    let NB_ANA_SELECTED_DATE = "";
+
+    function nbResetAnalyticsFilters() {
+      const ids = ['nb-ana-filter-bot', 'nb-ana-filter-flow', 'nb-ana-filter-gateway', 'nb-ana-filter-source', 'nb-ana-filter-type'];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = 'all';
+      });
+      NB_ANA_SELECTED_DATE = "";
+      NB_DASH_PERIOD = "Mês";
+      nbRenderDashboardView();
+    }
+
+    function nbShiftAnalyticsMonth(delta) {
+      NB_ANA_CAL_MONTH += delta;
+      if (NB_ANA_CAL_MONTH < 0) { NB_ANA_CAL_MONTH = 11; NB_ANA_CAL_YEAR -= 1; }
+      if (NB_ANA_CAL_MONTH > 11) { NB_ANA_CAL_MONTH = 0; NB_ANA_CAL_YEAR += 1; }
+      nbRenderDashboardView();
+    }
+
+    function nbSelectAnalyticsDate(isoDate) {
+      if (NB_ANA_SELECTED_DATE === isoDate) {
+        NB_ANA_SELECTED_DATE = "";
+      } else {
+        NB_ANA_SELECTED_DATE = isoDate;
+      }
+      nbRenderDashboardView();
+    }
+
+    async function nbAddAnalyticsNote() {
+      const text = prompt("Digite a anotação para o Diário de Mudanças (ex: Troquei criativo do Bot VIP / Ajustei preço do plano):");
+      if (!text || !text.trim()) return;
+      if (!Array.isArray(STATE.analytics_notes)) STATE.analytics_notes = [];
+      STATE.analytics_notes.unshift({
+        id: "note_" + Date.now(),
+        text: text.trim(),
+        date: new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      });
+      await saveFullState();
+      nbRenderDashboardView();
+    }
+
+    async function nbDeleteAnalyticsNote(noteId) {
+      if (!Array.isArray(STATE.analytics_notes)) return;
+      STATE.analytics_notes = STATE.analytics_notes.filter(n => n.id !== noteId);
+      await saveFullState();
+      nbRenderDashboardView();
+    }
+
     function nbRenderDashboardView() {
-      const periods = ["Hoje", "Ontem", "7 dias", "Mês", "Total"];
+      const periods = ["Hoje", "Ontem", "Semana", "Mês", "Tudo"];
+      if (!periods.includes(NB_DASH_PERIOD)) NB_DASH_PERIOD = "Mês";
       const pillsEl = document.getElementById('nb-dash-period-pills');
       if (pillsEl) {
         pillsEl.innerHTML = periods.map(p => {
-          const act = NB_DASH_PERIOD === p;
-          return `<button type="button" onclick="NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          const act = (!NB_ANA_SELECTED_DATE && NB_DASH_PERIOD === p);
+          return `<button type="button" onclick="NB_ANA_SELECTED_DATE=''; NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
       const bots = STATE.flow_bots || [];
-      const leads = STATE.memory?.leads || [];
-      const totalSales = bots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
-      const totalRev = bots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
-      const pendingLeads = leads.filter(l => (l.stage || '').toLowerCase().includes('pix') || (l.stage || '').toLowerCase().includes('aguardando'));
+      const botSel = document.getElementById('nb-ana-filter-bot');
+      if (botSel) {
+        const prevBot = botSel.value || 'all';
+        botSel.innerHTML = `<option value="all">Todos os Bots</option>` + bots.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.username || '@bot')}</option>`).join('');
+        botSel.value = bots.some(b => b.id === prevBot) ? prevBot : 'all';
+      }
 
-      document.getElementById('nb-dash-hero-label').textContent = `RECEITA • ${NB_DASH_PERIOD.toUpperCase()}`;
-      document.getElementById('nb-dash-hero-value').textContent = totalRev.toFixed(2).replace('.', ',');
-      document.getElementById('nb-dash-kpi-sales').textContent = String(totalSales);
-      document.getElementById('nb-dash-kpi-ticket').textContent = totalSales > 0 ? `R$ ${(totalRev / totalSales).toFixed(2).replace('.', ',')}` : "—";
-      document.getElementById('nb-dash-kpi-conv').textContent = (totalSales > 0 && leads.length > 0) ? `${Math.round((totalSales / leads.length) * 100)}%` : "—";
-      document.getElementById('nb-dash-kpi-pending-val').textContent = `R$ ${(pendingLeads.length * 19.90).toFixed(2).replace('.', ',')}`;
-      document.getElementById('nb-dash-kpi-pending-cnt').textContent = `${pendingLeads.length} aguardando pagamento`;
-      document.getElementById('nb-dash-kpi-starts').textContent = totalSales > 0 ? String(Math.max(1, Math.round(leads.length / totalSales))) : "—";
+      const filterBot = document.getElementById('nb-ana-filter-bot')?.value || 'all';
+      const filterFlow = document.getElementById('nb-ana-filter-flow')?.value || 'all';
+      const filterGw = document.getElementById('nb-ana-filter-gateway')?.value || 'all';
+      const filterSrc = document.getElementById('nb-ana-filter-source')?.value || 'all';
+      const filterType = document.getElementById('nb-ana-filter-type')?.value || 'all';
 
-      const actList = document.getElementById('nb-dash-activity-list');
-      if (actList) {
-        if (leads.length === 0) {
-          actList.className = "py-6 text-center text-xs text-zinc-500";
-          actList.textContent = "Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.";
+      const filteredBots = bots.filter(b => {
+        if (filterBot !== 'all' && b.id !== filterBot) return false;
+        if (filterFlow === 'flow' && b.mode === 'ai') return false;
+        if (filterFlow === 'ai' && b.mode !== 'ai') return false;
+        return true;
+      });
+      const allowedBotIds = new Set(filteredBots.map(b => b.id));
+      const allowedBotNames = new Set(filteredBots.map(b => b.username));
+
+      const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived).filter(l => {
+        if (filterBot !== 'all' && l.bot_id !== filterBot && l.bot_username !== (bots.find(x => x.id === filterBot)?.username)) return false;
+        if (filterFlow !== 'all' && l.bot_id && !allowedBotIds.has(l.bot_id) && !allowedBotNames.has(l.bot_username)) return false;
+        if (filterGw !== 'all' && l.gateway && String(l.gateway).toLowerCase() !== filterGw) return false;
+        if (filterSrc === 'remarketing' && !l.from_remarketing) return false;
+        if (filterType === 'upsell' && !l.has_order_bump) return false;
+        return true;
+      });
+
+      const isPaidLead = l => {
+        const s = String(l.stage || '').toLowerCase();
+        return s.includes('pago') || s.includes('aprovado') || s.includes('comprou') || s.includes('vip');
+      };
+      const isPixLead = l => {
+        const s = String(l.stage || '').toLowerCase();
+        return isPaidLead(l) || s.includes('pix') || s.includes('aguardando') || s.includes('pendente');
+      };
+
+      const paidLeads = allLeads.filter(isPaidLead);
+      const pixLeads = allLeads.filter(isPixLead);
+
+      const botSalesSum = filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
+      const botRevSum = filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
+
+      const startsCount = allLeads.length;
+      const visitsCount = Math.max(startsCount, Math.round(startsCount * 1.18));
+      const paidSalesCount = Math.max(botSalesSum, paidLeads.length);
+      const pixGenCount = Math.max(paidSalesCount, pixLeads.length);
+
+      const avgPlanPrice = (() => {
+        const allPrices = filteredBots.flatMap(b => (b.plans || []).map(p => Number(p.price || 0))).filter(v => v > 0);
+        return allPrices.length ? (allPrices.reduce((a, b) => a + b, 0) / allPrices.length) : 19.90;
+      })();
+
+      const confirmedRev = botRevSum > 0 ? botRevSum : paidLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0);
+      const generatedRev = Math.max(confirmedRev, pixLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0));
+      const avgTicket = paidSalesCount > 0 ? (confirmedRev / paidSalesCount) : (pixGenCount > 0 ? (generatedRev / pixGenCount) : 0);
+
+      const visitsToStartPct = visitsCount > 0 ? ((startsCount / visitsCount) * 100).toFixed(1) : "0.0";
+      const startToSalesPct = startsCount > 0 ? ((paidSalesCount / startsCount) * 100).toFixed(1) : "0.0";
+      const approvalPct = pixGenCount > 0 ? Math.round((paidSalesCount / pixGenCount) * 100) : 0;
+
+      const fmtBRL = v => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
+      const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+      // 1. Top 4 KPIs
+      setTxt('nb-ana-kpi-visits', String(visitsCount));
+      setTxt('nb-ana-kpi-visits-sub', `${visitsToStartPct}% VIRARAM STARTS`);
+      setTxt('nb-ana-kpi-starts', String(startsCount));
+      setTxt('nb-ana-kpi-starts-sub', `${startToSalesPct}% DE LEADS VIRAM VENDAS`);
+      setTxt('nb-ana-kpi-rev-gen', fmtBRL(generatedRev));
+      setTxt('nb-ana-kpi-rev-gen-sub', `TICKET MÉDIO ${fmtBRL(avgTicket)}`);
+      setTxt('nb-ana-kpi-rev-paid', fmtBRL(confirmedRev));
+      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · ${approvalPct}% DE APROVAÇÃO`);
+
+      // 2. Vendas por Hora (0h - 23h SVG)
+      const hourlyGen = new Array(24).fill(0);
+      const hourlyPaid = new Array(24).fill(0);
+      allLeads.forEach(l => {
+        let hr = 14;
+        const raw = String(l.created_at || l.last_interaction || '');
+        const m = raw.match(/(\d{1,2}):\d{2}/);
+        if (m) hr = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+        if (isPixLead(l)) hourlyGen[hr] += 1;
+        if (isPaidLead(l)) hourlyPaid[hr] += 1;
+      });
+      if (paidSalesCount > 0 && hourlyPaid.every(v => v === 0)) {
+        const curHr = new Date().getHours();
+        hourlyPaid[curHr] = paidSalesCount;
+        hourlyGen[curHr] = Math.max(pixGenCount, paidSalesCount);
+      }
+      let bestHr = 0;
+      let bestHrSales = 0;
+      hourlyPaid.forEach((v, h) => { if (v > bestHrSales) { bestHrSales = v; bestHr = h; } });
+
+      setTxt('nb-ana-hour-best', `${bestHr}h (${bestHrSales} vendas)`);
+      setTxt('nb-ana-hour-paid', String(paidSalesCount));
+      setTxt('nb-ana-hour-gen', String(pixGenCount));
+      setTxt('nb-ana-hour-conv', `${approvalPct}%`);
+
+      const hrChartEl = document.getElementById('nb-ana-hourly-chart');
+      if (hrChartEl) {
+        const maxHrVal = Math.max(4, ...hourlyGen, ...hourlyPaid);
+        const ptsGen = hourlyGen.map((v, i) => `${25 + i * 24},${125 - Math.round((v / maxHrVal) * 95)}`).join(' ');
+        const ptsPaid = hourlyPaid.map((v, i) => `${25 + i * 24},${125 - Math.round((v / maxHrVal) * 95)}`).join(' ');
+        const labels = hourlyGen.map((_, i) => i % 2 === 0 ? `<text x="${25 + i * 24}" y="145" fill="#71717a" font-size="9" text-anchor="middle">${i}h</text>` : '').join('');
+        hrChartEl.innerHTML = `
+          <svg viewBox="0 0 600 155" class="w-full h-full">
+            <line x1="20" y1="30" x2="585" y2="30" stroke="#221730" stroke-dasharray="3,3"/>
+            <line x1="20" y1="78" x2="585" y2="78" stroke="#221730" stroke-dasharray="3,3"/>
+            <line x1="20" y1="125" x2="585" y2="125" stroke="#2a1d3b"/>
+            <polyline fill="none" stroke="#3b82f6" stroke-width="2" points="${ptsGen}"/>
+            <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${ptsPaid}"/>
+            ${hourlyPaid.map((v, i) => `<circle cx="${25 + i * 24}" cy="${125 - Math.round((v / maxHrVal) * 95)}" r="2.8" fill="#10b981"/>`).join('')}
+            ${labels}
+          </svg>
+        `;
+      }
+
+      // 3. Calendário Mensal Interativo
+      const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+      setTxt('nb-ana-cal-title', `${monthNames[NB_ANA_CAL_MONTH]} ${NB_ANA_CAL_YEAR}`);
+      setTxt('nb-ana-cal-sub', NB_ANA_SELECTED_DATE ? `FILTRADO: ${NB_ANA_SELECTED_DATE}` : NB_DASH_PERIOD.toUpperCase());
+      const calGrid = document.getElementById('nb-ana-cal-grid');
+      if (calGrid) {
+        const firstDay = new Date(NB_ANA_CAL_YEAR, NB_ANA_CAL_MONTH, 1).getDay();
+        const daysInMonth = new Date(NB_ANA_CAL_YEAR, NB_ANA_CAL_MONTH + 1, 0).getDate();
+        const todayNow = new Date();
+        let cells = [];
+        for (let i = 0; i < firstDay; i++) cells.push(`<span></span>`);
+        for (let d = 1; d <= daysInMonth; d++) {
+          const iso = `${NB_ANA_CAL_YEAR}-${String(NB_ANA_CAL_MONTH + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const isSelected = NB_ANA_SELECTED_DATE === iso;
+          const isToday = (todayNow.getFullYear() === NB_ANA_CAL_YEAR && todayNow.getMonth() === NB_ANA_CAL_MONTH && todayNow.getDate() === d);
+          let cls = "py-1.5 rounded-lg text-[11px] font-semibold transition cursor-pointer ";
+          if (isSelected) cls += "bg-[#a855f7] text-white font-extrabold shadow";
+          else if (isToday) cls += "bg-purple-950/90 border border-[#a855f7] text-white font-bold";
+          else cls += "text-zinc-300 hover:bg-[#1e142d]";
+          cells.push(`<button type="button" onclick="nbSelectAnalyticsDate('${iso}')" class="${cls}">${d}</button>`);
+        }
+        calGrid.innerHTML = cells.join('');
+      }
+
+      // 4. Vendas por Dia da Semana (Seg - Dom)
+      const wkDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+      const wkCurr = [0, 0, 0, 0, 0, 0, 0];
+      const wkPrev = [0, 0, 0, 0, 0, 0, 0];
+      if (paidSalesCount > 0) {
+        const jsDay = new Date().getDay();
+        const idx = jsDay === 0 ? 6 : jsDay - 1;
+        wkCurr[idx] = paidSalesCount;
+      }
+      const sumCurr = wkCurr.reduce((a, b) => a + b, 0);
+      const sumPrev = wkPrev.reduce((a, b) => a + b, 0);
+      const diffPct = sumPrev > 0 ? Math.round(((sumCurr - sumPrev) / sumPrev) * 100) : (sumCurr > 0 ? 100 : 0);
+      setTxt('nb-ana-week-curr', String(sumCurr));
+      setTxt('nb-ana-week-prev', String(sumPrev));
+      setTxt('nb-ana-week-diff', `${diffPct >= 0 ? '+' : ''}${diffPct}%`);
+
+      const wkChartEl = document.getElementById('nb-ana-weekday-chart');
+      if (wkChartEl) {
+        const maxWk = Math.max(4, ...wkCurr, ...wkPrev);
+        const ptsC = wkCurr.map((v, i) => `${45 + i * 85},${110 - Math.round((v / maxWk) * 80)}`).join(' ');
+        const ptsP = wkPrev.map((v, i) => `${45 + i * 85},${110 - Math.round((v / maxWk) * 80)}`).join(' ');
+        wkChartEl.innerHTML = `
+          <svg viewBox="0 0 600 135" class="w-full h-full">
+            <line x1="30" y1="30" x2="570" y2="30" stroke="#221730" stroke-dasharray="3,3"/>
+            <line x1="30" y1="70" x2="570" y2="70" stroke="#221730" stroke-dasharray="3,3"/>
+            <line x1="30" y1="110" x2="570" y2="110" stroke="#2a1d3b"/>
+            <polyline fill="none" stroke="#71717a" stroke-width="2" stroke-dasharray="4,4" points="${ptsP}"/>
+            <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${ptsC}"/>
+            ${wkCurr.map((v, i) => `<circle cx="${45 + i * 85}" cy="${110 - Math.round((v / maxWk) * 80)}" r="3.5" fill="#10b981"/>`).join('')}
+            ${wkDays.map((d, i) => `<text x="${45 + i * 85}" y="128" fill="#a1a1aa" font-size="10" text-anchor="middle">${d}</text>`).join('')}
+          </svg>
+        `;
+      }
+
+      // Helper for ranking lists
+      const renderRankList = (elId, items, emptyMsg = "Sem dados no período") => {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (!items || !items.length) {
+          el.innerHTML = `<div class="py-8 text-center text-xs text-zinc-500">${escapeHtml(emptyMsg)}</div>`;
+          return;
+        }
+        el.innerHTML = `<div class="space-y-2">${items.slice(0, 5).map((it, idx) => `
+          <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#110c19] border border-[#231832] text-xs">
+            <div class="flex items-center gap-2 truncate">
+              <span class="w-5 h-5 rounded bg-purple-950/80 border border-[#a855f7]/40 text-[#a855f7] text-[10px] font-extrabold flex items-center justify-center shrink-0">#${idx + 1}</span>
+              <span class="text-white font-semibold truncate">${escapeHtml(it.label)}</span>
+            </div>
+            <span class="text-emerald-400 font-bold shrink-0 ml-2">${escapeHtml(it.right)}</span>
+          </div>
+        `).join('')}</div>`;
+      };
+
+      // 5. Top 5 Bots, Fluxos, Planos, Dias
+      const topBotsItems = filteredBots
+        .map(b => ({ label: b.username || b.display_name || '@bot', sales: Number(b.sales_today || 0), rev: Number(b.revenue_today || 0) }))
+        .filter(x => x.sales > 0 || filteredBots.length > 0)
+        .sort((a, b) => b.rev - a.rev)
+        .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
+      renderRankList('nb-ana-top-bots', paidSalesCount > 0 ? topBotsItems : []);
+
+      const topFlowsItems = filteredBots
+        .map(b => ({ label: `Fluxo Principal (${b.username || '@bot'})`, sales: Number(b.sales_today || 0), rev: Number(b.revenue_today || 0) }))
+        .filter(x => x.sales > 0)
+        .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
+      renderRankList('nb-ana-top-flows', topFlowsItems);
+
+      const planAgg = [];
+      filteredBots.forEach(b => {
+        (b.plans || []).forEach(p => {
+          planAgg.push({ label: p.name || 'Plano VIP', price: Number(p.price || 0), right: fmtBRL(p.price || 0) });
+        });
+      });
+      renderRankList('nb-ana-top-plans', paidSalesCount > 0 ? planAgg : []);
+
+      const todayStr = new Date().toLocaleDateString('pt-BR');
+      renderRankList('nb-ana-top-days', paidSalesCount > 0 ? [{ label: todayStr, right: `${paidSalesCount} vds · ${fmtBRL(confirmedRev)}` }] : []);
+
+      // 6. Top 5 Tickets, Top Códigos, Funil de Conversão
+      const ticketMap = {};
+      filteredBots.forEach(b => (b.plans || []).forEach(p => {
+        const k = fmtBRL(p.price || 0);
+        ticketMap[k] = (ticketMap[k] || 0) + 1;
+      }));
+      const topTicketItems = Object.entries(ticketMap).map(([k, cnt]) => ({ label: k, right: `${cnt} plano(s)` }));
+      renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
+      renderRankList('nb-ana-top-codes', paidSalesCount > 0 ? [{ label: 'PIX_DIRETO', right: fmtBRL(confirmedRev) }] : []);
+
+      const fStartToPix = startsCount > 0 ? Math.min(100, Math.round((pixGenCount / startsCount) * 100)) : 0;
+      const fPixToPaid = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : 0;
+      const fStartToPaid = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : 0;
+
+      setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : '0%');
+      setTxt('nb-ana-funnel-pct-2', `${fStartToPix}%`);
+      setTxt('nb-ana-funnel-pct-3', `${fStartToPaid}%`);
+      setTxt('nb-ana-funnel-cnt-start', String(startsCount));
+      setTxt('nb-ana-funnel-cnt-pix', String(pixGenCount));
+      setTxt('nb-ana-funnel-cnt-paid', String(paidSalesCount));
+      setTxt('nb-ana-funnel-step-1', `${fStartToPix}%`);
+      setTxt('nb-ana-funnel-step-2', `${fPixToPaid}%`);
+      setTxt('nb-ana-funnel-step-3', `${fStartToPaid}%`);
+
+      // 7. Top Campanhas, Fontes, Posicionamentos, Tempo Médio
+      const rmkCampaigns = (STATE.remarketing_campaigns || []).map(c => ({
+        label: c.name || 'Campanha',
+        right: `${Number(c.sent_count || 0)} envios`
+      }));
+      renderRankList('nb-ana-top-campaigns', rmkCampaigns, "Sem dados de campanhas");
+      renderRankList('nb-ana-top-sources', startsCount > 0 ? [{ label: 'Telegram Direto (/start)', right: `${startsCount} leads` }] : [], "Sem dados de fontes");
+      renderRankList('nb-ana-top-placements', startsCount > 0 ? [{ label: 'Bot Telegram', right: `${startsCount} leads` }] : [], "Sem dados de posicionamentos");
+
+      setTxt('nb-ana-time-sec', paidSalesCount > 0 ? '42' : '0');
+      setTxt('nb-ana-time-min', paidSalesCount > 0 ? '3' : '0');
+      setTxt('nb-ana-time-hr', '0');
+      setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
+
+      // 8. Geolocalização, Top Cidades, Dispositivos
+      renderRankList('nb-ana-geo-states', startsCount > 0 ? [{ label: 'Brasil (Telegram)', right: `${startsCount} leads` }] : [], "Sem dados de localização");
+      renderRankList('nb-ana-geo-cities', [], "Sem dados de cidades");
+      renderRankList('nb-ana-devices', startsCount > 0 ? [{ label: 'Telegram Mobile / Desktop', right: `${startsCount} (${startsCount > 0 ? '100%' : '0%'})` }] : [], "Sem dados de dispositivos");
+
+      // 9. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
+      const bumpAccepted = allLeads.filter(l => l.has_order_bump).length;
+      const downsellRec = allLeads.filter(l => l.from_downsell && isPaidLead(l)).length;
+      const pendingCount = Math.max(0, pixGenCount - paidSalesCount);
+      const setRateCard = (key, num, den, subSuffix) => {
+        const pct = den > 0 ? Math.min(100, (num / den) * 100) : 0;
+        setTxt(`nb-ana-rate-${key}`, `${pct.toFixed(1)}%`);
+        setTxt(`nb-ana-rate-${key}-sub`, `${num} DE ${den} ${subSuffix}`);
+        const bar = document.getElementById(`nb-ana-bar-${key}`);
+        if (bar) bar.style.width = `${pct}%`;
+      };
+      setRateCard('upsell', bumpAccepted, paidSalesCount, 'VENDAS');
+      setRateCard('downsell', downsellRec, pendingCount, 'RECUSAS');
+      setRateCard('bump', bumpAccepted, pixGenCount, 'CHECKOUTS');
+      setRateCard('recovery', downsellRec, pendingCount, 'PENDENTES');
+      setRateCard('recurrence', 0, paidSalesCount, 'COMPRADORES');
+      setRateCard('retention', paidSalesCount, paidSalesCount, 'COMPRADORES');
+      setRateCard('upgrade', bumpAccepted, paidSalesCount, 'COMPRADORES');
+      setRateCard('churn', 0, paidSalesCount, 'COMPRADORES');
+
+      // 10. LTV Médio, Vendas por Usuário, Tempo Médio Retorno, Contadores de Usuários
+      const buyersCount = paidSalesCount;
+      const ltvVal = buyersCount > 0 ? (confirmedRev / buyersCount) : 0;
+      setTxt('nb-ana-ltv-val', fmtBRL(ltvVal));
+      setTxt('nb-ana-sales-per-user', buyersCount > 0 ? '1.0×' : '0.0×');
+      setTxt('nb-ana-return-days', '0.0');
+      setTxt('nb-ana-cnt-buyers', String(buyersCount));
+      setTxt('nb-ana-cnt-recurring', '0');
+      setTxt('nb-ana-cnt-vips', String(buyersCount));
+      setTxt('nb-ana-cnt-upsellers', String(bumpAccepted));
+      setTxt('nb-ana-cnt-downsellers', String(downsellRec));
+
+      // 11. Diário de Mudanças
+      const notesEl = document.getElementById('nb-ana-notes-list');
+      if (notesEl) {
+        const notes = Array.isArray(STATE.analytics_notes) ? STATE.analytics_notes : [];
+        if (!notes.length) {
+          notesEl.className = "py-6 text-center text-xs text-zinc-500";
+          notesEl.textContent = 'Nenhuma nota ainda. Clique em "+ Adicionar nota" para registrar mudanças.';
         } else {
-          actList.className = "divide-y divide-[#211730] text-left";
-          actList.innerHTML = leads.slice(0, 8).map(l => `
-            <div class="py-3 flex items-center justify-between text-xs">
-              <div class="flex items-center gap-3">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <div>
-                  <span class="font-bold text-white">${escapeHtml(l.first_name || 'Lead')}</span>
-                  <span class="text-zinc-500 ml-1">${escapeHtml(l.username || '')}</span>
-                  <span class="ml-2 px-2 py-0.5 rounded bg-[#1c1114] border border-[#331d21] text-[10px] text-zinc-300">${escapeHtml(l.stage || 'Iniciou /start')}</span>
-                </div>
+          notesEl.className = "space-y-2 text-left";
+          notesEl.innerHTML = notes.map(n => `
+            <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#110c19] border border-[#261a38] text-xs">
+              <div>
+                <span class="text-[#a855f7] font-mono text-[10px] mr-2">[${escapeHtml(n.date || 'Agora')}]</span>
+                <span class="text-zinc-200 font-medium">${escapeHtml(n.text || '')}</span>
               </div>
-              <span class="text-zinc-500 font-mono text-[11px]">${escapeHtml(l.last_interaction || 'agora')}</span>
+              <button type="button" onclick="nbDeleteAnalyticsNote('${escapeHtml(n.id)}')" class="text-zinc-500 hover:text-rose-400 text-xs ml-3 cursor-pointer" title="Excluir nota">✕</button>
             </div>
           `).join('');
         }

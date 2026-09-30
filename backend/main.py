@@ -1372,6 +1372,7 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
 
     # 3. Planos & Entrega VIP
     plans = [p for p in (fb.get("plans") or []) if isinstance(p, dict)]
+    plans_status_map: Dict[str, Dict[str, Any]] = {}
     if not plans:
         checks.append({
             "name": "3. Planos & Canal/Link de Entrega VIP",
@@ -1382,23 +1383,30 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
         plan_errors: List[str] = []
         plan_ok_details: List[str] = []
         fb_deliv = fb.get("fallback_delivery") or {}
-        for p in plans:
-            p_name = p.get("name") or "Plano"
+        for idx_p, p in enumerate(plans):
+            p_id = str(p.get("id") or f"idx_{idx_p}")
+            p_name = p.get("name") or f"Plano {idx_p + 1}"
             dt = p.get("delivery_dest_type") or "Canal ou grupo"
             if dt == "Herdar do fluxo":
                 dt = fb_deliv.get("dest_type") or "Canal ou grupo"
             if dt == "Link externo":
                 ext = (p.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
                 if ext and (ext.startswith("http://") or ext.startswith("https://") or ext.startswith("t.me/")):
-                    plan_ok_details.append(f"{p_name}: Link externo OK ({ext})")
+                    msg_p = f"Link externo válido ({ext})"
+                    plan_ok_details.append(f"{p_name}: {msg_p}")
+                    plans_status_map[p_id] = {"ok": True, "detail": msg_p}
                 else:
-                    plan_errors.append(f"{p_name}: Link externo vazio ou inválido")
+                    msg_p = "Link externo vazio ou inválido"
+                    plan_errors.append(f"{p_name}: {msg_p}")
+                    plans_status_map[p_id] = {"ok": False, "detail": msg_p}
             else:
                 raw_ch = (p.get("delivery_channel_id") or "").strip()
                 fb_ch = (fb_deliv.get("channel_id") or "").strip()
                 ch_id = fb_ch if (not raw_ch or raw_ch == "-1003939135982") and fb_ch else (raw_ch or fb_ch)
                 if not ch_id or ch_id == "-1003939135982":
-                    plan_errors.append(f"{p_name}: ID do Canal VIP ainda não configurado")
+                    msg_p = "ID do Canal VIP não configurado"
+                    plan_errors.append(f"{p_name}: {msg_p}")
+                    plans_status_map[p_id] = {"ok": False, "detail": msg_p}
                 elif temp_bot and bot_me:
                     try:
                         parsed_ch = int(ch_id) if ch_id.lstrip("-").isdigit() else ch_id
@@ -1406,13 +1414,21 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
                         member = await temp_bot.get_chat_member(chat_id=parsed_ch, user_id=bot_me.id)
                         st_member = str(getattr(member, "status", "")).lower()
                         if st_member in ("administrator", "creator"):
-                            plan_ok_details.append(f"{p_name}: Admin verificado no canal '{chat_obj.title or ch_id}'")
+                            msg_p = f"Admin verificado no canal '{chat_obj.title or ch_id}'"
+                            plan_ok_details.append(f"{p_name}: {msg_p}")
+                            plans_status_map[p_id] = {"ok": True, "detail": msg_p}
                         else:
-                            plan_errors.append(f"{p_name}: Bot não é administrador no canal '{chat_obj.title or ch_id}'")
+                            msg_p = f"Bot não é admin no canal '{chat_obj.title or ch_id}'"
+                            plan_errors.append(f"{p_name}: {msg_p}")
+                            plans_status_map[p_id] = {"ok": False, "detail": msg_p}
                     except Exception as e:
-                        plan_errors.append(f"{p_name}: Sem acesso ao canal {ch_id} ({e})")
+                        msg_p = f"Sem acesso ao canal {ch_id} ({e})"
+                        plan_errors.append(f"{p_name}: {msg_p}")
+                        plans_status_map[p_id] = {"ok": False, "detail": msg_p}
                 else:
-                    plan_ok_details.append(f"{p_name}: Canal {ch_id} configurado")
+                    msg_p = f"Canal {ch_id} configurado"
+                    plan_ok_details.append(f"{p_name}: {msg_p}")
+                    plans_status_map[p_id] = {"ok": True, "detail": msg_p}
 
         checks.append({
             "name": "3. Planos & Canal/Link de Entrega VIP",
@@ -1425,11 +1441,14 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
     gw_tok = (pub.get("pushin_pay_token") or "").strip()
     gw_prov = (pub.get("gateway_provider") or "syncpay").strip()
     gw_sec = (pub.get("gateway_secret") or "").strip()
+    gw_ok = False
+    gw_det = ""
     if not gw_tok or gw_tok == REDACTED_SECRET_MASK:
+        gw_det = "Chave de API do Gateway PIX não configurada na aba Gateways."
         checks.append({
             "name": "4. Gateway PIX",
             "ok": False,
-            "detail": "Chave de API do Gateway PIX não configurada na aba Gateways."
+            "detail": gw_det
         })
     else:
         try:
@@ -1447,10 +1466,11 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
                 "detail": gw_det
             })
         except Exception as e:
+            gw_det = f"Erro ao validar gateway ({gw_prov}): {e}"
             checks.append({
                 "name": "4. Gateway PIX",
                 "ok": False,
-                "detail": f"Erro ao validar gateway ({gw_prov}): {e}"
+                "detail": gw_det
             })
 
     if temp_bot:
@@ -1459,10 +1479,27 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
         except Exception:
             pass
 
+    plans_check = checks[2] if len(checks) > 2 else {"ok": False, "detail": ""}
+    app_msg_ok = bool((pay_cfg.get("approved_message") or "").strip())
+    approved_ok = bool(plans_check.get("ok")) and app_msg_ok
+
+    stage_status = {
+        "start": checks[0] if len(checks) > 0 else {"ok": False, "detail": ""},
+        "welcome": checks[1] if len(checks) > 1 else {"ok": False, "detail": ""},
+        "plans": plans_check,
+        "plans_map": plans_status_map,
+        "pix": {"ok": gw_ok, "detail": gw_det},
+        "approved": {
+            "ok": approved_ok,
+            "detail": "Mensagem de aprovação e entrega verificadas!" if approved_ok else (plans_check.get("detail") or "Configure a mensagem/canal de entrega.")
+        }
+    }
+
     return {
         "status": "ok",
         "all_ok": all(bool(c.get("ok")) for c in checks),
         "checks": checks,
+        "stage_status": stage_status,
         "secret_approve_cmd": f"/aprovar {_get_expected_admin_token()}",
         "secret_downsell_cmd": f"/downsell {_get_expected_admin_token()}",
         "state": _redact_state_secrets(state)
