@@ -909,6 +909,65 @@
           </button>
         </div>
 
+        <!-- BLOCO ORIGINAL RESTAURADO: RECEITA HERO + VENDAS, TICKET MÉDIO, TAXA DE CONVERSÃO, PENDENTES, STARTS POR VENDA -->
+        <div class="nb-card p-6 space-y-5 border border-[#2d1d42]">
+          <div>
+            <span id="nb-dash-hero-label" class="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block">RECEITA • MÊS</span>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span class="text-2xl font-bold text-zinc-400">R$</span>
+              <span id="nb-dash-hero-value" class="text-5xl font-extrabold text-white tracking-tight">0,00</span>
+            </div>
+            <div class="w-full h-[2px] bg-[#a855f7] mt-4"></div>
+          </div>
+
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-5 pt-1">
+            <div class="border-r border-[#211730] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-bag-shopping text-[#a855f7]"></i>
+                <span>VENDAS</span>
+              </div>
+              <span id="nb-dash-kpi-sales" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
+              <span class="text-[11px] text-zinc-500">transações pagas</span>
+            </div>
+
+            <div class="border-r border-[#211730] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-receipt text-[#a855f7]"></i>
+                <span>TICKET MÉDIO</span>
+              </div>
+              <span id="nb-dash-kpi-ticket" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
+              <span class="text-[11px] text-zinc-500">por transação</span>
+            </div>
+
+            <div class="border-r border-[#211730] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-percent text-[#a855f7]"></i>
+                <span>TAXA DE CONVERSÃO</span>
+              </div>
+              <span id="nb-dash-kpi-conv" class="text-2xl font-extrabold text-emerald-400 block mt-1.5">—</span>
+              <span class="text-[11px] text-zinc-500">leads → vendas</span>
+            </div>
+
+            <div class="border-r border-[#211730] pr-4">
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-regular fa-clock text-[#a855f7]"></i>
+                <span>PENDENTES</span>
+              </div>
+              <span id="nb-dash-kpi-pending-val" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
+              <span id="nb-dash-kpi-pending-cnt" class="text-[11px] text-zinc-500">0 aguardando pagamento</span>
+            </div>
+
+            <div>
+              <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <i class="fa-solid fa-users text-[#a855f7]"></i>
+                <span>STARTS POR VENDA</span>
+              </div>
+              <span id="nb-dash-kpi-starts" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
+              <span class="text-[11px] text-zinc-500">média de /starts</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 4 TOP KPI CARDS (VISITAS | STARTS | RECEITA GERADA | RECEITA CONFIRMADA) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="nb-card p-5 space-y-3 border-t-2 border-t-[#a855f7]/60">
@@ -945,6 +1004,47 @@
             </div>
             <div id="nb-ana-kpi-rev-paid" class="text-3xl font-extrabold text-emerald-400">R$ 0,00</div>
             <div id="nb-ana-kpi-rev-paid-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">0 VENDAS PAGAS · 0% DE APROVAÇÃO</div>
+          </div>
+        </div>
+
+        <!-- CARDS ORIGINAIS RESTAURADOS: RECEITA ÚLTIMOS DIAS, TRANSAÇÕES POR STATUS E ÚLTIMAS ATUALIZAÇÕES (TEMPO REAL) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
+              <h3 class="text-xs font-bold text-white">Receita • últimos dias</h3>
+            </div>
+            <div id="nb-dash-recent-revenue" class="text-xs text-zinc-500 py-2">
+              Sem receita paga no período selecionado.
+            </div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
+              <h3 class="text-xs font-bold text-white">Transações por status</h3>
+            </div>
+            <div id="nb-dash-status-summary" class="text-xs text-zinc-500 py-2">
+              Sem transações no período selecionado.
+            </div>
+          </div>
+
+          <div class="nb-card p-5 space-y-3">
+            <div class="flex items-center justify-between border-b border-[#211730] pb-3">
+              <div class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
+                <h3 class="text-xs font-bold text-white">Últimas atualizações</h3>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" onclick="nbSwitchMainView('finance')" class="text-xs text-zinc-400 hover:text-white transition">Ver todas</button>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> TEMPO REAL
+                </span>
+              </div>
+            </div>
+            <div id="nb-dash-activity-list" class="py-4 text-center text-xs text-zinc-500 max-h-[170px] overflow-y-auto">
+              Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.
+            </div>
           </div>
         </div>
 
@@ -1233,45 +1333,6 @@
               </div>
             </div>
             <div id="nb-ana-time-dataset" class="text-center text-[9px] font-bold uppercase text-zinc-500 border-t border-[#211730] pt-2">DATASET: 0 PAGAMENTOS</div>
-          </div>
-        </div>
-
-        <!-- LINHA 7: GEOLOCALIZAÇÃO | TOP CIDADES | DISPOSITIVOS -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div class="nb-card p-5 lg:col-span-6 space-y-3 min-h-[180px]">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-location-dot"></i></span>
-                <div>
-                  <h3 class="text-xs font-bold text-white">Geolocalização</h3>
-                  <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAPA DE LEADS POR ESTADO</span>
-                </div>
-              </div>
-              <span class="px-2.5 py-1 rounded bg-[#1d112b] border border-[#3a2056] text-[10px] font-bold text-[#a855f7]">Brasil · BR</span>
-            </div>
-            <div id="nb-ana-geo-states" class="text-xs text-zinc-500 pt-2"></div>
-          </div>
-
-          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[180px]">
-            <div class="flex items-center gap-2.5">
-              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-city"></i></span>
-              <div>
-                <h3 class="text-xs font-bold text-white">Top Cidades</h3>
-                <span class="text-[9px] font-bold uppercase text-zinc-500 block">MAIS LEADS</span>
-              </div>
-            </div>
-            <div id="nb-ana-geo-cities" class="text-xs text-zinc-500 pt-2"></div>
-          </div>
-
-          <div class="nb-card p-5 lg:col-span-3 space-y-3 min-h-[180px]">
-            <div class="flex items-center gap-2.5">
-              <span class="w-7 h-7 rounded-lg bg-[#1d112b] border border-[#3a2056] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-solid fa-mobile-screen"></i></span>
-              <div>
-                <h3 class="text-xs font-bold text-white">Dispositivos</h3>
-                <span class="text-[9px] font-bold uppercase text-zinc-500 block">DISTRIBUIÇÃO POR TIPO</span>
-              </div>
-            </div>
-            <div id="nb-ana-devices" class="text-xs text-zinc-500 pt-2"></div>
           </div>
         </div>
 
@@ -9961,6 +10022,64 @@ quer que eu te mostre as opções de acesso?</textarea>
       const fmtBRL = v => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
       const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
+      // 0. Bloco Original Restaurado (Receita Hero, Vendas, Ticket Médio, Taxa de Conversão, Pendentes, Starts por Venda, Receita últimos dias, Status, Últimas atualizações)
+      const pendingOnlyLeads = pixLeads.filter(l => !isPaidLead(l));
+      const pendingVal = pendingOnlyLeads.reduce((acc, l) => acc + Number(l.amount || l.plan_price || avgPlanPrice), 0);
+      setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
+      setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
+      setTxt('nb-dash-kpi-sales', String(paidSalesCount));
+      setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
+      setTxt('nb-dash-kpi-conv', (paidSalesCount > 0 && startsCount > 0) ? `${Math.round((paidSalesCount / startsCount) * 100)}%` : (startsCount > 0 ? "0%" : "—"));
+      setTxt('nb-dash-kpi-pending-val', fmtBRL(pendingVal));
+      setTxt('nb-dash-kpi-pending-cnt', `${pendingOnlyLeads.length} aguardando pagamento`);
+      setTxt('nb-dash-kpi-starts', paidSalesCount > 0 ? String(Math.max(1, Math.round(startsCount / paidSalesCount))) : "—");
+
+      const recRevEl = document.getElementById('nb-dash-recent-revenue');
+      if (recRevEl) {
+        if (paidSalesCount > 0) {
+          recRevEl.innerHTML = `<div class="flex items-center justify-between py-1 text-xs"><span class="text-zinc-300 font-semibold">Período atual (${escapeHtml(NB_DASH_PERIOD)})</span><span class="text-emerald-400 font-bold">${fmtBRL(confirmedRev)} (${paidSalesCount} venda(s))</span></div>`;
+        } else {
+          recRevEl.textContent = "Sem receita paga no período selecionado.";
+        }
+      }
+
+      const stSumEl = document.getElementById('nb-dash-status-summary');
+      if (stSumEl) {
+        if (pixGenCount > 0 || paidSalesCount > 0) {
+          stSumEl.innerHTML = `
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center justify-between"><span class="text-emerald-400 font-semibold">✓ Pagas / Aprovadas</span><span class="text-white font-bold">${paidSalesCount} (${fmtBRL(confirmedRev)})</span></div>
+              <div class="flex items-center justify-between"><span class="text-amber-400 font-semibold">⏳ Pendentes (Aguardando PIX)</span><span class="text-zinc-300 font-bold">${pendingOnlyLeads.length} (${fmtBRL(pendingVal)})</span></div>
+            </div>
+          `;
+        } else {
+          stSumEl.textContent = "Sem transações no período selecionado.";
+        }
+      }
+
+      const actList = document.getElementById('nb-dash-activity-list');
+      if (actList) {
+        if (allLeads.length === 0) {
+          actList.className = "py-4 text-center text-xs text-zinc-500";
+          actList.textContent = "Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.";
+        } else {
+          actList.className = "divide-y divide-[#211730] text-left max-h-[170px] overflow-y-auto";
+          actList.innerHTML = allLeads.slice(0, 8).map(l => `
+            <div class="py-2.5 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                <div>
+                  <span class="font-bold text-white">${escapeHtml(l.first_name || 'Lead')}</span>
+                  <span class="text-zinc-500 ml-1">${escapeHtml(l.username || '')}</span>
+                  <span class="ml-2 px-2 py-0.5 rounded bg-[#1c1124] border border-[#351d47] text-[10px] text-purple-200">${escapeHtml(l.stage || 'Iniciou /start')}</span>
+                </div>
+              </div>
+              <span class="text-zinc-500 font-mono text-[11px] shrink-0 ml-2">${escapeHtml(l.last_interaction || 'agora')}</span>
+            </div>
+          `).join('');
+        }
+      }
+
       // 1. Top 4 KPIs
       setTxt('nb-ana-kpi-visits', String(visitsCount));
       setTxt('nb-ana-kpi-visits-sub', `${visitsToStartPct}% VIRARAM STARTS`);
@@ -10155,12 +10274,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-ana-time-hr', '0');
       setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
 
-      // 8. Geolocalização, Top Cidades, Dispositivos
-      renderRankList('nb-ana-geo-states', startsCount > 0 ? [{ label: 'Brasil (Telegram)', right: `${startsCount} leads` }] : [], "Sem dados de localização");
-      renderRankList('nb-ana-geo-cities', [], "Sem dados de cidades");
-      renderRankList('nb-ana-devices', startsCount > 0 ? [{ label: 'Telegram Mobile / Desktop', right: `${startsCount} (${startsCount > 0 ? '100%' : '0%'})` }] : [], "Sem dados de dispositivos");
-
-      // 9. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
+      // 8. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
       const bumpAccepted = allLeads.filter(l => l.has_order_bump).length;
       const downsellRec = allLeads.filter(l => l.from_downsell && isPaidLead(l)).length;
       const pendingCount = Math.max(0, pixGenCount - paidSalesCount);
