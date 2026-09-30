@@ -7248,111 +7248,53 @@ quer que eu te mostre as opções de acesso?</textarea>
           </div>`;
         }
 
-        // 4. Selecionou plano? · Order Bump
+        // 4. Selecionou plano? · Order Bump (somente se houver Order Bump ativo)
         const activeBumps = (b.order_bumps || []).filter(o => o.active !== false);
         let orderBumpHtml = '';
-        if (b.mode !== 'ai') {
-          if (activeBumps.length > 0) {
-            const bumpCards = activeBumps.map(o => {
-              const bMedias = Array.isArray(o.medias) ? o.medias.filter(Boolean) : (o.media_url ? [{ type: 'media', url: o.media_url }] : []);
-              const bPrice = Number(o.price || 0).toFixed(2).replace('.', ',');
-              return `<div class="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-[#3a2352] text-[11px] text-zinc-200">
-                <div class="font-bold text-white">${escapeHtml(o.title || o.name || 'Oferta Order Bump')} · <span class="text-emerald-400">+R$ ${bPrice}</span></div>
-                <div class="text-[10px] text-zinc-400 mt-0.5">${escapeHtml(o.offer_message || o.message || o.description || 'Mensagem configurada')}</div>
-                <div class="text-[10px] text-zinc-400 mt-1">Botões: <span class="text-emerald-300 font-semibold">${escapeHtml(o.accept_text || o.accept_label || 'Adicionar ao pedido')}</span> / <span class="text-zinc-400">${escapeHtml(o.reject_text || o.decline_label || 'Continuar sem adicional')}</span></div>
-                ${nbFormatMediaSummary(bMedias, 'Sem mídia vinculada no Order Bump')}
-              </div>`;
-            }).join('');
-            orderBumpHtml = nbFlowNode(
-              '4. Selecionou plano? · Order Bump',
-              `${activeBumps.length} oferta(s) complementar(es) exibida(s) antes de gerar o PIX`,
-              'purple',
-              bumpCards,
-              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`,
-              stMap.orderbump || null
-            );
-          } else {
-            orderBumpHtml = nbFlowNode(
-              '4. Selecionou plano? · Order Bump',
-              'Nenhum Order Bump ativo (prossegue direto para o PIX)',
-              'purple',
-              `<div class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/90 border border-zinc-700/60 text-[10px] text-zinc-400">Opcional · Clique para configurar</div>`,
-              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`,
-              stMap.orderbump || null
-            );
-          }
+        let stepNum = 4;
+        if (b.mode !== 'ai' && activeBumps.length > 0) {
+          const bumpCards = activeBumps.map(o => {
+            const bMedias = Array.isArray(o.medias) ? o.medias.filter(Boolean) : (o.media_url ? [{ type: 'media', url: o.media_url }] : []);
+            const bPrice = Number(o.price || 0).toFixed(2).replace('.', ',');
+            return `<div class="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-[#3a2352] text-[11px] text-zinc-200">
+              <div class="font-bold text-white">${escapeHtml(o.title || o.name || 'Oferta Order Bump')} · <span class="text-emerald-400">+R$ ${bPrice}</span></div>
+              <div class="text-[10px] text-zinc-400 mt-0.5">${escapeHtml(o.offer_message || o.message || o.description || 'Mensagem configurada')}</div>
+              <div class="text-[10px] text-zinc-400 mt-1">Botões: <span class="text-emerald-300 font-semibold">${escapeHtml(o.accept_text || o.accept_label || 'Adicionar ao pedido')}</span> / <span class="text-zinc-400">${escapeHtml(o.reject_text || o.decline_label || 'Continuar sem adicional')}</span></div>
+              ${nbFormatMediaSummary(bMedias, 'Sem mídia vinculada no Order Bump')}
+            </div>`;
+          }).join('');
+          orderBumpHtml = nbFlowNode(
+            `${stepNum}. Selecionou plano? · Order Bump`,
+            `${activeBumps.length} oferta(s) complementar(es) exibida(s) antes de gerar o PIX`,
+            'purple',
+            bumpCards,
+            `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`,
+            stMap.orderbump || null
+          );
+          stepNum += 1;
         }
 
-        // 5. Pagamento · Pix
+        // Pagamento · PIX Gerado + Pós-PIX (com ou sem Downsell ativo)
         let pixNodeHtml = '';
-        let splitBranchesHtml = '';
+        let postPixHtml = '';
         if (b.mode !== 'ai') {
           const pixSecHtml = b.payments?.secondary_enabled
             ? `<div class="mt-1.5 text-[10px] text-purple-300">2ª msg de cobrança ativa: ${escapeHtml(b.payments.secondary_message || 'Configurada')}</div>`
             : '';
           pixNodeHtml = nbFlowNode(
-            '5. Pagamento · PIX Gerado',
+            `${stepNum}. Pagamento · PIX Gerado`,
             b.payments?.generated_message || 'Mensagem de PIX gerado configurada',
             'purple',
             pixSecHtml,
             `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
             stMap.pix || null
           );
+          stepNum += 1;
 
-          // 6. Side-by-side split: Não pagou (Downsell) vs Pix pago (Aprovação e entrega)
           const dgEnabled = Boolean(b.downsell_general?.enabled);
           const dpEnabled = Boolean(b.downsell_pix?.enabled);
           const dgSeqs = Array.isArray(b.downsell_general?.sequences) ? b.downsell_general.sequences : [];
           const dpSeqs = Array.isArray(b.downsell_pix?.sequences) ? b.downsell_pix.sequences : [];
-
-          let localDsError = null;
-          const renderSeqList = (seqs, label) => {
-            if (!seqs.length) {
-              localDsError = `${label} está ativado, mas não possui nenhuma sequência criada.`;
-              return `<div class="text-[10px] text-rose-400 font-semibold mt-1">⚠️ ${escapeHtml(label)}: ativado sem sequência cadastrada</div>`;
-            }
-            return `<div class="mt-2 text-left space-y-1.5">
-              <div class="text-[10px] font-bold text-purple-300 uppercase tracking-wider text-center">${escapeHtml(label)} (${seqs.length})</div>
-              ${seqs.map((s, idx) => {
-                const sMedias = Array.isArray(s.medias) ? s.medias.filter(Boolean) : (s.media_url ? [{ type: 'media', url: s.media_url }] : []);
-                const sMsg = String(s.message || '').trim();
-                const hasContent = Boolean(sMsg || sMedias.length);
-                if (!hasContent) {
-                  localDsError = `${label} #${idx + 1} está sem mensagem de texto e sem mídia.`;
-                }
-                const discStr = (s.discount && s.discount !== 'Sem desconto')
-                  ? s.discount
-                  : (Number(s.discount_pct || 0) > 0 ? `-${Number(s.discount_pct)}% OFF` : 'Sem desconto');
-                const planCnt = Array.isArray(s.plan_ids) ? s.plan_ids.length : plans.length;
-                return `<div class="px-3 py-2 rounded-lg bg-black/35 border ${hasContent ? 'border-[#3b2357]' : 'border-rose-500/80'} text-[10px] text-zinc-300 text-center space-y-0.5">
-                  <div>
-                    <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-purple-300 font-bold">${Number(s.delay_minutes || 1)} min</span>
-                    · <span class="text-emerald-400 font-bold">${escapeHtml(discStr)}</span>
-                    · <span class="text-zinc-300">${planCnt} plano(s)</span>
-                    · ${sMedias.length ? `<span class="text-purple-300 font-semibold">📎 ${sMedias.length} mídia(s)</span>` : '<span class="text-zinc-500">sem mídia</span>'}
-                  </div>
-                  ${sMsg ? `<div class="text-[10px] text-zinc-400 italic truncate max-w-[360px] mx-auto">Mensagem: "${escapeHtml(sMsg)}"</div>` : ''}
-                  ${!hasContent ? `<div class="text-[10px] text-rose-400 font-bold">⚠️ Erro: Adicione uma mensagem ou mídia nesta sequência</div>` : ''}
-                </div>`;
-              }).join('')}
-            </div>`;
-          };
-
-          const unpaidDetailHtml = (dgEnabled ? renderSeqList(dgSeqs, 'Downsell Geral (Sem gerar Pix)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell Geral desativado</div>')
-            + (dpEnabled ? renderSeqList(dpSeqs, 'Downsell PIX (Gerou Pix e não pagou)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell PIX desativado</div>');
-
-          const dsDiagEntry = stMap.downsell || (localDsError ? { ok: false, status: 'error', detail: localDsError } : null);
-
-          const unpaidCard = nbFlowNode(
-            '⏳ Não pagou · Recuperação / Downsell',
-            (dgEnabled || dpEnabled)
-              ? 'Disparo automático para leads que não concluíram o pagamento'
-              : 'Nenhuma régua de recuperação ativa para não pagantes',
-            'purple',
-            unpaidDetailHtml,
-            `nbJumpFromFlowToBotTab('${b.id}', 'downsell')`,
-            dsDiagEntry
-          );
 
           const appMedias = Array.isArray(b.payments?.approved_medias) ? b.payments.approved_medias.filter(Boolean) : [];
           const appBtnText = b.payments?.approved_button_text || 'Acessar conteúdo VIP';
@@ -7362,35 +7304,93 @@ quer que eu te mostre as opções de acesso?</textarea>
             <div class="mt-1 text-[10px] text-zinc-400">Liberação automática conforme destino do plano (${plans.length} plano(s))</div>
           `;
 
-          const paidCard = nbFlowNode(
-            '✅ Pix pago · Aprovação e Entrega',
-            b.payments?.approved_message || 'Mensagem de aprovação configurada',
-            'emerald',
-            paidExtraHtml,
-            `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
-            stMap.approved || null
-          );
+          if (dgEnabled || dpEnabled) {
+            let localDsError = null;
+            const renderSeqList = (seqs, label) => {
+              if (!seqs.length) {
+                localDsError = `${label} está ativado, mas não possui nenhuma sequência criada.`;
+                return `<div class="text-[10px] text-rose-400 font-semibold mt-1">⚠️ ${escapeHtml(label)}: ativado sem sequência cadastrada</div>`;
+              }
+              return `<div class="mt-2 text-left space-y-1.5">
+                <div class="text-[10px] font-bold text-purple-300 uppercase tracking-wider text-center">${escapeHtml(label)} (${seqs.length})</div>
+                ${seqs.map((s, idx) => {
+                  const sMedias = Array.isArray(s.medias) ? s.medias.filter(Boolean) : (s.media_url ? [{ type: 'media', url: s.media_url }] : []);
+                  const sMsg = String(s.message || '').trim();
+                  const hasContent = Boolean(sMsg || sMedias.length);
+                  if (!hasContent) {
+                    localDsError = `${label} #${idx + 1} está sem mensagem de texto e sem mídia.`;
+                  }
+                  const discStr = (s.discount && s.discount !== 'Sem desconto')
+                    ? s.discount
+                    : (Number(s.discount_pct || 0) > 0 ? `-${Number(s.discount_pct)}% OFF` : 'Sem desconto');
+                  const planCnt = Array.isArray(s.plan_ids) ? s.plan_ids.length : plans.length;
+                  return `<div class="px-3 py-2 rounded-lg bg-black/35 border ${hasContent ? 'border-[#3b2357]' : 'border-rose-500/80'} text-[10px] text-zinc-300 text-center space-y-0.5">
+                    <div>
+                      <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-purple-300 font-bold">${Number(s.delay_minutes || 1)} min</span>
+                      · <span class="text-emerald-400 font-bold">${escapeHtml(discStr)}</span>
+                      · <span class="text-zinc-300">${planCnt} plano(s)</span>
+                      · ${sMedias.length ? `<span class="text-purple-300 font-semibold">📎 ${sMedias.length} mídia(s)</span>` : '<span class="text-zinc-500">sem mídia</span>'}
+                    </div>
+                    ${sMsg ? `<div class="text-[10px] text-zinc-400 italic truncate max-w-[360px] mx-auto">Mensagem: "${escapeHtml(sMsg)}"</div>` : ''}
+                    ${!hasContent ? `<div class="text-[10px] text-rose-400 font-bold">⚠️ Erro: Adicione uma mensagem ou mídia nesta sequência</div>` : ''}
+                  </div>`;
+                }).join('')}
+              </div>`;
+            };
 
-          splitBranchesHtml = `
-            <div class="w-full max-w-[1100px] mx-auto mt-1">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                <div class="flex flex-col items-center">
-                  <div class="text-[11px] font-bold text-purple-300 mb-1.5 flex items-center gap-1.5">
-                    <i class="fa-solid fa-code-branch fa-rotate-180"></i>
-                    <span>Caminho A: Não pagou</span>
+            const unpaidDetailHtml = (dgEnabled ? renderSeqList(dgSeqs, 'Downsell Geral (Sem gerar Pix)') : '')
+              + (dpEnabled ? renderSeqList(dpSeqs, 'Downsell PIX (Gerou Pix e não pagou)') : '');
+
+            const dsDiagEntry = stMap.downsell || (localDsError ? { ok: false, status: 'error', detail: localDsError } : null);
+
+            const unpaidCard = nbFlowNode(
+              '⏳ Não pagou · Recuperação / Downsell',
+              'Disparo automático para leads que não concluíram o pagamento',
+              'purple',
+              unpaidDetailHtml,
+              `nbJumpFromFlowToBotTab('${b.id}', 'downsell')`,
+              dsDiagEntry
+            );
+
+            const paidCard = nbFlowNode(
+              '✅ Pix pago · Aprovação e Entrega',
+              b.payments?.approved_message || 'Mensagem de aprovação configurada',
+              'emerald',
+              paidExtraHtml,
+              `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
+              stMap.approved || null
+            );
+
+            postPixHtml = `
+              <div class="w-full max-w-[1100px] mx-auto mt-1">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                  <div class="flex flex-col items-center">
+                    <div class="text-[11px] font-bold text-purple-300 mb-1.5 flex items-center gap-1.5">
+                      <i class="fa-solid fa-code-branch fa-rotate-180"></i>
+                      <span>Caminho A: Não pagou</span>
+                    </div>
+                    ${unpaidCard}
                   </div>
-                  ${unpaidCard}
-                </div>
-                <div class="flex flex-col items-center">
-                  <div class="text-[11px] font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
-                    <i class="fa-solid fa-code-branch"></i>
-                    <span>Caminho B: Pix confirmado</span>
+                  <div class="flex flex-col items-center">
+                    <div class="text-[11px] font-bold text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                      <i class="fa-solid fa-code-branch"></i>
+                      <span>Caminho B: Pix confirmado</span>
+                    </div>
+                    ${paidCard}
                   </div>
-                  ${paidCard}
                 </div>
               </div>
-            </div>
-          `;
+            `;
+          } else {
+            postPixHtml = nbFlowNode(
+              `${stepNum}. ✅ Pix pago · Aprovação e Entrega`,
+              b.payments?.approved_message || 'Mensagem de aprovação configurada',
+              'emerald',
+              paidExtraHtml,
+              `nbJumpFromFlowToBotTab('${b.id}', 'payments')`,
+              stMap.approved || null
+            );
+          }
         }
 
         const verticalSteps = [
@@ -7399,7 +7399,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           plansBlockHtml,
           ...(orderBumpHtml ? [orderBumpHtml] : []),
           ...(pixNodeHtml ? [pixNodeHtml] : []),
-          ...(splitBranchesHtml ? [splitBranchesHtml] : [])
+          ...(postPixHtml ? [postPixHtml] : [])
         ];
 
         const isDiagOk = diag ? (diag.ok === true || diag.all_ok === true) : false;
