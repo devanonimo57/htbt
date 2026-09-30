@@ -408,6 +408,11 @@ if os.path.exists(frontend_path):
 def redirect_to_dashboard():
     return RedirectResponse(url="/dashboard/")
 
+@app.get("/favicon.ico")
+@app.get("/favicon.png")
+def redirect_favicon():
+    return RedirectResponse(url="/dashboard/favicon.png?v=3")
+
 @app.get("/ping")
 @app.get("/health")
 def health_ping():
