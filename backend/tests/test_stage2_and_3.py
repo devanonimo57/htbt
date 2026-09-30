@@ -367,7 +367,51 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("escapeHtml(p.name || 'Plano')", html_src)
         self.assertNotIn("document.getElementById('chk-bot-live').checked = true;", html_src.split("async function saveFullState()")[1].split("async function loadInitialState()")[0])
 
+    async def test_7_multi_bot_concurrent_routing(self):
+        """Múltiplos bots ativos em flow_bots devem rotear /start e configurações de forma independente."""
+        from telegram_service import _CURRENT_BOT_TOKEN_CTX
+        mgr = await self._setup_manager()
+        self.server_state["flow_bots"] = [
+            {
+                "id": "bot_1",
+                "bot_id": "84980111",
+                "username": "@botteste33_bot",
+                "token": "84980111:AA_TOKEN_BOT_1",
+                "active": True,
+                "mode": "flow",
+                "welcome": {"message": "Boas-vindas Bot 1", "medias": []},
+                "plans": [{"id": "p1", "name": "Plano 1", "price": 10.0}],
+            },
+            {
+                "id": "bot_2",
+                "bot_id": "73213222",
+                "username": "@taxaaprovacao_bot",
+                "token": "73213222:AA_TOKEN_BOT_2",
+                "active": True,
+                "mode": "flow",
+                "welcome": {"message": "AAA", "medias": []},
+                "plans": [{"id": "p2", "name": "Plano 2", "price": 20.0}],
+            },
+        ]
+
+        t1 = _CURRENT_BOT_TOKEN_CTX.set("84980111:AA_TOKEN_BOT_1")
+        try:
+            fb1 = mgr._get_active_flow_bot(self.server_state)
+            self.assertEqual(fb1.get("username"), "@botteste33_bot")
+            self.assertEqual(fb1.get("welcome", {}).get("message"), "Boas-vindas Bot 1")
+        finally:
+            _CURRENT_BOT_TOKEN_CTX.reset(t1)
+
+        t2 = _CURRENT_BOT_TOKEN_CTX.set("73213222:AA_TOKEN_BOT_2")
+        try:
+            fb2 = mgr._get_active_flow_bot(self.server_state)
+            self.assertEqual(fb2.get("username"), "@taxaaprovacao_bot")
+            self.assertEqual(fb2.get("welcome", {}).get("message"), "AAA")
+        finally:
+            _CURRENT_BOT_TOKEN_CTX.reset(t2)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

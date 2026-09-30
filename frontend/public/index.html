@@ -6157,13 +6157,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       const btn = document.getElementById('nb-btn-save-bot-modal');
       btn.textContent = "Salvando...";
 
+      const isRealToken = Boolean(tok && tok !== "***configured***");
       let botInfo = {
-        bot_id: tok.includes(":") ? tok.split(":")[0] : String(Math.floor(1000000000 + Math.random() * 900000000)),
+        bot_id: (isRealToken && tok.includes(":")) ? tok.split(":")[0] : String(Math.floor(1000000000 + Math.random() * 900000000)),
         username: "@novo_bot",
         first_name: "Bot"
       };
 
-      if (tok) {
+      if (isRealToken) {
         try {
           const r = await adminFetch("/api/flow-bots/verify-token", {
             method: "POST",
@@ -6190,10 +6191,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (NB_EDITING_BOT_ID) {
         const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
         if (b) {
-          b.token = tok;
+          if (tok) b.token = tok;
           b.mode = mode;
           b.cache_channel_id = cacheCh;
-          if (tok) {
+          if (isRealToken) {
             b.bot_id = botInfo.bot_id;
             b.username = botInfo.username;
             b.first_name = botInfo.first_name;
@@ -6222,6 +6223,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       NB_CURRENT_BOT_ID = targetBotId;
+      STATE.current_bot_id = targetBotId;
       btn.textContent = "Salvar";
       nbCloseBotModal();
       nbSyncActiveBotToPublish();
@@ -6251,8 +6253,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       const activeBot = (current && current.active && current.token)
         ? current
         : ((STATE.flow_bots || []).find(b => b.active && b.token) || (STATE.flow_bots || [])[0]);
+      if (activeBot) {
+        STATE.current_bot_id = activeBot.id;
+      }
       if (activeBot && activeBot.token) {
         STATE.publish.bot_token = activeBot.token;
+        const inpTokEl = document.getElementById('inp-bot-token');
+        if (inpTokEl) inpTokEl.value = activeBot.token;
         STATE.publish.bot_username = activeBot.username || STATE.publish.bot_username;
         STATE.publish.is_live = Boolean(activeBot.active);
         if (activeBot.cache_channel_id !== undefined) {
@@ -6406,7 +6413,11 @@ quer que eu te mostre as opções de acesso?</textarea>
         const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: curBot?.token || STATE.publish?.bot_token || "", channel_id: chId })
+          body: JSON.stringify({
+            bot_id: curBot?.id || "",
+            token: curBot?.token || STATE.publish?.bot_token || "",
+            channel_id: chId
+          })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -6739,7 +6750,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
+          body: JSON.stringify({ bot_id: b.id || "", token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
         });
         const data = await res.json();
         if (data.status === "ok") {
@@ -6767,7 +6778,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const res = await adminFetch("/api/flow-bots/verify-channel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
+          body: JSON.stringify({ bot_id: b.id || "", token: b.token || STATE.publish?.bot_token || "", channel_id: chId })
         });
         const data = await res.json();
         if (data.status === "ok") {

@@ -3,6 +3,7 @@ import base64
 import html
 import logging
 import random
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 
@@ -36,6 +37,9 @@ from ai_engine import generate_ai_reply, _compute_effective_min_price
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("SharkBotTelegram")
 
+_CURRENT_BOT_CTX: ContextVar[Optional[Bot]] = ContextVar("_CURRENT_BOT_CTX", default=None)
+_CURRENT_BOT_TOKEN_CTX: ContextVar[str] = ContextVar("_CURRENT_BOT_TOKEN_CTX", default="")
+
 
 def _create_bot_instance(token: str) -> Bot:
     try:
@@ -51,9 +55,9 @@ def _create_bot_instance(token: str) -> Bot:
 
 class ActiveBotManager:
     """
-    Gerencia a instância ativa do Bot do Telegram em background,
+    Gerencia as instâncias ativas dos Bots do Telegram em background (suporte multi-bot simultâneo),
     incluindo:
-    - /start com variações de abertura e simulação de digitação ("typing...")
+    - /start com variações de abertura e simulação de digitação ("typing...") ou Modo Fluxo por bot
     - Conversa com IA contextual + envio de mídias com Spoiler e Cache de file_id
     - Geração de PIX via Pushin Pay (Webhook + Polling automático de confirmação)
     - Entrega automática de link único do Canal VIP
@@ -63,7 +67,9 @@ class ActiveBotManager:
     """
 
     def __init__(self):
-        self.bot: Optional[Bot] = None
+        self._primary_bot: Optional[Bot] = None
+        self.extra_bots: Dict[str, Bot] = {}
+        self.extra_polling_tasks: Dict[str, asyncio.Task] = {}
         self.dp: Optional[Dispatcher] = None
         self.polling_task: Optional[asyncio.Task] = None
         self.current_token: str = ""
@@ -77,8 +83,40 @@ class ActiveBotManager:
         self.state_saver = None
 
     @property
+    def bot(self) -> Optional[Bot]:
+        ctx_bot = _CURRENT_BOT_CTX.get()
+        if ctx_bot is not None:
+            return ctx_bot
+        return self._primary_bot
+
+    @bot.setter
+    def bot(self, value: Optional[Bot]):
+        self._primary_bot = value
+        if value is None:
+            _CURRENT_BOT_CTX.set(None)
+
+    @property
     def active_token(self) -> str:
+        ctx_tok = _CURRENT_BOT_TOKEN_CTX.get()
+        if ctx_tok:
+            return ctx_tok
         return self.current_token
+
+    def _get_bot_by_token(self, token: str) -> Optional[Bot]:
+        clean = (token or "").strip()
+        if clean:
+            if clean == self.current_token and self._primary_bot:
+                return self._primary_bot
+            if clean in self.extra_bots:
+                return self.extra_bots[clean]
+            if ":" in clean:
+                prefix = clean.split(":")[0]
+                if self.current_token.startswith(prefix + ":") and self._primary_bot:
+                    return self._primary_bot
+                for k, b_inst in self.extra_bots.items():
+                    if k.startswith(prefix + ":"):
+                        return b_inst
+        return self.bot
 
     def _get_lead_lock(self, uid: str) -> asyncio.Lock:
         if len(self.lead_locks) > 1000:
@@ -92,12 +130,90 @@ class ActiveBotManager:
             self.lead_locks[uid] = lock
         return lock
 
+    async def _sync_extra_bots(self, state: Dict[str, Any]):
+        flow_bots = state.get("flow_bots") if isinstance(state, dict) else []
+        if not isinstance(flow_bots, list):
+            flow_bots = []
+
+        desired_extra: Dict[str, Dict[str, Any]] = {}
+        for fb in flow_bots:
+            if not isinstance(fb, dict) or not fb.get("active", True):
+                continue
+            fb_tok = (fb.get("token") or "").strip()
+            if (
+                not fb_tok
+                or fb_tok == "***configured***"
+                or ":" not in fb_tok
+                or fb_tok == self.current_token
+            ):
+                continue
+            desired_extra[fb_tok] = fb
+
+        # Encerra tasks de bots extras que foram desativados ou removidos
+        for old_tok in list(self.extra_polling_tasks.keys()):
+            t = self.extra_polling_tasks.get(old_tok)
+            if old_tok not in desired_extra or (t and t.done()):
+                self.extra_polling_tasks.pop(old_tok, None)
+                if t and not t.done():
+                    t.cancel()
+                    try:
+                        await t
+                    except asyncio.CancelledError:
+                        pass
+                old_bot = self.extra_bots.pop(old_tok, None)
+                if old_bot:
+                    try:
+                        await old_bot.session.close()
+                    except Exception:
+                        pass
+
+        state_changed = False
+        for ext_tok, fb in desired_extra.items():
+            existing_task = self.extra_polling_tasks.get(ext_tok)
+            if existing_task and not existing_task.done() and ext_tok in self.extra_bots:
+                continue
+            try:
+                ext_bot = _create_bot_instance(ext_tok)
+                me = await ext_bot.get_me()
+                if me.username and fb.get("username") != f"@{me.username}":
+                    fb["username"] = f"@{me.username}"
+                    state_changed = True
+                if me.first_name and fb.get("first_name") != me.first_name:
+                    fb["first_name"] = me.first_name
+                    state_changed = True
+                if me.id and str(fb.get("bot_id")) != str(me.id):
+                    fb["bot_id"] = str(me.id)
+                    state_changed = True
+                self.extra_bots[ext_tok] = ext_bot
+                self.extra_polling_tasks[ext_tok] = asyncio.create_task(
+                    self._run_polling(bot_inst=ext_bot, bot_token=ext_tok)
+                )
+                logger.info(f"Bot adicional iniciado em produção: @{me.username}")
+            except Exception as e:
+                logger.error(f"Falha ao iniciar bot adicional ({fb.get('username')}): {e}")
+
+        if state_changed and self.state_saver:
+            try:
+                await self.state_saver(state)
+            except Exception:
+                pass
+
     async def configure_and_start(self, state_getter, state_saver):
         self.state_getter = state_getter
         self.state_saver = state_saver
         state = await self.state_getter()
         publish = state.get("publish", {})
         token = publish.get("bot_token", "").strip()
+        if not token or token == "***configured***":
+            for fb in (state.get("flow_bots") or []):
+                if isinstance(fb, dict) and fb.get("active", True):
+                    cand = (fb.get("token") or "").strip()
+                    if cand and cand != "***configured***" and ":" in cand:
+                        token = cand
+                        publish["bot_token"] = cand
+                        publish["is_live"] = True
+                        break
+
         # Se há token preenchido, ativa por padrão a menos que explicitamente desativado
         if token and "is_live" not in publish:
             publish["is_live"] = True
@@ -108,7 +224,12 @@ class ActiveBotManager:
             return {"status": "stopped", "reason": "Bot desativado ou sem token"}
 
         if token == self.current_token and self.polling_task and not self.polling_task.done():
-            return {"status": "running", "bot_username": publish.get("bot_username", "")}
+            await self._sync_extra_bots(state)
+            return {
+                "status": "running",
+                "bot_username": publish.get("bot_username", ""),
+                "active_bots": 1 + len(self.extra_polling_tasks)
+            }
 
         await self.stop()
 
@@ -127,10 +248,15 @@ class ActiveBotManager:
         self.bot = test_bot
         self.dp = Dispatcher()
         self._register_handlers()
-        self.polling_task = asyncio.create_task(self._run_polling())
+        self.polling_task = asyncio.create_task(self._run_polling(bot_inst=test_bot, bot_token=token))
+        await self._sync_extra_bots(state)
         self._resume_pending_pix_polls(state)
         logger.info(f"Bot iniciado em produção: @{me.username}")
-        return {"status": "running", "bot_username": f"@{me.username}"}
+        return {
+            "status": "running",
+            "bot_username": f"@{me.username}",
+            "active_bots": 1 + len(self.extra_polling_tasks)
+        }
 
     def _resume_pending_pix_polls(self, state: Dict[str, Any]):
         pub = state.get("publish", {})
@@ -168,45 +294,74 @@ class ActiveBotManager:
             t.cancel()
         self.upsell_tasks.clear()
 
+        for ext_tok, ext_task in list(self.extra_polling_tasks.items()):
+            if ext_task and not ext_task.done():
+                ext_task.cancel()
+                try:
+                    await ext_task
+                except asyncio.CancelledError:
+                    pass
+        self.extra_polling_tasks.clear()
+
+        for ext_tok, ext_bot in list(self.extra_bots.items()):
+            try:
+                await ext_bot.session.close()
+            except Exception:
+                pass
+        self.extra_bots.clear()
+
         if self.polling_task and not self.polling_task.done():
             self.polling_task.cancel()
             try:
                 await self.polling_task
             except asyncio.CancelledError:
                 pass
-        if self.bot:
+        if self._primary_bot:
             try:
-                await self.bot.session.close()
+                await self._primary_bot.session.close()
             except Exception:
                 pass
         self.bot = None
         self.dp = None
         self.current_token = ""
 
-    async def _safe_feed_update(self, update: types.Update):
+    async def _safe_feed_update(
+        self,
+        update: types.Update,
+        bot_inst: Optional[Bot] = None,
+        bot_token: str = ""
+    ):
+        target_bot = bot_inst or self._primary_bot
+        target_token = bot_token or self.current_token
+        _CURRENT_BOT_TOKEN_CTX.set(target_token)
+        _CURRENT_BOT_CTX.set(target_bot)
         try:
-            if self.dp and self.bot:
-                await self.dp.feed_update(self.bot, update)
+            if self.dp and target_bot:
+                await self.dp.feed_update(target_bot, update)
         except Exception as e:
             logger.error(f"Erro processando update {update.update_id}: {e}")
 
-    async def _run_polling(self):
+    async def _run_polling(self, bot_inst: Optional[Bot] = None, bot_token: str = ""):
+        target_bot = bot_inst or self._primary_bot
+        target_token = bot_token or self.current_token
+        if not target_bot:
+            return
         offset: Optional[int] = None
         try:
-            await self.bot.delete_webhook(drop_pending_updates=False)
+            await target_bot.delete_webhook(drop_pending_updates=False)
         except Exception as e:
             logger.warning(f"Aviso ao limpar webhook: {e}")
 
         while True:
             try:
-                updates = await self.bot.get_updates(
+                updates = await target_bot.get_updates(
                     offset=offset,
                     timeout=15,
                     allowed_updates=["message", "callback_query"]
                 )
                 for u in updates:
                     offset = u.update_id + 1
-                    asyncio.create_task(self._safe_feed_update(u))
+                    asyncio.create_task(self._safe_feed_update(u, bot_inst=target_bot, bot_token=target_token))
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -396,12 +551,44 @@ class ActiveBotManager:
             ])
         return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    def _get_active_flow_bot(self, state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_active_flow_bot(
+        self,
+        state: Dict[str, Any],
+        bot_token: str = "",
+        bot_id: str = ""
+    ) -> Optional[Dict[str, Any]]:
         flow_bots = state.get("flow_bots", [])
         if not isinstance(flow_bots, list):
             return None
+
+        eff_token = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or "").strip()
+        eff_token_prefix = eff_token.split(":")[0].strip() if ":" in eff_token else ""
+        eff_bot_id = (bot_id or "").strip()
+
+        if eff_bot_id or eff_token:
+            for fb in flow_bots:
+                if not isinstance(fb, dict):
+                    continue
+                fb_id = str(fb.get("id") or "").strip()
+                fb_tg_id = str(fb.get("bot_id") or "").strip()
+                fb_tok = str(fb.get("token") or "").strip()
+                if (
+                    (eff_bot_id and fb_id == eff_bot_id)
+                    or (eff_token and fb_tok == eff_token)
+                    or (eff_token_prefix and fb_tg_id == eff_token_prefix)
+                ):
+                    if not fb.get("active", True) or fb.get("mode", "flow") != "flow":
+                        return None
+                    if (
+                        (fb.get("welcome", {}).get("message") or "").strip()
+                        or fb.get("plans")
+                        or len(flow_bots) > 1
+                    ):
+                        return fb
+                    return None
+
         for fb in flow_bots:
-            if fb.get("active") and fb.get("mode", "flow") == "flow":
+            if isinstance(fb, dict) and fb.get("active") and fb.get("mode", "flow") == "flow":
                 # Usa modo fluxo se houver mensagem de boas-vindas ou planos cadastrados
                 if (fb.get("welcome", {}).get("message") or "").strip() or fb.get("plans"):
                     return fb
@@ -865,7 +1052,9 @@ class ActiveBotManager:
                 continue
 
             temp_bot = None
-            bot_to_use = self.bot if (self.bot and self.current_token == tok) else None
+            bot_to_use = self._get_bot_by_token(tok) if (self._primary_bot or self.extra_bots) else None
+            if bot_to_use and tok not in (self.current_token, *self.extra_bots.keys()):
+                bot_to_use = None
             if not bot_to_use:
                 try:
                     temp_bot = _create_bot_instance(tok)
@@ -1928,6 +2117,8 @@ class ActiveBotManager:
             "tx_id": tx_id,
             "user_id": int(callback.from_user.id),
             "mode": "flow",
+            "bot_id": str(fb.get("id") or ""),
+            "bot_token": str(_CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or ""),
             "plan_id": str(plan.get("id") if plan else plan_id),
             "offer_name": full_plan_label,
             "amount": round(total_price, 2),
@@ -2140,6 +2331,14 @@ class ActiveBotManager:
             if tx_record.get("status") == "paid" or tx_record.get("delivered"):
                 return False
 
+            tx_bot_token = str(tx_record.get("bot_token") or "").strip()
+            tx_bot_id = str(tx_record.get("bot_id") or "").strip()
+            if tx_bot_token and not _CURRENT_BOT_TOKEN_CTX.get():
+                _CURRENT_BOT_TOKEN_CTX.set(tx_bot_token)
+                resolved_bot = self._get_bot_by_token(tx_bot_token)
+                if resolved_bot:
+                    _CURRENT_BOT_CTX.set(resolved_bot)
+
             lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
             self._cancel_downsell(str(user_id))
 
@@ -2174,7 +2373,7 @@ class ActiveBotManager:
                 await self.state_saver(state)
                 return True
 
-            flow_bot = self._get_active_flow_bot(state)
+            flow_bot = self._get_active_flow_bot(state, bot_token=tx_bot_token, bot_id=tx_bot_id)
             is_flow_tx = (tx_record.get("mode") == "flow")
             if is_flow_tx and flow_bot:
                 paid_val = float(tx_record.get("amount") or (lead.get("flow_plan_price") or 9.90))

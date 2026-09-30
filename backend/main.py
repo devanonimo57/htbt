@@ -264,12 +264,30 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
         for b in (existing.get("flow_bots") or [])
         if isinstance(b, dict) and b.get("id")
     }
+    ex_bots_by_tg_id = {
+        str(b.get("bot_id")): b
+        for b in (existing.get("flow_bots") or [])
+        if isinstance(b, dict) and b.get("bot_id")
+    }
     for fb in incoming.get("flow_bots", []):
         if isinstance(fb, dict):
             tok = (fb.get("token") or "").strip()
             if tok == REDACTED_SECRET_MASK:
-                old_bot = ex_bots_by_id.get(str(fb.get("id")), {})
-                fb["token"] = old_bot.get("token") or ex_pub.get("bot_token", "")
+                old_bot = (
+                    ex_bots_by_id.get(str(fb.get("id")))
+                    or ex_bots_by_tg_id.get(str(fb.get("bot_id")))
+                    or {}
+                )
+                old_tok = (old_bot.get("token") or "").strip()
+                if old_tok and old_tok != REDACTED_SECRET_MASK:
+                    fb["token"] = old_tok
+                else:
+                    pub_tok = (ex_pub.get("bot_token") or "").strip()
+                    fb_tg_id = str(fb.get("bot_id") or "").strip()
+                    if pub_tok and (not fb_tg_id or pub_tok.startswith(fb_tg_id + ":")):
+                        fb["token"] = pub_tok
+                    else:
+                        fb["token"] = ""
 
     if "tx_records" not in incoming and "tx_records" in existing:
         incoming["tx_records"] = existing["tx_records"]
@@ -488,7 +506,21 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
         flow_bots = state["flow_bots"]
 
     # Sincroniza token ativo para que o polling rode o bot selecionado/ativo
-    active_fb = next((b for b in flow_bots if b.get("active") and b.get("token")), None)
+    cur_bot_id = str(state.get("current_bot_id") or "").strip()
+    cur_pub_tok = (pub.get("bot_token") or "").strip()
+    active_fb = None
+    if cur_bot_id:
+        active_fb = next(
+            (b for b in flow_bots if isinstance(b, dict) and str(b.get("id")) == cur_bot_id and b.get("active") and b.get("token")),
+            None
+        )
+    if not active_fb and cur_pub_tok and cur_pub_tok != REDACTED_SECRET_MASK:
+        active_fb = next(
+            (b for b in flow_bots if isinstance(b, dict) and b.get("active") and (b.get("token") == cur_pub_tok or str(b.get("bot_id")) == cur_pub_tok.split(":")[0])),
+            None
+        )
+    if not active_fb:
+        active_fb = next((b for b in flow_bots if isinstance(b, dict) and b.get("active") and b.get("token")), None)
     if active_fb:
         pub["bot_token"] = active_fb["token"]
         pub["bot_username"] = active_fb.get("username", pub.get("bot_username", ""))
@@ -960,6 +992,7 @@ async def verify_flow_bot_token(req: VerifyTokenRequest):
 
 
 class VerifyChannelRequest(BaseModel):
+    bot_id: Optional[str] = ""
     token: Optional[str] = ""
     channel_id: str
 
@@ -967,13 +1000,27 @@ class VerifyChannelRequest(BaseModel):
 async def verify_flow_channel(req: VerifyChannelRequest):
     from telegram_service import _create_bot_instance
     state = await _read_state_from_db()
+    target_fb = None
+    if req.bot_id:
+        for b in (state.get("flow_bots") or []):
+            if isinstance(b, dict) and str(b.get("id")) == str(req.bot_id):
+                target_fb = b
+                break
+    if not target_fb:
+        target_fb = bot_manager._get_active_flow_bot(state)
+
     tok = (req.token or "").strip()
     if not tok or tok == REDACTED_SECRET_MASK:
-        tok = (state.get("publish", {}).get("bot_token") or bot_manager.current_token or "").strip()
+        tok = (
+            (target_fb.get("token") if isinstance(target_fb, dict) else "")
+            or state.get("publish", {}).get("bot_token")
+            or bot_manager.current_token
+            or ""
+        ).strip()
     ch_id = (req.channel_id or "").strip()
     if not ch_id:
         return {"status": "error", "message": "ID do canal vazio"}
-    if not tok:
+    if not tok or tok == REDACTED_SECRET_MASK:
         return {"status": "error", "message": "Token do bot não configurado"}
     temp_bot = None
     try:
@@ -982,9 +1029,8 @@ async def verify_flow_channel(req: VerifyChannelRequest):
         chat = await temp_bot.get_chat(chat_id=parsed_ch)
         resolved_id = str(chat.id)
         state.setdefault("publish", {})["cache_channel_id"] = resolved_id
-        fb = bot_manager._get_active_flow_bot(state)
-        if isinstance(fb, dict):
-            fb["cache_channel_id"] = resolved_id
+        if isinstance(target_fb, dict):
+            target_fb["cache_channel_id"] = resolved_id
         warmed = await bot_manager.warm_all_state_medias(state)
         state = await _write_state_to_db(state)
         return {
@@ -1039,7 +1085,9 @@ async def cache_flow_media(req: CacheMediaRequest):
         fb["cache_channel_id"] = req.channel_id.strip()
 
     temp_bot = None
-    bot_to_use = bot_manager.bot if (bot_manager.bot and bot_manager.current_token == tok) else None
+    bot_to_use = bot_manager._get_bot_by_token(tok) if (bot_manager._primary_bot or bot_manager.extra_bots) else None
+    if bot_to_use and tok not in (bot_manager.current_token, *bot_manager.extra_bots.keys()):
+        bot_to_use = None
     if not bot_to_use:
         try:
             temp_bot = _create_bot_instance(tok)
