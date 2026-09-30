@@ -176,6 +176,7 @@ class ActiveBotManager:
             existing_task = self.extra_polling_tasks.get(ext_tok)
             if existing_task and not existing_task.done() and ext_tok in self.extra_bots:
                 continue
+            ext_bot = None
             try:
                 ext_bot = _create_bot_instance(ext_tok)
                 me = await ext_bot.get_me()
@@ -194,6 +195,11 @@ class ActiveBotManager:
                 )
                 logger.info(f"Bot adicional iniciado em produção: @{me.username}")
             except Exception as e:
+                if ext_bot:
+                    try:
+                        await ext_bot.session.close()
+                    except Exception:
+                        pass
                 logger.error(f"Falha ao iniciar bot adicional ({fb.get('username')}): {e}")
 
         if state_changed and self.state_saver:
@@ -237,6 +243,7 @@ class ActiveBotManager:
 
         await self.stop()
 
+        test_bot = None
         try:
             test_bot = _create_bot_instance(token)
             me = await test_bot.get_me()
@@ -252,6 +259,11 @@ class ActiveBotManager:
                         fb["first_name"] = me.first_name
             await self.state_saver(state)
         except Exception as e:
+            if test_bot:
+                try:
+                    await test_bot.session.close()
+                except Exception:
+                    pass
             logger.error(f"Token do Telegram inválido: {e}")
             return {"status": "error", "message": f"Token inválido: {e}"}
 

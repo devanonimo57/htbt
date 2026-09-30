@@ -1412,13 +1412,21 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
                         parsed_ch = int(ch_id) if ch_id.lstrip("-").isdigit() else ch_id
                         chat_obj = await temp_bot.get_chat(chat_id=parsed_ch)
                         member = await temp_bot.get_chat_member(chat_id=parsed_ch, user_id=bot_me.id)
-                        st_member = str(getattr(member, "status", "")).lower()
-                        if st_member in ("administrator", "creator"):
+                        raw_status = getattr(member, "status", "")
+                        st_member = str(getattr(raw_status, "value", raw_status)).lower()
+                        is_admin_member = (
+                            st_member in ("administrator", "creator", "owner")
+                            or "administrator" in st_member
+                            or "creator" in st_member
+                            or bool(getattr(member, "can_invite_users", False))
+                            or bool(getattr(member, "can_post_messages", False))
+                        )
+                        if is_admin_member:
                             msg_p = f"Admin verificado no canal '{chat_obj.title or ch_id}'"
                             plan_ok_details.append(f"{p_name}: {msg_p}")
                             plans_status_map[p_id] = {"ok": True, "detail": msg_p}
                         else:
-                            msg_p = f"Bot não é admin no canal '{chat_obj.title or ch_id}'"
+                            msg_p = f"Bot não é admin no canal '{chat_obj.title or ch_id}' (status: {st_member})"
                             plan_errors.append(f"{p_name}: {msg_p}")
                             plans_status_map[p_id] = {"ok": False, "detail": msg_p}
                     except Exception as e:
