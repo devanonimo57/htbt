@@ -1479,25 +1479,88 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
         except Exception:
             pass
 
-    plans_check = checks[2] if len(checks) > 2 else {"ok": False, "detail": ""}
+    # 5. Order Bump (opcional, mas se ativo valida título/preço)
+    active_bumps = [o for o in (fb.get("order_bumps") or []) if isinstance(o, dict) and o.get("active") is not False]
+    if not active_bumps:
+        ob_status = {"ok": True, "status": "ok", "detail": "Etapa OK (nenhum Order Bump ativo — segue direto ao PIX)"}
+    else:
+        bad_bumps = [o.get("title") or "Order Bump" for o in active_bumps if float(o.get("price") or 0) <= 0]
+        if bad_bumps:
+            ob_status = {"ok": False, "status": "error", "detail": f"Preço inválido em: {', '.join(bad_bumps)}"}
+            checks.append({"name": "5. Order Bump", "ok": False, "status": "error", "detail": ob_status["detail"]})
+        else:
+            ob_status = {"ok": True, "status": "ok", "detail": f"Etapa OK ({len(active_bumps)} Order Bump(s) configurado(s))"}
+
+    # 6. Downsell (Geral e PIX)
+    dg = fb.get("downsell_general") or {}
+    dp = fb.get("downsell_pix") or {}
+    dg_en = bool(dg.get("enabled"))
+    dp_en = bool(dp.get("enabled"))
+    ds_errors: List[str] = []
+    total_ds_seqs = 0
+    if dg_en:
+        dg_seqs = [s for s in (dg.get("sequences") or []) if isinstance(s, dict)]
+        total_ds_seqs += len(dg_seqs)
+        if not dg_seqs:
+            ds_errors.append("Downsell Geral ativado mas sem nenhuma sequência criada")
+        for idx_s, s in enumerate(dg_seqs):
+            has_msg = bool((s.get("message") or "").strip())
+            has_med = bool(s.get("medias") or s.get("media_url"))
+            if not has_msg and not has_med:
+                ds_errors.append(f"Downsell Geral #{idx_s + 1}: adicione texto ou mídia na sequência")
+    if dp_en:
+        dp_seqs = [s for s in (dp.get("sequences") or []) if isinstance(s, dict)]
+        total_ds_seqs += len(dp_seqs)
+        if not dp_seqs:
+            ds_errors.append("Downsell PIX ativado mas sem nenhuma sequência criada")
+        for idx_s, s in enumerate(dp_seqs):
+            has_msg = bool((s.get("message") or "").strip())
+            has_med = bool(s.get("medias") or s.get("media_url"))
+            if not has_msg and not has_med:
+                ds_errors.append(f"Downsell PIX #{idx_s + 1}: adicione texto ou mídia na sequência")
+
+    if ds_errors:
+        ds_status = {"ok": False, "status": "error", "detail": " | ".join(ds_errors)}
+        checks.append({"name": "6. Recuperação / Downsell", "ok": False, "status": "error", "detail": ds_status["detail"]})
+    elif dg_en or dp_en:
+        ds_status = {"ok": True, "status": "ok", "detail": f"Etapa OK ({total_ds_seqs} sequência(s) de recuperação pronta(s))"}
+    else:
+        ds_status = {"ok": True, "status": "ok", "detail": "Etapa OK (nenhum Downsell ativo)"}
+
+    for c in checks:
+        c["status"] = "ok" if c.get("ok") else "error"
+    for p_key, p_val in plans_status_map.items():
+        p_val["status"] = "ok" if p_val.get("ok") else "error"
+
+    plans_check = checks[2] if len(checks) > 2 else {"ok": False, "status": "error", "detail": ""}
     app_msg_ok = bool((pay_cfg.get("approved_message") or "").strip())
     approved_ok = bool(plans_check.get("ok")) and app_msg_ok
+    approved_detail = (
+        "Etapa OK · Mensagem de aprovação e entrega verificadas!"
+        if approved_ok
+        else (plans_check.get("detail") if not plans_check.get("ok") else "Mensagem de pagamento aprovado está vazia na aba Pagamentos.")
+    )
 
     stage_status = {
-        "start": checks[0] if len(checks) > 0 else {"ok": False, "detail": ""},
-        "welcome": checks[1] if len(checks) > 1 else {"ok": False, "detail": ""},
+        "start": checks[0] if len(checks) > 0 else {"ok": False, "status": "error", "detail": ""},
+        "welcome": checks[1] if len(checks) > 1 else {"ok": False, "status": "error", "detail": ""},
         "plans": plans_check,
         "plans_map": plans_status_map,
-        "pix": {"ok": gw_ok, "detail": gw_det},
+        "orderbump": ob_status,
+        "pix": {"ok": gw_ok, "status": "ok" if gw_ok else "error", "detail": gw_det},
+        "downsell": ds_status,
         "approved": {
             "ok": approved_ok,
-            "detail": "Mensagem de aprovação e entrega verificadas!" if approved_ok else (plans_check.get("detail") or "Configure a mensagem/canal de entrega.")
+            "status": "ok" if approved_ok else "error",
+            "detail": approved_detail
         }
     }
 
+    all_ok = all(bool(c.get("ok")) for c in checks)
     return {
         "status": "ok",
-        "all_ok": all(bool(c.get("ok")) for c in checks),
+        "ok": all_ok,
+        "all_ok": all_ok,
         "checks": checks,
         "stage_status": stage_status,
         "secret_approve_cmd": f"/aprovar {_get_expected_admin_token()}",

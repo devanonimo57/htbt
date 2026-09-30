@@ -7084,14 +7084,15 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbFlowDiagBadge(diagEntry) {
       if (!diagEntry) return '';
-      const st = diagEntry.status;
-      if (st === 'ok') {
+      const isOk = diagEntry.ok === true || diagEntry.status === 'ok';
+      const isWarn = diagEntry.status === 'warn';
+      if (isOk) {
         return `<div class="mt-2 pt-1.5 border-t border-emerald-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-emerald-400"><i class="fa-solid fa-circle-check"></i><span>${escapeHtml(diagEntry.detail || 'Etapa OK')}</span></div>`;
       }
-      if (st === 'warn') {
-        return `<div class="mt-2 pt-1.5 border-t border-amber-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation"></i><span>${escapeHtml(diagEntry.detail || 'Atenção')}</span></div>`;
+      if (isWarn) {
+        return `<div class="mt-2 pt-1.5 border-t border-amber-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-300"><i class="fa-solid fa-triangle-exclamation"></i><span>${escapeHtml(diagEntry.detail || 'Atenção nesta etapa')}</span></div>`;
       }
-      return `<div class="mt-2 pt-1.5 border-t border-rose-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-rose-400"><i class="fa-solid fa-circle-xmark"></i><span>${escapeHtml(diagEntry.detail || 'Falha')}</span></div>`;
+      return `<div class="mt-2 pt-1.5 border-t border-rose-800/40 flex items-center justify-center gap-1.5 text-[10px] font-bold text-rose-400"><i class="fa-solid fa-circle-xmark"></i><span>Motivo do erro: ${escapeHtml(diagEntry.detail || 'Configuração incompleta')}</span></div>`;
     }
 
     function nbFlowNode(title, detail, color = 'purple', extraHtml = '', onClickJs = '', diagEntry = null) {
@@ -7100,13 +7101,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (color === 'amber') border = 'border-amber-700/60 hover:border-amber-500';
       if (color === 'emerald') border = 'border-emerald-700/60 hover:border-emerald-500';
       if (diagEntry) {
-        if (diagEntry.status === 'ok') {
+        const isOk = diagEntry.ok === true || diagEntry.status === 'ok';
+        if (isOk) {
           border = 'border-emerald-500/80 ring-1 ring-emerald-500/30';
           bg = 'bg-[#0f1f18]';
         } else if (diagEntry.status === 'warn') {
           border = 'border-amber-500/80 ring-1 ring-amber-500/30';
           bg = 'bg-[#21190f]';
-        } else if (diagEntry.status === 'error') {
+        } else {
           border = 'border-rose-500/80 ring-1 ring-rose-500/30';
           bg = 'bg-[#221115]';
         }
@@ -7213,17 +7215,17 @@ quer que eu te mostre as opções de acesso?</textarea>
             'amber',
             '',
             `nbJumpFromFlowToBotTab('${b.id}', 'plans')`,
-            stMap.plans || { status: 'error', detail: 'Cadastre pelo menos 1 plano' }
+            stMap.plans || { ok: false, status: 'error', detail: 'Cadastre pelo menos 1 plano na aba Planos' }
           );
         } else {
           const planCards = plans.map((p, idx) => {
-            const pId = String(p.id || `plan_${idx}`);
-            const pDiag = (stMap.plans_map && stMap.plans_map[pId]) ? stMap.plans_map[pId] : null;
+            const pMap = stMap.plans_map || {};
+            const pDiag = pMap[String(p.id)] || pMap[`idx_${idx}`] || pMap[`plan_${idx}`] || null;
+            const pOk = pDiag ? (pDiag.ok === true || pDiag.status === 'ok') : null;
             let pBorder = 'border-[#573070] hover:border-[#a855f7]';
             let pBg = 'bg-[#1a1126]';
-            if (pDiag?.status === 'ok') { pBorder = 'border-emerald-500/80'; pBg = 'bg-[#0f1f18]'; }
-            else if (pDiag?.status === 'warn') { pBorder = 'border-amber-500/80'; pBg = 'bg-[#21190f]'; }
-            else if (pDiag?.status === 'error') { pBorder = 'border-rose-500/80'; pBg = 'bg-[#221115]'; }
+            if (pOk === true) { pBorder = 'border-emerald-500/80'; pBg = 'bg-[#0f1f18]'; }
+            else if (pOk === false) { pBorder = 'border-rose-500/80'; pBg = 'bg-[#221115]'; }
 
             const priceFmt = Number(p.price || 0).toFixed(2).replace('.', ',');
             const deliveryDesc = nbFormatPlanDelivery(p);
@@ -7256,8 +7258,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               const bPrice = Number(o.price || 0).toFixed(2).replace('.', ',');
               return `<div class="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-[#3a2352] text-[11px] text-zinc-200">
                 <div class="font-bold text-white">${escapeHtml(o.title || o.name || 'Oferta Order Bump')} · <span class="text-emerald-400">+R$ ${bPrice}</span></div>
-                <div class="text-[10px] text-zinc-400 mt-0.5">${escapeHtml(o.message || o.description || 'Mensagem configurada')}</div>
-                <div class="text-[10px] text-zinc-400 mt-1">Botões: <span class="text-emerald-300 font-semibold">${escapeHtml(o.accept_label || 'Sim, quero')}</span> / <span class="text-zinc-400">${escapeHtml(o.decline_label || 'Não, obrigado')}</span></div>
+                <div class="text-[10px] text-zinc-400 mt-0.5">${escapeHtml(o.offer_message || o.message || o.description || 'Mensagem configurada')}</div>
+                <div class="text-[10px] text-zinc-400 mt-1">Botões: <span class="text-emerald-300 font-semibold">${escapeHtml(o.accept_text || o.accept_label || 'Adicionar ao pedido')}</span> / <span class="text-zinc-400">${escapeHtml(o.reject_text || o.decline_label || 'Continuar sem adicional')}</span></div>
                 ${nbFormatMediaSummary(bMedias, 'Sem mídia vinculada no Order Bump')}
               </div>`;
             }).join('');
@@ -7266,7 +7268,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               `${activeBumps.length} oferta(s) complementar(es) exibida(s) antes de gerar o PIX`,
               'purple',
               bumpCards,
-              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`
+              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`,
+              stMap.orderbump || null
             );
           } else {
             orderBumpHtml = nbFlowNode(
@@ -7274,7 +7277,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               'Nenhum Order Bump ativo (prossegue direto para o PIX)',
               'purple',
               `<div class="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-900/90 border border-zinc-700/60 text-[10px] text-zinc-400">Opcional · Clique para configurar</div>`,
-              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`
+              `nbJumpFromFlowToBotTab('${b.id}', 'orderbump')`,
+              stMap.orderbump || null
             );
           }
         }
@@ -7301,16 +7305,34 @@ quer que eu te mostre as opções de acesso?</textarea>
           const dgSeqs = Array.isArray(b.downsell_general?.sequences) ? b.downsell_general.sequences : [];
           const dpSeqs = Array.isArray(b.downsell_pix?.sequences) ? b.downsell_pix.sequences : [];
 
+          let localDsError = null;
           const renderSeqList = (seqs, label) => {
-            if (!seqs.length) return `<div class="text-[10px] text-zinc-500 mt-1">${escapeHtml(label)}: nenhuma sequência cadastrada</div>`;
+            if (!seqs.length) {
+              localDsError = `${label} está ativado, mas não possui nenhuma sequência criada.`;
+              return `<div class="text-[10px] text-rose-400 font-semibold mt-1">⚠️ ${escapeHtml(label)}: ativado sem sequência cadastrada</div>`;
+            }
             return `<div class="mt-2 text-left space-y-1.5">
-              <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider text-center">${escapeHtml(label)} (${seqs.length})</div>
+              <div class="text-[10px] font-bold text-purple-300 uppercase tracking-wider text-center">${escapeHtml(label)} (${seqs.length})</div>
               ${seqs.map((s, idx) => {
                 const sMedias = Array.isArray(s.medias) ? s.medias.filter(Boolean) : (s.media_url ? [{ type: 'media', url: s.media_url }] : []);
-                return `<div class="px-2.5 py-1.5 rounded-lg bg-black/35 border border-amber-800/30 text-[10px] text-zinc-300 text-center">
-                  <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-amber-300 font-bold">${Number(s.delay_minutes || 5)} min</span>
-                  ${Number(s.discount_pct || 0) > 0 ? ` · <span class="text-emerald-400 font-bold">-${Number(s.discount_pct)}% OFF</span>` : ''}
-                  · ${sMedias.length ? `<span class="text-purple-300">📎 ${sMedias.length} mídia(s)</span>` : '<span class="text-zinc-500">sem mídia</span>'}
+                const sMsg = String(s.message || '').trim();
+                const hasContent = Boolean(sMsg || sMedias.length);
+                if (!hasContent) {
+                  localDsError = `${label} #${idx + 1} está sem mensagem de texto e sem mídia.`;
+                }
+                const discStr = (s.discount && s.discount !== 'Sem desconto')
+                  ? s.discount
+                  : (Number(s.discount_pct || 0) > 0 ? `-${Number(s.discount_pct)}% OFF` : 'Sem desconto');
+                const planCnt = Array.isArray(s.plan_ids) ? s.plan_ids.length : plans.length;
+                return `<div class="px-3 py-2 rounded-lg bg-black/35 border ${hasContent ? 'border-[#3b2357]' : 'border-rose-500/80'} text-[10px] text-zinc-300 text-center space-y-0.5">
+                  <div>
+                    <span class="font-bold text-white">#${idx + 1}</span> · após <span class="text-purple-300 font-bold">${Number(s.delay_minutes || 1)} min</span>
+                    · <span class="text-emerald-400 font-bold">${escapeHtml(discStr)}</span>
+                    · <span class="text-zinc-300">${planCnt} plano(s)</span>
+                    · ${sMedias.length ? `<span class="text-purple-300 font-semibold">📎 ${sMedias.length} mídia(s)</span>` : '<span class="text-zinc-500">sem mídia</span>'}
+                  </div>
+                  ${sMsg ? `<div class="text-[10px] text-zinc-400 italic truncate max-w-[360px] mx-auto">Mensagem: "${escapeHtml(sMsg)}"</div>` : ''}
+                  ${!hasContent ? `<div class="text-[10px] text-rose-400 font-bold">⚠️ Erro: Adicione uma mensagem ou mídia nesta sequência</div>` : ''}
                 </div>`;
               }).join('')}
             </div>`;
@@ -7319,14 +7341,17 @@ quer que eu te mostre as opções de acesso?</textarea>
           const unpaidDetailHtml = (dgEnabled ? renderSeqList(dgSeqs, 'Downsell Geral (Sem gerar Pix)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell Geral desativado</div>')
             + (dpEnabled ? renderSeqList(dpSeqs, 'Downsell PIX (Gerou Pix e não pagou)') : '<div class="text-[10px] text-zinc-500 mt-1">Downsell PIX desativado</div>');
 
+          const dsDiagEntry = stMap.downsell || (localDsError ? { ok: false, status: 'error', detail: localDsError } : null);
+
           const unpaidCard = nbFlowNode(
             '⏳ Não pagou · Recuperação / Downsell',
             (dgEnabled || dpEnabled)
               ? 'Disparo automático para leads que não concluíram o pagamento'
               : 'Nenhuma régua de recuperação ativa para não pagantes',
-            'amber',
+            'purple',
             unpaidDetailHtml,
-            `nbJumpFromFlowToBotTab('${b.id}', 'downsell')`
+            `nbJumpFromFlowToBotTab('${b.id}', 'downsell')`,
+            dsDiagEntry
           );
 
           const appMedias = Array.isArray(b.payments?.approved_medias) ? b.payments.approved_medias.filter(Boolean) : [];
@@ -7350,7 +7375,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             <div class="w-full max-w-[1100px] mx-auto mt-1">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                 <div class="flex flex-col items-center">
-                  <div class="text-[11px] font-bold text-amber-400 mb-1.5 flex items-center gap-1.5">
+                  <div class="text-[11px] font-bold text-purple-300 mb-1.5 flex items-center gap-1.5">
                     <i class="fa-solid fa-code-branch fa-rotate-180"></i>
                     <span>Caminho A: Não pagou</span>
                   </div>
@@ -7377,10 +7402,11 @@ quer que eu te mostre as opções de acesso?</textarea>
           ...(splitBranchesHtml ? [splitBranchesHtml] : [])
         ];
 
+        const isDiagOk = diag ? (diag.ok === true || diag.all_ok === true) : false;
         const diagHeaderBadge = diag
-          ? (diag.ok
+          ? (isDiagOk
               ? `<span class="px-2.5 py-1 rounded-full bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-[11px] font-bold"><i class="fa-solid fa-circle-check mr-1"></i>Fluxo 100% Verificado</span>`
-              : `<span class="px-2.5 py-1 rounded-full bg-amber-950/90 border border-amber-500/50 text-amber-300 text-[11px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Atenção em Etapa(s)</span>`)
+              : `<span class="px-2.5 py-1 rounded-full bg-rose-950/90 border border-rose-500/50 text-rose-300 text-[11px] font-bold"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Atenção em Etapa(s)</span>`)
           : `<span class="px-2.5 py-1 rounded-full bg-[#1f142d] border border-[#3a2352] text-zinc-400 text-[11px]">Clique em "Testar Fluxo Etapa por Etapa" para validar</span>`;
 
         return `
@@ -7432,17 +7458,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       if (banner) {
         banner.className = 'mb-5 p-4 rounded-xl border border-purple-500/50 bg-purple-950/40 text-xs text-purple-200 flex items-center justify-between gap-3';
-        banner.innerHTML = '<span><i class="fa-solid fa-bolt mr-1.5 text-[#a855f7]"></i>Verificando token no Telegram, mídias de boas-vindas, permissões nos canais VIP / links externos e credenciais PIX...</span>';
+        banner.innerHTML = '<span><i class="fa-solid fa-bolt mr-1.5 text-[#a855f7]"></i>Verificando token no Telegram, mídias de boas-vindas, permissões nos canais VIP / links externos, Downsell e credenciais PIX...</span>';
         banner.classList.remove('hidden');
       }
 
       let allOk = true;
       let totalChecks = 0;
-      let failedChecks = 0;
+      let failedReasons = [];
 
       for (const b of bots) {
         try {
-          const res = await apiFetch('/api/flow-bots/diagnose', {
+          const res = await adminFetch('/api/flow-bots/diagnose', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bot_id: b.id })
@@ -7450,17 +7476,23 @@ quer que eu te mostre as opções de acesso?</textarea>
           const data = await res.json();
           if (res.ok && data) {
             NB_FLOW_DIAG_RESULTS[b.id] = data;
-            if (!data.ok) allOk = false;
+            const botOk = data.ok === true || data.all_ok === true;
+            if (!botOk) allOk = false;
             const checks = Array.isArray(data.checks) ? data.checks : [];
             totalChecks += checks.length;
-            failedChecks += checks.filter(c => c.status === 'error' || c.status === 'warn').length;
+            checks.forEach(c => {
+              const isCheckOk = c.ok === true || c.status === 'ok';
+              if (!isCheckOk) {
+                failedReasons.push(`${b.username || '@bot'} → ${c.name || 'Etapa'}: ${c.detail || 'Falha na validação'}`);
+              }
+            });
           } else {
             allOk = false;
-            failedChecks += 1;
+            failedReasons.push(`${b.username || '@bot'}: ${data?.detail || 'Resposta inválida do servidor'}`);
           }
         } catch (err) {
           allOk = false;
-          failedChecks += 1;
+          failedReasons.push(`${b.username || '@bot'}: Erro de conexão ao testar (${err?.message || err})`);
         }
       }
 
@@ -7471,12 +7503,18 @@ quer que eu te mostre as opções de acesso?</textarea>
         btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Testar Fluxo Etapa por Etapa';
       }
       if (banner) {
-        if (allOk && failedChecks === 0) {
+        if (allOk && failedReasons.length === 0) {
           banner.className = 'mb-5 p-4 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
-          banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i><strong>Teste concluído com sucesso!</strong> Todas as etapas (${totalChecks} verificações em ${bots.length} bot(s)) estão operacionais e prontas para rodar.</div>`;
+          banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i><strong>Teste concluído com sucesso!</strong> Todas as etapas (${totalChecks} verificações em ${bots.length} bot(s)) estão 100% operacionais e destacadas em verde abaixo.</div>`;
         } else {
-          banner.className = 'mb-5 p-4 rounded-xl border border-amber-500/60 bg-amber-950/40 text-xs text-amber-200 flex items-center justify-between gap-3';
-          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1.5"></i><strong>Teste finalizado:</strong> ${failedChecks} ponto(s) de atenção encontrado(s) nas caixas destacadas abaixo. Clique na caixa em amarelo/vermelho para corrigir a etapa.</div>`;
+          banner.className = 'mb-5 p-4 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 space-y-1.5';
+          banner.innerHTML = `
+            <div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-1.5"></i><strong>Teste encontrou ${failedReasons.length} pendência(s):</strong></div>
+            <ul class="list-disc list-inside text-[11px] text-rose-200 space-y-0.5">
+              ${failedReasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+            </ul>
+            <div class="text-[11px] text-zinc-300 pt-1">Clique diretamente na caixa em vermelho abaixo para abrir a aba da etapa e corrigir.</div>
+          `;
         }
       }
     }
