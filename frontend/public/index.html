@@ -5338,7 +5338,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function deleteLead(telegramId, e) {
       if (e) e.stopPropagation();
-      if (!confirm(`Mover o lead ${telegramId} para Excluídos? Você poderá restaurá-lo depois.`)) return;
+      if (!confirm(`Mover o lead ${telegramId} para Excluídos e encerrar o acompanhamento dos Pix pendentes? O QR do provedor ainda poderá ser pago.`)) return;
       try {
         const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Servidor recusou exclusão');
@@ -5367,7 +5367,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbPermanentlyDeleteLead(id) {
-      if (!confirm(`Excluir PERMANENTEMENTE o lead ${id}? Esta ação não pode ser desfeita.`)) return;
+      if (!confirm(`Excluir PERMANENTEMENTE o lead ${id}, suas transações no painel e descontar as vendas correspondentes dos indicadores? Isso não estorna um Pix real e não pode ser desfeito.`)) return;
       try {
         const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/permanent`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Falha na exclusão definitiva');
@@ -5378,7 +5378,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function clearAllLeads() {
-      if (!confirm('Mover todos os leads ativos para Excluídos? Você poderá restaurá-los individualmente.')) return;
+      if (!confirm('Mover todos os leads ativos para Excluídos e encerrar o acompanhamento dos Pix pendentes? Pix já gerados podem continuar pagáveis no provedor.')) return;
       try {
         const res = await adminFetch('/api/leads', { method: 'DELETE' });
         if (!res.ok) throw new Error('Falha ao excluir leads');
@@ -9002,13 +9002,14 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (selectedBotId !== "all" && tx.bot_id && tx.bot_id !== selectedBotId) return false;
         const isPaid = tx.status === "paid" || Boolean(tx.delivered);
         if (NB_FIN_STATUS === "Pago" && !isPaid) return false;
-        if (NB_FIN_STATUS === "Pendente" && isPaid) return false;
-        if (!["Todos", "Pago", "Pendente"].includes(NB_FIN_STATUS)) return false;
+        if (NB_FIN_STATUS === "Pendente" && tx.status !== "pending") return false;
+        if (NB_FIN_STATUS === "Cancelado" && !["cancelled", "canceled"].includes(tx.status)) return false;
+        if (!["Todos", "Pago", "Pendente", "Cancelado"].includes(NB_FIN_STATUS)) return false;
         return true;
       });
 
       const pendingTotal = allTxList
-        .filter(tx => (selectedBotId === "all" || !tx.bot_id || tx.bot_id === selectedBotId) && tx.status !== "paid" && !tx.delivered)
+        .filter(tx => (selectedBotId === "all" || !tx.bot_id || tx.bot_id === selectedBotId) && tx.status === "pending" && !tx.delivered)
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
       document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;
@@ -9039,7 +9040,9 @@ quer que eu te mostre as opções de acesso?</textarea>
             const valFmt = `R$ ${Number(tx.amount || 0).toFixed(2).replace('.', ',')}`;
             const statusBadge = isPaid
               ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">PAGO</span>`
-              : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/50">PENDENTE</span>`;
+              : ["cancelled", "canceled"].includes(tx.status)
+                ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">CANCELADO NO PAINEL</span>`
+                : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/50">PENDENTE</span>`;
             const testBadge = isTest
               ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-950/80 text-purple-300 border border-purple-700/60">TESTE</span>`
               : ``;

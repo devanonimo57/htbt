@@ -28,6 +28,9 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         self.write.stop()
         self.read.stop()
 
+    async def _get_state(self):
+        return self.state
+
     async def _save(self, state, **kwargs):
         self.state = copy.deepcopy(state)
         return self.state
@@ -46,6 +49,25 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["state"]["memory"]["deleted_leads"][0]["telegram_id"], "42")
         self.cancel_mock.assert_called_once_with("42")
 
+    async def test_soft_delete_stops_pending_pix_and_marks_it_cancelled(self):
+        self.state["tx_records"] = {
+            "tx_pending": {"user_id": 42, "status": "pending", "amount": 49},
+            "tx_other": {"user_id": 43, "status": "pending", "amount": 20},
+        }
+        app_main.bot_manager.tx_records["tx_pending"] = self.state["tx_records"]["tx_pending"]
+        try:
+            await app_main.delete_lead("42")
+            self.assertEqual(self.state["tx_records"]["tx_pending"]["status"], "cancelled")
+            self.assertEqual(app_main.bot_manager.tx_records["tx_pending"]["status"], "cancelled")
+            self.assertEqual(self.state["tx_records"]["tx_other"]["status"], "pending")
+            manager = tg_srv.ActiveBotManager()
+            manager.state_getter = self._get_state
+            with patch.object(manager, "deliver_purchase_and_upsell", AsyncMock(return_value=True)) as delivery:
+                self.assertFalse(await manager.notify_payment_by_tx_id("tx_pending"))
+                delivery.assert_not_awaited()
+        finally:
+            app_main.bot_manager.tx_records.pop("tx_pending", None)
+
     async def test_restore_recovers_full_lead_without_archive_metadata(self):
         await app_main.delete_lead("42")
         result = await app_main.restore_lead("42")
@@ -54,13 +76,60 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["state"]["memory"]["leads"][0], self.lead)
         self.assertEqual(self.state["tx_records"]["tx1"]["telegram_id"], "42")
 
-    async def test_permanent_removes_only_archived_lead(self):
+    async def test_permanent_removes_clients_transactions_and_dashboard_totals(self):
+        self.state["tx_records"] = {
+            "tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "mode": "flow"},
+            "tx2": {"user_id": 42, "status": "pending", "amount": 12, "bot_id": "bot1", "mode": "flow"},
+            "other": {"user_id": 43, "status": "paid", "amount": 25, "bot_id": "bot1", "mode": "flow"},
+        }
         await app_main.delete_lead("42")
         result = await app_main.permanently_delete_lead("42")
         self.assertEqual(self.state["memory"]["deleted_leads"], [])
         self.assertEqual(self.state["memory"]["leads"], [{"telegram_id": "43"}])
-        self.assertIn("tx1", self.state["tx_records"])
+        self.assertEqual(list(self.state["tx_records"]), ["other"])
+        self.assertEqual(self.state["flow_bots"][0]["sales_today"], 7)
+        self.assertEqual(self.state["flow_bots"][0]["revenue_today"], 343)
+        self.assertEqual(self.state["learning"]["confirmed_purchases"], 7)
+        self.assertEqual(self.write_mock.await_args.kwargs["delete_tx_ids"], ["tx1", "tx2"])
         self.assertEqual(result["state"]["memory"]["deleted_leads"], [])
+
+    async def test_state_writer_deletes_relational_orders_in_same_commit(self):
+        from unittest.mock import MagicMock
+        self.write.stop()
+        try:
+            session = MagicMock()
+            session.__aenter__ = AsyncMock(return_value=session)
+            session.__aexit__ = AsyncMock(return_value=None)
+            config = MagicMock()
+            config.full_state_json = '{}'
+            config_row = MagicMock()
+            config_row.scalars.return_value.first.return_value = config
+            order = MagicMock()
+            order_rows = MagicMock()
+            order_rows.scalars.return_value.all.return_value = [order]
+            session.execute = AsyncMock(side_effect=[config_row, order_rows])
+            session.delete = AsyncMock()
+            session.commit = AsyncMock()
+            to_save = copy.deepcopy(self.state)
+            to_save['tx_records'] = {}
+            with patch.object(app_main, 'async_session', return_value=session):
+                await app_main._write_state_to_db(to_save, delete_tx_ids=['tx1'])
+            session.delete.assert_awaited_once_with(order)
+            session.commit.assert_awaited_once()
+        finally:
+            self.write_mock = self.write.start()
+
+    async def test_stale_panel_save_cannot_restore_deleted_sales(self):
+        stale = copy.deepcopy(self.state)
+        self.state["tx_records"] = {"tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "mode": "flow"}}
+        stale["tx_records"] = copy.deepcopy(self.state["tx_records"])
+        await app_main.delete_lead("42")
+        await app_main.permanently_delete_lead("42")
+        merged = app_main._merge_config_preserving_runtime(stale, self.state)
+        self.assertNotIn("tx1", merged["tx_records"])
+        self.assertEqual(merged["flow_bots"][0]["sales_today"], 7)
+        self.assertEqual(merged["flow_bots"][0]["revenue_today"], 343)
+        self.assertEqual(merged["learning"]["confirmed_purchases"], 7)
 
     async def test_restore_collision_leaves_both_versions_untouched(self):
         await app_main.delete_lead("42")
@@ -149,17 +218,59 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(archived["history"][0], self.lead["history"][0])
         self.assertEqual(len(self.state["memory"]["leads"]), 1)
 
-    async def test_payment_notification_does_not_restore_excluded_client(self):
+    async def test_poll_never_checks_cancelled_pix_after_exclusion(self):
+        self.state["tx_records"] = {"tx_pending": {"user_id": 42, "status": "pending", "amount": 49}}
+        manager = app_main.bot_manager
+        manager.tx_records["tx_pending"] = self.state["tx_records"]["tx_pending"]
+        try:
+            await app_main.delete_lead("42")
+            with patch.object(tg_srv.asyncio, "sleep", AsyncMock(side_effect=[None, tg_srv.asyncio.CancelledError()])), patch.object(tg_srv.PushinPayClient, "check_transaction_status", AsyncMock(return_value={"status": "pending"})) as check:
+                await manager._poll_pix_payment(42, "tx_pending", "configured")
+                check.assert_not_awaited()
+        finally:
+            manager.tx_records.pop("tx_pending", None)
+
+    async def test_old_check_pix_button_does_not_query_gateway_after_exclusion(self):
+        import types
+        self.state["tx_records"] = {"tx_pending": {"user_id": 42, "status": "pending", "amount": 49}}
         await app_main.delete_lead("42")
+        self.state["publish"]["pushin_pay_token"] = "configured"
+        manager = tg_srv.ActiveBotManager()
+        manager.bot = tg_srv.Bot(token="123456:MOCK")
+        manager.dp = tg_srv.Dispatcher()
+        manager.state_getter = self._get_state
+        manager.state_saver = self._save
+        manager._register_handlers()
+        callback = types.SimpleNamespace(
+            data="checkpix:tx_pending",
+            from_user=tg_srv.types.User(id=42, first_name="Ada"),
+            answer=AsyncMock(),
+        )
+        with patch.object(tg_srv.PushinPayClient, "check_transaction_status", AsyncMock(return_value={"status": "paid"})) as check, patch.object(manager, "deliver_purchase_and_upsell", AsyncMock()) as delivery:
+            await manager.dp.callback_handlers[1](callback)
+            check.assert_not_awaited()
+            delivery.assert_not_awaited()
+
+    async def test_cancelled_pix_webhook_skips_gateway_lookup_and_delivery(self):
+        self.state["tx_records"] = {"tx_pending": {"user_id": 42, "status": "pending", "amount": 49}}
+        await app_main.delete_lead("42")
+        self.state["publish"]["pushin_pay_token"] = "configured"
+        with patch.object(app_main, "PushinPayClient") as gateway, patch.object(app_main.bot_manager, "notify_payment_by_tx_id", AsyncMock()) as notify:
+            result = await app_main.webhook_gateway({"id": "tx_pending", "status": "paid"})
+            self.assertEqual(result["action"], "archived_or_cancelled_tx")
+            gateway.assert_not_called()
+            notify.assert_not_awaited()
+
+    async def test_old_pending_pix_does_not_deliver_after_archive(self):
         self.state["tx_records"] = {"tx_paid": {"user_id": 42, "mode": "ai", "status": "pending", "amount": 49}}
+        await app_main.delete_lead("42")
         self.state["publish"]["delivery_destination"] = "-100555000"
         manager = tg_srv.ActiveBotManager()
         manager.bot = tg_srv.Bot(token="123456:MOCK")
-        async def getter():
-            return self.state
-        manager.state_getter = getter
+        manager.state_getter = self._get_state
         manager.state_saver = self._save
-        await manager.deliver_purchase_and_upsell(42, tx_id="tx_paid")
+        self.assertFalse(await manager.deliver_purchase_and_upsell(42, tx_id="tx_paid"))
+        self.assertEqual(self.state["tx_records"]["tx_paid"]["status"], "cancelled")
         self.assertEqual([l["telegram_id"] for l in self.state["memory"]["leads"]], ["43"])
         self.assertEqual(self.state["memory"]["deleted_leads"][0]["telegram_id"], "42")
 

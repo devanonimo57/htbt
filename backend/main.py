@@ -374,14 +374,11 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
     if isinstance(existing.get("memory"), dict):
         incoming["memory"] = json.loads(json.dumps(existing["memory"]))
 
-    if isinstance(existing.get("tx_records"), dict) and existing["tx_records"]:
-        inc_tx = incoming.get("tx_records") if isinstance(incoming.get("tx_records"), dict) else {}
-        incoming["tx_records"] = {**inc_tx, **json.loads(json.dumps(existing["tx_records"]))}
+    if isinstance(existing.get("tx_records"), dict):
+        incoming["tx_records"] = json.loads(json.dumps(existing["tx_records"]))
 
     if isinstance(existing.get("learning"), dict):
-        ex_learn = existing["learning"]
-        if any(ex_learn.get(k) for k in ("evaluated_results", "confirmed_purchases", "unpaid_checkouts", "top_plans", "common_objections")):
-            incoming["learning"] = json.loads(json.dumps(ex_learn))
+        incoming["learning"] = json.loads(json.dumps(existing["learning"]))
 
     _preserve_media_file_ids(incoming.get("medias"), existing.get("medias"))
     if isinstance(incoming.get("upsell"), dict) and isinstance(existing.get("upsell"), dict):
@@ -396,11 +393,8 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
         if isinstance(fb, dict) and fb.get("id"):
             old_bot = ex_bots_by_id.get(str(fb.get("id")))
             if old_bot:
-                fb["sales_today"] = max(int(fb.get("sales_today") or 0), int(old_bot.get("sales_today") or 0))
-                fb["revenue_today"] = round(
-                    max(float(fb.get("revenue_today") or 0.0), float(old_bot.get("revenue_today") or 0.0)),
-                    2
-                )
+                fb["sales_today"] = int(old_bot.get("sales_today") or 0)
+                fb["revenue_today"] = round(float(old_bot.get("revenue_today") or 0.0), 2)
                 if isinstance(fb.get("welcome"), dict) and isinstance(old_bot.get("welcome"), dict):
                     _preserve_media_file_ids(fb["welcome"].get("medias"), old_bot["welcome"].get("medias"))
                 if isinstance(fb.get("payments"), dict) and isinstance(old_bot.get("payments"), dict):
@@ -618,7 +612,7 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None) -> Dict[str, Any]:
     global _STATE_CACHE
     async with _DB_LOCK:
         async with async_session() as session:
@@ -676,6 +670,10 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     except Exception:
                         pass
 
+            if delete_tx_ids:
+                order_result = await session.execute(select(Order).where(Order.transaction_id.in_(delete_tx_ids)))
+                for order in order_result.scalars().all():
+                    await session.delete(order)
             await session.commit()
         return _STATE_CACHE
 
@@ -782,6 +780,24 @@ def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
     old.update(new_record)
 
 
+def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -> None:
+    """Interrompe monitoramento local; não cancela a cobrança no gateway."""
+    for tx_id, record in (state.get("tx_records") or {}).items():
+        if not isinstance(record, dict) or str(record.get("user_id")) != str(telegram_id):
+            continue
+        if record.get("status") != "pending" or record.get("delivered"):
+            continue
+        record["status"] = "cancelled"
+        record["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+        cached = bot_manager.tx_records.get(tx_id)
+        if isinstance(cached, dict):
+            cached.update(record)
+        bot_manager.active_tx_map.pop(tx_id, None)
+        poll = bot_manager.pix_poll_tasks.pop(tx_id, None)
+        if poll and not poll.done():
+            poll.cancel()
+
+
 @app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_lead(telegram_id: str):
     state = await _read_state_from_db()
@@ -792,6 +808,7 @@ async def delete_lead(telegram_id: str):
         raise HTTPException(status_code=404, detail="Lead não encontrado.")
     archived = memory.setdefault("deleted_leads", [])
     bot_manager.cancel_lead_tasks(str(telegram_id))
+    _cancel_pending_lead_transactions(state, telegram_id)
     for lead in matched:
         _archive_lead(archived, lead)
     memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != str(telegram_id)]
@@ -815,16 +832,55 @@ async def restore_lead(telegram_id: str):
     return {"status": "success", "state": _redact_state_secrets(state)}
 
 
+def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[str]:
+    """Exclui lançamentos do painel e desfaz apenas os totais que foram somados."""
+    tx_map = state.setdefault("tx_records", {})
+    bots = state.get("flow_bots") or []
+    removed: List[str] = []
+    for tx_id, record in list(tx_map.items()):
+        if not isinstance(record, dict) or str(record.get("user_id") or record.get("telegram_id")) != str(telegram_id):
+            continue
+        was_paid = record.get("status") == "paid" or bool(record.get("delivered"))
+        if was_paid:
+            learning = state.setdefault("learning", {})
+            learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
+            if record.get("mode") == "flow" and not record.get("is_upsell"):
+                bot_id = str(record.get("bot_id") or "")
+                bot_token = str(record.get("bot_token") or "")
+                matched = next((b for b in bots if isinstance(b, dict) and bot_id and str(b.get("id")) == bot_id), None)
+                if not matched and bot_token:
+                    matched = next((b for b in bots if isinstance(b, dict) and b.get("token") == bot_token), None)
+                if not matched and len(bots) == 1:
+                    matched = bots[0]
+                if not matched:
+                    raise HTTPException(status_code=409, detail="Não foi possível identificar o bot de uma venda. Exclusão cancelada para não alterar a contabilidade errada.")
+                matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
+                matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
+        removed.append(tx_id)
+        tx_map.pop(tx_id)
+    return removed
+
+
 @app.delete("/api/leads/{telegram_id}/permanent", dependencies=[Depends(verify_admin_auth)])
 async def permanently_delete_lead(telegram_id: str):
-    state = await _read_state_from_db()
+    current = await _read_state_from_db()
+    state = json.loads(json.dumps(current))
     memory = state.setdefault("memory", {"leads": []})
     archived = memory.get("deleted_leads", [])
     remaining = [lead for lead in archived if str(lead.get("telegram_id")) != str(telegram_id)]
     if len(remaining) == len(archived):
         raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
+    if any(str(lead.get("telegram_id")) == str(telegram_id) for lead in memory.get("leads", [])):
+        raise HTTPException(status_code=409, detail="O mesmo cliente voltou ao bot. Exclua o cadastro ativo antes de apagar permanentemente.")
     memory["deleted_leads"] = remaining
-    await _write_state_to_db(state)
+    removed_tx_ids = _remove_lead_transactions(state, telegram_id)
+    state = await _write_state_to_db(state, delete_tx_ids=removed_tx_ids)
+    for tx_id in removed_tx_ids:
+        bot_manager.tx_records.pop(tx_id, None)
+        bot_manager.active_tx_map.pop(tx_id, None)
+        task = bot_manager.pix_poll_tasks.pop(tx_id, None)
+        if task and not task.done():
+            task.cancel()
     return {"status": "success", "state": _redact_state_secrets(state)}
 
 
@@ -858,6 +914,7 @@ async def clear_all_leads():
     archived = memory.setdefault("deleted_leads", [])
     for lead in leads:
         bot_manager.cancel_lead_tasks(str(lead.get("telegram_id")))
+        _cancel_pending_lead_transactions(state, str(lead.get("telegram_id")))
         _archive_lead(archived, lead)
     memory["leads"] = []
     await _write_state_to_db(state)
@@ -941,8 +998,14 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     if status not in ("paid", "completed", "approved", "settled"):
         return {"status": "received", "action": "ignored_non_paid_status", "transaction_id": transaction_id}
 
-    # Fail-closed: NUNCA confia apenas no JSON do webhook; consulta o status oficial no gateway
+    # Cobranças locais canceladas por exclusão não devem consultar o gateway
+    # novamente nem liberar acesso. O QR externo pode continuar pagável.
     state = await _read_state_from_db()
+    tx_record = (state.get("tx_records") or {}).get(transaction_id) or bot_manager.tx_records.get(transaction_id)
+    if isinstance(tx_record, dict) and tx_record.get("status") in ("cancelled", "canceled"):
+        return {"status": "received", "action": "archived_or_cancelled_tx", "transaction_id": transaction_id}
+
+    # Fail-closed: NUNCA confia apenas no JSON do webhook; consulta o status oficial no gateway
     pub = state.get("publish", {})
     token = (pub.get("pushin_pay_token") or "").strip()
     gw_provider = (pub.get("gateway_provider") or "syncpay").strip()

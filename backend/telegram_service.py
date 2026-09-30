@@ -2126,6 +2126,9 @@ class ActiveBotManager:
             if not tx_record or int(tx_record.get("user_id", 0)) != int(callback.from_user.id):
                 await callback.answer("Cobrança não localizada para este usuário.", show_alert=True)
                 return
+            if tx_record.get("status") in ("cancelled", "canceled"):
+                await callback.answer("Esta cobrança foi encerrada. Para tentar novamente, gere um novo PIX.", show_alert=True)
+                return
 
             pub = state.get("publish", {})
             pushin_token = pub.get("pushin_pay_token", "").strip()
@@ -2497,7 +2500,7 @@ class ActiveBotManager:
         tx_record = (state.get("tx_records") or {}).get(tx_id) or self.tx_records.get(tx_id)
         if not tx_record:
             return False
-        if tx_record.get("status") == "paid" or tx_record.get("delivered"):
+        if tx_record.get("status") in ("paid", "cancelled", "canceled") or tx_record.get("delivered"):
             return False
         uid = int(tx_record.get("user_id") or 0)
         if not uid:
@@ -2514,7 +2517,7 @@ class ActiveBotManager:
             for base_wait in intervals:
                 await asyncio.sleep(base_wait + random.uniform(0.0, 1.2))
                 existing_tx = self.tx_records.get(tx_id)
-                if existing_tx and (existing_tx.get("status") == "paid" or existing_tx.get("delivered")):
+                if existing_tx and (existing_tx.get("status") in ("paid", "cancelled", "canceled") or existing_tx.get("delivered")):
                     return
                 try:
                     data = await client.check_transaction_status(tx_id)
@@ -2601,7 +2604,7 @@ class ActiveBotManager:
             tx_record = (state.setdefault("tx_records", {})).get(tx_id) or self.tx_records.get(tx_id)
             if not tx_record or int(tx_record.get("user_id", 0)) != int(user_id):
                 return False
-            if tx_record.get("status") == "paid" or tx_record.get("delivered"):
+            if tx_record.get("status") in ("paid", "cancelled", "canceled") or tx_record.get("delivered"):
                 return False
 
             tx_bot_token = str(tx_record.get("bot_token") or "").strip()
