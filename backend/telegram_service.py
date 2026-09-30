@@ -2226,7 +2226,6 @@ class ActiveBotManager:
                 return
 
             lead = await self._get_or_create_lead(state, callback.from_user)
-            self._cancel_downsell(str(callback.from_user.id))
             self._advance_stage(lead, "Escolheu um plano")
             lead["accepted_bump_indices"] = []
             auth_discounts = lead.get("authorized_flow_discounts") or []
