@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RicoBot - Gerenciador de Fluxos e IA para Telegram</title>
+  <link id="site-favicon" rel="icon" type="image/png" href="favicon.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -188,6 +189,7 @@
   <!-- Input oculto para upload real de arquivos de mídia -->
   <input type="file" id="hidden-media-upload" class="hidden" accept="image/*,video/*,audio/*" onchange="handleRealFileUpload(event)">
   <input type="file" id="nb-hidden-media-input" class="hidden" accept="image/*,video/*,audio/*" onchange="nbHandleMediaUpload(event)">
+  <input type="file" id="nb-site-icon-input" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon" onchange="nbHandleSiteIconUpload(event)">
 
   <!-- =========================================================
        WORKSPACE 1 (TELA INICIAL): RICOBOT — MEUS BOTS E GERENCIADOR DE FLUXO
@@ -197,11 +199,15 @@
     <!-- TOP BAR RICOBOT -->
     <header class="h-14 border-b border-[#24181a] bg-[#090707]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
       <div class="flex items-center gap-2.5 cursor-pointer" onclick="nbBackToBotsList()">
-        <div class="w-7 h-7 rounded-md bg-[#ef4444] text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-red-950/50">
+        <div id="nb-header-logo-box" class="w-7 h-7 rounded-md bg-[#ef4444] text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-red-950/50 overflow-hidden">
           <i class="fa-solid fa-bolt"></i>
         </div>
         <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#ef4444]">Bot</span></span>
       </div>
+      <button type="button" onclick="document.getElementById('nb-site-icon-input').click()" class="px-2.5 py-1 rounded-lg bg-[#141011] hover:bg-[#1f1719] border border-[#2b1d20] text-[11px] text-zinc-400 hover:text-white flex items-center gap-1.5 transition" title="Alterar ícone da aba e logo do painel (ideal: 512x512 px PNG)">
+        <i class="fa-regular fa-image text-[10px] text-[#ef4444]"></i>
+        <span>Ícone do site</span>
+      </button>
     </header>
 
     <!-- ÁREA CENTRAL ROLÁVEL -->
@@ -5971,11 +5977,40 @@ quer que eu te mostre as opções de acesso?</textarea>
       };
     }
 
+    function nbApplySiteIcon() {
+      const iconUrl = (STATE.site_icon_url || "").trim();
+      const favEl = document.getElementById('site-favicon');
+      const boxEl = document.getElementById('nb-header-logo-box');
+      if (iconUrl) {
+        if (favEl) favEl.href = iconUrl;
+        if (boxEl) {
+          boxEl.innerHTML = `<img src="${iconUrl}" alt="Logo" class="w-full h-full object-cover">`;
+          boxEl.className = "w-7 h-7 rounded-md bg-transparent flex items-center justify-center overflow-hidden shadow-sm";
+        }
+      } else if (boxEl) {
+        boxEl.innerHTML = `<i class="fa-solid fa-bolt"></i>`;
+        boxEl.className = "w-7 h-7 rounded-md bg-[#ef4444] text-white flex items-center justify-center font-bold text-xs shadow-sm shadow-red-950/50 overflow-hidden";
+      }
+    }
+
+    function nbHandleSiteIconUpload(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        STATE.site_icon_url = reader.result;
+        nbApplySiteIcon();
+        await saveFullState();
+      };
+      reader.readAsDataURL(file);
+    }
+
     function nbInitNeurotBot() {
       if (!Array.isArray(STATE.bot_folders)) STATE.bot_folders = [];
       if (!Array.isArray(STATE.flow_bots) || STATE.flow_bots.length === 0) {
         STATE.flow_bots = [nbBuildDefaultBotObj(STATE.publish || {})];
       }
+      nbApplySiteIcon();
       nbRenderBotsList();
     }
 
