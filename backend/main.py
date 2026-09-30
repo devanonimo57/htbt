@@ -1468,8 +1468,297 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
     }
 
 
+class AccessResendRequest(BaseModel):
+    tx_ids: Optional[List[str]] = None
+    bot_id: Optional[str] = ""
+
+
+@app.post("/api/flow-bots/access/resend", dependencies=[Depends(verify_admin_auth)])
+async def resend_vip_access(req: AccessResendRequest):
+    from datetime import timedelta
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from telegram_service import _create_bot_instance
+
+    state = await _read_state_from_db()
+    tx_map = state.get("tx_records") or {}
+    target_ids = req.tx_ids if isinstance(req.tx_ids, list) and len(req.tx_ids) > 0 else [
+        tid for tid, rec in tx_map.items()
+        if isinstance(rec, dict) and (rec.get("status") == "paid" or rec.get("delivered"))
+        and (not req.bot_id or req.bot_id == "all" or str(rec.get("bot_id") or "") == req.bot_id)
+    ]
+
+    sent_count = 0
+    for tid in target_ids:
+        rec = tx_map.get(tid)
+        if not isinstance(rec, dict):
+            continue
+        uid = int(rec.get("user_id") or 0)
+        if not uid:
+            continue
+        fb = None
+        for b in (state.get("flow_bots") or []):
+            if isinstance(b, dict) and str(b.get("id")) == str(rec.get("bot_id") or ""):
+                fb = b
+                break
+        if not fb:
+            fb = bot_manager._get_active_flow_bot(state)
+        tok = (
+            str(rec.get("bot_token") or "").strip()
+            or (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
+            or str(state.get("publish", {}).get("bot_token") or "").strip()
+        )
+        if not tok or tok == REDACTED_SECRET_MASK:
+            continue
+
+        temp_bot = None
+        try:
+            temp_bot = _create_bot_instance(tok)
+            eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
+            ch_target = (rec.get("delivery_channel_id") or "").strip()
+            ext_url = (rec.get("delivery_external_url") or "").strip()
+            invite_url = rec.get("invite_url") or "https://t.me/+link_exclusivo_vip"
+
+            if eff_type == "Link externo" and ext_url:
+                invite_url = ext_url
+            elif ch_target:
+                try:
+                    parsed_ch = int(ch_target) if ch_target.lstrip("-").isdigit() else ch_target
+                    inv = await temp_bot.create_chat_invite_link(
+                        chat_id=parsed_ch,
+                        member_limit=1,
+                        expire_date=datetime.utcnow() + timedelta(minutes=15)
+                    )
+                    invite_url = inv.invite_link
+                except Exception:
+                    pass
+
+            btn_txt = ((fb.get("payments") or {}).get("access_button_text") if isinstance(fb, dict) else None) or "Acessar conteúdo"
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text=btn_txt, url=invite_url)]
+            ])
+            plan_label = rec.get("offer_name") or "Plano VIP"
+            await temp_bot.send_message(
+                chat_id=uid,
+                text=f"🔑 <b>Seu acesso ao plano {plan_label} foi reenviado!</b>\n\nClique no botão abaixo para acessar:",
+                parse_mode="HTML",
+                reply_markup=kb
+            )
+            rec["invite_url"] = invite_url
+            rec["access_status"] = "Ativo"
+            sent_count += 1
+        except Exception:
+            pass
+        finally:
+            if temp_bot:
+                try:
+                    await temp_bot.session.close()
+                except Exception:
+                    pass
+
+    if sent_count > 0:
+        state = await _write_state_to_db(state, preserve_runtime=False)
+    return {"status": "ok", "sent_count": sent_count, "state": _redact_state_secrets(state)}
+
+
+class AccessStatusUpdateRequest(BaseModel):
+    tx_id: str
+    access_status: str
+
+
+@app.post("/api/flow-bots/access/update-status", dependencies=[Depends(verify_admin_auth)])
+async def update_vip_access_status(req: AccessStatusUpdateRequest):
+    from telegram_service import _create_bot_instance
+    state = await _read_state_from_db()
+    tx_map = state.get("tx_records") or {}
+    rec = tx_map.get(req.tx_id)
+    if not isinstance(rec, dict):
+        raise HTTPException(status_code=404, detail="Registro de acesso não encontrado.")
+
+    rec["access_status"] = req.access_status
+    if req.access_status == "Removido":
+        ch_target = (rec.get("delivery_channel_id") or "").strip()
+        uid = int(rec.get("user_id") or 0)
+        tok = (rec.get("bot_token") or state.get("publish", {}).get("bot_token") or "").strip()
+        if ch_target and uid and tok and tok != REDACTED_SECRET_MASK:
+            temp_bot = None
+            try:
+                temp_bot = _create_bot_instance(tok)
+                parsed_ch = int(ch_target) if ch_target.lstrip("-").isdigit() else ch_target
+                await temp_bot.ban_chat_member(chat_id=parsed_ch, user_id=uid)
+            except Exception:
+                pass
+            finally:
+                if temp_bot:
+                    try:
+                        await temp_bot.session.close()
+                    except Exception:
+                        pass
+
+    state = await _write_state_to_db(state, preserve_runtime=False)
+    return {"status": "ok", "state": _redact_state_secrets(state)}
+
+
+class LeadActionRequest(BaseModel):
+    telegram_id: str
+    action: str  # "send_message" | "toggle_block"
+    message: Optional[str] = ""
+
+
+@app.post("/api/flow-bots/leads/action", dependencies=[Depends(verify_admin_auth)])
+async def handle_lead_action(req: LeadActionRequest):
+    from telegram_service import _create_bot_instance
+    state = await _read_state_from_db()
+    leads = (state.get("memory") or {}).get("leads") or []
+    target_lead = next((l for l in leads if str(l.get("telegram_id")) == str(req.telegram_id)), None)
+    if not target_lead:
+        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+
+    if req.action == "toggle_block":
+        target_lead["blocked"] = not bool(target_lead.get("blocked", False))
+        state = await _write_state_to_db(state, preserve_runtime=False)
+        return {"status": "ok", "blocked": target_lead["blocked"], "state": _redact_state_secrets(state)}
+
+    if req.action == "send_message":
+        txt = (req.message or "").strip()
+        if not txt:
+            return {"status": "error", "message": "Mensagem vazia."}
+        fb = None
+        for b in (state.get("flow_bots") or []):
+            if isinstance(b, dict) and str(b.get("id")) == str(target_lead.get("bot_id") or ""):
+                fb = b
+                break
+        if not fb:
+            fb = bot_manager._get_active_flow_bot(state)
+        tok = (
+            (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
+            or str(state.get("publish", {}).get("bot_token") or "").strip()
+        )
+        if not tok or tok == REDACTED_SECRET_MASK:
+            return {"status": "error", "message": "Token do bot não configurado."}
+        temp_bot = None
+        try:
+            temp_bot = _create_bot_instance(tok)
+            await temp_bot.send_message(chat_id=int(req.telegram_id), text=txt, parse_mode="HTML")
+            target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
+            state = await _write_state_to_db(state, preserve_runtime=False)
+            return {"status": "ok", "state": _redact_state_secrets(state)}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            if temp_bot:
+                try:
+                    await temp_bot.session.close()
+                except Exception:
+                    pass
+
+    return {"status": "ok", "state": _redact_state_secrets(state)}
+
+
+class RemarketingSendRequest(BaseModel):
+    campaign_id: str
+
+
+@app.post("/api/flow-bots/remarketing/send", dependencies=[Depends(verify_admin_auth)])
+async def send_remarketing_campaign(req: RemarketingSendRequest):
+    from aiogram import types
+    from telegram_service import _create_bot_instance
+
+    state = await _read_state_from_db()
+    campaigns = state.setdefault("remarketing_campaigns", [])
+    camp = next((c for c in campaigns if isinstance(c, dict) and str(c.get("id")) == str(req.campaign_id)), None)
+    if not camp:
+        raise HTTPException(status_code=404, detail="Campanha não encontrada.")
+
+    target_bot_id = str(camp.get("bot_id") or "all").strip()
+    segment = str(camp.get("segment") or "all").strip()
+    discount_str = str(camp.get("discount") or "Sem desconto").strip()
+    include_buttons = bool(camp.get("include_plan_buttons", True))
+    msg_tmpl = (camp.get("message") or "").strip()
+
+    leads = (state.get("memory") or {}).get("leads") or []
+    paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
+    pending_stages = ("Gerou checkout", "Escolheu um plano", "Escolheu upsell")
+
+    matched_leads: List[Dict[str, Any]] = []
+    for l in leads:
+        if not isinstance(l, dict) or l.get("blocked"):
+            continue
+        if target_bot_id != "all" and l.get("bot_id") and str(l.get("bot_id")) != target_bot_id:
+            continue
+        st = str(l.get("stage") or "Conversando")
+        is_paid = st in paid_stages
+        is_pend = st in pending_stages
+        if segment == "paid" and not is_paid:
+            continue
+        if segment == "pending" and not is_pend:
+            continue
+        if segment == "new" and (is_paid or is_pend):
+            continue
+        if segment == "unpaid" and is_paid:
+            continue
+        matched_leads.append(l)
+
+    fb = None
+    if target_bot_id != "all":
+        fb = next((b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == target_bot_id), None)
+    if not fb:
+        fb = bot_manager._get_active_flow_bot(state) or ((state.get("flow_bots") or [None])[0])
+
+    tok = (
+        (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
+        or str(state.get("publish", {}).get("bot_token") or "").strip()
+    )
+    if not tok or tok == REDACTED_SECRET_MASK:
+        return {"status": "error", "message": "Token do bot não configurado."}
+
+    temp_bot = None
+    sent_ok = 0
+    try:
+        temp_bot = _create_bot_instance(tok)
+        kb = None
+        disc_pct = bot_manager._parse_discount_pct(discount_str)
+        if include_buttons and isinstance(fb, dict):
+            kb = bot_manager._build_flow_plans_kb(fb, discount_str=discount_str)
+
+        for l in matched_leads:
+            uid_str = str(l.get("telegram_id") or "").strip()
+            if not uid_str.lstrip("-").isdigit():
+                continue
+            uid = int(uid_str)
+            try:
+                if disc_pct > 0:
+                    auth_d = l.setdefault("authorized_flow_discounts", [])
+                    if disc_pct not in auth_d:
+                        auth_d.append(disc_pct)
+                fake_user = types.User(id=uid, is_bot=False, first_name=l.get("first_name") or "Cliente")
+                rendered = bot_manager._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você!", fake_user, fb or {})
+                await temp_bot.send_message(chat_id=uid, text=rendered, parse_mode="HTML", reply_markup=kb)
+                l.setdefault("history", []).append({"role": "assistant", "content": f"[Remarketing: {camp.get('name', 'Campanha')}] {rendered}"})
+                sent_ok += 1
+            except Exception:
+                pass
+    finally:
+        if temp_bot:
+            try:
+                await temp_bot.session.close()
+            except Exception:
+                pass
+
+    camp["sent_count"] = int(camp.get("sent_count") or 0) + sent_ok
+    camp["status"] = "Finalizada"
+    camp["last_sent_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+    state = await _write_state_to_db(state, preserve_runtime=False)
+    return {
+        "status": "ok",
+        "sent_count": sent_ok,
+        "target_count": len(matched_leads),
+        "state": _redact_state_secrets(state)
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+
 
 

@@ -510,11 +510,22 @@ class ActiveBotManager:
         memory = state.setdefault("memory", {"leads": []})
         leads: List[Dict[str, Any]] = memory.setdefault("leads", [])
         uid = str(user.id)
+        active_fb = self._get_active_flow_bot(state)
+        bot_id_str = str(active_fb.get("id") or "") if active_fb else ""
+        bot_uname_str = str(active_fb.get("username") or state.get("publish", {}).get("bot_username") or "@bot") if active_fb else str(state.get("publish", {}).get("bot_username") or "@bot")
+        bot_mode_str = "flow" if active_fb else "ai"
+
         for lead in leads:
             if str(lead.get("telegram_id")) == uid:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
                 lead["last_interaction"] = datetime.utcnow().strftime("%d/%m %H:%M")
+                lead.setdefault("created_at", datetime.utcnow().isoformat())
+                if bot_id_str:
+                    lead["bot_id"] = bot_id_str
+                if bot_uname_str:
+                    lead["bot_username"] = bot_uname_str
+                lead["bot_mode"] = bot_mode_str
                 if lead.get("stage") == "Em conversa" or not lead.get("stage"):
                     lead["stage"] = "Conversando"
                 lead.setdefault("stage_history", ["Conversando"])
@@ -526,7 +537,12 @@ class ActiveBotManager:
             "username": f"@{user.username}" if user.username else "Sem @user",
             "stage": "Conversando",
             "stage_history": ["Conversando"],
+            "created_at": datetime.utcnow().isoformat(),
             "last_interaction": datetime.utcnow().strftime("%d/%m %H:%M"),
+            "bot_id": bot_id_str,
+            "bot_username": bot_uname_str,
+            "bot_mode": bot_mode_str,
+            "blocked": False,
             "preferences": "Iniciou conversa no bot",
             "objections": "Nenhuma identificada",
             "prefs_list": [],
@@ -2350,6 +2366,8 @@ class ActiveBotManager:
                 ch_target = raw_plan_ch or fb_ch
             ext_url = ((plan.get("delivery_external_url") if plan else "") or fb_deliv.get("external_url") or "").strip()
 
+        ch_name_val = ((plan.get("delivery_channel_name") if plan else "") or fb_deliv.get("channel_name") or "Grupo VIP").strip()
+        dur_val = ((plan.get("duration") if plan else "") or "Vitalício").strip()
         tx_record = {
             "tx_id": tx_id,
             "user_id": int(callback.from_user.id),
@@ -2358,13 +2376,16 @@ class ActiveBotManager:
             "bot_token": str(_CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or ""),
             "plan_id": str(plan.get("id") if plan else plan_id),
             "offer_name": full_plan_label,
+            "plan_duration": dur_val,
             "amount": round(total_price, 2),
             "cents": cents,
             "is_upsell": False,
             "deliverable": bump_deliverable_str,
             "delivery_dest_type": eff_type,
             "delivery_channel_id": ch_target,
+            "delivery_channel_name": ch_name_val,
             "delivery_external_url": ext_url,
+            "access_status": "Pendente",
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),
         }
@@ -2699,9 +2720,31 @@ class ActiveBotManager:
                         parse_mode="HTML"
                     )
 
+                dur_str = str(tx_record.get("plan_duration") or "Vitalício")
+                exp_days = 0
+                if "7" in dur_str or "semanal" in dur_str.lower():
+                    exp_days = 7
+                elif "30" in dur_str or "mensal" in dur_str.lower():
+                    exp_days = 30
+                elif "90" in dur_str or "trimestral" in dur_str.lower():
+                    exp_days = 90
+                elif "180" in dur_str or "semestral" in dur_str.lower():
+                    exp_days = 180
+                elif "365" in dur_str or "anual" in dur_str.lower():
+                    exp_days = 365
+
                 tx_record["status"] = "paid"
                 tx_record["delivered"] = True
+                tx_record["access_status"] = "Ativo"
+                tx_record["invite_url"] = invite_url
                 tx_record["paid_at"] = datetime.utcnow().isoformat()
+                tx_record["expires_at"] = (datetime.utcnow() + timedelta(days=exp_days)).isoformat() if exp_days > 0 else "Vitalício"
+                if not tx_record.get("delivery_channel_name"):
+                    tx_record["delivery_channel_name"] = (
+                        (flow_bot.get("fallback_delivery") or {}).get("channel_name")
+                        or ch_target
+                        or "Link Externo"
+                    )
                 self.tx_records[tx_id] = tx_record
                 state["tx_records"][tx_id] = tx_record
 

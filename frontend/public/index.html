@@ -204,10 +204,33 @@
         </div>
         <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#ef4444]">Bot</span></span>
       </div>
-      <button type="button" onclick="document.getElementById('nb-site-icon-input').click()" class="px-2.5 py-1 rounded-lg bg-[#141011] hover:bg-[#1f1719] border border-[#2b1d20] text-[11px] text-zinc-400 hover:text-white flex items-center gap-1.5 transition" title="Alterar ícone da aba e logo do painel (ideal: 512x512 px PNG)">
-        <i class="fa-regular fa-image text-[10px] text-[#ef4444]"></i>
-        <span>Ícone do site</span>
-      </button>
+
+      <div class="flex items-center gap-3">
+        <!-- CARD DE FATURAMENTO NO TOPO (PRINT 5) -->
+        <div onclick="nbSwitchMainView('finance')" class="px-3.5 py-1.5 rounded-full bg-[#0e110f] border border-[#1d2922] hover:border-emerald-700/60 flex items-center gap-3 cursor-pointer transition shadow-inner" title="Faturamento acumulado — Clique para abrir o Financeiro">
+          <div class="w-6 h-6 rounded-full bg-emerald-950/90 border border-emerald-700/60 text-emerald-400 flex items-center justify-center text-xs font-extrabold shrink-0">
+            $
+          </div>
+          <div class="flex flex-col gap-1 min-w-[105px]">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[9px] font-extrabold uppercase tracking-wider text-zinc-400">FATURAMENTO</span>
+              <span id="nb-header-rev-pct" class="text-[9px] font-bold text-zinc-400">0%</span>
+            </div>
+            <div class="w-full h-1 bg-[#1b241e] rounded-full overflow-hidden">
+              <div id="nb-header-rev-bar" class="h-full bg-emerald-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+          <div class="flex items-baseline gap-1 pl-1">
+            <span id="nb-header-rev-val" class="text-xs font-extrabold text-emerald-400">R$ 0,00</span>
+            <span id="nb-header-rev-goal" class="text-[10px] font-semibold text-zinc-500">/ 10k</span>
+          </div>
+        </div>
+
+        <button type="button" onclick="document.getElementById('nb-site-icon-input').click()" class="px-2.5 py-1.5 rounded-lg bg-[#141011] hover:bg-[#1f1719] border border-[#2b1d20] text-[11px] text-zinc-400 hover:text-white flex items-center gap-1.5 transition" title="Alterar ícone da aba e logo do painel (ideal: 512x512 px PNG)">
+          <i class="fa-regular fa-image text-[10px] text-[#ef4444]"></i>
+          <span>Ícone do site</span>
+        </button>
+      </div>
     </header>
 
     <!-- ÁREA CENTRAL ROLÁVEL -->
@@ -280,7 +303,7 @@
           <div id="nb-bot-diagnostics-body" class="space-y-2.5 text-xs text-zinc-300"></div>
         </div>
 
-        <!-- SUB-ABAS: Boas-vindas | Planos | Downsell | Order Bump | Pagamentos -->
+        <!-- SUB-ABAS: Boas-vindas | Planos | Downsell | Order Bump | Pagamentos | Remarketing | Base de Clientes -->
         <div class="border-b border-[#222018] flex items-center gap-2 overflow-x-auto">
           <button onclick="nbSwitchBotTab('welcome')" id="nbtab-btn-welcome" class="nb-tab-btn active">
             <i class="fa-regular fa-comment-dots text-xs"></i>
@@ -301,6 +324,14 @@
           <button onclick="nbSwitchBotTab('payments')" id="nbtab-btn-payments" class="nb-tab-btn">
             <i class="fa-regular fa-credit-card text-xs"></i>
             <span>Pagamentos</span>
+          </button>
+          <button onclick="nbSwitchMainView('remarketing')" class="nb-tab-btn" title="Abrir campanhas de Remarketing">
+            <i class="fa-solid fa-bullhorn text-xs text-[#ef4444]"></i>
+            <span>Remarketing</span>
+          </button>
+          <button onclick="nbSwitchMainView('clients')" class="nb-tab-btn" title="Abrir Base de Clientes e Controle de Acessos">
+            <i class="fa-solid fa-users text-xs text-[#ef4444]"></i>
+            <span>Base de Clientes</span>
           </button>
         </div>
 
@@ -1150,9 +1181,383 @@
         </div>
       </div>
 
+      <!-- =====================================================
+           TELA 6: BASE DE CLIENTES (TODOS OS LEADS & CONTROLE DE ACESSOS)
+      ====================================================== -->
+      <div id="nb-view-clients" class="hidden max-w-[1160px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold text-white">Base de Clientes</h1>
+            <p class="text-xs text-zinc-400 mt-1">Gerencie seus leads, acompanhe vendas e controle acessos em um só lugar</p>
+          </div>
+          <!-- Pílulas de período (visíveis na sub-aba Todos os Leads) -->
+          <div id="nb-clients-leads-period-pills" class="flex items-center gap-1 p-1 rounded-xl bg-[#140d0f] border border-[#291b1e]"></div>
+        </div>
+
+        <!-- SUB-ABAS DA BASE DE CLIENTES (SEM RANKING DE CLIENTES) -->
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-[#120c0e] border border-[#26191c]">
+            <button type="button" id="nb-clients-subtab-leads" onclick="nbSwitchClientsSubtab('leads')" class="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]">
+              <i class="fa-solid fa-users text-[#ef4444]"></i>
+              <span>Todos os Leads</span>
+            </button>
+            <button type="button" id="nb-clients-subtab-access" onclick="nbSwitchClientsSubtab('access')" class="px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent">
+              <i class="fa-solid fa-key text-zinc-400"></i>
+              <span>Controle de Acessos</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ===================================================
+             SUB-ABA 1: TODOS OS LEADS (SEM "TODOS OS STARTS")
+        ==================================================== -->
+        <div id="nb-clients-panel-leads" class="space-y-5">
+          <!-- 5 CARDS KPI -->
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            <div class="nb-card p-4 flex flex-col justify-between min-h-[100px]">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">NOVOS</span>
+                <div class="w-7 h-7 rounded-lg bg-purple-950/60 border border-purple-800/40 text-purple-400 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-user-plus"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <span id="nb-leads-kpi-new" class="text-2xl font-extrabold text-white block">0</span>
+                <span class="text-[11px] text-zinc-500">Sem compras</span>
+              </div>
+            </div>
+
+            <div class="nb-card p-4 flex flex-col justify-between min-h-[100px]">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">PENDENTES</span>
+                <div class="w-7 h-7 rounded-lg bg-amber-950/60 border border-amber-800/40 text-amber-400 flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-clock"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <span id="nb-leads-kpi-pending" class="text-2xl font-extrabold text-white block">0</span>
+                <span class="text-[11px] text-zinc-500">Geraram PIX</span>
+              </div>
+            </div>
+
+            <div class="nb-card p-4 flex flex-col justify-between min-h-[100px]">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">PAGOS</span>
+                <div class="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 flex items-center justify-center text-xs">
+                  <i class="fa-regular fa-circle-check"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <span id="nb-leads-kpi-paid" class="text-2xl font-extrabold text-white block">0</span>
+                <span id="nb-leads-kpi-paid-sub" class="text-[11px] text-zinc-500">0% conversão</span>
+              </div>
+            </div>
+
+            <div class="nb-card p-4 flex flex-col justify-between min-h-[100px]">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">BLOQUEADOS</span>
+                <div class="w-7 h-7 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-400 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-ban"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <span id="nb-leads-kpi-blocked" class="text-2xl font-extrabold text-white block">0</span>
+                <span class="text-[11px] text-zinc-500">Pararam o bot</span>
+              </div>
+            </div>
+
+            <div class="nb-card p-4 flex flex-col justify-between min-h-[100px]">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">TOTAL LEADS</span>
+                <div class="w-7 h-7 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-400 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-users"></i>
+                </div>
+              </div>
+              <div class="mt-2">
+                <span id="nb-leads-kpi-total" class="text-2xl font-extrabold text-white block">0</span>
+                <span class="text-[11px] text-zinc-500">Na base filtrada</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARRA DE FILTROS: BUSCA | TODOS OS BOTS | TODOS OS FLUXOS | TODOS OS STATUS -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass text-zinc-500 text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="nb-leads-search" oninput="nbRenderClientsView()" placeholder="Buscar por nome, @username ou ID..." class="nb-input pl-9">
+            </div>
+            <select id="nb-leads-filter-bot" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Bots</option>
+            </select>
+            <select id="nb-leads-filter-flow" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Fluxos</option>
+              <option value="flow">Fluxo Principal (Botões)</option>
+              <option value="ai">Fluxo de IA</option>
+            </select>
+            <select id="nb-leads-filter-status" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Status</option>
+              <option value="Novo">Novos</option>
+              <option value="Pendente">Pendentes</option>
+              <option value="Pago">Pagos</option>
+              <option value="Bloqueado">Bloqueados</option>
+            </select>
+          </div>
+
+          <!-- TABELA DE LEADS -->
+          <div class="nb-card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-[#24181a] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
+                    <th class="py-3.5 px-4">NOME / USERNAME</th>
+                    <th class="py-3.5 px-3">ID</th>
+                    <th class="py-3.5 px-3">CÓD. VENDAS</th>
+                    <th class="py-3.5 px-3">PLANO</th>
+                    <th class="py-3.5 px-3">BOT</th>
+                    <th class="py-3.5 px-3">FLUXO</th>
+                    <th class="py-3.5 px-3">STATUS</th>
+                    <th class="py-3.5 px-3">DATA</th>
+                    <th class="py-3.5 px-4 text-right">AÇÕES</th>
+                  </tr>
+                </thead>
+                <tbody id="nb-leads-table-body" class="divide-y divide-[#221619] text-xs"></tbody>
+              </table>
+            </div>
+            <div class="px-4 py-3 border-t border-[#24181a] bg-[#0d090a] flex items-center justify-between text-xs text-zinc-400">
+              <span id="nb-leads-footer-count">Mostrando 0 de 0 leads</span>
+              <span class="text-[11px] text-zinc-500">Atualizado em tempo real</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================
+             SUB-ABA 2: CONTROLE DE ACESSOS
+        ==================================================== -->
+        <div id="nb-clients-panel-access" class="hidden space-y-5">
+          <!-- 6 CARDS KPI + BOTÃO REENVIAR ACESSO EM MASSA -->
+          <div class="flex flex-wrap items-stretch justify-between gap-3">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 flex-1">
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-950/60 border border-amber-800/40 text-amber-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-regular fa-clock"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">PENDENTES</span>
+                  <span id="nb-acc-kpi-pending" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">ATIVOS</span>
+                  <span id="nb-acc-kpi-active" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-orange-950/60 border border-orange-800/40 text-orange-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">SAÍRAM</span>
+                  <span id="nb-acc-kpi-left" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-rose-950/60 border border-rose-800/40 text-rose-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-solid fa-user-xmark"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">REMOVIDOS</span>
+                  <span id="nb-acc-kpi-removed" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-700/50 text-zinc-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-regular fa-calendar-xmark"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">EXPIRADOS</span>
+                  <span id="nb-acc-kpi-expired" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+
+              <div class="nb-card p-3.5 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-purple-950/60 border border-purple-800/40 text-purple-400 flex items-center justify-center text-xs shrink-0">
+                  <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-zinc-400 block">TOTAL</span>
+                  <span id="nb-acc-kpi-total" class="text-lg font-extrabold text-white">0</span>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" id="nb-btn-bulk-resend-access" onclick="nbResendAccess('all')" class="px-4 py-3 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition shrink-0">
+              <i class="fa-regular fa-paper-plane"></i>
+              <span>Reenviar Acesso em Massa</span>
+            </button>
+          </div>
+
+          <div id="nb-acc-feedback-banner" class="hidden p-3 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-xs text-emerald-300 font-semibold"></div>
+
+          <!-- BARRA DE FILTROS: BUSCA | TODO PERÍODO | TODOS OS STATUS | TODOS OS GRUPOS | TODOS OS PLANOS -->
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass text-zinc-500 text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="nb-acc-search" oninput="nbRenderClientsView()" placeholder="Buscar por nome, username ou grupo..." class="nb-input pl-9">
+            </div>
+
+            <select id="nb-acc-filter-period" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todo Período</option>
+              <option value="today">Hoje</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="30d">Últimos 30 dias</option>
+            </select>
+
+            <select id="nb-acc-filter-status" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Status</option>
+              <option value="Pendente">Pendentes</option>
+              <option value="Ativo">Ativos</option>
+              <option value="Saiu">Saíram</option>
+              <option value="Removido">Removidos</option>
+              <option value="Expirado">Expirados</option>
+            </select>
+
+            <select id="nb-acc-filter-group" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Grupos</option>
+            </select>
+
+            <select id="nb-acc-filter-plan" onchange="nbRenderClientsView()" class="nb-select">
+              <option value="all">Todos os Planos</option>
+            </select>
+          </div>
+
+          <!-- TABELA DE CONTROLE DE ACESSOS -->
+          <div class="nb-card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-[#24181a] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
+                    <th class="py-3.5 px-4">LEAD</th>
+                    <th class="py-3.5 px-3">GRUPO</th>
+                    <th class="py-3.5 px-3">PLANO</th>
+                    <th class="py-3.5 px-3">STATUS</th>
+                    <th class="py-3.5 px-3">EXPIRA</th>
+                    <th class="py-3.5 px-4 text-right">AÇÕES</th>
+                  </tr>
+                </thead>
+                <tbody id="nb-acc-table-body" class="divide-y divide-[#221619] text-xs"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================
+           TELA 7: REMARKETING (CAMPANHAS INTELIGENTES)
+      ====================================================== -->
+      <div id="nb-view-remarketing" class="hidden max-w-[1120px] mx-auto px-8 pt-10 space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold text-white">Remarketing</h1>
+            <p class="text-xs text-zinc-400 mt-1">Recupere vendas e reengaje seus leads com campanhas inteligentes</p>
+          </div>
+          <button type="button" onclick="nbOpenRemarketingModal()" class="px-4 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition">
+            <i class="fa-solid fa-plus text-[11px]"></i>
+            <span>Nova Campanha</span>
+          </button>
+        </div>
+
+        <!-- 4 CARDS KPI REMARKETING -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div class="nb-card p-4 flex flex-col justify-between min-h-[104px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">TOTAL CAMPANHAS</span>
+              <div class="w-7 h-7 rounded-lg bg-[#241215] border border-[#3d1e23] text-[#ef4444] flex items-center justify-center text-xs">
+                <i class="fa-solid fa-bullhorn"></i>
+              </div>
+            </div>
+            <div class="mt-2">
+              <span id="nb-rmk-kpi-total" class="text-2xl font-extrabold text-white block">0</span>
+              <span id="nb-rmk-kpi-total-sub" class="text-[11px] text-zinc-500">0 rascunhos</span>
+            </div>
+          </div>
+
+          <div class="nb-card p-4 flex flex-col justify-between min-h-[104px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">ATIVAS AGORA</span>
+              <div class="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-bolt"></i>
+              </div>
+            </div>
+            <div class="mt-2">
+              <span id="nb-rmk-kpi-active" class="text-2xl font-extrabold text-white block">0</span>
+              <span id="nb-rmk-kpi-active-sub" class="text-[11px] text-zinc-500">0 agendadas</span>
+            </div>
+          </div>
+
+          <div class="nb-card p-4 flex flex-col justify-between min-h-[104px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MENSAGENS ENVIADAS</span>
+              <div class="w-7 h-7 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-400 flex items-center justify-center text-xs">
+                <i class="fa-regular fa-paper-plane"></i>
+              </div>
+            </div>
+            <div class="mt-2">
+              <span id="nb-rmk-kpi-sent" class="text-2xl font-extrabold text-white block">0</span>
+              <span id="nb-rmk-kpi-sent-sub" class="text-[11px] text-zinc-500">0% entregues</span>
+            </div>
+          </div>
+
+          <div class="nb-card p-4 flex flex-col justify-between min-h-[104px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">RECEITA TOTAL</span>
+              <div class="w-7 h-7 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-dollar-sign"></i>
+              </div>
+            </div>
+            <div class="mt-2">
+              <span id="nb-rmk-kpi-revenue" class="text-2xl font-extrabold text-white block">R$ 0,00</span>
+              <span id="nb-rmk-kpi-revenue-sub" class="text-[11px] text-zinc-500">0 conversões</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BARRA DE FILTROS REMARKETING -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div class="md:col-span-2 relative">
+            <i class="fa-solid fa-magnifying-glass text-zinc-500 text-xs absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="nb-rmk-search" oninput="nbRenderRemarketingView()" placeholder="Buscar campanhas..." class="nb-input pl-9">
+          </div>
+          <select id="nb-rmk-filter-status" onchange="nbRenderRemarketingView()" class="nb-select">
+            <option value="all">Todos Status</option>
+            <option value="Ativa">Ativas</option>
+            <option value="Agendada">Agendadas</option>
+            <option value="Pausada">Pausadas</option>
+            <option value="Finalizada">Finalizadas</option>
+            <option value="Rascunho">Rascunhos</option>
+          </select>
+          <select id="nb-rmk-filter-sort" onchange="nbRenderRemarketingView()" class="nb-select">
+            <option value="recent">Mais Recentes</option>
+            <option value="oldest">Mais Antigas</option>
+          </select>
+        </div>
+
+        <div id="nb-rmk-feedback-banner" class="hidden p-3 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-xs text-emerald-300 font-semibold"></div>
+
+        <!-- CONTAINER DE CAMPANHAS / EMPTY STATE -->
+        <div id="nb-rmk-campaigns-container"></div>
+      </div>
+
     </div>
 
-    <!-- DOCK INFERIOR FLUTUANTE RICOBOT (FIEL ÀS 4 NOVAS PRINTS) -->
+    <!-- DOCK INFERIOR FLUTUANTE RICOBOT -->
     <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#140d0f]/95 border border-[#2e1d20] shadow-2xl backdrop-blur">
       <div class="relative">
         <button id="nb-dock-btn-dashboard" onclick="nbSwitchMainView('dashboard')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Painel — Resultado dos seus bots">
@@ -1169,6 +1574,20 @@
       </div>
 
       <div class="relative">
+        <button id="nb-dock-btn-clients" onclick="nbSwitchMainView('clients')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Base de Clientes — Leads e Controle de Acessos">
+          <i class="fa-solid fa-users"></i>
+        </button>
+        <span id="nb-dock-dot-clients" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+
+      <div class="relative">
+        <button id="nb-dock-btn-remarketing" onclick="nbSwitchMainView('remarketing')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Remarketing — Campanhas e disparos">
+          <i class="fa-solid fa-bullhorn"></i>
+        </button>
+        <span id="nb-dock-dot-remarketing" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+
+      <div class="relative">
         <button id="nb-dock-btn-finance" onclick="nbSwitchMainView('finance')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Financeiro — Receita e pagamentos">
           <i class="fa-solid fa-wallet"></i>
         </button>
@@ -1180,6 +1599,106 @@
           <i class="fa-regular fa-credit-card"></i>
         </button>
         <span id="nb-dock-dot-gateways" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+      </div>
+    </div>
+
+    <!-- MODAL: ABRIR CHAT COM O LEAD (HISTÓRICO E MENSAGEM DIRETA NO TELEGRAM) -->
+    <div id="nb-modal-lead-chat" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#382125]">
+        <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+          <div>
+            <h3 id="nb-lead-chat-title" class="text-sm font-bold text-white">Chat com Lead</h3>
+            <p id="nb-lead-chat-sub" class="text-[11px] text-zinc-400"></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="nb-lead-chat-block-btn" onclick="nbToggleLeadBlock()" class="px-2.5 py-1 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 border border-rose-800/50 text-[11px] font-semibold text-rose-300 transition">
+              Bloquear
+            </button>
+            <button type="button" onclick="nbCloseLeadChatModal()" class="text-zinc-500 hover:text-white text-sm ml-2">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+        <div id="nb-lead-chat-history" class="h-64 overflow-y-auto space-y-2.5 p-3 rounded-xl bg-[#090607] border border-[#221518] text-xs"></div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="nb-lead-chat-input" onkeydown="if(event.key==='Enter') nbSendLeadDirectMsg()" placeholder="Enviar mensagem ao vivo para este lead no Telegram..." class="nb-input flex-1">
+          <button type="button" id="nb-lead-chat-send-btn" onclick="nbSendLeadDirectMsg()" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition shrink-0">
+            <i class="fa-regular fa-paper-plane mr-1"></i> Enviar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CRIAR / EDITAR CAMPANHA DE REMARKETING -->
+    <div id="nb-modal-remarketing" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#382125] max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+          <h3 id="nb-modal-rmk-title" class="text-sm font-bold text-white">Nova Campanha de Remarketing</h3>
+          <button type="button" onclick="nbCloseRemarketingModal()" class="text-zinc-500 hover:text-white text-sm">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="space-y-3.5">
+          <div>
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">NOME DA CAMPANHA *</label>
+            <input type="text" id="nb-rmk-inp-name" placeholder="Ex: Recuperação PIX Pendentes — Oferta Relâmpago" class="nb-input">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">BOT DE DISPARO</label>
+              <select id="nb-rmk-inp-bot" class="nb-select"></select>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">PÚBLICO-ALVO (SEGMENTO)</label>
+              <select id="nb-rmk-inp-segment" class="nb-select">
+                <option value="Pendentes">Pendentes (Geraram PIX e não pagaram)</option>
+                <option value="Novos">Novos (Deram /start sem gerar PIX)</option>
+                <option value="Todos">Todos os Leads (Exceto bloqueados)</option>
+                <option value="Pagos">Pagos (Clientes VIP)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">STATUS DA CAMPANHA</label>
+              <select id="nb-rmk-inp-status" class="nb-select">
+                <option value="Ativa">Ativa</option>
+                <option value="Agendada">Agendada</option>
+                <option value="Rascunho">Rascunho</option>
+                <option value="Pausada">Pausada</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">DESCONTO NOS PLANOS (%)</label>
+              <input type="number" id="nb-rmk-inp-discount" min="0" max="90" value="0" placeholder="0" class="nb-input">
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">MENSAGEM DA CAMPANHA *</label>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="nbInsertVar('nb-rmk-inp-msg', '{primeiro_nome}')" class="px-2 py-0.5 rounded bg-[#1c1214] border border-[#331e22] text-[10px] text-zinc-300 hover:text-white">{primeiro_nome}</button>
+                <button type="button" onclick="nbInsertVar('nb-rmk-inp-msg', '{username}')" class="px-2 py-0.5 rounded bg-[#1c1214] border border-[#331e22] text-[10px] text-zinc-300 hover:text-white">{username}</button>
+              </div>
+            </div>
+            <textarea id="nb-rmk-inp-msg" rows="4" placeholder="Oi {primeiro_nome}! Vi que sua vaga VIP ficou pendente. Liberei uma condição especial para você concluir agora:" class="nb-textarea"></textarea>
+          </div>
+          <label class="flex items-center justify-between p-3 rounded-xl bg-[#130d0e] border border-[#291b1e] cursor-pointer">
+            <div>
+              <span class="text-xs font-bold text-white block">Incluir botões dos planos na mensagem</span>
+              <span class="text-[11px] text-zinc-400">Envia os botões de compra junto com o texto para conversão imediata</span>
+            </div>
+            <input type="checkbox" id="nb-rmk-inp-include-plans" checked class="accent-[#ef4444] w-4 h-4">
+          </label>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-[#24181a]">
+          <button type="button" onclick="nbCloseRemarketingModal()" class="px-4 py-2 rounded-lg bg-[#191214] hover:bg-[#251a1d] text-xs font-semibold text-zinc-300">Cancelar</button>
+          <button type="button" onclick="nbSaveRemarketingCampaign(false)" class="px-4 py-2 rounded-lg bg-[#26181b] hover:bg-[#342024] border border-[#45282d] text-xs font-bold text-white">Salvar Campanha</button>
+          <button type="button" onclick="nbSaveRemarketingCampaign(true)" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-red-950/40">
+            <i class="fa-regular fa-paper-plane"></i>
+            <span>Salvar e Disparar Agora</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -6053,6 +6572,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       `;
 
       gridEl.innerHTML = cardsHtml + addCardHtml;
+      if (typeof nbUpdateHeaderRevenueWidget === 'function') nbUpdateHeaderRevenueWidget();
     }
 
     function nbSelectModalBotMode(mode) {
@@ -7328,22 +7848,59 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     // =========================================================
-    // NAVEGAÇÃO PRINCIPAL DO DOCK (PAINEL | BOTS | FINANCEIRO | GATEWAYS)
+    // NAVEGAÇÃO PRINCIPAL DO DOCK (PAINEL | BOTS | CLIENTES | REMARKETING | FINANCEIRO | GATEWAYS)
     // =========================================================
     let NB_MAIN_VIEW = "bots";
     let NB_DASH_PERIOD = "Hoje";
     let NB_FIN_PERIOD = "Hoje";
     let NB_FIN_STATUS = "Todos";
+    let NB_CLIENTS_SUBTAB = "leads";
+    let NB_LEADS_PERIOD = "Tudo";
+    let NB_ACTIVE_CHAT_USER_ID = "";
+    let NB_EDITING_RMK_ID = null;
+
+    function nbUpdateHeaderRevenueWidget() {
+      const bots = STATE.flow_bots || [];
+      const txMap = STATE.tx_records || {};
+      const botsRev = bots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
+      const txPaidRev = Object.values(txMap)
+        .filter(tx => tx && (tx.status === "paid" || tx.delivered))
+        .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+      const totalRev = Math.max(botsRev, txPaidRev);
+
+      const milestones = [
+        { max: 10000, label: "/ 10k" },
+        { max: 50000, label: "/ 50k" },
+        { max: 100000, label: "/ 100k" },
+        { max: 500000, label: "/ 500k" },
+        { max: 1000000, label: "/ 1M" }
+      ];
+      const goal = milestones.find(m => totalRev < m.max) || milestones[milestones.length - 1];
+      const pct = Math.min(100, Math.round((totalRev / goal.max) * 100));
+
+      const valEl = document.getElementById('nb-header-rev-val');
+      const goalEl = document.getElementById('nb-header-rev-goal');
+      const pctEl = document.getElementById('nb-header-rev-pct');
+      const barEl = document.getElementById('nb-header-rev-bar');
+
+      if (valEl) valEl.textContent = `R$ ${totalRev.toFixed(2).replace('.', ',')}`;
+      if (goalEl) goalEl.textContent = goal.label;
+      if (pctEl) pctEl.textContent = `${pct}%`;
+      if (barEl) barEl.style.width = `${pct}%`;
+    }
 
     function nbSwitchMainView(view) {
       NB_MAIN_VIEW = view;
       switchWorkspace('neurotbot');
+      nbUpdateHeaderRevenueWidget();
 
       const views = {
         bots: document.getElementById('nb-view-bots-list'),
         modesel: document.getElementById('nb-view-bot-mode-select'),
         detail: document.getElementById('nb-view-bot-detail'),
         dashboard: document.getElementById('nb-view-dashboard'),
+        clients: document.getElementById('nb-view-clients'),
+        remarketing: document.getElementById('nb-view-remarketing'),
         finance: document.getElementById('nb-view-finance'),
         gateways: document.getElementById('nb-view-gateways')
       };
@@ -7351,7 +7908,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (el) el.classList.toggle('hidden', k !== view);
       });
 
-      ['dashboard', 'bots', 'finance', 'gateways'].forEach(k => {
+      ['dashboard', 'bots', 'clients', 'remarketing', 'finance', 'gateways'].forEach(k => {
         const btn = document.getElementById('nb-dock-btn-' + k);
         const dot = document.getElementById('nb-dock-dot-' + k);
         const isAct = (view === k) || ((view === 'detail' || view === 'modesel') && k === 'bots');
@@ -7365,8 +7922,768 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       if (view === 'bots') nbRenderBotsList();
       if (view === 'dashboard') nbRenderDashboardView();
+      if (view === 'clients') nbRenderClientsView();
+      if (view === 'remarketing') nbRenderRemarketingView();
       if (view === 'finance') nbRenderFinanceView();
       if (view === 'gateways') nbRenderGatewaysView();
+    }
+
+    // =========================================================
+    // TELA 6: BASE DE CLIENTES (TODOS OS LEADS & CONTROLE DE ACESSOS)
+    // =========================================================
+    function nbSwitchClientsSubtab(subtab) {
+      NB_CLIENTS_SUBTAB = subtab === 'access' ? 'access' : 'leads';
+      const isLeads = NB_CLIENTS_SUBTAB === 'leads';
+
+      const btnLeads = document.getElementById('nb-clients-subtab-leads');
+      const btnAcc = document.getElementById('nb-clients-subtab-access');
+      const panelLeads = document.getElementById('nb-clients-panel-leads');
+      const panelAcc = document.getElementById('nb-clients-panel-access');
+      const pillsLeads = document.getElementById('nb-clients-leads-period-pills');
+
+      if (btnLeads) {
+        btnLeads.className = isLeads
+          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]"
+          : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
+      }
+      if (btnAcc) {
+        btnAcc.className = !isLeads
+          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]"
+          : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
+      }
+      if (panelLeads) panelLeads.classList.toggle('hidden', !isLeads);
+      if (panelAcc) panelAcc.classList.toggle('hidden', isLeads);
+      if (pillsLeads) pillsLeads.classList.toggle('hidden', !isLeads);
+
+      nbRenderClientsView();
+    }
+
+    function nbClassifyLeadStatus(lead, txList) {
+      if (lead.blocked || (lead.stage || "").toLowerCase().includes("bloqueado")) return "Bloqueado";
+      const uid = String(lead.user_id || "");
+      const userTxs = txList.filter(tx => String(tx.user_id || "") === uid);
+      const hasPaid = Boolean(lead.purchased) || userTxs.some(tx => tx.status === "paid" || tx.delivered);
+      if (hasPaid) return "Pago";
+      const stg = (lead.stage || "").toLowerCase();
+      const hasPend = userTxs.length > 0 || stg.includes("pix") || stg.includes("aguardando");
+      if (hasPend) return "Pendente";
+      return "Novo";
+    }
+
+    function nbMatchesDateFilter(isoStr, periodKey) {
+      if (!periodKey || periodKey === "Tudo" || periodKey === "all") return true;
+      if (!isoStr) return true;
+      const dt = new Date(isoStr);
+      if (isNaN(dt.getTime())) return true;
+      const now = new Date();
+      const diffMs = now - dt;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      if (periodKey === "Hoje" || periodKey === "today") {
+        return dt.toDateString() === now.toDateString();
+      }
+      if (periodKey === "Ontem") {
+        const yest = new Date(now);
+        yest.setDate(now.getDate() - 1);
+        return dt.toDateString() === yest.toDateString();
+      }
+      if (periodKey === "Semana" || periodKey === "7d") {
+        return diffDays <= 7;
+      }
+      if (periodKey === "Mês" || periodKey === "30d") {
+        return diffDays <= 30;
+      }
+      return true;
+    }
+
+    function nbRenderClientsView() {
+      const bots = STATE.flow_bots || [];
+      const leads = STATE.memory?.leads || [];
+      const txMap = STATE.tx_records || {};
+      const allTxList = Object.entries(txMap).map(([tid, rec]) => ({ tx_id: tid, ...(rec || {}) })).reverse();
+
+      // 1. Renderizar pílulas de período para Todos os Leads
+      const leadPeriods = ["Hoje", "Ontem", "Semana", "Mês", "Tudo"];
+      const pillsEl = document.getElementById('nb-clients-leads-period-pills');
+      if (pillsEl) {
+        pillsEl.innerHTML = leadPeriods.map(p => {
+          const act = NB_LEADS_PERIOD === p;
+          return `<button type="button" onclick="NB_LEADS_PERIOD='${p}'; nbRenderClientsView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+        }).join('');
+      }
+
+      // Popular filtro de Bots na aba Todos os Leads
+      const botFilterEl = document.getElementById('nb-leads-filter-bot');
+      if (botFilterEl) {
+        const curBot = botFilterEl.value || "all";
+        botFilterEl.innerHTML = `<option value="all">Todos os Bots</option>` + bots.map(b => `<option value="${escapeHtml(b.id)}" ${curBot === b.id ? 'selected' : ''}>${escapeHtml(b.username || '@bot')}</option>`).join('');
+      }
+
+      const searchLeadQ = (document.getElementById('nb-leads-search')?.value || "").trim().toLowerCase();
+      const selBotId = document.getElementById('nb-leads-filter-bot')?.value || "all";
+      const selFlow = document.getElementById('nb-leads-filter-flow')?.value || "all";
+      const selStatus = document.getElementById('nb-leads-filter-status')?.value || "all";
+
+      // Enriquecer leads com dados da última transação e do bot
+      const enrichedLeads = leads.map(l => {
+        const uid = String(l.user_id || "");
+        const userTxs = allTxList.filter(tx => String(tx.user_id || "") === uid);
+        const latestPaidTx = userTxs.find(tx => tx.status === "paid" || tx.delivered);
+        const latestTx = latestPaidTx || userTxs[0] || null;
+        const botId = l.bot_id || (latestTx && latestTx.bot_id) || (bots[0]?.id || "");
+        const botObj = bots.find(b => b.id === botId) || bots[0] || null;
+        const botUsername = l.bot_username || (botObj ? botObj.username : "@bot");
+        const flowMode = l.bot_mode || (botObj ? botObj.mode : "flow");
+        const status = nbClassifyLeadStatus(l, allTxList);
+        const planName = (latestTx && latestTx.offer_name) || l.selected_plan || "—";
+        const txCode = latestTx ? String(latestTx.tx_id || "").slice(0, 14) : "—";
+        const dateIso = (latestTx && (latestTx.paid_at || latestTx.created_at)) || l.created_at || "";
+        const dateDisplay = l.last_interaction || (dateIso ? dateIso.replace("T", " ").slice(0, 16) : "Recente");
+        return {
+          raw: l,
+          user_id: uid,
+          first_name: l.first_name || "Lead",
+          username: l.username || "@sem_user",
+          bot_id: botId,
+          bot_username: botUsername,
+          flow_mode: flowMode,
+          status,
+          plan_name: planName,
+          tx_code: txCode,
+          date_iso: dateIso,
+          date_display: dateDisplay
+        };
+      });
+
+      const periodFilteredLeads = enrichedLeads.filter(item => nbMatchesDateFilter(item.date_iso, NB_LEADS_PERIOD));
+
+      // Contadores KPI sobre a base do período
+      const kpiNew = periodFilteredLeads.filter(x => x.status === "Novo").length;
+      const kpiPend = periodFilteredLeads.filter(x => x.status === "Pendente").length;
+      const kpiPaid = periodFilteredLeads.filter(x => x.status === "Pago").length;
+      const kpiBlk = periodFilteredLeads.filter(x => x.status === "Bloqueado").length;
+      const kpiTotal = periodFilteredLeads.length;
+      const convPct = kpiTotal > 0 ? Math.round((kpiPaid / kpiTotal) * 100) : 0;
+
+      const elKpiNew = document.getElementById('nb-leads-kpi-new');
+      const elKpiPend = document.getElementById('nb-leads-kpi-pending');
+      const elKpiPaid = document.getElementById('nb-leads-kpi-paid');
+      const elKpiPaidSub = document.getElementById('nb-leads-kpi-paid-sub');
+      const elKpiBlk = document.getElementById('nb-leads-kpi-blocked');
+      const elKpiTot = document.getElementById('nb-leads-kpi-total');
+
+      if (elKpiNew) elKpiNew.textContent = String(kpiNew);
+      if (elKpiPend) elKpiPend.textContent = String(kpiPend);
+      if (elKpiPaid) elKpiPaid.textContent = String(kpiPaid);
+      if (elKpiPaidSub) elKpiPaidSub.textContent = `${convPct}% conversão`;
+      if (elKpiBlk) elKpiBlk.textContent = String(kpiBlk);
+      if (elKpiTot) elKpiTot.textContent = String(kpiTotal);
+
+      const finalLeads = periodFilteredLeads.filter(item => {
+        if (selBotId !== "all" && item.bot_id !== selBotId) return false;
+        if (selFlow !== "all" && item.flow_mode !== selFlow) return false;
+        if (selStatus !== "all" && item.status !== selStatus) return false;
+        if (searchLeadQ) {
+          const hay = `${item.first_name} ${item.username} ${item.user_id} ${item.tx_code}`.toLowerCase();
+          if (!hay.includes(searchLeadQ)) return false;
+        }
+        return true;
+      });
+
+      const tbodyLeads = document.getElementById('nb-leads-table-body');
+      const footerLeads = document.getElementById('nb-leads-footer-count');
+      if (footerLeads) {
+        footerLeads.textContent = `Mostrando ${finalLeads.length} de ${kpiTotal} leads`;
+      }
+      if (tbodyLeads) {
+        if (finalLeads.length === 0) {
+          tbodyLeads.innerHTML = `
+            <tr>
+              <td colspan="9" class="py-12 text-center text-xs text-zinc-500">
+                Nenhum lead encontrado para os filtros selecionados.
+              </td>
+            </tr>
+          `;
+        } else {
+          tbodyLeads.innerHTML = finalLeads.map(item => {
+            const stMap = {
+              "Novo": "bg-purple-950/70 text-purple-300 border-purple-800/50",
+              "Pendente": "bg-amber-950/70 text-amber-300 border-amber-800/50",
+              "Pago": "bg-emerald-950/70 text-emerald-300 border-emerald-800/50",
+              "Bloqueado": "bg-rose-950/70 text-rose-300 border-rose-800/50"
+            };
+            const stCls = stMap[item.status] || stMap["Novo"];
+            const flowLabel = item.flow_mode === "ai" ? "Fluxo IA" : "Fluxo Principal";
+            return `
+              <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-3.5 px-4">
+                  <div class="font-bold text-white">${escapeHtml(item.first_name)}</div>
+                  <div class="text-[11px] text-zinc-500">${escapeHtml(item.username)}</div>
+                </td>
+                <td class="py-3.5 px-3 font-mono text-[11px] text-zinc-400">${escapeHtml(item.user_id)}</td>
+                <td class="py-3.5 px-3 font-mono text-[11px] text-zinc-400">${escapeHtml(item.tx_code)}</td>
+                <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.plan_name)}</td>
+                <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.bot_username)}</td>
+                <td class="py-3.5 px-3">
+                  <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-300">${escapeHtml(flowLabel)}</span>
+                </td>
+                <td class="py-3.5 px-3">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${stCls}">• ${escapeHtml(item.status)}</span>
+                </td>
+                <td class="py-3.5 px-3 text-[11px] text-zinc-400">${escapeHtml(item.date_display)}</td>
+                <td class="py-3.5 px-4 text-right">
+                  <button type="button" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}')" class="px-3 py-1.5 rounded-lg bg-[#1c1215] hover:bg-[#ef4444] border border-[#382126] hover:border-[#ef4444] text-[11px] font-bold text-zinc-200 hover:text-white inline-flex items-center gap-1.5 transition">
+                    <i class="fa-regular fa-comment-dots"></i>
+                    <span>Abrir Chat</span>
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+      // =====================================================
+      // 2. SUB-ABA CONTROLE DE ACESSOS
+      // =====================================================
+      // Coletar todos os grupos e todos os planos configurados nos bots + presentes nas transações
+      const groupsMap = new Map();
+      const plansSet = new Set();
+
+      bots.forEach(b => {
+        (b.plans || []).forEach(p => {
+          if (p.name) plansSet.add(p.name);
+          const chId = (p.delivery_channel_id || "").trim();
+          const chName = (p.delivery_channel_name || "").trim();
+          if (chId && chId !== "-1003939135982") {
+            groupsMap.set(chId, chName ? `${chName} (${chId})` : chId);
+          } else if (chName) {
+            groupsMap.set(chName, chName);
+          }
+        });
+        const fb = b.fallback_delivery || {};
+        if (fb.channel_id && fb.channel_id !== "-1003939135982") {
+          groupsMap.set(fb.channel_id, fb.channel_name ? `${fb.channel_name} (${fb.channel_id})` : fb.channel_id);
+        }
+      });
+
+      allTxList.forEach(tx => {
+        if (tx.offer_name) plansSet.add(tx.offer_name);
+        if (tx.delivery_channel_id && tx.delivery_channel_id !== "-1003939135982") {
+          groupsMap.set(tx.delivery_channel_id, tx.delivery_channel_name ? `${tx.delivery_channel_name} (${tx.delivery_channel_id})` : tx.delivery_channel_id);
+        } else if (tx.delivery_channel_name) {
+          groupsMap.set(tx.delivery_channel_name, tx.delivery_channel_name);
+        }
+      });
+
+      const grpSel = document.getElementById('nb-acc-filter-group');
+      if (grpSel) {
+        const curG = grpSel.value || "all";
+        grpSel.innerHTML = `<option value="all">Todos os Grupos</option>` + Array.from(groupsMap.entries()).map(([k, label]) => `<option value="${escapeHtml(k)}" ${curG === k ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+      }
+
+      const planSel = document.getElementById('nb-acc-filter-plan');
+      if (planSel) {
+        const curP = planSel.value || "all";
+        planSel.innerHTML = `<option value="all">Todos os Planos</option>` + Array.from(plansSet).map(pName => `<option value="${escapeHtml(pName)}" ${curP === pName ? 'selected' : ''}>${escapeHtml(pName)}</option>`).join('');
+      }
+
+      // Construir lista de registros de acesso a partir das transações
+      const accessRecords = allTxList.map(tx => {
+        const uid = String(tx.user_id || "");
+        const leadObj = leads.find(l => String(l.user_id || "") === uid) || {};
+        const botObj = bots.find(b => b.id === tx.bot_id) || bots[0] || {};
+        const isPaid = tx.status === "paid" || Boolean(tx.delivered);
+        let accStatus = tx.access_status || (isPaid ? "Ativo" : "Pendente");
+        if (tx.expires_at && tx.expires_at !== "Vitalício" && accStatus === "Ativo") {
+          const expDate = new Date(tx.expires_at);
+          if (!isNaN(expDate.getTime()) && expDate < new Date()) {
+            accStatus = "Expirado";
+          }
+        }
+        const chId = tx.delivery_channel_id || botObj.fallback_delivery?.channel_id || "";
+        const chName = tx.delivery_channel_name || botObj.fallback_delivery?.channel_name || (chId ? `Grupo ${chId}` : "Canal VIP");
+        const expLabel = (!tx.expires_at || tx.expires_at === "Vitalício")
+          ? "Vitalício"
+          : String(tx.expires_at).replace("T", " ").slice(0, 16);
+        return {
+          tx_id: String(tx.tx_id || ""),
+          user_id: uid,
+          first_name: leadObj.first_name || "Cliente",
+          username: leadObj.username || `@id_${uid}`,
+          group_id: chId,
+          group_name: chName,
+          plan_name: tx.offer_name || "Plano VIP",
+          status: accStatus,
+          expires_label: expLabel,
+          date_iso: tx.paid_at || tx.created_at || ""
+        };
+      });
+
+      const accPeriod = document.getElementById('nb-acc-filter-period')?.value || "all";
+      const accStatusFilter = document.getElementById('nb-acc-filter-status')?.value || "all";
+      const accGroupFilter = document.getElementById('nb-acc-filter-group')?.value || "all";
+      const accPlanFilter = document.getElementById('nb-acc-filter-plan')?.value || "all";
+      const accSearchQ = (document.getElementById('nb-acc-search')?.value || "").trim().toLowerCase();
+
+      const periodAccRecords = accessRecords.filter(r => nbMatchesDateFilter(r.date_iso, accPeriod));
+
+      // KPIs de Controle de Acessos
+      const cPend = periodAccRecords.filter(r => r.status === "Pendente").length;
+      const cAct = periodAccRecords.filter(r => r.status === "Ativo").length;
+      const cLeft = periodAccRecords.filter(r => r.status === "Saiu").length;
+      const cRem = periodAccRecords.filter(r => r.status === "Removido").length;
+      const cExp = periodAccRecords.filter(r => r.status === "Expirado").length;
+      const cTot = periodAccRecords.length;
+
+      const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
+      setTxt('nb-acc-kpi-pending', cPend);
+      setTxt('nb-acc-kpi-active', cAct);
+      setTxt('nb-acc-kpi-left', cLeft);
+      setTxt('nb-acc-kpi-removed', cRem);
+      setTxt('nb-acc-kpi-expired', cExp);
+      setTxt('nb-acc-kpi-total', cTot);
+
+      const filteredAcc = periodAccRecords.filter(r => {
+        if (accStatusFilter !== "all" && r.status !== accStatusFilter) return false;
+        if (accGroupFilter !== "all" && r.group_id !== accGroupFilter && r.group_name !== accGroupFilter) return false;
+        if (accPlanFilter !== "all" && r.plan_name !== accPlanFilter) return false;
+        if (accSearchQ) {
+          const hay = `${r.first_name} ${r.username} ${r.user_id} ${r.group_name} ${r.plan_name}`.toLowerCase();
+          if (!hay.includes(accSearchQ)) return false;
+        }
+        return true;
+      });
+
+      const tbodyAcc = document.getElementById('nb-acc-table-body');
+      if (tbodyAcc) {
+        if (filteredAcc.length === 0) {
+          tbodyAcc.innerHTML = `
+            <tr>
+              <td colspan="6" class="py-12 text-center text-xs text-zinc-500">
+                Nenhum registro de acesso encontrado para os filtros selecionados.
+              </td>
+            </tr>
+          `;
+        } else {
+          const badgeMap = {
+            "Pendente": "bg-amber-950/70 text-amber-300 border-amber-800/50",
+            "Ativo": "bg-emerald-950/70 text-emerald-300 border-emerald-800/50",
+            "Saiu": "bg-orange-950/70 text-orange-300 border-orange-800/50",
+            "Removido": "bg-rose-950/70 text-rose-300 border-rose-800/50",
+            "Expirado": "bg-zinc-900 text-zinc-400 border-zinc-700"
+          };
+          tbodyAcc.innerHTML = filteredAcc.map(r => {
+            const bCls = badgeMap[r.status] || badgeMap["Pendente"];
+            return `
+              <tr class="hover:bg-white/[0.02] transition">
+                <td class="py-3.5 px-4">
+                  <div class="font-bold text-white">${escapeHtml(r.first_name)}</div>
+                  <div class="text-[11px] text-zinc-500">${escapeHtml(r.username)} · ID ${escapeHtml(r.user_id)}</div>
+                </td>
+                <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(r.group_name)}</td>
+                <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(r.plan_name)}</td>
+                <td class="py-3.5 px-3">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${bCls}">• ${escapeHtml(r.status)}</span>
+                </td>
+                <td class="py-3.5 px-3 text-[11px] text-zinc-400">${escapeHtml(r.expires_label)}</td>
+                <td class="py-3.5 px-4 text-right">
+                  <div class="inline-flex items-center gap-2">
+                    <button type="button" onclick="nbResendAccess('${escapeHtml(r.tx_id)}')" class="px-2.5 py-1.5 rounded-lg bg-[#1d1316] hover:bg-[#ef4444] border border-[#382126] text-[11px] font-semibold text-zinc-200 hover:text-white transition" title="Gerar novo link único e reenviar no Telegram do cliente">
+                      <i class="fa-regular fa-paper-plane mr-1"></i> Reenviar Acesso
+                    </button>
+                    <select onchange="if(this.value) nbUpdateAccessStatus('${escapeHtml(r.tx_id)}', this.value)" class="px-2 py-1 rounded-lg bg-[#120c0e] border border-[#2c1d20] text-[11px] text-zinc-300">
+                      <option value="">Alterar status...</option>
+                      <option value="Ativo">Marcar Ativo</option>
+                      <option value="Pendente">Marcar Pendente</option>
+                      <option value="Saiu">Marcar Saiu</option>
+                      <option value="Removido">Remover do Grupo</option>
+                      <option value="Expirado">Marcar Expirado</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function nbOpenLeadChatModal(userId) {
+      NB_ACTIVE_CHAT_USER_ID = String(userId || "");
+      const leads = STATE.memory?.leads || [];
+      const lead = leads.find(l => String(l.user_id || "") === NB_ACTIVE_CHAT_USER_ID);
+      if (!lead) return;
+
+      document.getElementById('nb-lead-chat-title').textContent = `${lead.first_name || 'Lead'} (${lead.username || ''})`;
+      document.getElementById('nb-lead-chat-sub').textContent = `Telegram ID: ${NB_ACTIVE_CHAT_USER_ID} · Etapa: ${lead.stage || 'Iniciou /start'}`;
+      const blkBtn = document.getElementById('nb-lead-chat-block-btn');
+      if (blkBtn) {
+        blkBtn.textContent = lead.blocked ? "Desbloquear Lead" : "Bloquear Lead";
+      }
+
+      const histEl = document.getElementById('nb-lead-chat-history');
+      const hist = lead.history || [];
+      if (histEl) {
+        if (hist.length === 0) {
+          histEl.innerHTML = `<div class="py-10 text-center text-zinc-500">Nenhuma mensagem registrada ainda. Envie uma mensagem abaixo para falar com este lead no Telegram.</div>`;
+        } else {
+          histEl.innerHTML = hist.map(h => {
+            const isBot = h.role === 'assistant';
+            return `
+              <div class="flex ${isBot ? 'justify-end' : 'justify-start'}">
+                <div class="max-w-[82%] px-3 py-2 rounded-xl ${isBot ? 'bg-[#251316] border border-[#422026] text-zinc-100' : 'bg-[#141418] border border-zinc-800 text-zinc-300'}">
+                  <div class="text-[10px] font-bold ${isBot ? 'text-[#ef4444]' : 'text-zinc-400'} mb-0.5">${isBot ? 'Bot / Suporte' : escapeHtml(lead.first_name || 'Lead')}</div>
+                  <div class="whitespace-pre-wrap break-words">${escapeHtml(h.content || '')}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+          histEl.scrollTop = histEl.scrollHeight;
+        }
+      }
+
+      document.getElementById('nb-modal-lead-chat').classList.remove('hidden');
+    }
+
+    function nbCloseLeadChatModal() {
+      document.getElementById('nb-modal-lead-chat').classList.add('hidden');
+    }
+
+    async function nbSendLeadDirectMsg() {
+      const inp = document.getElementById('nb-lead-chat-input');
+      const btn = document.getElementById('nb-lead-chat-send-btn');
+      const text = (inp?.value || "").trim();
+      if (!text || !NB_ACTIVE_CHAT_USER_ID) return;
+      if (btn) btn.disabled = true;
+      try {
+        const res = await adminFetch("/api/flow-bots/leads/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: NB_ACTIVE_CHAT_USER_ID,
+            action: "send_message",
+            message: text
+          })
+        });
+        const data = await res.json();
+        if (data && data.state) {
+          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          saveLocalBackup();
+        }
+        if (inp) inp.value = "";
+        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID);
+        nbRenderClientsView();
+      } catch (e) {} finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function nbToggleLeadBlock() {
+      if (!NB_ACTIVE_CHAT_USER_ID) return;
+      try {
+        const res = await adminFetch("/api/flow-bots/leads/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: NB_ACTIVE_CHAT_USER_ID,
+            action: "toggle_block"
+          })
+        });
+        const data = await res.json();
+        if (data && data.state) {
+          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          saveLocalBackup();
+        }
+        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID);
+        nbRenderClientsView();
+      } catch (e) {}
+    }
+
+    async function nbResendAccess(txIdOrAll) {
+      const banner = document.getElementById('nb-acc-feedback-banner');
+      const btn = document.getElementById('nb-btn-bulk-resend-access');
+      if (btn) btn.disabled = true;
+      if (banner) {
+        banner.classList.remove('hidden');
+        banner.textContent = "Reenviando link(s) de acesso VIP no Telegram...";
+      }
+      try {
+        const res = await adminFetch("/api/flow-bots/access/resend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tx_id: txIdOrAll || "all",
+            bot_id: document.getElementById('nb-acc-filter-group')?.value === "all" ? "all" : "all"
+          })
+        });
+        const data = await res.json();
+        if (data && data.state) {
+          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          saveLocalBackup();
+        }
+        if (banner) {
+          banner.textContent = `✓ Acesso VIP reenviado com sucesso para ${Number(data.sent_count || 0)} cliente(s)!`;
+          setTimeout(() => { if (banner) banner.classList.add('hidden'); }, 4500);
+        }
+        nbRenderClientsView();
+      } catch (e) {
+        if (banner) banner.textContent = "Erro ao reenviar acessos.";
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function nbUpdateAccessStatus(txId, newStatus) {
+      if (!txId || !newStatus) return;
+      try {
+        const res = await adminFetch("/api/flow-bots/access/update-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tx_id: txId, status: newStatus })
+        });
+        const data = await res.json();
+        if (data && data.state) {
+          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          saveLocalBackup();
+        }
+        nbRenderClientsView();
+      } catch (e) {}
+    }
+
+    // =========================================================
+    // TELA 7: REMARKETING (CAMPANHAS E DISPAROS)
+    // =========================================================
+    function nbRenderRemarketingView() {
+      if (!Array.isArray(STATE.remarketing_campaigns)) STATE.remarketing_campaigns = [];
+      const campaigns = STATE.remarketing_campaigns;
+      const bots = STATE.flow_bots || [];
+
+      const totalCamp = campaigns.length;
+      const draftCamp = campaigns.filter(c => c.status === "Rascunho").length;
+      const activeCamp = campaigns.filter(c => c.status === "Ativa").length;
+      const schedCamp = campaigns.filter(c => c.status === "Agendada").length;
+      const totalSent = campaigns.reduce((acc, c) => acc + Number(c.sent_count || 0), 0);
+      const totalTargets = campaigns.reduce((acc, c) => acc + Number(c.total_targets || c.sent_count || 0), 0);
+      const delivPct = totalTargets > 0 ? Math.round((totalSent / totalTargets) * 100) : (totalSent > 0 ? 100 : 0);
+      const totalRev = campaigns.reduce((acc, c) => acc + Number(c.revenue || 0), 0);
+      const totalConv = campaigns.reduce((acc, c) => acc + Number(c.conversions || 0), 0);
+
+      const setEl = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+      setEl('nb-rmk-kpi-total', String(totalCamp));
+      setEl('nb-rmk-kpi-total-sub', `${draftCamp} rascunhos`);
+      setEl('nb-rmk-kpi-active', String(activeCamp));
+      setEl('nb-rmk-kpi-active-sub', `${schedCamp} agendadas`);
+      setEl('nb-rmk-kpi-sent', String(totalSent));
+      setEl('nb-rmk-kpi-sent-sub', `${delivPct}% entregues`);
+      setEl('nb-rmk-kpi-revenue', `R$ ${totalRev.toFixed(2).replace('.', ',')}`);
+      setEl('nb-rmk-kpi-revenue-sub', `${totalConv} conversões`);
+
+      const q = (document.getElementById('nb-rmk-search')?.value || "").trim().toLowerCase();
+      const stFilter = document.getElementById('nb-rmk-filter-status')?.value || "all";
+      const sortOrder = document.getElementById('nb-rmk-filter-sort')?.value || "recent";
+
+      let list = [...campaigns];
+      if (sortOrder === "recent") list.reverse();
+
+      list = list.filter(c => {
+        if (stFilter !== "all" && (c.status || "Ativa") !== stFilter) return false;
+        if (q && !(c.name || "").toLowerCase().includes(q) && !(c.message || "").toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const cont = document.getElementById('nb-rmk-campaigns-container');
+      if (!cont) return;
+
+      if (campaigns.length === 0) {
+        cont.innerHTML = `
+          <div class="nb-card py-16 px-6 flex flex-col items-center justify-center text-center space-y-3 border border-[#2b1a1d]">
+            <div class="w-12 h-12 rounded-2xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-lg shadow-inner">
+              <i class="fa-solid fa-bullhorn"></i>
+            </div>
+            <h3 class="text-base font-bold text-white pt-1">Pronto para começar?</h3>
+            <p class="text-xs text-zinc-400 max-w-md leading-relaxed">
+              Crie sua primeira campanha de remarketing para recuperar vendas perdidas e reengajar leads que não converteram.
+            </p>
+            <div class="pt-2">
+              <button type="button" onclick="nbOpenRemarketingModal()" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white inline-flex items-center gap-2 shadow-lg shadow-red-950/50 transition">
+                <i class="fa-solid fa-plus text-[11px]"></i>
+                <span>Criar Primeira Campanha</span>
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (list.length === 0) {
+        cont.innerHTML = `<div class="nb-card py-12 text-center text-xs text-zinc-500">Nenhuma campanha encontrada para este filtro.</div>`;
+        return;
+      }
+
+      cont.innerHTML = `<div class="space-y-3">` + list.map(c => {
+        const botObj = bots.find(b => b.id === c.bot_id);
+        const botLabel = c.bot_id === "all" || !botObj ? "Todos os Bots" : (botObj.username || "@bot");
+        const stBadgeMap = {
+          "Ativa": "bg-emerald-950/70 text-emerald-300 border-emerald-800/50",
+          "Agendada": "bg-blue-950/70 text-blue-300 border-blue-800/50",
+          "Pausada": "bg-amber-950/70 text-amber-300 border-amber-800/50",
+          "Finalizada": "bg-purple-950/70 text-purple-300 border-purple-800/50",
+          "Rascunho": "bg-zinc-900 text-zinc-400 border-zinc-700"
+        };
+        const stCls = stBadgeMap[c.status || "Ativa"] || stBadgeMap["Ativa"];
+        const discTag = Number(c.discount_pct || 0) > 0 ? `<span class="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/40 text-[10px] text-emerald-300 font-bold">-${Number(c.discount_pct)}% OFF</span>` : '';
+        return `
+          <div class="nb-card p-5 flex flex-wrap items-center justify-between gap-4">
+            <div class="space-y-1.5 max-w-xl">
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${stCls}">• ${escapeHtml(c.status || 'Ativa')}</span>
+                <h4 class="text-sm font-bold text-white">${escapeHtml(c.name || 'Campanha')}</h4>
+                <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-300">Alvo: ${escapeHtml(c.segment || 'Pendentes')}</span>
+                <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-400">${escapeHtml(botLabel)}</span>
+                ${discTag}
+              </div>
+              <p class="text-xs text-zinc-400 line-clamp-2">${escapeHtml(c.message || '')}</p>
+              <div class="text-[11px] text-zinc-500 flex items-center gap-4 pt-1">
+                <span><i class="fa-regular fa-paper-plane mr-1 text-zinc-400"></i><b>${Number(c.sent_count || 0)}</b> enviadas</span>
+                ${c.last_sent_at ? `<span>Último disparo: ${escapeHtml(String(c.last_sent_at).replace('T', ' ').slice(0, 16))}</span>` : ''}
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="nbSendRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3.5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-red-950/40 transition">
+                <i class="fa-regular fa-paper-plane"></i>
+                <span>Disparar Agora</span>
+              </button>
+              <button type="button" onclick="nbOpenRemarketingModal('${escapeHtml(c.id)}')" class="px-3 py-2 rounded-xl bg-[#191214] hover:bg-[#261b1e] border border-[#2f1f23] text-xs font-semibold text-zinc-300 hover:text-white transition">
+                Editar
+              </button>
+              <button type="button" onclick="nbDeleteRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-xs text-rose-300 transition">
+                <i class="fa-regular fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('') + `</div>`;
+    }
+
+    function nbOpenRemarketingModal(campaignId = null) {
+      NB_EDITING_RMK_ID = campaignId;
+      if (!Array.isArray(STATE.remarketing_campaigns)) STATE.remarketing_campaigns = [];
+      const bots = STATE.flow_bots || [];
+      const botSel = document.getElementById('nb-rmk-inp-bot');
+      if (botSel) {
+        botSel.innerHTML = `<option value="all">Todos os Bots</option>` + bots.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.username || '@bot')}</option>`).join('');
+      }
+
+      const existing = campaignId ? STATE.remarketing_campaigns.find(c => c.id === campaignId) : null;
+      document.getElementById('nb-modal-rmk-title').textContent = existing ? "Editar Campanha de Remarketing" : "Nova Campanha de Remarketing";
+      document.getElementById('nb-rmk-inp-name').value = existing ? (existing.name || "") : "";
+      if (botSel) botSel.value = existing ? (existing.bot_id || "all") : (NB_CURRENT_BOT_ID || "all");
+      document.getElementById('nb-rmk-inp-segment').value = existing ? (existing.segment || "Pendentes") : "Pendentes";
+      document.getElementById('nb-rmk-inp-status').value = existing ? (existing.status || "Ativa") : "Ativa";
+      document.getElementById('nb-rmk-inp-discount').value = existing ? Number(existing.discount_pct || 0) : 0;
+      document.getElementById('nb-rmk-inp-msg').value = existing ? (existing.message || "") : "Oi {primeiro_nome}! Vi que sua vaga VIP ficou pendente. Liberei uma condição especial para você entrar agora:";
+      document.getElementById('nb-rmk-inp-include-plans').checked = existing ? (existing.include_plans !== false) : true;
+
+      document.getElementById('nb-modal-remarketing').classList.remove('hidden');
+    }
+
+    function nbCloseRemarketingModal() {
+      document.getElementById('nb-modal-remarketing').classList.add('hidden');
+    }
+
+    async function nbSaveRemarketingCampaign(sendImmediately = false) {
+      if (!Array.isArray(STATE.remarketing_campaigns)) STATE.remarketing_campaigns = [];
+      const name = (document.getElementById('nb-rmk-inp-name')?.value || "").trim() || "Campanha de Recuperação VIP";
+      const bot_id = document.getElementById('nb-rmk-inp-bot')?.value || "all";
+      const segment = document.getElementById('nb-rmk-inp-segment')?.value || "Pendentes";
+      const status = document.getElementById('nb-rmk-inp-status')?.value || "Ativa";
+      const discount_pct = Number(document.getElementById('nb-rmk-inp-discount')?.value || 0);
+      const message = (document.getElementById('nb-rmk-inp-msg')?.value || "").trim();
+      const include_plans = Boolean(document.getElementById('nb-rmk-inp-include-plans')?.checked);
+
+      let targetId = NB_EDITING_RMK_ID;
+      if (targetId) {
+        const idx = STATE.remarketing_campaigns.findIndex(c => c.id === targetId);
+        if (idx >= 0) {
+          STATE.remarketing_campaigns[idx] = {
+            ...STATE.remarketing_campaigns[idx],
+            name, bot_id, segment, status, discount_pct, message, include_plans
+          };
+        }
+      } else {
+        targetId = "rmk_" + Date.now();
+        STATE.remarketing_campaigns.push({
+          id: targetId,
+          name,
+          bot_id,
+          segment,
+          status,
+          discount_pct,
+          message,
+          include_plans,
+          sent_count: 0,
+          total_targets: 0,
+          revenue: 0,
+          conversions: 0,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      nbCloseRemarketingModal();
+      await saveFullState();
+      nbRenderRemarketingView();
+
+      if (sendImmediately && targetId) {
+        await nbSendRemarketingCampaign(targetId);
+      }
+    }
+
+    async function nbSendRemarketingCampaign(campaignId) {
+      const c = (STATE.remarketing_campaigns || []).find(x => x.id === campaignId);
+      if (!c) return;
+      const banner = document.getElementById('nb-rmk-feedback-banner');
+      if (banner) {
+        banner.classList.remove('hidden');
+        banner.textContent = `Disparando campanha "${c.name}" no Telegram para o segmento ${c.segment}...`;
+      }
+      try {
+        const res = await adminFetch("/api/flow-bots/remarketing/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaign_id: c.id,
+            bot_id: c.bot_id || "all",
+            segment: c.segment || "Pendentes",
+            message: c.message || "",
+            include_plans: c.include_plans !== false,
+            discount_pct: Number(c.discount_pct || 0)
+          })
+        });
+        const data = await res.json();
+        if (data && data.state) {
+          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
+          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          saveLocalBackup();
+        }
+        if (banner) {
+          banner.textContent = `✓ Campanha disparada! ${Number(data.sent_count || 0)} mensagem(ns) entregue(s) (${Number(data.total_targets || 0)} leads no segmento).`;
+          setTimeout(() => { if (banner) banner.classList.add('hidden'); }, 5000);
+        }
+        nbRenderRemarketingView();
+      } catch (e) {
+        if (banner) banner.textContent = "Erro ao disparar campanha de remarketing.";
+      }
+    }
+
+    async function nbDeleteRemarketingCampaign(campaignId) {
+      if (!Array.isArray(STATE.remarketing_campaigns)) return;
+      STATE.remarketing_campaigns = STATE.remarketing_campaigns.filter(c => c.id !== campaignId);
+      await saveFullState();
+      nbRenderRemarketingView();
     }
 
     function nbRenderDashboardView() {
