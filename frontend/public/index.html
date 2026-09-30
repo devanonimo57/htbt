@@ -15,7 +15,7 @@
     /* Scrollbars vermelhas RicoBot */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #090708; }
-    ::-webkit-scrollbar-thumb { background: #ef4444; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 9999px; }
 
     .sb-card {
       background-color: #0e0a0b;
@@ -39,7 +39,7 @@
     }
     .sb-input:focus {
       outline: none;
-      border-color: #ef4444;
+      border-color: #a855f7;
     }
     .sb-radio-card {
       background-color: #110b0d;
@@ -52,8 +52,8 @@
     }
     .sb-radio-card:hover { border-color: #4c262b; }
     .sb-radio-card.selected {
-      background-color: rgba(239, 68, 68, 0.14);
-      border-color: #ef4444;
+      background-color: rgba(168, 85, 247, 0.16);
+      border-color: #a855f7;
     }
     .sb-nav-item {
       display: flex;
@@ -76,7 +76,7 @@
     }
     .sb-nav-item.active {
       background: #241013 !important;
-      border-color: #dc2626 !important;
+      border-color: #9333ea !important;
     }
     .toggle-switch {
       position: relative;
@@ -93,29 +93,29 @@
       position: absolute; content: ""; height: 15px; width: 15px;
       left: 3px; bottom: 3px; background-color: #fff; border-radius: 50%; transition: 0.2s;
     }
-    input:checked + .toggle-slider { background-color: #ef4444; }
+    input:checked + .toggle-slider { background-color: #a855f7; }
     input:checked + .toggle-slider:before { transform: translateX(17px); }
 
     /* RICOBOT STYLES (DESTAQUE VERMELHO) */
     .nb-grid-bg {
-      background-color: #090707;
+      background-color: #08060c;
       background-image:
-        radial-gradient(circle at 20% 0%, rgba(239, 68, 68, 0.11), transparent 38%),
+        radial-gradient(circle at 20% 0%, rgba(168, 85, 247, 0.13), transparent 38%),
         linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
         linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
       background-size: 100% 100%, 48px 48px, 48px 48px;
     }
     .nb-card {
-      background-color: #110c0d;
-      border: 1px solid #261b1d;
+      background-color: #0f0b15;
+      border: 1px solid #231a31;
       border-radius: 12px;
     }
     .nb-input,
     .nb-select,
     .nb-textarea {
       width: 100%;
-      background-color: #0a0708;
-      border: 1px solid #2b1d20;
+      background-color: #09070e;
+      border: 1px solid #291d3a;
       border-radius: 8px;
       padding: 10px 14px;
       color: #f4f4f0;
@@ -138,29 +138,29 @@
     .nb-select option,
     .nb-input option,
     select option {
-      background-color: #110c0d;
+      background-color: #0f0b15;
       color: #f4f4f0;
     }
     .nb-input:focus,
     .nb-select:focus,
     .nb-textarea:focus {
-      border-color: #ef4444;
+      border-color: #a855f7;
     }
     .nb-var-chip {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 11px;
       padding: 3px 8px;
       border-radius: 4px;
-      background-color: #181113;
-      border: 1px solid #2e1f22;
+      background-color: #151020;
+      border: 1px solid #2c1f3e;
       color: #c4b5b8;
       cursor: pointer;
       transition: all 0.15s;
     }
     .nb-var-chip:hover {
-      border-color: #ef4444;
-      color: #ef4444;
-      background-color: #241316;
+      border-color: #a855f7;
+      color: #a855f7;
+      background-color: #211332;
     }
     .nb-toggle {
       position: relative;
@@ -171,7 +171,7 @@
     .nb-toggle input { opacity: 0; width: 0; height: 0; }
     .nb-toggle-slider {
       position: absolute; cursor: pointer; inset: 0;
-      background-color: #291e20; border-radius: 999px; transition: 0.2s;
+      background-color: #261d36; border-radius: 999px; transition: 0.2s;
     }
     .nb-toggle-slider:before {
       position: absolute; content: ""; height: 15px; width: 15px;
@@ -181,7 +181,7 @@
       background-color: #a19a9b;
     }
     .nb-toggle input:checked + .nb-toggle-slider {
-      background-color: #ef4444;
+      background-color: #a855f7;
     }
     .nb-toggle input:checked + .nb-toggle-slider:before {
       transform: translateX(17px);
@@ -202,7 +202,7 @@
     .nb-tab-btn.active {
       color: #ffffff;
       font-weight: 600;
-      border-bottom-color: #ef4444;
+      border-bottom-color: #a855f7;
     }
   </style>
 </head>
@@ -211,7 +211,6 @@
   <!-- Input oculto para upload real de arquivos de mídia -->
   <input type="file" id="hidden-media-upload" class="hidden" accept="image/*,video/*,audio/*" onchange="handleRealFileUpload(event)">
   <input type="file" id="nb-hidden-media-input" class="hidden" accept="image/*,video/*,audio/*" onchange="nbHandleMediaUpload(event)">
-  <input type="file" id="nb-site-icon-input" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon" onchange="nbHandleSiteIconUpload(event)">
 
   <!-- =========================================================
        WORKSPACE 1 (TELA INICIAL): RICOBOT — MEUS BOTS E GERENCIADOR DE FLUXO
@@ -219,16 +218,16 @@
   <div id="workspace-neurotbot" class="h-screen flex flex-col w-full nb-grid-bg text-[#f3f3ee] overflow-hidden relative">
 
     <!-- TOP BAR RICOBOT -->
-    <header class="h-14 border-b border-[#24181a] bg-[#090707]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
+    <header class="h-14 border-b border-[#211730] bg-[#08060c]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20">
       <div class="flex items-center gap-2.5 cursor-pointer" onclick="nbBackToBotsList()">
         <div id="nb-header-logo-box" class="w-7 h-7 rounded-md bg-transparent flex items-center justify-center overflow-hidden shadow-sm">
           <img src="favicon.png?v=3" alt="Logo" class="w-full h-full object-contain">
         </div>
-        <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#ef4444]">Bot</span></span>
+        <span class="text-sm font-bold tracking-tight text-white">Rico<span class="text-[#a855f7]">Bot</span></span>
       </div>
 
       <div class="flex items-center gap-3">
-        <!-- CARD DE FATURAMENTO NO TOPO (PRINT 5) -->
+        <!-- CARD DE FATURAMENTO NO TOPO -->
         <div onclick="nbSwitchMainView('finance')" class="px-3.5 py-1.5 rounded-full bg-[#0e110f] border border-[#1d2922] hover:border-emerald-700/60 flex items-center gap-3 cursor-pointer transition shadow-inner" title="Faturamento acumulado — Clique para abrir o Financeiro">
           <div class="w-6 h-6 rounded-full bg-emerald-950/90 border border-emerald-700/60 text-emerald-400 flex items-center justify-center text-xs font-extrabold shrink-0">
             $
@@ -247,11 +246,6 @@
             <span id="nb-header-rev-goal" class="text-[10px] font-semibold text-zinc-500">/ 10k</span>
           </div>
         </div>
-
-        <button type="button" onclick="document.getElementById('nb-site-icon-input').click()" class="px-2.5 py-1.5 rounded-lg bg-[#141011] hover:bg-[#1f1719] border border-[#2b1d20] text-[11px] text-zinc-400 hover:text-white flex items-center gap-1.5 transition" title="Alterar ícone da aba e logo do painel (ideal: 512x512 px PNG)">
-          <i class="fa-regular fa-image text-[10px] text-[#ef4444]"></i>
-          <span>Ícone do site</span>
-        </button>
       </div>
     </header>
 
@@ -264,12 +258,12 @@
       <div id="nb-view-bots-list" class="max-w-[1060px] mx-auto px-8 pt-10 space-y-6">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span class="text-[10px] font-bold uppercase tracking-widest text-[#ef4444] block">MEUS BOTS</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest text-[#a855f7] block">MEUS BOTS</span>
             <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
             <p class="text-xs text-zinc-400 mt-1">Clique em um bot para escolher o modo de operação e configurar seu fluxo.</p>
           </div>
           <div class="flex items-center gap-2.5">
-            <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-red-950/40 transition">
+            <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-purple-950/40 transition">
               <i class="fa-solid fa-plus text-[11px]"></i>
               <span>Adicionar bot</span>
             </button>
@@ -300,8 +294,8 @@
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
-            <button type="button" id="nb-btn-diagnose-funnel" onclick="nbRunBotDiagnostics()" class="px-3.5 py-2 rounded-lg bg-[#1d1214] hover:bg-[#2a191c] border border-[#3d2328] text-xs font-semibold text-white flex items-center gap-2 transition">
-              <i class="fa-solid fa-stethoscope text-[#ef4444]"></i>
+            <button type="button" id="nb-btn-diagnose-funnel" onclick="nbRunBotDiagnostics()" class="px-3.5 py-2 rounded-lg bg-[#1a1128] hover:bg-[#251738] border border-[#36204f] text-xs font-semibold text-white flex items-center gap-2 transition">
+              <i class="fa-solid fa-stethoscope text-[#a855f7]"></i>
               <span>Testar / Diagnosticar Funil</span>
             </button>
             <button type="button" onclick="nbClearBotTestSales(false)" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 transition" title="Apaga vendas aprovadas com a palavra-chave de teste e reseta sua conversa para testar de novo">
@@ -312,10 +306,10 @@
         </div>
 
         <!-- PAINEL DE DIAGNÓSTICO E COMANDOS DE TESTE DO FUNIL -->
-        <div id="nb-bot-diagnostics-panel" class="hidden nb-card p-5 space-y-4 border border-[#3d2328]">
-          <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+        <div id="nb-bot-diagnostics-panel" class="hidden nb-card p-5 space-y-4 border border-[#36204f]">
+          <div class="flex items-center justify-between border-b border-[#211730] pb-3">
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-[#ef4444]"></span>
+              <span class="w-2 h-2 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white uppercase tracking-wider">Verificação Completa do Funil & Comandos Secretos de Teste</h3>
             </div>
             <button type="button" onclick="document.getElementById('nb-bot-diagnostics-panel').classList.add('hidden')" class="text-xs text-zinc-500 hover:text-white">
@@ -325,7 +319,7 @@
           <div id="nb-bot-diagnostics-body" class="space-y-2.5 text-xs text-zinc-300"></div>
         </div>
 
-        <!-- SUB-ABAS: Boas-vindas | Planos | Downsell | Order Bump | Pagamentos | Remarketing | Base de Clientes -->
+        <!-- SUB-ABAS: Boas-vindas | Planos | Downsell | Order Bump | Pagamentos -->
         <div class="border-b border-[#222018] flex items-center gap-2 overflow-x-auto">
           <button onclick="nbSwitchBotTab('welcome')" id="nbtab-btn-welcome" class="nb-tab-btn active">
             <i class="fa-regular fa-comment-dots text-xs"></i>
@@ -347,14 +341,6 @@
             <i class="fa-regular fa-credit-card text-xs"></i>
             <span>Pagamentos</span>
           </button>
-          <button onclick="nbSwitchMainView('remarketing')" class="nb-tab-btn" title="Abrir campanhas de Remarketing">
-            <i class="fa-solid fa-bullhorn text-xs text-[#ef4444]"></i>
-            <span>Remarketing</span>
-          </button>
-          <button onclick="nbSwitchMainView('clients')" class="nb-tab-btn" title="Abrir Base de Clientes e Controle de Acessos">
-            <i class="fa-solid fa-users text-xs text-[#ef4444]"></i>
-            <span>Base de Clientes</span>
-          </button>
         </div>
 
         <!-- ===================================================
@@ -363,7 +349,7 @@
         <div id="nbtab-panel-welcome" class="nb-subtab-panel space-y-5">
           <div class="nb-card p-5 space-y-2.5">
             <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white">Boas-vindas</h3>
             </div>
             <div class="border-t border-[#1e1d15] pt-3">
@@ -416,18 +402,18 @@
               <div id="nb-welcome-medias-list" class="flex flex-wrap gap-2.5"></div>
 
               <!-- CAMPO DO CANAL DE CACHE DE MÍDIAS -->
-              <div class="p-3.5 rounded-xl bg-[#120d0e] border border-[#2b1d20] space-y-2">
+              <div class="p-3.5 rounded-xl bg-[#120d0e] border border-[#291d3a] space-y-2">
                 <div class="flex items-center justify-between gap-2">
                   <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                    <i class="fa-solid fa-bolt text-[#ef4444]"></i>
+                    <i class="fa-solid fa-bolt text-[#a855f7]"></i>
                     <span>Canal de Cache de Mídias (ID do Canal ou Grupo)</span>
                   </label>
                   <span id="nb-cache-channel-status" class="text-[11px] text-zinc-500"></span>
                 </div>
                 <div class="flex items-center gap-2">
                   <input type="text" id="nb-bot-cache-channel" oninput="nbOnCacheChannelInput(this.value)" placeholder="Ex: -1001234567890 (bot precisa ser admin)" class="nb-input font-mono flex-1">
-                  <button type="button" onclick="nbVerifyCacheChannel()" class="px-3.5 py-2 rounded-lg bg-[#1d1214] hover:bg-[#2a191c] border border-[#3d2328] text-xs font-semibold text-white shrink-0 flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-arrows-rotate text-[10px] text-[#ef4444]"></i>
+                  <button type="button" onclick="nbVerifyCacheChannel()" class="px-3.5 py-2 rounded-lg bg-[#1a1128] hover:bg-[#251738] border border-[#36204f] text-xs font-semibold text-white shrink-0 flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-arrows-rotate text-[10px] text-[#a855f7]"></i>
                     <span>Sincronizar</span>
                   </button>
                 </div>
@@ -440,7 +426,7 @@
           <div class="nb-card p-5 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                 <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
               </div>
               <label class="nb-toggle">
@@ -459,7 +445,7 @@
           </div>
 
           <div class="flex items-center gap-4 pt-1">
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
             <span id="nb-welcome-validation" class="text-xs text-rose-400"></span>
@@ -476,7 +462,7 @@
             <div class="lg:col-span-8 nb-card p-5 space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                   <h3 class="text-xs font-bold text-white">Planos de pagamento</h3>
                 </div>
                 <span id="nb-plans-count-badge" class="text-xs text-zinc-500 font-mono">01 / 10</span>
@@ -484,7 +470,7 @@
 
               <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
                 <p class="text-xs text-zinc-400">Configure até 10 planos com entregas personalizadas (Canal/Grupo VIP ou Link Externo).</p>
-                <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
+                <button type="button" onclick="nbAddPlan()" class="px-3.5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[10px]"></i>
                   <span>Novo plano</span>
                 </button>
@@ -499,7 +485,7 @@
               <!-- VARIAÇÃO DE PREÇO -->
               <div class="nb-card p-5 space-y-3">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                   <h3 class="text-xs font-bold text-white">Variação de preço</h3>
                 </div>
                 <div class="border-t border-[#1e1d15] pt-3 flex items-start justify-between gap-3">
@@ -511,7 +497,7 @@
                 </div>
               </div>
 
-              <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+              <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                 Salvar alterações
               </button>
             </div>
@@ -531,7 +517,7 @@
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                 <h3 id="nb-ds-header-title" class="text-xs font-bold text-white">Downsell — Geral</h3>
               </div>
               <div class="flex items-center gap-3">
@@ -551,13 +537,13 @@
           <div id="nb-ds-sequences-container" class="space-y-4"></div>
 
           <!-- BOTÃO ADICIONAR SEQUÊNCIA -->
-          <button type="button" onclick="nbAddDownsellSequence()" class="w-full py-3.5 rounded-xl border border-dashed border-[#ef4444]/60 hover:border-[#ef4444] bg-[#14120b]/60 hover:bg-[#1c190f] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-plus text-[11px] text-[#ef4444]"></i>
+          <button type="button" onclick="nbAddDownsellSequence()" class="w-full py-3.5 rounded-xl border border-dashed border-[#a855f7]/60 hover:border-[#a855f7] bg-[#14120b]/60 hover:bg-[#1c190f] text-xs font-semibold text-zinc-200 flex items-center justify-center gap-2 transition">
+            <i class="fa-solid fa-plus text-[11px] text-[#a855f7]"></i>
             <span>Adicionar sequência</span>
           </button>
 
           <div class="flex items-center gap-4 pt-1">
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
             <span id="nb-ds-validation" class="text-xs text-rose-400"></span>
@@ -571,7 +557,7 @@
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                 <h3 class="text-xs font-bold text-white">Order bump</h3>
               </div>
               <span id="nb-ob-count-badge" class="text-xs text-zinc-500 font-mono">00 / 10</span>
@@ -579,7 +565,7 @@
 
             <div class="border-t border-[#1e1d15] pt-3 flex items-center justify-between gap-4">
               <p class="text-xs text-zinc-400 leading-relaxed max-w-2xl">Ofertas de acréscimo mostradas antes do PIX, após o clique em qualquer plano do fluxo principal ou do downsell. Até 10 bumps; todos os ativos são oferecidos em sequência, e o valor aceito soma ao do plano.</p>
-              <button type="button" onclick="nbOpenOrderBumpForm(-1)" class="px-3.5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
+              <button type="button" onclick="nbOpenOrderBumpForm(-1)" class="px-3.5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shrink-0 transition">
                 <i class="fa-solid fa-plus text-[10px]"></i>
                 <span>Novo order bump</span>
               </button>
@@ -589,7 +575,7 @@
             <div id="nb-ob-saved-list" class="space-y-2.5 pt-2"></div>
 
             <!-- FORMULÁRIO NOVO / EDITAR ORDER BUMP (FIEL AOS PRINTS 8 E 9) -->
-            <div id="nb-ob-form-wrapper" class="border-l-2 border-[#ef4444] pl-5 pt-3 space-y-4 mt-4">
+            <div id="nb-ob-form-wrapper" class="border-l-2 border-[#a855f7] pl-5 pt-3 space-y-4 mt-4">
               <h4 id="nb-ob-form-title" class="text-xs font-bold text-white">Novo order bump</h4>
 
               <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-white font-medium">
@@ -679,7 +665,7 @@
               </div>
 
               <div class="flex items-center gap-4 pt-2">
-                <button type="button" onclick="nbSaveOrderBumpForm()" id="nb-ob-submit-btn" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                <button type="button" onclick="nbSaveOrderBumpForm()" id="nb-ob-submit-btn" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                   Criar order bump
                 </button>
                 <button type="button" onclick="nbResetOrderBumpForm()" class="text-xs text-zinc-400 hover:text-white transition">
@@ -696,21 +682,16 @@
         <div id="nbtab-panel-payments" class="nb-subtab-panel hidden space-y-5">
           <div class="flex items-center justify-between flex-wrap gap-3">
             <div class="inline-flex p-1 rounded-lg bg-[#14130f] border border-[#25231b]">
-              <button type="button" id="nb-pay-pill-gen" onclick="nbSwitchPaymentSubtab('generated')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition">Pagamento Gerado</button>
+              <button type="button" id="nb-pay-pill-gen" onclick="nbSwitchPaymentSubtab('generated')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#a855f7]/50 transition">Pagamento Gerado</button>
               <button type="button" id="nb-pay-pill-app" onclick="nbSwitchPaymentSubtab('approved')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition">Pagamento Aprovado</button>
             </div>
-
-            <button type="button" onclick="nbOpenGatewayModal()" class="px-3.5 py-1.5 rounded-lg bg-[#16150f] hover:bg-[#222017] border border-[#2e2b1d] text-xs font-semibold text-[#ef4444] flex items-center gap-2 transition">
-              <i class="fa-solid fa-key text-[11px]"></i>
-              <span>Credenciais do Gateway PIX</span>
-            </button>
           </div>
 
           <!-- SUB-ABA: PAGAMENTO GERADO (PRINTS 10 & 11) -->
           <div id="nb-pay-panel-generated" class="space-y-5">
             <div class="nb-card p-5 space-y-4">
               <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#a855f7]">*</span></label>
                 <textarea id="nb-pay-gen-msg" rows="10" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
                 <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-gen-counter">0/4000 caracteres</div>
               </div>
@@ -730,7 +711,7 @@
 
               <div class="border-t border-[#1e1d15] pt-4 max-w-sm space-y-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">FORMATO DO CÓDIGO PIX</label>
-                <select id="nb-pay-pix-format" onchange="nbOnPaymentsInput()" class="nb-input !border-[#ef4444]">
+                <select id="nb-pay-pix-format" onchange="nbOnPaymentsInput()" class="nb-input !border-[#a855f7]">
                   <option value="Código (monoespaçado)">Código (monoespaçado)</option>
                   <option value="Bloco de código">Bloco de código</option>
                   <option value="Texto simples">Texto simples</option>
@@ -764,7 +745,7 @@
             <div class="nb-card p-5 space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                   <h3 class="text-xs font-bold text-white">Mensagem secundária</h3>
                 </div>
                 <label class="nb-toggle">
@@ -782,7 +763,7 @@
               </div>
             </div>
 
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
           </div>
@@ -791,7 +772,7 @@
           <div id="nb-pay-panel-approved" class="hidden space-y-5">
             <div class="nb-card p-5 space-y-4">
               <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#ef4444]">*</span></label>
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">MENSAGEM <span class="text-[#a855f7]">*</span></label>
                 <textarea id="nb-pay-app-msg" rows="6" maxlength="4000" oninput="nbOnPaymentsInput()" class="nb-input resize-y font-sans leading-relaxed"></textarea>
                 <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-pay-app-counter">0/4000 caracteres</div>
               </div>
@@ -836,7 +817,7 @@
               </div>
             </div>
 
-            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+            <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
               Salvar alterações
             </button>
           </div>
@@ -864,33 +845,33 @@
             <span class="text-2xl font-bold text-zinc-400">R$</span>
             <span id="nb-dash-hero-value" class="text-6xl font-extrabold text-white tracking-tight">0,00</span>
           </div>
-          <div class="w-full h-[2px] bg-[#ef4444] mt-5"></div>
+          <div class="w-full h-[2px] bg-[#a855f7] mt-5"></div>
         </div>
 
         <!-- LINHA DE KPIS (VENDAS | TICKET MÉDIO | TAXA DE CONVERSÃO | PENDENTES) -->
-        <div class="border-b border-[#24181a] pb-5">
+        <div class="border-b border-[#211730] pb-5">
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div class="border-r border-[#24181a] pr-4">
+            <div class="border-r border-[#211730] pr-4">
               <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-bag-shopping text-[#ef4444]"></i>
+                <i class="fa-solid fa-bag-shopping text-[#a855f7]"></i>
                 <span>VENDAS</span>
               </div>
               <span id="nb-dash-kpi-sales" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
               <span class="text-[11px] text-zinc-500">transações pagas</span>
             </div>
 
-            <div class="border-r border-[#24181a] pr-4">
+            <div class="border-r border-[#211730] pr-4">
               <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-receipt text-[#ef4444]"></i>
+                <i class="fa-solid fa-receipt text-[#a855f7]"></i>
                 <span>TICKET MÉDIO</span>
               </div>
               <span id="nb-dash-kpi-ticket" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
               <span class="text-[11px] text-zinc-500">por transação</span>
             </div>
 
-            <div class="border-r border-[#24181a] pr-4">
+            <div class="border-r border-[#211730] pr-4">
               <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-solid fa-percent text-[#ef4444]"></i>
+                <i class="fa-solid fa-percent text-[#a855f7]"></i>
                 <span>TAXA DE CONVERSÃO</span>
               </div>
               <span id="nb-dash-kpi-conv" class="text-2xl font-extrabold text-white block mt-1.5">—</span>
@@ -898,7 +879,7 @@
 
             <div>
               <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                <i class="fa-regular fa-clock text-[#ef4444]"></i>
+                <i class="fa-regular fa-clock text-[#a855f7]"></i>
                 <span>PENDENTES</span>
               </div>
               <span id="nb-dash-kpi-pending-val" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
@@ -906,9 +887,9 @@
             </div>
           </div>
 
-          <div class="border-t border-[#24181a] mt-5 pt-4">
+          <div class="border-t border-[#211730] mt-5 pt-4">
             <div class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-              <i class="fa-solid fa-users text-[#ef4444]"></i>
+              <i class="fa-solid fa-users text-[#a855f7]"></i>
               <span>STARTS POR VENDA</span>
             </div>
             <span id="nb-dash-kpi-starts" class="text-xl font-extrabold text-white block mt-1">—</span>
@@ -918,8 +899,8 @@
         <!-- 2 CARDS: RECEITA ÚLTIMOS DIAS & TRANSAÇÕES POR STATUS -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div class="nb-card p-5 space-y-3">
-            <div class="flex items-center gap-2 border-b border-[#24181a] pb-3">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white">Receita • últimos dias</h3>
             </div>
             <div id="nb-dash-recent-revenue" class="text-xs text-zinc-500 py-2">
@@ -928,8 +909,8 @@
           </div>
 
           <div class="nb-card p-5 space-y-3">
-            <div class="flex items-center gap-2 border-b border-[#24181a] pb-3">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+            <div class="flex items-center gap-2 border-b border-[#211730] pb-3">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white">Transações por status</h3>
             </div>
             <div id="nb-dash-status-summary" class="text-xs text-zinc-500 py-2">
@@ -940,9 +921,9 @@
 
         <!-- CARD: ÚLTIMAS ATUALIZAÇÕES (TEMPO REAL) -->
         <div class="nb-card p-5 space-y-3">
-          <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+          <div class="flex items-center justify-between border-b border-[#211730] pb-3">
             <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white">Últimas atualizações</h3>
             </div>
             <div class="flex items-center gap-3">
@@ -979,37 +960,37 @@
         </div>
 
         <!-- 4 KPIS FINANCEIRO -->
-        <div class="border-y border-[#24181a] py-5 grid grid-cols-2 lg:grid-cols-4 gap-6">
-          <div class="border-r border-[#24181a] pr-4">
+        <div class="border-y border-[#211730] py-5 grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="border-r border-[#211730] pr-4">
             <span id="nb-fin-rev-label" class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">RECEITA • HOJE</span>
             <span id="nb-fin-rev-value" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
           </div>
-          <div class="border-r border-[#24181a] pr-4">
+          <div class="border-r border-[#211730] pr-4">
             <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">TRANSAÇÕES PAGAS</span>
             <span id="nb-fin-paid-count" class="text-2xl font-extrabold text-white block mt-1.5">0</span>
           </div>
-          <div class="border-r border-[#24181a] pr-4">
+          <div class="border-r border-[#211730] pr-4">
             <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">TICKET MÉDIO</span>
             <span id="nb-fin-ticket-value" class="text-2xl font-extrabold text-white block mt-1.5">R$ 0,00</span>
           </div>
           <div>
             <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">PENDENTE</span>
-            <span id="nb-fin-pending-value" class="text-2xl font-extrabold text-[#ef4444] block mt-1.5">R$ 0,00</span>
+            <span id="nb-fin-pending-value" class="text-2xl font-extrabold text-[#a855f7] block mt-1.5">R$ 0,00</span>
           </div>
         </div>
 
         <!-- CARD DE TRANSAÇÕES -->
         <div class="nb-card p-5 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#24181a] pb-3.5">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#211730] pb-3.5">
             <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
               <h3 class="text-xs font-bold text-white">Transações</h3>
             </div>
             <div id="nb-fin-status-pills" class="flex items-center gap-1.5 flex-wrap"></div>
           </div>
 
           <div id="nb-fin-tx-container" class="py-16 flex flex-col items-center justify-center text-center space-y-2">
-            <div class="w-10 h-10 rounded-xl bg-[#181012] border border-[#2b1d20] text-zinc-500 flex items-center justify-center text-base mb-1">
+            <div class="w-10 h-10 rounded-xl bg-[#181012] border border-[#291d3a] text-zinc-500 flex items-center justify-center text-base mb-1">
               <i class="fa-solid fa-wallet"></i>
             </div>
             <p class="text-xs font-extrabold uppercase tracking-wider text-white">NENHUMA TRANSAÇÃO ENCONTRADA</p>
@@ -1033,10 +1014,10 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
 
           <!-- CARD 1: OMEGAPAY -->
-          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+          <div class="nb-card p-5 border border-[#a855f7]/50 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#a855f7] flex items-center justify-center text-xs">
                   <i class="fa-regular fa-credit-card"></i>
                 </div>
                 <span class="text-sm font-bold text-white">OmegaPay</span>
@@ -1067,7 +1048,7 @@
                 </div>
               </div>
               <div class="pt-1 flex items-center gap-3">
-                <button type="button" onclick="nbSaveGatewayProviderCard('omegapay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                <button type="button" onclick="nbSaveGatewayProviderCard('omegapay')" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                   Validar e salvar
                 </button>
                 <span id="nb-gw-msg-omegapay" class="text-xs text-emerald-400"></span>
@@ -1076,10 +1057,10 @@
           </div>
 
           <!-- CARD 2: SYNCPAY -->
-          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+          <div class="nb-card p-5 border border-[#a855f7]/50 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#a855f7] flex items-center justify-center text-xs">
                   <i class="fa-regular fa-credit-card"></i>
                 </div>
                 <span class="text-sm font-bold text-white">SyncPay</span>
@@ -1110,7 +1091,7 @@
                 </div>
               </div>
               <div class="pt-1 flex items-center gap-3">
-                <button type="button" onclick="nbSaveGatewayProviderCard('syncpay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                <button type="button" onclick="nbSaveGatewayProviderCard('syncpay')" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                   Validar e salvar
                 </button>
                 <span id="nb-gw-msg-syncpay" class="text-xs text-emerald-400"></span>
@@ -1119,10 +1100,10 @@
           </div>
 
           <!-- CARD 3: ONIX -->
-          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+          <div class="nb-card p-5 border border-[#a855f7]/50 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#a855f7] flex items-center justify-center text-xs">
                   <i class="fa-regular fa-credit-card"></i>
                 </div>
                 <span class="text-sm font-bold text-white">Onix</span>
@@ -1153,7 +1134,7 @@
                 </div>
               </div>
               <div class="pt-1 flex items-center gap-3">
-                <button type="button" onclick="nbSaveGatewayProviderCard('onix')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                <button type="button" onclick="nbSaveGatewayProviderCard('onix')" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                   Validar e salvar
                 </button>
                 <span id="nb-gw-msg-onix" class="text-xs text-emerald-400"></span>
@@ -1162,10 +1143,10 @@
           </div>
 
           <!-- CARD 4: PUSHINPAY -->
-          <div class="nb-card p-5 border border-[#ef4444]/50 space-y-4">
+          <div class="nb-card p-5 border border-[#a855f7]/50 space-y-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#ef4444] flex items-center justify-center text-xs">
+                <div class="w-9 h-9 rounded-xl bg-[#1d1114] border border-[#381e22] text-[#a855f7] flex items-center justify-center text-xs">
                   <i class="fa-regular fa-credit-card"></i>
                 </div>
                 <span class="text-sm font-bold text-white">PushinPay</span>
@@ -1192,7 +1173,7 @@
                 </div>
               </div>
               <div class="pt-1 flex items-center gap-3">
-                <button type="button" onclick="nbSaveGatewayProviderCard('pushinpay')" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                <button type="button" onclick="nbSaveGatewayProviderCard('pushinpay')" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                   Validar e salvar
                 </button>
                 <span id="nb-gw-msg-pushinpay" class="text-xs text-emerald-400"></span>
@@ -1213,14 +1194,14 @@
             <p class="text-xs text-zinc-400 mt-1">Gerencie seus leads, acompanhe vendas e controle acessos em um só lugar</p>
           </div>
           <!-- Pílulas de período (visíveis na sub-aba Todos os Leads) -->
-          <div id="nb-clients-leads-period-pills" class="flex items-center gap-1 p-1 rounded-xl bg-[#140d0f] border border-[#291b1e]"></div>
+          <div id="nb-clients-leads-period-pills" class="flex items-center gap-1 p-1 rounded-xl bg-[#120d1b] border border-[#291b1e]"></div>
         </div>
 
         <!-- SUB-ABAS DA BASE DE CLIENTES (SEM RANKING DE CLIENTES) -->
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="inline-flex items-center gap-1 p-1 rounded-xl bg-[#120c0e] border border-[#26191c]">
-            <button type="button" id="nb-clients-subtab-leads" onclick="nbSwitchClientsSubtab('leads')" class="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]">
-              <i class="fa-solid fa-users text-[#ef4444]"></i>
+            <button type="button" id="nb-clients-subtab-leads" onclick="nbSwitchClientsSubtab('leads')" class="px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#36204f]">
+              <i class="fa-solid fa-users text-[#a855f7]"></i>
               <span>Todos os Leads</span>
             </button>
             <button type="button" id="nb-clients-subtab-access" onclick="nbSwitchClientsSubtab('access')" class="px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent">
@@ -1330,7 +1311,7 @@
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
                 <thead>
-                  <tr class="border-b border-[#24181a] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
+                  <tr class="border-b border-[#211730] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
                     <th class="py-3.5 px-4">NOME / USERNAME</th>
                     <th class="py-3.5 px-3">ID</th>
                     <th class="py-3.5 px-3">CÓD. VENDAS</th>
@@ -1345,7 +1326,7 @@
                 <tbody id="nb-leads-table-body" class="divide-y divide-[#221619] text-xs"></tbody>
               </table>
             </div>
-            <div class="px-4 py-3 border-t border-[#24181a] bg-[#0d090a] flex items-center justify-between text-xs text-zinc-400">
+            <div class="px-4 py-3 border-t border-[#211730] bg-[#0d090a] flex items-center justify-between text-xs text-zinc-400">
               <span id="nb-leads-footer-count">Mostrando 0 de 0 leads</span>
               <span class="text-[11px] text-zinc-500">Atualizado em tempo real</span>
             </div>
@@ -1420,7 +1401,7 @@
               </div>
             </div>
 
-            <button type="button" id="nb-btn-bulk-resend-access" onclick="nbResendAccess('all')" class="px-4 py-3 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition shrink-0">
+            <button type="button" id="nb-btn-bulk-resend-access" onclick="nbResendAccess('all')" class="px-4 py-3 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-purple-950/40 transition shrink-0">
               <i class="fa-regular fa-paper-plane"></i>
               <span>Reenviar Acesso em Massa</span>
             </button>
@@ -1465,7 +1446,7 @@
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
                 <thead>
-                  <tr class="border-b border-[#24181a] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
+                  <tr class="border-b border-[#211730] text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-[#0d090a]">
                     <th class="py-3.5 px-4">LEAD</th>
                     <th class="py-3.5 px-3">GRUPO</th>
                     <th class="py-3.5 px-3">PLANO</th>
@@ -1490,7 +1471,7 @@
             <h1 class="text-2xl font-bold text-white">Remarketing</h1>
             <p class="text-xs text-zinc-400 mt-1">Recupere vendas e reengaje seus leads com campanhas inteligentes</p>
           </div>
-          <button type="button" onclick="nbOpenRemarketingModal()" class="px-4 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition">
+          <button type="button" onclick="nbOpenRemarketingModal()" class="px-4 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-purple-950/40 transition">
             <i class="fa-solid fa-plus text-[11px]"></i>
             <span>Nova Campanha</span>
           </button>
@@ -1501,7 +1482,7 @@
           <div class="nb-card p-4 flex flex-col justify-between min-h-[104px]">
             <div class="flex items-center justify-between">
               <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">TOTAL CAMPANHAS</span>
-              <div class="w-7 h-7 rounded-lg bg-[#241215] border border-[#3d1e23] text-[#ef4444] flex items-center justify-center text-xs">
+              <div class="w-7 h-7 rounded-lg bg-[#241215] border border-[#3d1e23] text-[#a855f7] flex items-center justify-center text-xs">
                 <i class="fa-solid fa-bullhorn"></i>
               </div>
             </div>
@@ -1580,54 +1561,54 @@
     </div>
 
     <!-- DOCK INFERIOR FLUTUANTE RICOBOT -->
-    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#140d0f]/95 border border-[#2e1d20] shadow-2xl backdrop-blur">
+    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#120d1b]/95 border border-[#2b1e3d] shadow-2xl backdrop-blur">
       <div class="relative">
         <button id="nb-dock-btn-dashboard" onclick="nbSwitchMainView('dashboard')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Painel — Resultado dos seus bots">
           <i class="fa-solid fa-border-all"></i>
         </button>
-        <span id="nb-dock-dot-dashboard" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-dashboard" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
       <div class="relative">
-        <button id="nb-dock-btn-bots" onclick="nbSwitchMainView('bots')" class="w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition" title="Meus Bots — Bots conectados">
+        <button id="nb-dock-btn-bots" onclick="nbSwitchMainView('bots')" class="w-10 h-10 rounded-xl bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-950/50 transition" title="Meus Bots — Bots conectados">
           <i class="fa-solid fa-robot"></i>
         </button>
-        <span id="nb-dock-dot-bots" class="w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-bots" class="w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
       <div class="relative">
         <button id="nb-dock-btn-clients" onclick="nbSwitchMainView('clients')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Base de Clientes — Leads e Controle de Acessos">
           <i class="fa-solid fa-users"></i>
         </button>
-        <span id="nb-dock-dot-clients" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-clients" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
       <div class="relative">
         <button id="nb-dock-btn-remarketing" onclick="nbSwitchMainView('remarketing')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Remarketing — Campanhas e disparos">
           <i class="fa-solid fa-bullhorn"></i>
         </button>
-        <span id="nb-dock-dot-remarketing" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-remarketing" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
       <div class="relative">
         <button id="nb-dock-btn-finance" onclick="nbSwitchMainView('finance')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Financeiro — Receita e pagamentos">
           <i class="fa-solid fa-wallet"></i>
         </button>
-        <span id="nb-dock-dot-finance" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-finance" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
       <div class="relative">
         <button id="nb-dock-btn-gateways" onclick="nbSwitchMainView('gateways')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Gateways de pagamento">
           <i class="fa-regular fa-credit-card"></i>
         </button>
-        <span id="nb-dock-dot-gateways" class="hidden w-1 h-1 rounded-full bg-[#ef4444] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
+        <span id="nb-dock-dot-gateways" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
     </div>
 
     <!-- MODAL: ABRIR CHAT COM O LEAD (HISTÓRICO E MENSAGEM DIRETA NO TELEGRAM) -->
     <div id="nb-modal-lead-chat" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#382125]">
-        <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#321e4a]">
+        <div class="flex items-center justify-between border-b border-[#211730] pb-3">
           <div>
             <h3 id="nb-lead-chat-title" class="text-sm font-bold text-white">Chat com Lead</h3>
             <p id="nb-lead-chat-sub" class="text-[11px] text-zinc-400"></p>
@@ -1644,7 +1625,7 @@
         <div id="nb-lead-chat-history" class="h-64 overflow-y-auto space-y-2.5 p-3 rounded-xl bg-[#090607] border border-[#221518] text-xs"></div>
         <div class="flex items-center gap-2">
           <input type="text" id="nb-lead-chat-input" onkeydown="if(event.key==='Enter') nbSendLeadDirectMsg()" placeholder="Enviar mensagem ao vivo para este lead no Telegram..." class="nb-input flex-1">
-          <button type="button" id="nb-lead-chat-send-btn" onclick="nbSendLeadDirectMsg()" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition shrink-0">
+          <button type="button" id="nb-lead-chat-send-btn" onclick="nbSendLeadDirectMsg()" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition shrink-0">
             <i class="fa-regular fa-paper-plane mr-1"></i> Enviar
           </button>
         </div>
@@ -1653,8 +1634,8 @@
 
     <!-- MODAL: CRIAR / EDITAR CAMPANHA DE REMARKETING -->
     <div id="nb-modal-remarketing" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#382125] max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between border-b border-[#24181a] pb-3">
+      <div class="nb-card w-full max-w-lg p-6 space-y-4 shadow-2xl border border-[#321e4a] max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-[#211730] pb-3">
           <h3 id="nb-modal-rmk-title" class="text-sm font-bold text-white">Nova Campanha de Remarketing</h3>
           <button type="button" onclick="nbCloseRemarketingModal()" class="text-zinc-500 hover:text-white text-sm">
             <i class="fa-solid fa-xmark"></i>
@@ -1710,13 +1691,13 @@
               <span class="text-xs font-bold text-white block">Incluir botões dos planos na mensagem</span>
               <span class="text-[11px] text-zinc-400">Envia os botões de compra junto com o texto para conversão imediata</span>
             </div>
-            <input type="checkbox" id="nb-rmk-inp-include-plans" checked class="accent-[#ef4444] w-4 h-4">
+            <input type="checkbox" id="nb-rmk-inp-include-plans" checked class="accent-[#a855f7] w-4 h-4">
           </label>
         </div>
-        <div class="flex items-center justify-end gap-2 pt-3 border-t border-[#24181a]">
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-[#211730]">
           <button type="button" onclick="nbCloseRemarketingModal()" class="px-4 py-2 rounded-lg bg-[#191214] hover:bg-[#251a1d] text-xs font-semibold text-zinc-300">Cancelar</button>
           <button type="button" onclick="nbSaveRemarketingCampaign(false)" class="px-4 py-2 rounded-lg bg-[#26181b] hover:bg-[#342024] border border-[#45282d] text-xs font-bold text-white">Salvar Campanha</button>
-          <button type="button" onclick="nbSaveRemarketingCampaign(true)" class="px-4 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-red-950/40">
+          <button type="button" onclick="nbSaveRemarketingCampaign(true)" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-purple-950/40">
             <i class="fa-regular fa-paper-plane"></i>
             <span>Salvar e Disparar Agora</span>
           </button>
@@ -1726,7 +1707,7 @@
 
     <!-- MODAL: ADICIONAR / EDITAR BOT (3 PONTINHOS DO BOT) -->
     <div id="nb-modal-bot" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#382125]">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#321e4a]">
         <div class="flex items-center justify-between">
           <h3 id="nb-modal-bot-title" class="text-sm font-bold text-white">Configurar Bot</h3>
           <button onclick="nbCloseBotModal()" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
@@ -1747,7 +1728,7 @@
             <div class="grid grid-cols-2 gap-2.5">
               <button type="button" id="nb-modal-modebtn-flow" onclick="nbSelectModalBotMode('flow')" class="p-3 rounded-xl border text-left transition flex flex-col gap-1">
                 <div class="flex items-center justify-between">
-                  <i class="fa-solid fa-list-check text-xs text-[#ef4444]"></i>
+                  <i class="fa-solid fa-list-check text-xs text-[#a855f7]"></i>
                   <span id="nb-modal-modedot-flow" class="w-2 h-2 rounded-full"></span>
                 </div>
                 <span class="text-xs font-bold text-white block mt-1">Fluxo de Botões</span>
@@ -1755,7 +1736,7 @@
               </button>
               <button type="button" id="nb-modal-modebtn-ai" onclick="nbSelectModalBotMode('ai')" class="p-3 rounded-xl border text-left transition flex flex-col gap-1">
                 <div class="flex items-center justify-between">
-                  <i class="fa-solid fa-wand-magic-sparkles text-xs text-[#ef4444]"></i>
+                  <i class="fa-solid fa-wand-magic-sparkles text-xs text-[#a855f7]"></i>
                   <span id="nb-modal-modedot-ai" class="w-2 h-2 rounded-full"></span>
                 </div>
                 <span class="text-xs font-bold text-white block mt-1">Fluxo de IA</span>
@@ -1770,7 +1751,7 @@
           </button>
           <div class="flex items-center gap-2 ml-auto">
             <button type="button" onclick="nbCloseBotModal()" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300 hover:text-white">Cancelar</button>
-            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white shadow-lg shadow-red-950/40">Salvar</button>
+            <button type="button" id="nb-btn-save-bot-modal" onclick="nbSubmitBotModal()" class="px-5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white shadow-lg shadow-purple-950/40">Salvar</button>
           </div>
         </div>
       </div>
@@ -1778,7 +1759,7 @@
 
     <!-- MODAL: GATEWAY PIX -->
     <div id="nb-modal-gateway" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#382125]">
+      <div class="nb-card w-full max-w-md p-6 space-y-4 shadow-2xl border border-[#321e4a]">
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-white">Configurar Gateway PIX</h3>
           <button onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="text-zinc-500 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
@@ -1802,7 +1783,7 @@
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300">Fechar</button>
-          <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white">Salvar Gateway</button>
+          <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white">Salvar Gateway</button>
         </div>
       </div>
     </div>
@@ -1815,15 +1796,15 @@
   <div id="workspace-ai-mode" class="hidden h-screen flex flex-col w-full">
 
   <!-- TOP HEADER BAR RICOBOT (SEÇÃO FLUXO DE IA DO BOT) -->
-  <header class="h-16 bg-[#090707] border-b border-[#24181a] px-5 flex items-center justify-between shrink-0 z-20 gap-3">
+  <header class="h-16 bg-[#08060c] border-b border-[#211730] px-5 flex items-center justify-between shrink-0 z-20 gap-3">
     <div class="flex items-center gap-3.5">
-      <button onclick="nbBackToBotsList()" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#2b1d20] hover:border-[#ef4444] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
-        <i class="fa-solid fa-chevron-left text-xs text-[#ef4444]"></i>
+      <button onclick="nbBackToBotsList()" title="Voltar para Meus Bots" class="px-3 h-10 rounded-xl bg-[#140e10] border border-[#291d3a] hover:border-[#a855f7] flex items-center justify-center gap-2 text-zinc-300 hover:text-white text-xs font-semibold transition">
+        <i class="fa-solid fa-chevron-left text-xs text-[#a855f7]"></i>
         <span>Voltar</span>
       </button>
       <div>
         <div class="flex items-center gap-1.5 mb-0.5">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-[#ef4444]">RICOBOT • FLUXO DE IA</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-[#a855f7]">RICOBOT • FLUXO DE IA</span>
           <span class="text-[11px] text-zinc-500">•</span>
           <span id="unsaved-indicator" class="text-[11px] font-medium uppercase tracking-wider text-zinc-400">TUDO SALVO</span>
         </div>
@@ -1834,9 +1815,9 @@
     </div>
 
     <!-- BARRA CENTRAL: LISTA DE CONFIGURAÇÕES SALVAS (PERSISTENTE) -->
-    <div class="hidden xl:flex items-center gap-2 bg-[#110c0d] border border-[#261b1d] rounded-xl px-3 py-1.5">
-      <i class="fa-solid fa-bookmark text-[#ef4444] text-xs"></i>
-      <select id="sel-saved-profiles" class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#ef4444] min-w-[160px] max-w-[210px]">
+    <div class="hidden xl:flex items-center gap-2 bg-[#0f0b15] border border-[#231a31] rounded-xl px-3 py-1.5">
+      <i class="fa-solid fa-bookmark text-[#a855f7] text-xs"></i>
+      <select id="sel-saved-profiles" class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#a855f7] min-w-[160px] max-w-[210px]">
         <option value="">Configurações salvas (0)</option>
       </select>
       <button type="button" onclick="applySelectedProfile()" id="btn-apply-profile" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center gap-1.5" title="Carregar e aplicar esta configuração no bot">
@@ -1844,8 +1825,8 @@
         <span>Aplicar</span>
       </button>
       <div class="h-4 w-[1px] bg-[#281c1f] mx-0.5"></div>
-      <input type="text" id="inp-new-profile-name" placeholder="Nome da config..." class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#ef4444] w-28">
-      <button type="button" onclick="saveCurrentToProfileList()" class="px-3 py-1.5 rounded-lg bg-[#1c1013] hover:bg-[#291519] border border-[#3d1e24] text-[#ef4444] text-xs font-bold transition flex items-center gap-1.5" title="Salvar a configuração atual na lista">
+      <input type="text" id="inp-new-profile-name" placeholder="Nome da config..." class="bg-[#090607] border border-[#281c1f] text-xs text-zinc-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#a855f7] w-28">
+      <button type="button" onclick="saveCurrentToProfileList()" class="px-3 py-1.5 rounded-lg bg-[#1c1013] hover:bg-[#291519] border border-[#3d1e24] text-[#a855f7] text-xs font-bold transition flex items-center gap-1.5" title="Salvar a configuração atual na lista">
         <i class="fa-solid fa-plus text-[10px]"></i>
         <span>Salvar na lista</span>
       </button>
@@ -1855,15 +1836,15 @@
     </div>
 
     <div class="flex items-center gap-2.5">
-      <button onclick="navigateTab('saldo')" class="px-3 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#ef4444]/60 transition">
+      <button onclick="navigateTab('saldo')" class="px-3 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#a855f7]/60 transition">
         <span class="w-4 h-4 rounded-full border border-zinc-500 flex items-center justify-center text-[9px] text-zinc-400 font-bold">%</span>
         <span id="header-balance">R$ 0,00</span>
       </button>
-      <button onclick="navigateTab('testar')" class="px-3.5 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#ef4444]/60 transition">
+      <button onclick="navigateTab('testar')" class="px-3.5 py-2 rounded-xl bg-[#140e10] border border-[#281c1f] text-xs font-medium text-zinc-200 flex items-center gap-2 hover:border-[#a855f7]/60 transition">
         <i class="fa-regular fa-eye text-zinc-400 text-xs"></i>
         <span>Visualizar</span>
       </button>
-      <button onclick="saveFullState()" id="btn-save-top" class="px-5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-red-950/40 transition">
+      <button onclick="saveFullState()" id="btn-save-top" class="px-5 py-2 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-2 shadow-lg shadow-purple-950/40 transition">
         <i class="fa-regular fa-floppy-disk text-xs"></i>
         <span>Salvar</span>
       </button>
@@ -2044,7 +2025,7 @@
           <span id="sidebar-prep-count" class="font-semibold text-white">2/5</span>
         </div>
         <div class="w-full h-1.5 bg-[#171b28] rounded-full overflow-hidden">
-          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-[#ef4444] via-[#818cf8] to-[#f87171] rounded-full" style="width: 40%"></div>
+          <div id="sidebar-prep-bar" class="h-full bg-gradient-to-r from-[#a855f7] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
         </div>
         <div class="flex justify-between items-center text-[11px] pt-1">
           <span class="text-slate-400">Configuração</span>
@@ -2068,7 +2049,7 @@
         ========================================================== -->
         <section id="sec-resumo" class="tab-section space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">COMEÇAR</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">COMEÇAR</span>
             <h1 class="text-2xl font-bold text-white mt-1">Resumo do atendimento</h1>
             <p class="text-sm text-slate-400 mt-1">Veja o que já está pronto e qual é o próximo passo.</p>
           </div>
@@ -2076,10 +2057,10 @@
           <!-- HERO BANNER "EM PREPARAÇÃO" -->
           <div class="rounded-2xl p-6 border border-[#451a20] bg-gradient-to-br from-[#2b1014] via-[#1a0b0e] to-[#0f0809] relative overflow-hidden">
             <div class="flex justify-between items-start">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#381318] text-[#f87171] border border-[#6e212b]">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#f87171]"></span> EM PREPARAÇÃO
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#381318] text-[#c084fc] border border-[#6e212b]">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#c084fc]"></span> EM PREPARAÇÃO
               </span>
-              <div class="w-10 h-10 rounded-xl bg-[#381318]/50 border border-[#6e212b] flex items-center justify-center text-[#f87171]">
+              <div class="w-10 h-10 rounded-xl bg-[#381318]/50 border border-[#6e212b] flex items-center justify-center text-[#c084fc]">
                 <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
             </div>
@@ -2093,12 +2074,12 @@
                 <span id="hero-prep-label" class="text-slate-300 font-medium">2 de 5 concluídos</span>
               </div>
               <div class="w-full h-1.5 bg-[#1f1a33] rounded-full overflow-hidden">
-                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-[#ef4444] via-[#818cf8] to-[#f87171] rounded-full" style="width: 40%"></div>
+                <div id="hero-prep-bar" class="h-full bg-gradient-to-r from-[#a855f7] via-[#818cf8] to-[#c084fc] rounded-full" style="width: 40%"></div>
               </div>
             </div>
 
             <div class="flex items-center gap-3.5 mt-6">
-              <button onclick="navigateTab('ofertas')" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
+              <button onclick="navigateTab('ofertas')" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
                 <span>Cadastrar as ofertas</span>
                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
               </button>
@@ -2463,7 +2444,7 @@
         ========================================================== -->
         <section id="sec-persona" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Persona e identidade</h1>
             <p class="text-sm text-slate-400 mt-1">Defina quem conversa: nome, história e personalidade.</p>
           </div>
@@ -2500,7 +2481,7 @@
                 <div onclick="selectGender('Feminina', 'Fala e se apresenta no feminino.')" data-val="Feminina" class="sb-radio-card selected !p-4 !rounded-xl">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Feminina</span>
-                    <span class="gender-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center">
+                    <span class="gender-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center">
                       <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
                     </span>
                   </div>
@@ -2579,7 +2560,7 @@
         ========================================================== -->
         <section id="sec-ofertas" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Negócio e ofertas</h1>
             <p class="text-sm text-slate-400 mt-1">Explique o VIP, cadastre preços e responda dúvidas comuns.</p>
           </div>
@@ -2686,7 +2667,7 @@
             <div class="flex justify-between items-center">
               <div>
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                  <i class="fa-regular fa-circle-question text-[#ef4444] text-xs"></i> Dúvidas que a IA já sabe responder
+                  <i class="fa-regular fa-circle-question text-[#a855f7] text-xs"></i> Dúvidas que a IA já sabe responder
                 </h3>
                 <p class="text-xs text-slate-400 mt-1">Cadastre perguntas comuns e a resposta correta para cada uma.</p>
               </div>
@@ -2723,7 +2704,7 @@
         ========================================================== -->
         <section id="sec-conversa" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONFIGURAÇÃO ESSENCIAL</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">CONFIGURAÇÃO ESSENCIAL</span>
             <h1 class="text-2xl font-bold text-white mt-1">Jeito de conversar</h1>
             <p class="text-sm text-slate-400 mt-1">Ajuste tom, ritmo, abertura e momento de apresentar a oferta.</p>
           </div>
@@ -2731,7 +2712,7 @@
           <!-- CARD 1: HUMANIZAÇÃO DA VENDA -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#f87171] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
                 <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
               </div>
               <div>
@@ -2748,7 +2729,7 @@
                 <div onclick="selectRadioGroup('rg-strategy', 'strategy', 'Conexão primeiro')" data-val="Conexão primeiro" class="sb-radio-card selected !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Conexão primeiro</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <p class="text-xs text-slate-400 mt-2 leading-relaxed">Conversa e entende o interesse antes de vender.</p>
                 </div>
@@ -2783,7 +2764,7 @@
 
                   <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Leve</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
 
                   <div onclick="selectRadioGroup('rg-flirt', 'flirt', 'Explícito')" data-val="Explícito" class="sb-radio-card !p-4">
@@ -2806,7 +2787,7 @@
 
                   <div onclick="selectRadioGroup('rg-slang', 'slang', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Natural</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
 
                   <div onclick="selectRadioGroup('rg-slang', 'slang', 'Marcante')" data-val="Marcante" class="sb-radio-card !p-4 flex justify-between items-center">
@@ -2833,7 +2814,7 @@
                 <div onclick="selectRadioGroup('rg-cadence', 'cadence', 'Natural')" data-val="Natural" class="sb-radio-card selected !p-4">
                   <div class="flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Natural</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <p class="text-xs text-slate-400 mt-2 leading-relaxed">Alterna reação, pergunta e próximo passo.</p>
                 </div>
@@ -2892,7 +2873,7 @@
               <div class="grid grid-cols-4 gap-3" id="rg-tone">
                 <div onclick="selectRadioGroup('rg-tone', 'tone', 'Acolhedor')" data-val="Acolhedor" class="sb-radio-card selected !p-4 flex justify-between items-center">
                   <span class="text-xs font-bold text-white">Acolhedor</span>
-                  <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                  <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                 </div>
                 <div onclick="selectRadioGroup('rg-tone', 'tone', 'Direto')" data-val="Direto" class="sb-radio-card !p-4 flex justify-between items-center">
                   <span class="text-xs font-bold text-white">Direto</span>
@@ -2916,7 +2897,7 @@
                 <div class="grid grid-cols-2 gap-3" id="rg-length">
                   <div onclick="selectRadioGroup('rg-length', 'length', 'Curta')" data-val="Curta" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Curta</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <div onclick="selectRadioGroup('rg-length', 'length', 'Média')" data-val="Média" class="sb-radio-card !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Média</span>
@@ -2938,7 +2919,7 @@
                   </div>
                   <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Leve')" data-val="Leve" class="sb-radio-card selected !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Leve</span>
-                    <span class="radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
+                    <span class="radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-white"></span></span>
                   </div>
                   <div onclick="selectRadioGroup('rg-emojis', 'emojis', 'Moderado')" data-val="Moderado" class="sb-radio-card !p-4 flex justify-between items-center">
                     <span class="text-xs font-bold text-white">Moderado</span>
@@ -3050,7 +3031,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         ========================================================== -->
         <section id="sec-midias" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONTEÚDO E AUTOMAÇÕES</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">CONTEÚDO E AUTOMAÇÕES</span>
             <h1 class="text-2xl font-bold text-white mt-1">Mídias da conversa</h1>
             <p class="text-sm text-slate-400 mt-1">Adicione fotos, vídeos, GIFs e áudios com contexto de uso.</p>
           </div>
@@ -3058,7 +3039,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <!-- BANNER CARD: CONTEÚDO NO MOMENTO CERTO -->
           <div class="rounded-2xl p-6 border border-[#231d3d] bg-gradient-to-r from-[#0b0d14] via-[#111022] to-[#1a1236] flex items-center justify-between gap-4">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#f87171] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#111524] border border-[#1d2338] flex items-center justify-center text-[#c084fc] shrink-0">
                 <i class="fa-regular fa-images text-sm"></i>
               </div>
               <div>
@@ -3066,7 +3047,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
                 <p class="text-xs text-slate-400 mt-0.5 max-w-lg leading-relaxed">Diga o que cada arquivo mostra e quando ele ajuda. A IA escolhe pelo contexto, sem receber URL ou acesso ao arquivo original.</p>
               </div>
             </div>
-            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white text-xs font-semibold flex items-center gap-2 shrink-0 shadow-lg shadow-purple-950/50 transition">
+            <button onclick="document.getElementById('hidden-media-upload').click()" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-semibold flex items-center gap-2 shrink-0 shadow-lg shadow-purple-950/50 transition">
               <i class="fa-solid fa-plus text-[10px]"></i> Adicionar mídias
             </button>
           </div>
@@ -3081,7 +3062,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <div class="flex items-center justify-between">
             <div class="flex gap-2" id="media-filter-pills">
               <button onclick="setMediaFilter('Todas')" data-filter="Todas" class="px-3.5 py-1.5 rounded-xl bg-[#17122b] border border-[#3d286b] text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#f87171]"></i> Todas
+                <i class="fa-solid fa-wand-magic-sparkles text-[10px] text-[#c084fc]"></i> Todas
               </button>
               <button onclick="setMediaFilter('Fotos')" data-filter="Fotos" class="px-3.5 py-1.5 rounded-xl bg-[#0b0d14] border border-[#181c28] hover:border-slate-700 text-slate-400 text-xs font-medium flex items-center gap-1.5 transition">
                 <i class="fa-regular fa-image text-[11px]"></i> Fotos
@@ -3127,7 +3108,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
         ========================================================== -->
         <section id="sec-downsell" class="tab-section hidden space-y-6">
           <div>
-            <span class="text-xs font-bold uppercase tracking-wider text-[#ef4444]">CONTEÚDO E AUTOMAÇÕES</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#a855f7]">CONTEÚDO E AUTOMAÇÕES</span>
             <h1 class="text-2xl font-bold text-white mt-1">Downsell</h1>
             <p class="text-sm text-slate-400 mt-1">Organize mensagens, mídias e ofertas para quem deixou de responder.</p>
           </div>
@@ -3135,7 +3116,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
           <!-- CARD TOPO: RETOME A CONVERSA, NO TEMPO CERTO -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-3.5">
             <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-[#ef4444]">Downsell • sem resposta</span>
+              <span class="text-xs font-bold text-[#a855f7]">Downsell • sem resposta</span>
               <label class="toggle-switch">
                 <input type="checkbox" id="chk-downsell-enabled" onchange="onDownsellToggle()">
                 <span class="toggle-slider"></span>
@@ -3169,7 +3150,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
 
             <div class="col-span-8 sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-6">
               <div class="pb-4 border-b border-[#181c28]">
-                <span class="text-xs font-bold text-[#ef4444] block" id="ds-editor-badge">Etapa 1</span>
+                <span class="text-xs font-bold text-[#a855f7] block" id="ds-editor-badge">Etapa 1</span>
                 <h4 class="text-base font-bold text-white mt-0.5" id="ds-editor-title">Primeiro contato após o silêncio</h4>
               </div>
 
@@ -3199,7 +3180,7 @@ Quando houver intencao de compra, abra os planos sem criar etapas artificiais.</
                 </div>
 
                 <p class="text-[11px] text-slate-500 pt-0.5">De 30 segundos a 7 dias de espera nesta etapa.</p>
-                <p id="ds-forecast-text" class="text-xs text-[#ef4444] leading-relaxed">Esta etapa está prevista para ~1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
+                <p id="ds-forecast-text" class="text-xs text-[#a855f7] leading-relaxed">Esta etapa está prevista para ~1 min após a resposta da IA que inicia a sequência, se não houver nova interação.</p>
                 <p id="ds-short-warning" class="text-xs text-amber-300/90 leading-relaxed">Intervalo curto: esta mensagem pode chegar enquanto a pessoa ainda lê sua resposta. Para uma conversa mais tranquila, experimente 5 ou 15 minutos.</p>
               </div>
 
@@ -3326,11 +3307,11 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div id="menu-upsell-origin" class="hidden mt-1.5 w-full rounded-xl border border-[#1e2333] bg-[#0e111a] p-1.5 shadow-2xl space-y-1">
                   <button type="button" onclick="selectUpsellOrigin('Usar plano já cadastrado', event)" data-origin="Usar plano já cadastrado" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-[#2563eb] bg-[#111624] text-white font-semibold">
                     <span>Usar plano já cadastrado</span>
-                    <i class="fa-solid fa-check text-[#ef4444] text-[11px] origin-check"></i>
+                    <i class="fa-solid fa-check text-[#a855f7] text-[11px] origin-check"></i>
                   </button>
                   <button type="button" onclick="selectUpsellOrigin('Criar nova oferta exclusiva', event)" data-origin="Criar nova oferta exclusiva" class="upsell-origin-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition border border-transparent text-slate-300 hover:bg-[#141824]">
                     <span>Criar nova oferta exclusiva</span>
-                    <i class="fa-solid fa-check text-[#ef4444] text-[11px] origin-check hidden"></i>
+                    <i class="fa-solid fa-check text-[#a855f7] text-[11px] origin-check hidden"></i>
                   </button>
                 </div>
               </div>
@@ -3543,7 +3524,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <!-- CARD 2: BOT DO ATENDIMENTO (COM CAMPO DE TOKEN SEMPRE VISÍVEL) -->
           <div class="sb-card p-6 border border-[#181c28] bg-[#0b0d14] rounded-2xl space-y-4">
             <div class="flex items-start gap-3.5">
-              <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#ef4444] shrink-0">
+              <div class="w-10 h-10 rounded-xl bg-[#0e1624] border border-[#1c2c44] flex items-center justify-center text-[#a855f7] shrink-0">
                 <i class="fa-solid fa-robot text-sm"></i>
               </div>
               <div>
@@ -3557,7 +3538,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <select id="sel-bot-available" class="sb-input flex-1 !bg-[#0b0d14] !border-[#1e3a8a] text-slate-300">
                   <option value="">Escolha um bot disponível</option>
                 </select>
-                <button type="button" onclick="document.getElementById('inp-bot-token').focus()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#dc2626] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
+                <button type="button" onclick="document.getElementById('inp-bot-token').focus()" class="px-5 py-2.5 rounded-xl bg-[#6d28d9] hover:bg-[#9333ea] text-white text-xs font-bold flex items-center gap-2 shrink-0 transition">
                   <i class="fa-solid fa-plus text-[11px]"></i> Vincular bot
                 </button>
               </div>
@@ -3687,14 +3668,14 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <i class="fa-solid fa-link text-emerald-400 text-xs"></i>
                     <span>Link de acesso</span>
                   </span>
-                  <i class="fa-solid fa-check text-[#ef4444] text-[11px] dtype-check"></i>
+                  <i class="fa-solid fa-check text-[#a855f7] text-[11px] dtype-check"></i>
                 </button>
                 <button type="button" onclick="selectDeliveryType('Mensagem no bot', event)" data-dtype="Mensagem no bot" class="delivery-type-opt w-full px-3.5 py-2.5 rounded-lg text-left text-xs flex items-center justify-between transition text-slate-200 hover:bg-[#141824]">
                   <span class="flex items-center gap-2.5">
                     <i class="fa-regular fa-comment-dots text-[#a78bfa] text-xs"></i>
                     <span>Mensagem no bot</span>
                   </span>
-                  <i class="fa-solid fa-check text-[#ef4444] text-[11px] dtype-check hidden"></i>
+                  <i class="fa-solid fa-check text-[#a855f7] text-[11px] dtype-check hidden"></i>
                 </button>
               </div>
 
@@ -3774,7 +3755,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <button type="button" onclick="clearAllLeads()" class="px-3.5 py-2.5 rounded-xl bg-red-950/30 hover:bg-red-900/50 border border-red-800/40 text-xs font-bold text-red-300 flex items-center gap-2 transition">
+                <button type="button" onclick="clearAllLeads()" class="px-3.5 py-2.5 rounded-xl bg-purple-950/30 hover:bg-red-900/50 border border-purple-800/40 text-xs font-bold text-purple-300 flex items-center gap-2 transition">
                   <i class="fa-regular fa-trash-can text-[11px]"></i> Limpar todas
                 </button>
                 <button type="button" onclick="loadInitialState()" class="px-4 py-2.5 rounded-xl bg-[#0b0d14] hover:bg-[#141824] border border-[#1e3a8a] text-xs font-bold text-white flex items-center gap-2 transition">
@@ -4275,7 +4256,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const dot = card.querySelector('.gender-dot');
         if (dot) {
           if (isSel) {
-            dot.className = "gender-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center";
+            dot.className = "gender-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center";
             dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
           } else {
             dot.className = "gender-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center";
@@ -4522,7 +4503,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const dot = card.querySelector('.radio-dot');
         if (dot) {
           if (isSel) {
-            dot.className = "radio-dot w-4 h-4 rounded-full bg-[#ef4444] flex items-center justify-center shrink-0";
+            dot.className = "radio-dot w-4 h-4 rounded-full bg-[#a855f7] flex items-center justify-center shrink-0";
             dot.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-white"></span>';
           } else {
             dot.className = "radio-dot w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center shrink-0";
@@ -4875,7 +4856,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const isSel = idx === SELECTED_DOWNSELL_IDX;
         return `
         <div onclick="selectDownsellStep(${idx})" class="rounded-2xl p-4 border ${isSel ? 'border-[#1e3a8a] bg-[#0e1526]' : 'border-[#181c28] bg-[#0b0d14] hover:border-slate-700'} cursor-pointer flex items-center gap-3.5 transition">
-          <span class="w-7 h-7 rounded-full ${isSel ? 'bg-[#ef4444] text-[#050507]' : 'bg-[#181c28] text-slate-300'} text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+          <span class="w-7 h-7 rounded-full ${isSel ? 'bg-[#a855f7] text-[#050507]' : 'bg-[#181c28] text-slate-300'} text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
           <div class="overflow-hidden flex-1">
             <div class="flex items-center justify-between">
               <p class="text-xs font-bold text-white truncate">${s.title}</p>
@@ -4884,7 +4865,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
             <p class="text-[11px] text-slate-400 mt-0.5">Espera ${s.delay_label} • 0 mídia(s)</p>
-            <p class="text-[11px] text-[#ef4444] mt-0.5">~${s.delay_label} desde o início</p>
+            <p class="text-[11px] text-[#a855f7] mt-0.5">~${s.delay_label} desde o início</p>
           </div>
         </div>
       `}).join('');
@@ -5032,7 +5013,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         <div class="rounded-2xl border border-[#181c28] bg-[#090b10] p-4 space-y-3.5">
           <div class="flex justify-between items-center">
             <div class="flex items-center gap-2.5">
-              <i class="fa-regular fa-image text-[#ef4444] text-xs"></i>
+              <i class="fa-regular fa-image text-[#a855f7] text-xs"></i>
               <div>
                 <p class="text-xs font-bold text-white">${idx + 1}. ${m.name}</p>
                 <p class="text-[11px] text-slate-400">Exclusiva desta automação</p>
@@ -5043,7 +5024,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </button>
           </div>
 
-          <button type="button" onclick="toggleUpsellMediaCaption(${idx})" class="w-full text-left px-3 py-2.5 rounded-xl bg-[#0b0d14] border ${isExp ? 'border-[#ef4444]' : 'border-[#181c28]'} text-xs text-slate-300 flex items-center gap-1.5 transition">
+          <button type="button" onclick="toggleUpsellMediaCaption(${idx})" class="w-full text-left px-3 py-2.5 rounded-xl bg-[#0b0d14] border ${isExp ? 'border-[#a855f7]' : 'border-[#181c28]'} text-xs text-slate-300 flex items-center gap-1.5 transition">
             <span class="text-[10px]">${isExp ? '▾' : '▸'}</span>
             <span>Visualizar e editar legenda</span>
           </button>
@@ -5221,14 +5202,14 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div onclick="showLeadDetail(${realIdx})" class="rounded-xl border border-[#181c28] bg-[#07090e] p-3 cursor-pointer hover:border-[#2563eb] flex justify-between items-center gap-2 transition">
             <div class="min-w-0">
               <p class="text-xs font-bold text-white truncate">${escapeHtml(l.first_name)} <span class="text-slate-500 font-normal">${escapeHtml(l.username || '')}</span></p>
-              <span class="text-[11px] text-[#ef4444]">${escapeHtml(normStage)}</span>
+              <span class="text-[11px] text-[#a855f7]">${escapeHtml(normStage)}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-[10px] text-slate-500">${escapeHtml(l.last_interaction || '')}</span>
               <button type="button" onclick="resetLeadHistory('${safeTid}', event)" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
-              <button type="button" onclick="deleteLead('${safeTid}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-[10px] text-red-300 hover:text-white transition">
+              <button type="button" onclick="deleteLead('${safeTid}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-[10px] text-purple-300 hover:text-white transition">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
             </div>
@@ -5276,7 +5257,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             <button type="button" onclick="resetLeadHistory('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
               <i class="fa-solid fa-rotate-left text-[11px]"></i> Reiniciar conversa
             </button>
-            <button type="button" onclick="deleteLead('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/40 text-xs font-bold text-red-300 flex items-center gap-1.5 transition">
+            <button type="button" onclick="deleteLead('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-xs font-bold text-purple-300 flex items-center gap-1.5 transition">
               <i class="fa-regular fa-trash-can text-[11px]"></i> Excluir conversa
             </button>
           </div>
@@ -5505,7 +5486,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           elRecBox.innerHTML = `
             <div class="rounded-xl border border-[#1e3a8a]/60 bg-[#090d18] p-3.5 flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <p class="text-xs font-bold text-[#ef4444]">${recTitle}</p>
+                <p class="text-xs font-bold text-[#a855f7]">${recTitle}</p>
                 <p class="text-[11px] text-slate-300 mt-0.5">${recDetail}</p>
               </div>
               <button type="button" onclick="approveLearningSnapshot('${recTitle.replace(/'/g, '')}')" class="px-3 py-1.5 rounded-xl bg-[#1e3a8a]/40 hover:bg-[#1e3a8a]/70 border border-[#3b82f6]/40 text-xs font-bold text-white transition shrink-0">
@@ -5672,7 +5653,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('full-sim-messages');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#dc2626] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]]">${escapeHtml(text)}</div>
+          <div class="bg-[#9333ea] text-white px-3.5 py-2 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[80%]]">${escapeHtml(text)}</div>
         </div>
       `;
       input.value = '';
@@ -5729,7 +5710,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const box = document.getElementById('preview-chat-bubbles');
       box.innerHTML += `
         <div class="flex justify-end">
-          <div class="bg-[#dc2626] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${escapeHtml(text)}</div>
+          <div class="bg-[#9333ea] text-white px-3 py-1.5 rounded-2xl rounded-tr-sm text-xs w-fit max-w-[85%]">${escapeHtml(text)}</div>
         </div>
       `;
       inp.value = '';
@@ -6489,7 +6470,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbApplySiteIcon() {
-      const iconUrl = (STATE.site_icon_url || "").trim() || "favicon.png?v=3";
+      const iconUrl = "favicon.png?v=3";
       const favEl = document.getElementById('site-favicon');
       const boxEl = document.getElementById('nb-header-logo-box');
       if (favEl) favEl.href = iconUrl;
@@ -6497,18 +6478,6 @@ quer que eu te mostre as opções de acesso?</textarea>
         boxEl.innerHTML = `<img src="${iconUrl}" alt="Logo" class="w-full h-full object-contain">`;
         boxEl.className = "w-7 h-7 rounded-md bg-transparent flex items-center justify-center overflow-hidden shadow-sm";
       }
-    }
-
-    function nbHandleSiteIconUpload(event) {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        STATE.site_icon_url = reader.result;
-        nbApplySiteIcon();
-        await saveFullState();
-      };
-      reader.readAsDataURL(file);
     }
 
     function nbInitNeurotBot() {
@@ -6537,18 +6506,18 @@ quer que eu te mostre as opções de acesso?</textarea>
         const sales = Number(b.sales_today || 0);
         const rev = Number(b.revenue_today || 0).toFixed(2).replace('.', ',');
         const modeTag = isAi
-          ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-red-950/90 border border-[#ef4444]/50 text-[10px] text-[#ef4444] font-bold">FLUXO IA</span>'
+          ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-purple-950/90 border border-[#a855f7]/50 text-[10px] text-[#a855f7] font-bold">FLUXO IA</span>'
           : '<span class="ml-2 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700/60 text-[10px] text-zinc-300 font-bold">BOTÕES</span>';
         return `
-          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#ef4444]/60 transition group min-h-[195px]">
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#a855f7]/60 transition group min-h-[195px]">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-sm shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-[#1d102e] border border-[#391b52] text-[#a855f7] flex items-center justify-center text-sm shrink-0">
                   <i class="fa-solid fa-robot"></i>
                 </div>
                 <div>
                   <div class="flex items-center flex-wrap">
-                    <h3 class="text-sm font-bold text-white group-hover:text-[#ef4444] transition">${escapeHtml(b.username || '@bot')}</h3>
+                    <h3 class="text-sm font-bold text-white group-hover:text-[#a855f7] transition">${escapeHtml(b.username || '@bot')}</h3>
                     ${modeTag}
                   </div>
                   <span class="inline-flex items-center gap-1.5 text-[11px] ${isAct ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">
@@ -6562,7 +6531,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
 
-            <div class="border-t border-[#24181a] my-3 pt-3 flex items-baseline justify-between">
+            <div class="border-t border-[#211730] my-3 pt-3 flex items-baseline justify-between">
               <div>
                 <span class="text-base font-bold text-white block">${sales} vendas</span>
                 <span class="text-[11px] text-zinc-500">hoje</span>
@@ -6573,7 +6542,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-2 border-t border-[#24181a]" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pt-2 border-t border-[#211730]" onclick="event.stopPropagation()">
               <span class="text-[11px] font-medium text-zinc-400">${isAct ? 'Bot ligado' : 'Bot desligado'}</span>
               <label class="nb-toggle" title="Ligar ou desligar este bot">
                 <input type="checkbox" ${isAct ? 'checked' : ''} onchange="nbToggleBotFromCard('${b.id}', this.checked)">
@@ -6585,8 +6554,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }).join('');
 
       const addCardHtml = `
-        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#ef4444]/60 transition min-h-[195px] bg-[#0d090a]/60">
-          <div class="w-10 h-10 rounded-xl bg-[#1a1113] border border-[#2e1e21] text-[#ef4444] flex items-center justify-center text-sm">
+        <div onclick="nbOpenAddBotModal()" class="nb-card p-5 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-[#a855f7]/60 transition min-h-[195px] bg-[#0d090a]/60">
+          <div class="w-10 h-10 rounded-xl bg-[#1a1113] border border-[#2e1e21] text-[#a855f7] flex items-center justify-center text-sm">
             <i class="fa-solid fa-plus"></i>
           </div>
           <span class="text-xs font-bold text-white">Adicionar bot</span>
@@ -6609,19 +6578,19 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       if (btnFlow) {
         btnFlow.className = m === 'flow'
-          ? "p-3 rounded-xl border border-[#ef4444] bg-[#211013]/80 ring-1 ring-[#ef4444]/40 text-left transition flex flex-col gap-1"
-          : "p-3 rounded-xl border border-[#2b1d20] bg-[#120c0e] hover:border-[#ef4444]/50 text-left transition flex flex-col gap-1";
+          ? "p-3 rounded-xl border border-[#a855f7] bg-[#1d102e]/80 ring-1 ring-[#a855f7]/40 text-left transition flex flex-col gap-1"
+          : "p-3 rounded-xl border border-[#291d3a] bg-[#120c0e] hover:border-[#a855f7]/50 text-left transition flex flex-col gap-1";
       }
       if (btnAi) {
         btnAi.className = m === 'ai'
-          ? "p-3 rounded-xl border border-[#ef4444] bg-[#211013]/80 ring-1 ring-[#ef4444]/40 text-left transition flex flex-col gap-1"
-          : "p-3 rounded-xl border border-[#2b1d20] bg-[#120c0e] hover:border-[#ef4444]/50 text-left transition flex flex-col gap-1";
+          ? "p-3 rounded-xl border border-[#a855f7] bg-[#1d102e]/80 ring-1 ring-[#a855f7]/40 text-left transition flex flex-col gap-1"
+          : "p-3 rounded-xl border border-[#291d3a] bg-[#120c0e] hover:border-[#a855f7]/50 text-left transition flex flex-col gap-1";
       }
       if (dotFlow) {
-        dotFlow.className = m === 'flow' ? "w-2.5 h-2.5 rounded-full bg-[#ef4444]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
+        dotFlow.className = m === 'flow' ? "w-2.5 h-2.5 rounded-full bg-[#a855f7]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
       }
       if (dotAi) {
-        dotAi.className = m === 'ai' ? "w-2.5 h-2.5 rounded-full bg-[#ef4444]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
+        dotAi.className = m === 'ai' ? "w-2.5 h-2.5 rounded-full bg-[#a855f7]" : "w-2.5 h-2.5 rounded-full border border-zinc-600";
       }
     }
 
@@ -7037,7 +7006,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           const colorTabs = colors.map(c => {
             const active = (p.button_color || "Padrão") === c.label;
             return `
-              <button type="button" onclick="nbSetPlanField(${idx}, 'button_color', '${c.label}')" class="px-3 py-2 flex items-center gap-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 hover:text-white border-b-2 border-transparent'}">
+              <button type="button" onclick="nbSetPlanField(${idx}, 'button_color', '${c.label}')" class="px-3 py-2 flex items-center gap-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#a855f7]' : 'text-zinc-400 hover:text-white border-b-2 border-transparent'}">
                 <span class="w-2 h-2 rounded-full ${c.dot}"></span>
                 <span>${c.label}</span>
               </button>
@@ -7047,7 +7016,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           const destTypes = ["Canal ou grupo", "Link externo"];
           const destTabs = destTypes.map(dt => {
             const active = (p.delivery_dest_type || "Canal ou grupo") === dt;
-            return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
+            return `<button type="button" onclick="nbSetPlanField(${idx}, 'delivery_dest_type', '${dt}')" class="px-3 py-2 text-xs ${active ? 'text-white font-bold border-b-2 border-[#a855f7]' : 'text-zinc-500 hover:text-zinc-300 border-b-2 border-transparent'}">${dt}</button>`;
           }).join('');
 
           let deliveryBody = '';
@@ -7065,8 +7034,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="space-y-3 pt-2">
                 <p class="text-[11px] text-zinc-500">Gera um link de convite de uso único, com expiração curta.</p>
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#ef4444]">*</span></span>
-                  <button type="button" onclick="nbSyncPlanChannel(${idx})" class="text-[11px] text-zinc-400 hover:text-[#ef4444] flex items-center gap-1">
+                  <span class="text-xs font-semibold text-zinc-300">Canal ou grupo de entrega <span class="text-[#a855f7]">*</span></span>
+                  <button type="button" onclick="nbSyncPlanChannel(${idx})" class="text-[11px] text-zinc-400 hover:text-[#a855f7] flex items-center gap-1">
                     <i class="fa-solid fa-arrows-rotate text-[10px]"></i> Sincronizar
                   </button>
                 </div>
@@ -7089,7 +7058,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           }
 
           return `
-            <div class="rounded-xl bg-[#0e0d0a] border border-[#232119] ${isExp ? 'border-l-2 border-l-[#ef4444]' : ''} overflow-hidden">
+            <div class="rounded-xl bg-[#0e0d0a] border border-[#232119] ${isExp ? 'border-l-2 border-l-[#a855f7]' : ''} overflow-hidden">
               <div onclick="nbTogglePlanExpand(${idx})" class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-white/[0.02]">
                 <div class="flex items-center gap-3">
                   <div class="flex flex-col text-[9px] text-zinc-500 leading-none gap-0.5" onclick="event.stopPropagation()">
@@ -7145,7 +7114,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
 
                 <div class="flex items-center justify-between pt-2">
-                  <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2 rounded-lg bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white transition">
+                  <button type="button" onclick="nbSaveCurrentBot()" class="px-5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white transition">
                     Salvar alterações
                   </button>
                   <button type="button" onclick="nbRemovePlan(${idx})" class="text-xs font-semibold text-rose-400 hover:text-rose-300 flex items-center gap-1.5">
@@ -7322,7 +7291,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="nb-card p-5 space-y-4">
             <div class="flex items-center justify-between border-b border-[#1e1d15] pb-3">
               <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                 <h4 class="text-xs font-bold text-white">Sequência ${sIdx + 1}</h4>
               </div>
               <div class="flex items-center gap-3 text-xs text-zinc-500">
@@ -7385,7 +7354,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                         : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400">Pendente cache</span>`);
                   return `
                     <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-                      <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
+                      <i class="fa-regular fa-image text-[#a855f7]"></i> ${escapeHtml(m.name || 'Mídia')}
                       ${badge}
                       <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
                     </span>
@@ -7537,7 +7506,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
               <div>
                 <span class="text-xs font-bold text-white">${escapeHtml(ob.title || 'Order Bump')}</span>
-                <span class="text-xs text-[#ef4444] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
+                <span class="text-xs text-[#a855f7] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
                 <span class="ml-2 px-2 py-0.5 rounded bg-[#171611] border border-[#2c2a1f] text-[10px] text-zinc-300">${escapeHtml(planTag)}</span>
                 <p class="text-[11px] text-zinc-500 truncate max-w-md mt-0.5">${escapeHtml(ob.description || '')}</p>
               </div>
@@ -7568,14 +7537,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       const rejEl = document.getElementById('nb-ob-reject-colors');
       if (accEl) {
         accEl.innerHTML = colors.map(c => `
-          <button type="button" onclick="NB_OB_ACCEPT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_ACCEPT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 border-b-2 border-transparent'}">
+          <button type="button" onclick="NB_OB_ACCEPT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_ACCEPT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#a855f7]' : 'text-zinc-400 border-b-2 border-transparent'}">
             <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
           </button>
         `).join('');
       }
       if (rejEl) {
         rejEl.innerHTML = colors.map(c => `
-          <button type="button" onclick="NB_OB_REJECT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_REJECT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#ef4444]' : 'text-zinc-400 border-b-2 border-transparent'}">
+          <button type="button" onclick="NB_OB_REJECT_COLOR='${c.label}'; nbRenderOrderBumpColorPickers();" class="pb-2 flex items-center gap-1.5 ${NB_OB_REJECT_COLOR === c.label ? 'text-white font-bold border-b-2 border-[#a855f7]' : 'text-zinc-400 border-b-2 border-transparent'}">
             <span class="w-2 h-2 rounded-full ${c.dot}"></span> ${c.label}
           </button>
         `).join('');
@@ -7684,10 +7653,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_PAYMENT_SUBTAB = sub;
       const isGen = sub === 'generated';
       document.getElementById('nb-pay-pill-gen').className = isGen
-        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition"
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#a855f7]/50 transition"
         : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
       document.getElementById('nb-pay-pill-app').className = !isGen
-        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#ef4444]/50 transition"
+        ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white border border-[#a855f7]/50 transition"
         : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white border border-transparent transition";
       document.getElementById('nb-pay-panel-generated').classList.toggle('hidden', !isGen);
       document.getElementById('nb-pay-panel-approved').classList.toggle('hidden', isGen);
@@ -7841,7 +7810,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               : `<button type="button" onclick="nbVerifyCacheChannel()" class="px-1.5 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[10px] text-amber-300 cursor-pointer" title="${escapeHtml(errHint || 'Clique para enviar ao canal de cache agora')}">Pendente cache ↻</button>`);
         return `
           <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-            <i class="fa-regular fa-image text-[#ef4444]"></i> ${escapeHtml(m.name || 'Mídia')}
+            <i class="fa-regular fa-image text-[#a855f7]"></i> ${escapeHtml(m.name || 'Mídia')}
             ${badge}
             <button type="button" onclick="nbRemoveMedia('${section}', ${idx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
           </span>
@@ -7936,7 +7905,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const isAct = (view === k) || ((view === 'detail' || view === 'modesel') && k === 'bots');
         if (btn) {
           btn.className = isAct
-            ? "w-10 h-10 rounded-xl bg-[#ef4444] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-red-950/50 transition"
+            ? "w-10 h-10 rounded-xl bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-950/50 transition"
             : "w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition";
         }
         if (dot) dot.classList.toggle('hidden', !isAct);
@@ -7965,12 +7934,12 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       if (btnLeads) {
         btnLeads.className = isLeads
-          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]"
+          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#36204f]"
           : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
       }
       if (btnAcc) {
         btnAcc.className = !isLeads
-          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#3d2328]"
+          ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#36204f]"
           : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
       }
       if (panelLeads) panelLeads.classList.toggle('hidden', !isLeads);
@@ -8029,7 +7998,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (pillsEl) {
         pillsEl.innerHTML = leadPeriods.map(p => {
           const act = NB_LEADS_PERIOD === p;
-          return `<button type="button" onclick="NB_LEADS_PERIOD='${p}'; nbRenderClientsView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          return `<button type="button" onclick="NB_LEADS_PERIOD='${p}'; nbRenderClientsView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
@@ -8146,14 +8115,14 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.plan_name)}</td>
                 <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.bot_username)}</td>
                 <td class="py-3.5 px-3">
-                  <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-300">${escapeHtml(flowLabel)}</span>
+                  <span class="px-2 py-0.5 rounded bg-[#151020] border border-[#2d1e22] text-[10px] text-zinc-300">${escapeHtml(flowLabel)}</span>
                 </td>
                 <td class="py-3.5 px-3">
                   <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${stCls}">• ${escapeHtml(item.status)}</span>
                 </td>
                 <td class="py-3.5 px-3 text-[11px] text-zinc-400">${escapeHtml(item.date_display)}</td>
                 <td class="py-3.5 px-4 text-right">
-                  <button type="button" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}')" class="px-3 py-1.5 rounded-lg bg-[#1c1215] hover:bg-[#ef4444] border border-[#382126] hover:border-[#ef4444] text-[11px] font-bold text-zinc-200 hover:text-white inline-flex items-center gap-1.5 transition">
+                  <button type="button" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}')" class="px-3 py-1.5 rounded-lg bg-[#1c1215] hover:bg-[#a855f7] border border-[#382126] hover:border-[#a855f7] text-[11px] font-bold text-zinc-200 hover:text-white inline-flex items-center gap-1.5 transition">
                     <i class="fa-regular fa-comment-dots"></i>
                     <span>Abrir Chat</span>
                   </button>
@@ -8317,7 +8286,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <td class="py-3.5 px-3 text-[11px] text-zinc-400">${escapeHtml(r.expires_label)}</td>
                 <td class="py-3.5 px-4 text-right">
                   <div class="inline-flex items-center gap-2">
-                    <button type="button" onclick="nbResendAccess('${escapeHtml(r.tx_id)}')" class="px-2.5 py-1.5 rounded-lg bg-[#1d1316] hover:bg-[#ef4444] border border-[#382126] text-[11px] font-semibold text-zinc-200 hover:text-white transition" title="Gerar novo link único e reenviar no Telegram do cliente">
+                    <button type="button" onclick="nbResendAccess('${escapeHtml(r.tx_id)}')" class="px-2.5 py-1.5 rounded-lg bg-[#1d1316] hover:bg-[#a855f7] border border-[#382126] text-[11px] font-semibold text-zinc-200 hover:text-white transition" title="Gerar novo link único e reenviar no Telegram do cliente">
                       <i class="fa-regular fa-paper-plane mr-1"></i> Reenviar Acesso
                     </button>
                     <select onchange="if(this.value) nbUpdateAccessStatus('${escapeHtml(r.tx_id)}', this.value)" class="nb-select !w-auto !py-1 !px-2.5 !pr-7 !text-[11px]">
@@ -8361,7 +8330,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             return `
               <div class="flex ${isBot ? 'justify-end' : 'justify-start'}">
                 <div class="max-w-[82%] px-3 py-2 rounded-xl ${isBot ? 'bg-[#251316] border border-[#422026] text-zinc-100' : 'bg-[#141418] border border-zinc-800 text-zinc-300'}">
-                  <div class="text-[10px] font-bold ${isBot ? 'text-[#ef4444]' : 'text-zinc-400'} mb-0.5">${isBot ? 'Bot / Suporte' : escapeHtml(lead.first_name || 'Lead')}</div>
+                  <div class="text-[10px] font-bold ${isBot ? 'text-[#a855f7]' : 'text-zinc-400'} mb-0.5">${isBot ? 'Bot / Suporte' : escapeHtml(lead.first_name || 'Lead')}</div>
                   <div class="whitespace-pre-wrap break-words">${escapeHtml(h.content || '')}</div>
                 </div>
               </div>
@@ -8530,7 +8499,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (campaigns.length === 0) {
         cont.innerHTML = `
           <div class="nb-card py-16 px-6 flex flex-col items-center justify-center text-center space-y-3 border border-[#2b1a1d]">
-            <div class="w-12 h-12 rounded-2xl bg-[#211013] border border-[#3d1b20] text-[#ef4444] flex items-center justify-center text-lg shadow-inner">
+            <div class="w-12 h-12 rounded-2xl bg-[#1d102e] border border-[#391b52] text-[#a855f7] flex items-center justify-center text-lg shadow-inner">
               <i class="fa-solid fa-bullhorn"></i>
             </div>
             <h3 class="text-base font-bold text-white pt-1">Pronto para começar?</h3>
@@ -8538,7 +8507,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               Crie sua primeira campanha de remarketing para recuperar vendas perdidas e reengajar leads que não converteram.
             </p>
             <div class="pt-2">
-              <button type="button" onclick="nbOpenRemarketingModal()" class="px-5 py-2.5 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white inline-flex items-center gap-2 shadow-lg shadow-red-950/50 transition">
+              <button type="button" onclick="nbOpenRemarketingModal()" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white inline-flex items-center gap-2 shadow-lg shadow-purple-950/50 transition">
                 <i class="fa-solid fa-plus text-[11px]"></i>
                 <span>Criar Primeira Campanha</span>
               </button>
@@ -8571,8 +8540,8 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="flex items-center gap-2.5 flex-wrap">
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${stCls}">• ${escapeHtml(c.status || 'Ativa')}</span>
                 <h4 class="text-sm font-bold text-white">${escapeHtml(c.name || 'Campanha')}</h4>
-                <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-300">Alvo: ${escapeHtml(c.segment || 'Pendentes')}</span>
-                <span class="px-2 py-0.5 rounded bg-[#181113] border border-[#2d1e22] text-[10px] text-zinc-400">${escapeHtml(botLabel)}</span>
+                <span class="px-2 py-0.5 rounded bg-[#151020] border border-[#2d1e22] text-[10px] text-zinc-300">Alvo: ${escapeHtml(c.segment || 'Pendentes')}</span>
+                <span class="px-2 py-0.5 rounded bg-[#151020] border border-[#2d1e22] text-[10px] text-zinc-400">${escapeHtml(botLabel)}</span>
                 ${discTag}
               </div>
               <p class="text-xs text-zinc-400 line-clamp-2">${escapeHtml(c.message || '')}</p>
@@ -8582,7 +8551,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="nbSendRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3.5 py-2 rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-red-950/40 transition">
+              <button type="button" onclick="nbSendRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3.5 py-2 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-purple-950/40 transition">
                 <i class="fa-regular fa-paper-plane"></i>
                 <span>Disparar Agora</span>
               </button>
@@ -8721,7 +8690,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (pillsEl) {
         pillsEl.innerHTML = periods.map(p => {
           const act = NB_DASH_PERIOD === p;
-          return `<button type="button" onclick="NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          return `<button type="button" onclick="NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
@@ -8746,7 +8715,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           actList.className = "py-6 text-center text-xs text-zinc-500";
           actList.textContent = "Nenhuma atividade ainda. Assim que um lead der /start no seu bot, ela aparece aqui.";
         } else {
-          actList.className = "divide-y divide-[#24181a] text-left";
+          actList.className = "divide-y divide-[#211730] text-left";
           actList.innerHTML = leads.slice(0, 8).map(l => `
             <div class="py-3 flex items-center justify-between text-xs">
               <div class="flex items-center gap-3">
@@ -8770,7 +8739,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (pillsEl) {
         pillsEl.innerHTML = periods.map(p => {
           const act = NB_FIN_PERIOD === p;
-          return `<button type="button" onclick="NB_FIN_PERIOD='${p}'; nbRenderFinanceView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          return `<button type="button" onclick="NB_FIN_PERIOD='${p}'; nbRenderFinanceView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
@@ -8786,7 +8755,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (statusEl) {
         statusEl.innerHTML = statuses.map(s => {
           const act = NB_FIN_STATUS === s;
-          return `<button type="button" onclick="NB_FIN_STATUS='${s}'; nbRenderFinanceView();" class="px-3 py-1 rounded-full text-xs font-semibold transition ${act ? 'bg-[#ef4444] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${s}</button>`;
+          return `<button type="button" onclick="NB_FIN_STATUS='${s}'; nbRenderFinanceView();" class="px-3 py-1 rounded-full text-xs font-semibold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${s}</button>`;
         }).join('');
       }
 
@@ -8822,14 +8791,14 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (filteredTx.length === 0) {
           txCont.className = "py-16 flex flex-col items-center justify-center text-center space-y-2";
           txCont.innerHTML = `
-            <div class="w-10 h-10 rounded-xl bg-[#181012] border border-[#2b1d20] text-zinc-500 flex items-center justify-center text-base mb-1">
+            <div class="w-10 h-10 rounded-xl bg-[#181012] border border-[#291d3a] text-zinc-500 flex items-center justify-center text-base mb-1">
               <i class="fa-solid fa-wallet"></i>
             </div>
             <p class="text-xs font-extrabold uppercase tracking-wider text-white">NENHUMA TRANSAÇÃO ENCONTRADA</p>
             <p class="text-xs text-zinc-500">Ajuste os filtros ou gere um PIX no bot para visualizar e gerenciar aqui.</p>
           `;
         } else {
-          txCont.className = "divide-y divide-[#24181a]";
+          txCont.className = "divide-y divide-[#211730]";
           txCont.innerHTML = filteredTx.map(tx => {
             const isPaid = tx.status === "paid" || Boolean(tx.delivered);
             const isTest = Boolean(tx.is_test) || String(tx.tx_id || "").startsWith("test_");
@@ -8850,7 +8819,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                   ${testBadge}
                   <div>
                     <span class="font-bold text-white">${escapeHtml(tx.offer_name || 'Plano VIP')}</span>
-                    <span class="text-[#ef4444] font-bold ml-2">${valFmt}</span>
+                    <span class="text-[#a855f7] font-bold ml-2">${valFmt}</span>
                     <span class="text-zinc-500 ml-2">${escapeHtml(botName)} · Lead ID ${escapeHtml(String(tx.user_id || ''))}</span>
                     <span class="block text-[11px] text-zinc-500 font-mono mt-0.5">TX: ${escapeHtml(String(tx.tx_id || '').slice(0, 28))} ${dateStr ? '· ' + escapeHtml(dateStr) : ''}</span>
                   </div>
@@ -8968,7 +8937,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <div class="space-y-2">${checksHtml}</div>
           <div class="mt-3 p-3.5 rounded-xl bg-[#140e10] border border-[#311f23] space-y-2">
             <div class="font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-key text-[#ef4444]"></i>
+              <i class="fa-solid fa-key text-[#a855f7]"></i>
               <span>Comandos Secretos para Testar no Chat do Telegram (sem precisar pagar):</span>
             </div>
             <p class="text-[11px] text-zinc-400">Envie no privado do seu bot após gerar o PIX (soma nas vendas e entrega o Link VIP real; depois clique em <b>Limpar Vendas de Teste</b> para zerar):</p>
