@@ -249,8 +249,70 @@
       </div>
     </header>
 
-    <!-- ÁREA CENTRAL ROLÁVEL -->
-    <div class="flex-1 overflow-y-auto pb-28">
+    <!-- CORPO PRINCIPAL: BARRA ESQUERDA (NAVEGAÇÃO) + CENTRO (TELAS) + BARRA DIREITA (FLUXO VERTICAL) -->
+    <div class="flex-1 flex overflow-hidden w-full">
+
+      <!-- BARRA LATERAL ESQUERDA: NAVEGAÇÃO ENTRE PAINÉIS (ÍCONES + TEXTO) -->
+      <aside id="nb-left-nav" class="w-[210px] shrink-0 border-r border-[#211730] bg-[#0a0710]/95 px-3 py-5 flex flex-col justify-between z-20 overflow-y-auto">
+        <div class="space-y-1.5">
+          <span class="px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-500 block mb-2.5">Menu Principal</span>
+
+          <div class="relative">
+            <button id="nb-dock-btn-dashboard" onclick="nbSwitchMainView('dashboard')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Painel — Resultado dos seus bots">
+              <i class="fa-solid fa-border-all w-4 text-center text-sm"></i>
+              <span>Painel</span>
+              <span id="nb-dock-dot-dashboard" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-bots" onclick="nbSwitchMainView('bots')" class="w-full px-3.5 py-2.5 rounded-xl bg-[#a855f7] text-white flex items-center gap-3 text-xs font-bold shadow-md shadow-purple-950/50 transition text-left" title="Meus Bots — Bots conectados">
+              <i class="fa-solid fa-robot w-4 text-center text-sm"></i>
+              <span>Meus Bots</span>
+              <span id="nb-dock-dot-bots" class="w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-clients" onclick="nbSwitchMainView('clients')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Base de Clientes — Leads e Controle de Acessos">
+              <i class="fa-solid fa-users w-4 text-center text-sm"></i>
+              <span>Clientes</span>
+              <span id="nb-dock-dot-clients" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-remarketing" onclick="nbSwitchMainView('remarketing')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Remarketing — Campanhas e disparos">
+              <i class="fa-solid fa-bullhorn w-4 text-center text-sm"></i>
+              <span>Remarketing</span>
+              <span id="nb-dock-dot-remarketing" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-finance" onclick="nbSwitchMainView('finance')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Financeiro — Receita e pagamentos">
+              <i class="fa-solid fa-wallet w-4 text-center text-sm"></i>
+              <span>Financeiro</span>
+              <span id="nb-dock-dot-finance" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-gateways" onclick="nbSwitchMainView('gateways')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Gateways de pagamento">
+              <i class="fa-regular fa-credit-card w-4 text-center text-sm"></i>
+              <span>Gateways</span>
+              <span id="nb-dock-dot-gateways" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="px-2 pt-4 border-t border-[#1c1328] text-[10px] text-zinc-500">
+          RicoBot • Painel Ativo
+        </div>
+      </aside>
+
+      <!-- ÁREA CENTRAL ROLÁVEL -->
+      <div class="flex-1 overflow-y-auto pb-16">
 
       <!-- =====================================================
            TELA 1: MEUS BOTS — BOTS CONECTADOS (LIMPA, SEM REPETIÇÕES)
@@ -260,7 +322,7 @@
           <div>
             <span class="text-[10px] font-bold uppercase tracking-widest text-[#a855f7] block">MEUS BOTS</span>
             <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
-            <p class="text-xs text-zinc-400 mt-1">Selecione bots para visualizar o fluxo configurado ou clique em um bot para editar.</p>
+            <p class="text-xs text-zinc-400 mt-1">Clique em um bot para editar ou use a barra lateral direita para visualizar o fluxo completo.</p>
           </div>
           <div class="flex items-center gap-2.5">
             <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-purple-950/40 transition">
@@ -272,19 +334,6 @@
 
         <!-- GRADE DE CARDS DOS BOTS CONECTADOS -->
         <div id="nb-bots-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1"></div>
-        <div class="nb-card p-4 space-y-3">
-          <div class="flex flex-wrap items-center gap-3">
-            <button id="nb-flow-open" type="button" disabled onclick="nbOpenSelectedFlow()" class="px-4 py-2 rounded-lg bg-[#a855f7] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white">Visualizar fluxo completo</button>
-            <span id="nb-flow-selection-count" class="text-xs text-zinc-400">Selecione pelo menos um bot</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <input id="nb-group-name" class="nb-input !w-auto flex-1 min-w-[180px]" maxlength="80" placeholder="Nome da operação">
-            <button type="button" onclick="nbCreateOperationGroup()" class="px-3 py-2 rounded-lg border border-[#36204f] text-xs text-white">Criar operação com selecionados</button>
-            <select id="nb-group-select" class="nb-select !w-auto" onchange="nbSelectOperationGroup(this.value)"><option value="">Operações salvas</option></select>
-            <button type="button" onclick="nbRemoveOperationGroup()" class="px-3 py-2 text-xs text-rose-400">Excluir operação</button>
-          </div>
-          <p id="nb-group-feedback" class="text-xs text-zinc-400">Operações organizam bots em sequência; não criam integração automática entre eles.</p>
-        </div>
       </div>
       <div id="nb-view-flow-canvas" class="hidden max-w-[1400px] mx-auto px-6 md:px-10 pt-8 space-y-5">
         <div class="flex flex-wrap items-center justify-between gap-4">
@@ -2139,51 +2188,59 @@
         <div id="nb-rmk-campaigns-container"></div>
       </div>
 
-    </div>
-
-    <!-- DOCK INFERIOR FLUTUANTE RICOBOT -->
-    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-2 rounded-2xl bg-[#120d1b]/95 border border-[#2b1e3d] shadow-2xl backdrop-blur">
-      <div class="relative">
-        <button id="nb-dock-btn-dashboard" onclick="nbSwitchMainView('dashboard')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Painel — Resultado dos seus bots">
-          <i class="fa-solid fa-border-all"></i>
-        </button>
-        <span id="nb-dock-dot-dashboard" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
       </div>
 
-      <div class="relative">
-        <button id="nb-dock-btn-bots" onclick="nbSwitchMainView('bots')" class="w-10 h-10 rounded-xl bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-950/50 transition" title="Meus Bots — Bots conectados">
-          <i class="fa-solid fa-robot"></i>
-        </button>
-        <span id="nb-dock-dot-bots" class="w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
-      </div>
+      <!-- BARRA LATERAL DIREITA VERTICAL: VISUALIZAÇÃO DE FLUXO COMPLETO E OPERAÇÕES -->
+      <aside id="nb-right-flow-sidebar" class="w-[300px] shrink-0 border-l border-[#211730] bg-[#0a0710]/95 p-5 flex flex-col justify-between z-20 overflow-y-auto">
+        <div class="space-y-4">
+          <div class="border-b border-[#211730] pb-3.5">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-[#a855f7] block">VISUALIZAÇÃO DE FLUXO</span>
+            <h3 class="text-sm font-bold text-white mt-0.5 flex items-center gap-2">
+              <i class="fa-solid fa-diagram-project text-[#a855f7] text-xs"></i>
+              <span>Fluxo Completo</span>
+            </h3>
+            <p class="text-[11px] text-zinc-400 mt-1 leading-relaxed">Ative a seleção quando quiser escolher os bots para inspecionar o fluxo.</p>
+          </div>
 
-      <div class="relative">
-        <button id="nb-dock-btn-clients" onclick="nbSwitchMainView('clients')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Base de Clientes — Leads e Controle de Acessos">
-          <i class="fa-solid fa-users"></i>
-        </button>
-        <span id="nb-dock-dot-clients" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
-      </div>
+          <!-- BOTÃO PARA ATIVAR/OCULTAR CAIXINHAS DE SELEÇÃO NOS CARDS -->
+          <div class="space-y-2">
+            <button type="button" id="nb-btn-toggle-select-mode" onclick="nbToggleFlowSelectMode()" class="w-full px-3.5 py-2.5 rounded-xl bg-[#150e22] hover:bg-[#1e1430] border border-[#33204a] text-xs font-semibold text-zinc-200 flex items-center justify-between transition">
+              <span class="flex items-center gap-2">
+                <i class="fa-regular fa-square-check text-[#a855f7]"></i>
+                <span id="nb-btn-toggle-select-label">Selecionar bots</span>
+              </span>
+              <span id="nb-select-mode-badge" class="text-[10px] px-2 py-0.5 rounded-md bg-[#231636] text-zinc-400">Oculto</span>
+            </button>
+            <div id="nb-right-flow-bot-list" class="hidden space-y-1.5 pt-1 max-h-48 overflow-y-auto"></div>
+          </div>
 
-      <div class="relative">
-        <button id="nb-dock-btn-remarketing" onclick="nbSwitchMainView('remarketing')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Remarketing — Campanhas e disparos">
-          <i class="fa-solid fa-bullhorn"></i>
-        </button>
-        <span id="nb-dock-dot-remarketing" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
-      </div>
+          <!-- BOTÃO PRINCIPAL: VISUALIZAR FLUXO COMPLETO -->
+          <div class="space-y-2 pt-1">
+            <button id="nb-flow-open" type="button" disabled onclick="nbOpenSelectedFlow()" class="w-full px-4 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-purple-950/40 transition">
+              <i class="fa-solid fa-diagram-project"></i>
+              <span>Visualizar fluxo completo</span>
+            </button>
+            <span id="nb-flow-selection-count" class="text-[11px] text-zinc-400 block text-center">Selecione pelo menos um bot</span>
+          </div>
 
-      <div class="relative">
-        <button id="nb-dock-btn-finance" onclick="nbSwitchMainView('finance')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Financeiro — Receita e pagamentos">
-          <i class="fa-solid fa-wallet"></i>
-        </button>
-        <span id="nb-dock-dot-finance" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
-      </div>
+          <!-- OPERAÇÕES EM SEQUÊNCIA (VERTICAL) -->
+          <div class="border-t border-[#211730] pt-4 space-y-2.5">
+            <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">Operações Salvas</label>
+            <input id="nb-group-name" class="nb-input text-xs" maxlength="80" placeholder="Nome da operação">
+            <button type="button" onclick="nbCreateOperationGroup()" class="w-full px-3 py-2 rounded-lg bg-[#161021] hover:bg-[#211730] border border-[#36204f] text-xs font-semibold text-white transition">
+              Criar operação com selecionados
+            </button>
+            <select id="nb-group-select" class="nb-select text-xs" onchange="nbSelectOperationGroup(this.value)">
+              <option value="">Operações salvas</option>
+            </select>
+            <button type="button" onclick="nbRemoveOperationGroup()" class="w-full px-3 py-2 rounded-lg bg-rose-950/30 hover:bg-rose-950/50 border border-rose-900/40 text-xs font-semibold text-rose-400 transition">
+              Excluir operação
+            </button>
+            <p id="nb-group-feedback" class="text-[11px] text-zinc-400 leading-relaxed pt-1">Operações organizam bots em sequência; não criam integração automática entre eles.</p>
+          </div>
+        </div>
+      </aside>
 
-      <div class="relative">
-        <button id="nb-dock-btn-gateways" onclick="nbSwitchMainView('gateways')" class="w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition" title="Gateways de pagamento">
-          <i class="fa-regular fa-credit-card"></i>
-        </button>
-        <span id="nb-dock-dot-gateways" class="hidden w-1 h-1 rounded-full bg-[#a855f7] absolute -bottom-1.5 left-1/2 -translate-x-1/2"></span>
-      </div>
     </div>
 
     <!-- MODAL: ABRIR CHAT COM O LEAD (HISTÓRICO E MENSAGEM DIRETA NO TELEGRAM) -->
@@ -7089,6 +7146,13 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     let NB_SELECTED_FLOW_BOTS = [];
+    let NB_FLOW_SELECT_MODE = false;
+
+    function nbToggleFlowSelectMode(forceVal) {
+      NB_FLOW_SELECT_MODE = typeof forceVal === 'boolean' ? forceVal : !NB_FLOW_SELECT_MODE;
+      nbRenderBotsList();
+    }
+
     function nbToggleFlowSelection(id, checked) {
       NB_SELECTED_FLOW_BOTS = checked ? [...new Set([...NB_SELECTED_FLOW_BOTS, id])] : NB_SELECTED_FLOW_BOTS.filter(x => x !== id);
       nbRenderBotsList();
@@ -7137,8 +7201,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!botId) return;
       nbOpenBotDetail(botId);
       if (subtab) {
+        const targetTab = subtab === 'config' ? 'welcome' : subtab;
         setTimeout(() => {
-          if (typeof nbSwitchBotSubtab === 'function') nbSwitchBotSubtab(subtab);
+          if (typeof nbSwitchBotTab === 'function') nbSwitchBotTab(targetTab);
         }, 40);
       }
     }
@@ -7582,6 +7647,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbOpenSelectedFlow() {
       if (!NB_SELECTED_FLOW_BOTS.some(id => (STATE.flow_bots || []).some(b => b.id === id))) return;
+      NB_FLOW_SELECT_MODE = false;
       const banner = document.getElementById('nb-flow-verify-banner');
       if (banner) banner.classList.add('hidden');
       nbRenderFlowCanvas();
@@ -7605,16 +7671,47 @@ quer que eu te mostre as opções de acesso?</textarea>
         groupSelect.value = previous;
       }
 
+      // Atualizar controles do modo de seleção na barra vertical direita
+      const selBadge = document.getElementById('nb-select-mode-badge');
+      const selLabel = document.getElementById('nb-btn-toggle-select-label');
+      const rightBotList = document.getElementById('nb-right-flow-bot-list');
+      if (selBadge) {
+        selBadge.textContent = NB_FLOW_SELECT_MODE ? 'Ativo' : 'Oculto';
+        selBadge.className = NB_FLOW_SELECT_MODE
+          ? 'text-[10px] px-2 py-0.5 rounded-md bg-[#a855f7] text-white font-bold'
+          : 'text-[10px] px-2 py-0.5 rounded-md bg-[#231636] text-zinc-400';
+      }
+      if (selLabel) {
+        selLabel.textContent = NB_FLOW_SELECT_MODE ? 'Ocultar seleção' : 'Selecionar bots';
+      }
+      if (rightBotList) {
+        rightBotList.classList.toggle('hidden', !NB_FLOW_SELECT_MODE);
+        rightBotList.innerHTML = bots.map(b => {
+          const checked = NB_SELECTED_FLOW_BOTS.includes(b.id);
+          return `<label class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${checked ? 'border-[#a855f7]/70 bg-[#1c102b]' : 'border-[#241934] bg-[#110c19]'} text-xs text-zinc-200 cursor-pointer hover:border-[#a855f7]/50 transition">
+            <span class="truncate font-medium">${escapeHtml(b.username || '@bot')}</span>
+            <input type="checkbox" class="accent-[#a855f7]" ${checked ? 'checked' : ''} onchange="nbToggleFlowSelection('${b.id}', this.checked)">
+          </label>`;
+        }).join('');
+      }
+
       const cardsHtml = bots.map(b => {
         const isAct = b.active !== false;
         const isAi = b.mode === 'ai';
+        const isSel = NB_SELECTED_FLOW_BOTS.includes(b.id);
         const sales = Number(b.sales_today || 0);
         const rev = Number(b.revenue_today || 0).toFixed(2).replace('.', ',');
         const modeTag = isAi
           ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-purple-950/90 border border-[#a855f7]/50 text-[10px] text-[#a855f7] font-bold">FLUXO IA</span>'
           : '<span class="ml-2 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700/60 text-[10px] text-zinc-300 font-bold">BOTÕES</span>';
+        const selBadgeHtml = (!NB_FLOW_SELECT_MODE && isSel)
+          ? '<span class="ml-1.5 px-1.5 py-0.5 rounded bg-purple-950/90 border border-[#a855f7]/60 text-[9px] text-purple-200 font-bold">✓ Fluxo</span>'
+          : '';
+        const selectCheckboxHtml = NB_FLOW_SELECT_MODE
+          ? `<label onclick="event.stopPropagation()" class="inline-flex items-center gap-2 text-[11px] text-purple-200 mt-2.5 px-2.5 py-1 rounded-lg bg-[#191029] border border-[#3a2259] cursor-pointer"><input type="checkbox" class="accent-[#a855f7]" ${isSel ? 'checked' : ''} onchange="nbToggleFlowSelection('${b.id}', this.checked)"> Selecionar para o fluxo</label>`
+          : '';
         return `
-          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-4 flex flex-col justify-between cursor-pointer hover:border-[#a855f7]/60 transition group min-h-[140px]">
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-4 flex flex-col justify-between cursor-pointer ${isSel ? 'border-[#a855f7]/70 ring-1 ring-[#a855f7]/30' : 'hover:border-[#a855f7]/60'} transition group min-h-[140px]">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-[#1d102e] border border-[#391b52] text-[#a855f7] flex items-center justify-center text-sm shrink-0">
@@ -7624,6 +7721,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                   <div class="flex items-center flex-wrap">
                     <h3 class="text-sm font-bold text-white group-hover:text-[#a855f7] transition">${escapeHtml(b.username || '@bot')}</h3>
                     ${modeTag}
+                    ${selBadgeHtml}
                   </div>
                   <span class="inline-flex items-center gap-1.5 text-[11px] ${isAct ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">
                     <span class="w-1.5 h-1.5 rounded-full ${isAct ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
@@ -7636,7 +7734,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
 
-            <label onclick="event.stopPropagation()" class="inline-flex items-center gap-2 text-[11px] text-zinc-300 mt-2 cursor-pointer"><input type="checkbox" ${NB_SELECTED_FLOW_BOTS.includes(b.id) ? 'checked' : ''} onchange="nbToggleFlowSelection('${b.id}', this.checked)"> Selecionar para o fluxo</label>
+            ${selectCheckboxHtml}
             <div class="border-t border-[#211730] my-3 pt-3 flex items-baseline justify-between">
               <div>
                 <span class="text-base font-bold text-white block">${sales} vendas</span>
@@ -9040,14 +9138,19 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (el) el.classList.toggle('hidden', k !== view);
       });
 
+      const rightFlowSidebar = document.getElementById('nb-right-flow-sidebar');
+      if (rightFlowSidebar) {
+        rightFlowSidebar.classList.toggle('hidden', view !== 'bots');
+      }
+
       ['dashboard', 'bots', 'clients', 'remarketing', 'finance', 'gateways'].forEach(k => {
         const btn = document.getElementById('nb-dock-btn-' + k);
         const dot = document.getElementById('nb-dock-dot-' + k);
         const isAct = (view === k) || ((view === 'detail' || view === 'modesel' || view === 'flow') && k === 'bots');
         if (btn) {
           btn.className = isAct
-            ? "w-10 h-10 rounded-xl bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-950/50 transition"
-            : "w-10 h-10 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-center text-sm transition";
+            ? "w-full px-3.5 py-2.5 rounded-xl bg-[#a855f7] text-white flex items-center gap-3 text-xs font-bold shadow-md shadow-purple-950/50 transition text-left"
+            : "w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left";
         }
         if (dot) dot.classList.toggle('hidden', !isAct);
       });
