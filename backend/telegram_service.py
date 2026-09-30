@@ -1731,7 +1731,7 @@ class ActiveBotManager:
             if disc_pct not in auth_discounts:
                 disc_pct = 0
 
-            active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+            active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
             if active_bumps:
                 await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=0)
             else:
@@ -1765,7 +1765,7 @@ class ActiveBotManager:
                 accepted_list.append(bump_idx)
             await self.state_saver(state)
 
-            active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+            active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
             next_idx = bump_idx + 1
             if next_idx < len(active_bumps):
                 await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=next_idx)
@@ -1773,6 +1773,20 @@ class ActiveBotManager:
                 chosen_bumps = [active_bumps[i] for i in accepted_list if 0 <= i < len(active_bumps)]
                 lead["accepted_bump_indices"] = []
                 await self._generate_flow_checkout(callback, fb, state, plan_id, disc_pct, accepted_bumps=chosen_bumps)
+
+    def _get_active_bumps_for_plan(self, fb: Dict[str, Any], plan_id: str) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        target_pid = str(plan_id or "")[:20]
+        for b in (fb.get("order_bumps") or []):
+            if not isinstance(b, dict) or not b.get("active", True):
+                continue
+            pids = b.get("plan_ids")
+            if isinstance(pids, list) and len(pids) > 0:
+                allowed = [str(x)[:20] for x in pids if x]
+                if allowed and target_pid and target_pid not in allowed:
+                    continue
+            out.append(b)
+        return out
 
     async def _present_flow_order_bump(
         self,
@@ -1782,7 +1796,7 @@ class ActiveBotManager:
         disc_pct: int,
         bump_index: int
     ):
-        active_bumps = [b for b in fb.get("order_bumps", []) if b.get("active", True)]
+        active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
         if bump_index >= len(active_bumps):
             return
         bump = active_bumps[bump_index]

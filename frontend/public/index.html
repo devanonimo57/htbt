@@ -583,6 +583,12 @@
                 </div>
               </div>
 
+              <div class="space-y-1.5">
+                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">PLANOS EM QUE ESTE ORDER BUMP É OFERECIDO</label>
+                <div id="nb-ob-plan-chips" class="flex flex-wrap gap-2"></div>
+                <p class="text-[11px] text-zinc-500">Selecione em quais planos este adicional deve aparecer antes de gerar o PIX.</p>
+              </div>
+
               <div>
                 <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCRIÇÃO</label>
                 <textarea id="nb-ob-desc" rows="2" placeholder="O que é esse adicional (mostrado ao cliente na oferta)" class="nb-input resize-y"></textarea>
@@ -6954,28 +6960,76 @@ quer que eu te mostre as opções de acesso?</textarea>
     // =========================================================
     // ABA 4: ORDER BUMP
     // =========================================================
+    let NB_OB_TEMP_PLAN_IDS = [];
+
+    function nbRenderOrderBumpPlanChips() {
+      const b = nbGetCurrentBot();
+      const chipsEl = document.getElementById('nb-ob-plan-chips');
+      if (!chipsEl || !b) return;
+      const plans = b.plans || [];
+      if (!plans.length) {
+        chipsEl.innerHTML = '<span class="text-xs text-zinc-500">Cadastre um plano na aba Planos</span>';
+        return;
+      }
+      chipsEl.innerHTML = plans.map((p, idx) => {
+        const pid = String(p.id || `plan_${idx + 1}`);
+        const isSel = NB_OB_TEMP_PLAN_IDS.includes(pid);
+        const pFmt = `R$${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
+        return `
+          <button type="button" onclick="nbToggleOrderBumpPlan('${escapeHtml(pid)}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
+            ${isSel ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
+            <span>${escapeHtml(p.name || 'Plano')} — ${pFmt}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function nbToggleOrderBumpPlan(planId) {
+      if (NB_OB_TEMP_PLAN_IDS.includes(planId)) {
+        NB_OB_TEMP_PLAN_IDS = NB_OB_TEMP_PLAN_IDS.filter(id => id !== planId);
+      } else {
+        NB_OB_TEMP_PLAN_IDS.push(planId);
+      }
+      nbRenderOrderBumpPlanChips();
+    }
+
     function nbRenderOrderBumpTab(b) {
       const bumps = b.order_bumps || (b.order_bumps = []);
+      const plans = b.plans || [];
       document.getElementById('nb-ob-count-badge').textContent = `${String(bumps.length).padStart(2, '0')} / 10`;
 
       const listEl = document.getElementById('nb-ob-saved-list');
-      listEl.innerHTML = bumps.map((ob, idx) => `
-        <div class="p-3.5 rounded-xl bg-[#0c0b08] border border-[#26241b] flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
-            <div>
-              <span class="text-xs font-bold text-white">${escapeHtml(ob.title || 'Order Bump')}</span>
-              <span class="text-xs text-[#ef4444] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
-              <p class="text-[11px] text-zinc-500 truncate max-w-md">${escapeHtml(ob.description || '')}</p>
+      listEl.innerHTML = bumps.map((ob, idx) => {
+        const obPlanIds = Array.isArray(ob.plan_ids) && ob.plan_ids.length ? ob.plan_ids : plans.map((p, i) => String(p.id || `plan_${i + 1}`));
+        const linkedNames = plans
+          .filter((p, i) => obPlanIds.includes(String(p.id || `plan_${i + 1}`)))
+          .map(p => p.name || 'Plano');
+        const planTag = (!plans.length || linkedNames.length === plans.length)
+          ? 'Todos os planos'
+          : (linkedNames.length ? `Planos: ${linkedNames.join(', ')}` : 'Nenhum plano selecionado');
+        return `
+          <div class="p-3.5 rounded-xl bg-[#0c0b08] border border-[#26241b] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-2 h-2 rounded-full ${ob.active !== false ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
+              <div>
+                <span class="text-xs font-bold text-white">${escapeHtml(ob.title || 'Order Bump')}</span>
+                <span class="text-xs text-[#ef4444] font-semibold ml-2">+ R$ ${Number(ob.price || 0).toFixed(2).replace('.', ',')}</span>
+                <span class="ml-2 px-2 py-0.5 rounded bg-[#171611] border border-[#2c2a1f] text-[10px] text-zinc-300">${escapeHtml(planTag)}</span>
+                <p class="text-[11px] text-zinc-500 truncate max-w-md mt-0.5">${escapeHtml(ob.description || '')}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="nbOpenOrderBumpForm(${idx})" class="px-2.5 py-1 rounded bg-[#181711] hover:bg-[#25231a] text-xs text-zinc-300">Editar</button>
+              <button type="button" onclick="nbDeleteOrderBump(${idx})" class="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-xs text-rose-300"><i class="fa-regular fa-trash-can"></i></button>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button type="button" onclick="nbOpenOrderBumpForm(${idx})" class="px-2.5 py-1 rounded bg-[#181711] hover:bg-[#25231a] text-xs text-zinc-300">Editar</button>
-            <button type="button" onclick="nbDeleteOrderBump(${idx})" class="px-2.5 py-1 rounded bg-rose-950/40 hover:bg-rose-900/60 text-xs text-rose-300"><i class="fa-regular fa-trash-can"></i></button>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
+      if (NB_EDITING_BUMP_IDX < 0 && !NB_OB_TEMP_PLAN_IDS.length && plans.length) {
+        NB_OB_TEMP_PLAN_IDS = plans.map((p, i) => String(p.id || `plan_${i + 1}`));
+      }
+      nbRenderOrderBumpPlanChips();
       nbRenderOrderBumpColorPickers();
     }
 
@@ -7008,6 +7062,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const b = nbGetCurrentBot();
       if (!b) return;
       NB_EDITING_BUMP_IDX = idx;
+      const allPlanIds = (b.plans || []).map((p, i) => String(p.id || `plan_${i + 1}`));
       if (idx >= 0 && b.order_bumps && b.order_bumps[idx]) {
         const ob = b.order_bumps[idx];
         document.getElementById('nb-ob-form-title').textContent = "Editar order bump";
@@ -7024,14 +7079,17 @@ quer que eu te mostre as opções de acesso?</textarea>
         NB_OB_ACCEPT_COLOR = ob.accept_color || "Padrão";
         NB_OB_REJECT_COLOR = ob.reject_color || "Padrão";
         NB_OB_TEMP_MEDIAS = JSON.parse(JSON.stringify(ob.medias || []));
+        NB_OB_TEMP_PLAN_IDS = Array.isArray(ob.plan_ids) && ob.plan_ids.length ? [...ob.plan_ids] : [...allPlanIds];
       } else {
         nbResetOrderBumpForm();
       }
+      nbRenderOrderBumpPlanChips();
       nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
       nbRenderOrderBumpColorPickers();
     }
 
     function nbResetOrderBumpForm() {
+      const b = nbGetCurrentBot();
       NB_EDITING_BUMP_IDX = -1;
       document.getElementById('nb-ob-form-title').textContent = "Novo order bump";
       document.getElementById('nb-ob-submit-btn').textContent = "Criar order bump";
@@ -7047,6 +7105,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_OB_ACCEPT_COLOR = "Padrão";
       NB_OB_REJECT_COLOR = "Padrão";
       NB_OB_TEMP_MEDIAS = [];
+      NB_OB_TEMP_PLAN_IDS = ((b && b.plans) || []).map((p, i) => String(p.id || `plan_${i + 1}`));
+      nbRenderOrderBumpPlanChips();
       nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
       nbRenderOrderBumpColorPickers();
     }
@@ -7057,11 +7117,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       const title = document.getElementById('nb-ob-title').value.trim() || "Adicional VIP";
       const rawPrice = document.getElementById('nb-ob-price').value.replace(',', '.');
       const price = parseFloat(rawPrice) || 9.90;
+      const allPlanIds = (b.plans || []).map((p, i) => String(p.id || `plan_${i + 1}`));
       const obj = {
-        id: "ob_" + Date.now(),
+        id: (NB_EDITING_BUMP_IDX >= 0 && b.order_bumps?.[NB_EDITING_BUMP_IDX]?.id) ? b.order_bumps[NB_EDITING_BUMP_IDX].id : ("ob_" + Date.now()),
         active: document.getElementById('nb-ob-active').checked,
         title,
         price,
+        plan_ids: NB_OB_TEMP_PLAN_IDS.length ? [...NB_OB_TEMP_PLAN_IDS] : [...allPlanIds],
         description: document.getElementById('nb-ob-desc').value,
         deliverable: document.getElementById('nb-ob-deliverable').value,
         offer_message: document.getElementById('nb-ob-offer-msg').value,
