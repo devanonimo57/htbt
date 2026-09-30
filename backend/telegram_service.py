@@ -577,6 +577,7 @@ class ActiveBotManager:
         eff_bot_id = (bot_id or "").strip()
 
         if eff_bot_id or eff_token:
+            matched_entries = []
             for fb in flow_bots:
                 if not isinstance(fb, dict):
                     continue
@@ -588,9 +589,12 @@ class ActiveBotManager:
                     or (eff_token and fb_tok == eff_token)
                     or (eff_token_prefix and fb_tg_id == eff_token_prefix)
                 ):
-                    if not fb.get("active", True) or fb.get("mode", "flow") != "flow":
-                        return None
-                    return fb
+                    matched_entries.append(fb)
+            if matched_entries:
+                for fb in matched_entries:
+                    if fb.get("active", True) and fb.get("mode", "flow") == "flow":
+                        return fb
+                return None
 
         for fb in flow_bots:
             if isinstance(fb, dict) and fb.get("active", True) and fb.get("mode", "flow") == "flow":
