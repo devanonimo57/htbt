@@ -2612,7 +2612,14 @@ class ActiveBotManager:
                 if resolved_bot:
                     _CURRENT_BOT_CTX.set(resolved_bot)
 
-            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
+            # A confirmação assíncrona de Pix deve registrar a entrega no arquivo,
+            # sem recriar um cliente ativo excluído pelo administrador.
+            memory = state.setdefault("memory", {})
+            active_lead = next((item for item in memory.get("leads", []) if str(item.get("telegram_id")) == str(user_id)), None)
+            archived_lead = next((item for item in memory.get("deleted_leads", []) if str(item.get("telegram_id")) == str(user_id)), None)
+            lead = active_lead or archived_lead
+            if lead is None:
+                lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
             self._cancel_downsell(str(user_id))
 
             is_upsell_payment = bool(tx_record.get("is_upsell"))

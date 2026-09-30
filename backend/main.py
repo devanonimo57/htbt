@@ -3,7 +3,7 @@ import json
 import secrets
 import hmac
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -250,6 +250,19 @@ def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     rec["bot_token"] = ""
 
+    def _mask_archived_secrets(value: Any) -> None:
+        sensitive = {"token", "bot_token", "pushin_pay_token", "gateway_secret", "secret", "password", "api_key", "ai_api_key"}
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key.lower() in sensitive:
+                    value[key] = REDACTED_SECRET_MASK if item else ""
+                else:
+                    _mask_archived_secrets(item)
+        elif isinstance(value, list):
+            for item in value:
+                _mask_archived_secrets(item)
+
+    _mask_archived_secrets(copy_state.get("memory", {}).get("deleted_leads", []))
     return copy_state
 
 
@@ -358,7 +371,7 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
 
     incoming = _preserve_existing_secrets(incoming, existing)
 
-    if isinstance(existing.get("memory"), dict) and existing["memory"].get("leads"):
+    if isinstance(existing.get("memory"), dict):
         incoming["memory"] = json.loads(json.dumps(existing["memory"]))
 
     if isinstance(existing.get("tx_records"), dict) and existing["tx_records"]:
@@ -568,10 +581,8 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
 
     memory = state.setdefault("memory", {"leads": []})
     leads = memory.get("leads", [])
-    if len(leads) > MAX_ACTIVE_LEADS:
-        memory["leads"] = leads[:MAX_ACTIVE_LEADS]
-        leads = memory["leads"]
-
+    # Nunca descarte clientes silenciosamente: um novo /start ou uma
+    # restauração podem ultrapassar a antiga limitação visual de 500.
     for lead in leads:
         if lead.get("stage") in ("Em conversa", "", None):
             lead["stage"] = "Conversando"
@@ -751,17 +762,71 @@ async def get_config_compat():
 async def post_config_compat(data: Dict[str, Any]):
     return await save_full_state(data)
 
+def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
+    """Arquiva sem perder sessões anteriores se o mesmo usuário voltou ao bot."""
+    telegram_id = str(lead.get("telegram_id"))
+    old = next((item for item in archived if str(item.get("telegram_id")) == telegram_id), None)
+    new_record = json.loads(json.dumps(lead))
+    new_record["deleted_at"] = datetime.now(timezone.utc).isoformat()
+    if old is None:
+        archived.append(new_record)
+        return
+    old_snapshot = json.loads(json.dumps(old))
+    earlier = old_snapshot.get("previous_records") or []
+    previous_version = {k: v for k, v in old_snapshot.items() if k != "previous_records"}
+    new_record["previous_records"] = [*earlier, previous_version]
+    old_history = old_snapshot.get("history") if isinstance(old_snapshot.get("history"), list) else []
+    new_history = new_record.get("history") if isinstance(new_record.get("history"), list) else []
+    new_record["history"] = [*old_history, *new_history]
+    old.clear()
+    old.update(new_record)
+
+
 @app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_lead(telegram_id: str):
-    bot_manager.cancel_lead_tasks(str(telegram_id))
     state = await _read_state_from_db()
     memory = state.setdefault("memory", {"leads": []})
     leads = memory.get("leads", [])
-    memory["leads"] = [l for l in leads if str(l.get("telegram_id")) != str(telegram_id)]
-    learning = state.setdefault("learning", {})
-    learning["evaluated_results"] = len(memory["leads"])
+    matched = [lead for lead in leads if str(lead.get("telegram_id")) == str(telegram_id)]
+    if not matched:
+        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+    archived = memory.setdefault("deleted_leads", [])
+    bot_manager.cancel_lead_tasks(str(telegram_id))
+    for lead in matched:
+        _archive_lead(archived, lead)
+    memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != str(telegram_id)]
     await _write_state_to_db(state)
     return {"status": "success", "state": _redact_state_secrets(state)}
+
+@app.post("/api/leads/{telegram_id}/restore", dependencies=[Depends(verify_admin_auth)])
+async def restore_lead(telegram_id: str):
+    state = await _read_state_from_db()
+    memory = state.setdefault("memory", {"leads": []})
+    archived = memory.setdefault("deleted_leads", [])
+    matched = [lead for lead in archived if str(lead.get("telegram_id")) == str(telegram_id)]
+    if not matched:
+        raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
+    leads = memory.setdefault("leads", [])
+    if any(str(lead.get("telegram_id")) == str(telegram_id) for lead in leads):
+        raise HTTPException(status_code=409, detail="Lead ativo já existe.")
+    memory["deleted_leads"] = [lead for lead in archived if str(lead.get("telegram_id")) != str(telegram_id)]
+    leads[:0] = [{key: value for key, value in lead.items() if key != "deleted_at"} for lead in matched]
+    await _write_state_to_db(state)
+    return {"status": "success", "state": _redact_state_secrets(state)}
+
+
+@app.delete("/api/leads/{telegram_id}/permanent", dependencies=[Depends(verify_admin_auth)])
+async def permanently_delete_lead(telegram_id: str):
+    state = await _read_state_from_db()
+    memory = state.setdefault("memory", {"leads": []})
+    archived = memory.get("deleted_leads", [])
+    remaining = [lead for lead in archived if str(lead.get("telegram_id")) != str(telegram_id)]
+    if len(remaining) == len(archived):
+        raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
+    memory["deleted_leads"] = remaining
+    await _write_state_to_db(state)
+    return {"status": "success", "state": _redact_state_secrets(state)}
+
 
 @app.post("/api/leads/{telegram_id}/reset", dependencies=[Depends(verify_admin_auth)])
 async def reset_lead_conversation(telegram_id: str):
@@ -788,17 +853,13 @@ async def reset_lead_conversation(telegram_id: str):
 @app.delete("/api/leads", dependencies=[Depends(verify_admin_auth)])
 async def clear_all_leads():
     state = await _read_state_from_db()
-    for lead in state.get("memory", {}).get("leads", []):
+    memory = state.setdefault("memory", {"leads": []})
+    leads = memory.get("leads", [])
+    archived = memory.setdefault("deleted_leads", [])
+    for lead in leads:
         bot_manager.cancel_lead_tasks(str(lead.get("telegram_id")))
-    state["memory"] = {"leads": []}
-    state["learning"] = {
-        "evaluated_results": 0,
-        "confirmed_purchases": 0,
-        "unpaid_checkouts": 0,
-        "conversations_without_purchase": 0,
-        "common_objections": [],
-        "top_plans": []
-    }
+        _archive_lead(archived, lead)
+    memory["leads"] = []
     await _write_state_to_db(state)
     return {"status": "success", "state": _redact_state_secrets(state)}
 

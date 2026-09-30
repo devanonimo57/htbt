@@ -260,7 +260,7 @@
           <div>
             <span class="text-[10px] font-bold uppercase tracking-widest text-[#a855f7] block">MEUS BOTS</span>
             <h1 class="text-2xl font-bold text-white mt-1">Bots conectados</h1>
-            <p class="text-xs text-zinc-400 mt-1">Clique em um bot para escolher o modo de operação e configurar seu fluxo.</p>
+            <p class="text-xs text-zinc-400 mt-1">Selecione bots para visualizar o fluxo configurado ou clique em um bot para editar.</p>
           </div>
           <div class="flex items-center gap-2.5">
             <button onclick="nbOpenAddBotModal()" class="px-4 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-lg shadow-purple-950/40 transition">
@@ -272,6 +272,26 @@
 
         <!-- GRADE DE CARDS DOS BOTS CONECTADOS -->
         <div id="nb-bots-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1"></div>
+        <div class="nb-card p-4 space-y-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="nb-flow-open" type="button" disabled onclick="nbOpenSelectedFlow()" class="px-4 py-2 rounded-lg bg-[#a855f7] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold text-white">Visualizar fluxo completo</button>
+            <span id="nb-flow-selection-count" class="text-xs text-zinc-400">Selecione pelo menos um bot</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <input id="nb-group-name" class="nb-input !w-auto flex-1 min-w-[180px]" maxlength="80" placeholder="Nome da operação">
+            <button type="button" onclick="nbCreateOperationGroup()" class="px-3 py-2 rounded-lg border border-[#36204f] text-xs text-white">Criar operação com selecionados</button>
+            <select id="nb-group-select" class="nb-select !w-auto" onchange="nbSelectOperationGroup(this.value)"><option value="">Operações salvas</option></select>
+            <button type="button" onclick="nbRemoveOperationGroup()" class="px-3 py-2 text-xs text-rose-400">Excluir operação</button>
+          </div>
+          <p id="nb-group-feedback" class="text-xs text-zinc-400">Operações organizam bots em sequência; não criam integração automática entre eles.</p>
+        </div>
+      </div>
+      <div id="nb-view-flow-canvas" class="hidden max-w-[1100px] mx-auto px-8 pt-10 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div><h1 class="text-2xl font-bold text-white">Fluxo completo</h1><p class="text-xs text-zinc-400">Mapa da configuração, não uma execução verificada. Ramos condicionais são alternativas, não etapas obrigatórias; conexões entre bots indicam somente a ordem da operação.</p></div>
+          <button type="button" onclick="nbSwitchMainView('bots')" class="px-4 py-2 rounded-lg border border-[#36204f] text-xs text-white">Voltar aos bots</button>
+        </div>
+        <div id="nb-flow-canvas-body" class="space-y-6 overflow-x-auto"></div>
       </div>
 
       <!-- =====================================================
@@ -306,6 +326,7 @@
         </div>
 
         <!-- PAINEL DE DIAGNÓSTICO E COMANDOS DE TESTE DO FUNIL -->
+        <p id="nb-save-status" role="status" class="text-xs text-zinc-400"></p>
         <div id="nb-bot-diagnostics-panel" class="hidden nb-card p-5 space-y-4 border border-[#36204f]">
           <div class="flex items-center justify-between border-b border-[#211730] pb-3">
             <div class="flex items-center gap-2">
@@ -1208,6 +1229,7 @@
               <i class="fa-solid fa-key text-zinc-400"></i>
               <span>Controle de Acessos</span>
             </button>
+            <button type="button" id="nb-clients-subtab-excluded" onclick="nbSwitchClientsSubtab('excluded')" class="px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent"><i class="fa-solid fa-trash-can"></i><span>Excluídos</span></button>
           </div>
         </div>
 
@@ -1331,6 +1353,11 @@
               <span class="text-[11px] text-zinc-500">Atualizado em tempo real</span>
             </div>
           </div>
+        </div>
+
+        <div id="nb-clients-panel-excluded" class="hidden space-y-4">
+          <p class="text-xs text-zinc-400">Leads excluídos não aparecem na base ativa. Restaure-os ou exclua-os permanentemente.</p>
+          <div class="nb-card overflow-x-auto"><table class="w-full text-left text-xs"><thead class="text-zinc-400 border-b border-[#211730]"><tr><th class="p-3">NOME / USERNAME</th><th class="p-3">ID</th><th class="p-3">CÓD. VENDAS</th><th class="p-3">PLANO</th><th class="p-3">BOT</th><th class="p-3">FLUXO</th><th class="p-3">STATUS</th><th class="p-3">DATA</th><th class="p-3">AÇÕES</th></tr></thead><tbody id="nb-excluded-table-body"></tbody></table></div>
         </div>
 
         <!-- ===================================================
@@ -5311,48 +5338,54 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function deleteLead(telegramId, e) {
       if (e) e.stopPropagation();
-      if (STATE.memory && Array.isArray(STATE.memory.leads)) {
-        STATE.memory.leads = STATE.memory.leads.filter(l => String(l.telegram_id) !== String(telegramId));
-      }
-      if (STATE.learning) {
-        STATE.learning.evaluated_results = (STATE.memory?.leads || []).length;
-      }
-      saveLocalBackup();
-      renderMemoryLeads();
-      renderLearningKpis();
+      if (!confirm(`Mover o lead ${telegramId} para Excluídos? Você poderá restaurá-lo depois.`)) return;
       try {
         const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}`, { method: 'DELETE' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.state) STATE = data.state;
-          saveLocalBackup();
-          renderMemoryLeads();
-          renderLearningKpis();
-        }
-      } catch (err) {}
+        if (!res.ok) throw new Error('Servidor recusou exclusão');
+        const data = await res.json();
+        if (data.state) STATE = data.state;
+        else await nbRefreshLeadsState();
+        saveLocalBackup(); renderMemoryLeads(); renderLearningKpis(); nbRenderClientsView();
+      } catch (err) { alert('Não foi possível mover o lead para Excluídos. Tente novamente.'); }
+    }
+
+    async function nbRefreshLeadsState() {
+      const res = await adminFetch('/api/state');
+      if (!res.ok) throw new Error('Falha ao atualizar leads');
+      STATE = { ...STATE, ...await res.json() };
+    }
+
+    async function nbRestoreExcludedLead(id) {
+      if (!confirm(`Restaurar o lead ${id} à base ativa?`)) return;
+      try {
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+        if (!res.ok) throw new Error('Falha ao restaurar');
+        const data = await res.json();
+        if (data.state) STATE = data.state; else await nbRefreshLeadsState();
+        saveLocalBackup(); renderMemoryLeads(); nbRenderClientsView();
+      } catch (err) { alert('Não foi possível restaurar o lead. Tente novamente.'); }
+    }
+
+    async function nbPermanentlyDeleteLead(id) {
+      if (!confirm(`Excluir PERMANENTEMENTE o lead ${id}? Esta ação não pode ser desfeita.`)) return;
+      try {
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/permanent`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Falha na exclusão definitiva');
+        const data = await res.json();
+        if (data.state) STATE = data.state; else await nbRefreshLeadsState();
+        saveLocalBackup(); renderMemoryLeads(); nbRenderClientsView();
+      } catch (err) { alert('Não foi possível excluir permanentemente o lead. Tente novamente.'); }
     }
 
     async function clearAllLeads() {
-      if (STATE.memory) STATE.memory.leads = [];
-      if (STATE.learning) {
-        STATE.learning.evaluated_results = 0;
-        STATE.learning.confirmed_purchases = 0;
-        STATE.learning.unpaid_checkouts = 0;
-        STATE.learning.conversations_without_purchase = 0;
-      }
-      saveLocalBackup();
-      renderMemoryLeads();
-      renderLearningKpis();
+      if (!confirm('Mover todos os leads ativos para Excluídos? Você poderá restaurá-los individualmente.')) return;
       try {
         const res = await adminFetch('/api/leads', { method: 'DELETE' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.state) STATE = data.state;
-          saveLocalBackup();
-          renderMemoryLeads();
-          renderLearningKpis();
-        }
-      } catch (err) {}
+        if (!res.ok) throw new Error('Falha ao excluir leads');
+        const data = await res.json();
+        if (data.state) STATE = data.state; else await nbRefreshLeadsState();
+        saveLocalBackup(); renderMemoryLeads(); renderLearningKpis(); nbRenderClientsView();
+      } catch (err) { alert('Não foi possível mover os leads para Excluídos. Tente novamente.'); }
     }
 
     function renderLearningKpis() {
@@ -6281,13 +6314,15 @@ quer que eu te mostre as opções de acesso?</textarea>
       const btn = document.getElementById('btn-save-top');
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[11px]"></i> <span>Salvando...</span>`;
 
-      if (tokenVal && tokenVal.includes(':')) {
-        const me = await verifyTelegramTokenDirect(tokenVal);
-        if (me && me.username) {
-          STATE.publish.bot_username = `@${me.username}`;
-          STATE.publish.bot_first_name = me.first_name || '';
+      try {
+        if (tokenVal && tokenVal.includes(':')) {
+          const me = await verifyTelegramTokenDirect(tokenVal);
+          if (me && me.username) {
+            STATE.publish.bot_username = `@${me.username}`;
+            STATE.publish.bot_first_name = me.first_name || '';
+          }
         }
-      }
+      } catch (err) { /* Token verification is advisory; state POST still runs. */ }
 
       saveLocalBackup();
 
@@ -6320,6 +6355,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         btn.innerHTML = savedOk
           ? `<i class="fa-regular fa-floppy-disk text-[11px]"></i> <span>Salvar</span>`
           : `<i class="fa-solid fa-triangle-exclamation text-amber-400 text-[11px]"></i> <span>Tentar Salvar</span>`;
+      }
+      if (!savedOk) {
+        const status = document.getElementById('nb-save-status');
+        if (status) { status.textContent = 'Não foi possível salvar no servidor. As alterações permanecem nesta página; tente novamente.'; status.className = 'text-xs text-rose-400'; }
       }
       return savedOk;
     }
@@ -6482,6 +6521,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbInitNeurotBot() {
       if (!Array.isArray(STATE.bot_folders)) STATE.bot_folders = [];
+      if (!Array.isArray(STATE.operation_groups)) STATE.operation_groups = [];
       if (!Array.isArray(STATE.flow_bots) || STATE.flow_bots.length === 0) {
         STATE.flow_bots = [nbBuildDefaultBotObj(STATE.publish || {})];
       }
@@ -6494,11 +6534,100 @@ quer que eu te mostre as opções de acesso?</textarea>
       return STATE.flow_bots.find(b => b.id === NB_CURRENT_BOT_ID) || STATE.flow_bots[0] || null;
     }
 
+    let NB_SELECTED_FLOW_BOTS = [];
+    function nbToggleFlowSelection(id, checked) {
+      NB_SELECTED_FLOW_BOTS = checked ? [...new Set([...NB_SELECTED_FLOW_BOTS, id])] : NB_SELECTED_FLOW_BOTS.filter(x => x !== id);
+      nbRenderBotsList();
+    }
+
+    function nbGroupFeedback(message, error = false) {
+      const el = document.getElementById('nb-group-feedback');
+      if (el) { el.textContent = message; el.className = `text-xs ${error ? 'text-rose-400' : 'text-zinc-400'}`; }
+    }
+
+    async function nbCreateOperationGroup() {
+      const name = (document.getElementById('nb-group-name')?.value || '').trim();
+      const ids = NB_SELECTED_FLOW_BOTS.filter(id => (STATE.flow_bots || []).some(b => b.id === id));
+      if (!name || !ids.length) { nbGroupFeedback('Informe um nome e selecione pelo menos um bot.', true); return; }
+      if (!Array.isArray(STATE.operation_groups)) STATE.operation_groups = [];
+      const group = { id: 'op_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), name, bot_ids: ids };
+      STATE.operation_groups.push(group);
+      if (!await saveFullState()) { STATE.operation_groups = STATE.operation_groups.filter(g => g.id !== group.id); nbGroupFeedback('Não foi possível salvar a operação no servidor.', true); return; }
+      nbRenderBotsList();
+      document.getElementById('nb-group-select').value = group.id;
+      nbGroupFeedback('Operação salva. A ordem dos bots segue a seleção.');
+    }
+
+    function nbSelectOperationGroup(id) {
+      const group = (STATE.operation_groups || []).find(g => g.id === id);
+      if (!group) return;
+      NB_SELECTED_FLOW_BOTS = (group.bot_ids || []).filter(botId => (STATE.flow_bots || []).some(b => b.id === botId));
+      nbRenderBotsList();
+      document.getElementById('nb-group-select').value = id;
+      nbGroupFeedback(`${group.name}: ${NB_SELECTED_FLOW_BOTS.length} bots na ordem salva. Selecione Visualizar fluxo completo.`);
+    }
+
+    async function nbRemoveOperationGroup() {
+      const id = document.getElementById('nb-group-select')?.value;
+      const group = (STATE.operation_groups || []).find(g => g.id === id);
+      if (!group || !confirm(`Excluir a operação "${group.name}"? Os bots não serão excluídos.`)) return;
+      STATE.operation_groups = STATE.operation_groups.filter(g => g.id !== id);
+      if (!await saveFullState()) { STATE.operation_groups.push(group); nbGroupFeedback('Não foi possível excluir a operação no servidor.', true); return; }
+      nbRenderBotsList();
+      nbGroupFeedback('Operação excluída.');
+    }
+
+    function nbFlowNode(title, detail, color = 'purple') {
+      const border = color === 'amber' ? 'border-amber-800/60' : 'border-[#573070]';
+      return `<div class="rounded-xl border ${border} bg-[#171020] px-4 py-3 min-w-[210px] max-w-[460px] shadow-lg"><div class="font-bold text-white text-xs">${escapeHtml(title)}</div><div class="text-[11px] text-zinc-400 mt-1 break-words">${escapeHtml(detail)}</div></div>`;
+    }
+
+    function nbRenderFlowCanvas() {
+      const host = document.getElementById('nb-flow-canvas-body');
+      if (!host) return;
+      const bots = NB_SELECTED_FLOW_BOTS.map(id => (STATE.flow_bots || []).find(b => b.id === id)).filter(Boolean);
+      host.innerHTML = bots.map((b, index) => {
+        const plans = Array.isArray(b.plans) ? b.plans : [];
+        const nodes = [
+          nbFlowNode('Início · /start', b.username || '@bot'),
+          nbFlowNode('Boas-vindas', b.welcome?.message || (b.welcome?.medias?.length ? 'Mídia configurada' : 'Mensagem não configurada')),
+          ...(b.welcome?.secondary_enabled ? [nbFlowNode('Mensagem secundária', b.welcome.secondary_message || 'Habilitada sem texto', 'amber')] : []),
+          ...(b.mode === 'ai' ? [nbFlowNode('Fluxo IA', 'Configuração de IA; respostas e execução não verificadas')] : [
+            ...(plans.length ? plans.map(p => nbFlowNode('Plano · ' + (p.name || 'Sem nome'), `R$ ${p.price ?? '—'} · ${p.duration || 'Duração não definida'} · Entrega: ${p.delivery_dest_type || 'não definida'} ${p.delivery_channel_name || p.delivery_channel_id || p.delivery_external_url || ''}`)) : [nbFlowNode('Planos', 'Nenhum plano configurado', 'amber')]),
+            ...(b.order_bumps || []).filter(o => o.active !== false).map(o => nbFlowNode('Antes do Pix · Order bump opcional', o.name || o.title || 'Oferta configurada')),
+            nbFlowNode('Pagamento · Pix', b.payments?.generated_message ? 'Mensagem de cobrança configurada' : 'Mensagem não configurada'),
+            ...(b.payments?.secondary_enabled ? [nbFlowNode('Mensagem secundária de cobrança', b.payments.secondary_message || 'Habilitada sem texto', 'amber')] : []),
+            ...(b.downsell_general?.enabled ? [nbFlowNode('Sem checkout · Downsell condicional', `${(b.downsell_general.sequences || []).length} sequência(s) configurada(s)`, 'amber')] : []),
+            ...(b.downsell_pix?.enabled ? [nbFlowNode('Pix não pago · Downsell condicional', `${(b.downsell_pix.sequences || []).length} sequência(s) configurada(s)`, 'amber')] : []),
+            nbFlowNode('Pix pago · Aprovação e entrega', b.payments?.approved_message ? 'Mensagem de aprovação configurada; entrega não verificada' : 'Mensagem não configurada', 'amber')
+          ])
+        ];
+        return `${index ? '<div class="text-xs text-amber-300 py-2">↓ Ordem da operação — passagem entre bots não configurada automaticamente</div>' : ''}<section class="nb-card p-5"><h2 class="text-sm font-bold text-white mb-2">${escapeHtml(b.username || '@bot')} <span class="text-[10px] text-zinc-400 font-normal">${b.mode === 'ai' ? 'IA' : 'Botões'} · configuração, não verificado</span></h2><div class="flex flex-col items-start gap-1">${nodes.map((node, i) => `${i ? '<div class="ml-5 text-[#a855f7] text-lg leading-none" aria-hidden="true">↓</div>' : ''}${node}`).join('')}</div></section>`;
+      }).join('') || '<p class="text-zinc-400">Nenhum bot selecionado.</p>';
+    }
+
+    function nbOpenSelectedFlow() {
+      if (!NB_SELECTED_FLOW_BOTS.some(id => (STATE.flow_bots || []).some(b => b.id === id))) return;
+      nbRenderFlowCanvas();
+      nbSwitchMainView('flow');
+    }
+
     function nbRenderBotsList() {
       const gridEl = document.getElementById('nb-bots-grid');
       if (!gridEl) return;
 
       const bots = STATE.flow_bots || [];
+      NB_SELECTED_FLOW_BOTS = NB_SELECTED_FLOW_BOTS.filter(id => bots.some(b => b.id === id));
+      const flowBtn = document.getElementById('nb-flow-open');
+      if (flowBtn) flowBtn.disabled = !NB_SELECTED_FLOW_BOTS.length;
+      const count = document.getElementById('nb-flow-selection-count');
+      if (count) count.textContent = NB_SELECTED_FLOW_BOTS.length ? `${NB_SELECTED_FLOW_BOTS.length} bot(s) selecionado(s) — ordem da seleção` : 'Selecione pelo menos um bot';
+      const groupSelect = document.getElementById('nb-group-select');
+      if (groupSelect) {
+        const previous = groupSelect.value;
+        groupSelect.innerHTML = '<option value="">Operações salvas</option>' + (STATE.operation_groups || []).map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join('');
+        groupSelect.value = previous;
+      }
 
       const cardsHtml = bots.map(b => {
         const isAct = b.active !== false;
@@ -6509,7 +6638,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           ? '<span class="ml-2 px-2 py-0.5 rounded-md bg-purple-950/90 border border-[#a855f7]/50 text-[10px] text-[#a855f7] font-bold">FLUXO IA</span>'
           : '<span class="ml-2 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700/60 text-[10px] text-zinc-300 font-bold">BOTÕES</span>';
         return `
-          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-5 flex flex-col justify-between cursor-pointer hover:border-[#a855f7]/60 transition group min-h-[195px]">
+          <div onclick="nbOpenBotDetail('${b.id}')" class="nb-card p-4 flex flex-col justify-between cursor-pointer hover:border-[#a855f7]/60 transition group min-h-[140px]">
             <div class="flex items-start justify-between gap-2">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-[#1d102e] border border-[#391b52] text-[#a855f7] flex items-center justify-center text-sm shrink-0">
@@ -6531,6 +6660,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               </button>
             </div>
 
+            <label onclick="event.stopPropagation()" class="inline-flex items-center gap-2 text-[11px] text-zinc-300 mt-2 cursor-pointer"><input type="checkbox" ${NB_SELECTED_FLOW_BOTS.includes(b.id) ? 'checked' : ''} onchange="nbToggleFlowSelection('${b.id}', this.checked)"> Selecionar para o fluxo</label>
             <div class="border-t border-[#211730] my-3 pt-3 flex items-baseline justify-between">
               <div>
                 <span class="text-base font-bold text-white block">${sales} vendas</span>
@@ -6708,11 +6838,30 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbDeleteEditingBot() {
-      if (!NB_EDITING_BOT_ID) return;
-      STATE.flow_bots = (STATE.flow_bots || []).filter(x => x.id !== NB_EDITING_BOT_ID);
+      if (!NB_EDITING_BOT_ID || (STATE.flow_bots || []).length <= 1) return;
+      const deletedId = NB_EDITING_BOT_ID;
+      const previousBots = STATE.flow_bots;
+      const previousCurrent = NB_CURRENT_BOT_ID;
+      const previousStateCurrent = STATE.current_bot_id;
+      const deleting = previousBots.find(b => b.id === deletedId);
+      if (!deleting || !confirm(`Excluir o bot ${deleting.username || deletedId}?`)) return;
+      STATE.flow_bots = previousBots.filter(b => b.id !== deletedId);
+      if (NB_CURRENT_BOT_ID === deletedId) {
+        NB_CURRENT_BOT_ID = STATE.flow_bots[0].id;
+        STATE.current_bot_id = NB_CURRENT_BOT_ID;
+      }
+      if (!await saveFullState()) {
+        STATE.flow_bots = previousBots;
+        NB_CURRENT_BOT_ID = previousCurrent;
+        STATE.current_bot_id = previousStateCurrent;
+        alert('Não foi possível excluir o bot no servidor.');
+        return;
+      }
       nbCloseBotModal();
-      nbBackToBotsList();
-      await saveFullState();
+      // O bot editado foi removido: não executar autosave da tela antiga em outro bot.
+      NB_MAIN_VIEW = 'bots';
+      NB_AI_DETAIL_OPEN = false;
+      await nbSwitchMainView('bots');
     }
 
     async function nbToggleBotFromCard(botId, isChecked) {
@@ -6765,6 +6914,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         syncStateToInputs();
       }
       switchWorkspace('ai');
+      NB_AI_DETAIL_OPEN = true;
       navigateTab('resumo');
     }
 
@@ -7880,13 +8030,28 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (barEl) barEl.style.width = `${pct}%`;
     }
 
-    function nbSwitchMainView(view) {
+    let NB_LEAVING_DETAIL = false;
+    let NB_AI_DETAIL_OPEN = false;
+    async function nbSwitchMainView(view) {
+      if ((NB_MAIN_VIEW === 'detail' || NB_AI_DETAIL_OPEN) && view !== 'detail') {
+        if (NB_LEAVING_DETAIL) return false;
+        NB_LEAVING_DETAIL = true;
+        try {
+          const saved = NB_AI_DETAIL_OPEN ? await saveFullState() : await nbSaveCurrentBot();
+          if (!saved) {
+            alert('Não foi possível salvar no servidor. Você continua na edição do bot; tente novamente.');
+            return false;
+          }
+        } finally { NB_LEAVING_DETAIL = false; }
+      }
+      NB_AI_DETAIL_OPEN = false;
       NB_MAIN_VIEW = view;
       switchWorkspace('neurotbot');
       nbUpdateHeaderRevenueWidget();
 
       const views = {
         bots: document.getElementById('nb-view-bots-list'),
+        flow: document.getElementById('nb-view-flow-canvas'),
         modesel: document.getElementById('nb-view-bot-mode-select'),
         detail: document.getElementById('nb-view-bot-detail'),
         dashboard: document.getElementById('nb-view-dashboard'),
@@ -7902,7 +8067,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       ['dashboard', 'bots', 'clients', 'remarketing', 'finance', 'gateways'].forEach(k => {
         const btn = document.getElementById('nb-dock-btn-' + k);
         const dot = document.getElementById('nb-dock-dot-' + k);
-        const isAct = (view === k) || ((view === 'detail' || view === 'modesel') && k === 'bots');
+        const isAct = (view === k) || ((view === 'detail' || view === 'modesel' || view === 'flow') && k === 'bots');
         if (btn) {
           btn.className = isAct
             ? "w-10 h-10 rounded-xl bg-[#a855f7] text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-950/50 transition"
@@ -7917,19 +8082,22 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (view === 'remarketing') nbRenderRemarketingView();
       if (view === 'finance') nbRenderFinanceView();
       if (view === 'gateways') nbRenderGatewaysView();
+      return true;
     }
 
     // =========================================================
     // TELA 6: BASE DE CLIENTES (TODOS OS LEADS & CONTROLE DE ACESSOS)
     // =========================================================
     function nbSwitchClientsSubtab(subtab) {
-      NB_CLIENTS_SUBTAB = subtab === 'access' ? 'access' : 'leads';
+      NB_CLIENTS_SUBTAB = ['access', 'excluded'].includes(subtab) ? subtab : 'leads';
       const isLeads = NB_CLIENTS_SUBTAB === 'leads';
 
       const btnLeads = document.getElementById('nb-clients-subtab-leads');
       const btnAcc = document.getElementById('nb-clients-subtab-access');
+      const btnExcluded = document.getElementById('nb-clients-subtab-excluded');
       const panelLeads = document.getElementById('nb-clients-panel-leads');
       const panelAcc = document.getElementById('nb-clients-panel-access');
+      const panelExcluded = document.getElementById('nb-clients-panel-excluded');
       const pillsLeads = document.getElementById('nb-clients-leads-period-pills');
 
       if (btnLeads) {
@@ -7938,12 +8106,16 @@ quer que eu te mostre as opções de acesso?</textarea>
           : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
       }
       if (btnAcc) {
-        btnAcc.className = !isLeads
+        btnAcc.className = NB_CLIENTS_SUBTAB === 'access'
           ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#36204f]"
           : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
       }
+      if (btnExcluded) btnExcluded.className = NB_CLIENTS_SUBTAB === 'excluded'
+        ? "px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition bg-[#1d1416] text-white border border-[#36204f]"
+        : "px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition text-zinc-400 hover:text-white border border-transparent";
       if (panelLeads) panelLeads.classList.toggle('hidden', !isLeads);
-      if (panelAcc) panelAcc.classList.toggle('hidden', isLeads);
+      if (panelAcc) panelAcc.classList.toggle('hidden', NB_CLIENTS_SUBTAB !== 'access');
+      if (panelExcluded) panelExcluded.classList.toggle('hidden', NB_CLIENTS_SUBTAB !== 'excluded');
       if (pillsLeads) pillsLeads.classList.toggle('hidden', !isLeads);
 
       nbRenderClientsView();
@@ -8015,7 +8187,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const selStatus = document.getElementById('nb-leads-filter-status')?.value || "all";
 
       // Enriquecer leads com dados da última transação e do bot
-      const enrichedLeads = leads.map(l => {
+      const enrichLead = l => {
         const uid = String(l.telegram_id || l.user_id || "");
         const userTxs = allTxList.filter(tx => String(tx.user_id || tx.telegram_id || "") === uid);
         const latestPaidTx = userTxs.find(tx => tx.status === "paid" || tx.delivered);
@@ -8043,7 +8215,19 @@ quer que eu te mostre as opções de acesso?</textarea>
           date_iso: dateIso,
           date_display: dateDisplay
         };
-      });
+      };
+      const enrichedLeads = leads.map(enrichLead);
+      const excluded = (STATE.memory?.deleted_leads || []).map(enrichLead);
+      const excludedBody = document.getElementById('nb-excluded-table-body');
+      if (excludedBody) excludedBody.innerHTML = excluded.length ? excluded.map(item => `
+        <tr class="border-b border-[#211730] text-zinc-300">
+          <td class="p-3"><div class="font-bold text-white">${escapeHtml(item.first_name)}</div><div>${escapeHtml(item.username)}</div></td>
+          <td class="p-3 font-mono">${escapeHtml(item.user_id)}</td><td class="p-3 font-mono">${escapeHtml(item.tx_code)}</td>
+          <td class="p-3">${escapeHtml(item.plan_name)}</td><td class="p-3">${escapeHtml(item.bot_username)}</td>
+          <td class="p-3">${item.flow_mode === 'ai' ? 'Fluxo IA' : 'Fluxo Principal'}</td><td class="p-3">${escapeHtml(item.status)}</td>
+          <td class="p-3">${escapeHtml(item.date_display)}</td>
+          <td class="p-3 whitespace-nowrap"><button type="button" class="text-sky-300 mr-3" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}', true)">Ver histórico</button><button type="button" class="text-emerald-400 mr-3" onclick="nbRestoreExcludedLead('${escapeHtml(item.user_id)}')">Restaurar</button><button type="button" class="text-rose-400" onclick="nbPermanentlyDeleteLead('${escapeHtml(item.user_id)}')">Excluir permanentemente</button></td>
+        </tr>`).join('') : '<tr><td colspan="9" class="p-8 text-center text-zinc-500">Nenhum lead excluído.</td></tr>';
 
       const periodFilteredLeads = enrichedLeads.filter(item => nbMatchesDateFilter(item.date_iso, NB_LEADS_PERIOD));
 
@@ -8126,6 +8310,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <i class="fa-regular fa-comment-dots"></i>
                     <span>Abrir Chat</span>
                   </button>
+                  <button type="button" onclick="deleteLead('${escapeHtml(item.user_id)}')" class="ml-2 text-[11px] text-rose-400 hover:text-rose-300">Excluir</button>
                 </td>
               </tr>
             `;
@@ -8308,18 +8493,21 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
     }
 
-    function nbOpenLeadChatModal(userId) {
-      NB_ACTIVE_CHAT_USER_ID = String(userId || "");
-      const leads = STATE.memory?.leads || [];
-      const lead = leads.find(l => String(l.telegram_id || l.user_id || "") === NB_ACTIVE_CHAT_USER_ID);
+    function nbOpenLeadChatModal(userId, archived = false) {
+      const selectedId = String(userId || "");
+      const leads = archived ? (STATE.memory?.deleted_leads || []) : (STATE.memory?.leads || []);
+      const lead = leads.find(l => String(l.telegram_id || l.user_id || "") === selectedId);
       if (!lead) return;
-
+      NB_ACTIVE_CHAT_USER_ID = archived ? "" : selectedId;
       document.getElementById('nb-lead-chat-title').textContent = `${lead.first_name || 'Lead'} (${lead.username || ''})`;
-      document.getElementById('nb-lead-chat-sub').textContent = `Telegram ID: ${NB_ACTIVE_CHAT_USER_ID} · Etapa: ${lead.stage || 'Iniciou /start'}`;
+      document.getElementById('nb-lead-chat-sub').textContent = `Telegram ID: ${selectedId} · Etapa: ${lead.stage || 'Iniciou /start'}${archived ? ' · Excluído (somente leitura)' : ''}`;
       const blkBtn = document.getElementById('nb-lead-chat-block-btn');
       if (blkBtn) {
-        blkBtn.textContent = lead.blocked ? "Desbloquear Lead" : "Bloquear Lead";
+        blkBtn.classList.toggle('hidden', archived);
+        if (!archived) blkBtn.textContent = lead.blocked ? "Desbloquear Lead" : "Bloquear Lead";
       }
+      const sendBtn = document.getElementById('nb-lead-chat-send-btn');
+      if (sendBtn) sendBtn.parentElement.classList.toggle('hidden', archived);
 
       const histEl = document.getElementById('nb-lead-chat-history');
       const hist = lead.history || [];
@@ -9102,21 +9290,23 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (chVal) nbOnCacheChannelInput(chVal);
       const b = nbGetCurrentBot();
       if (b) {
-        b.mode = "flow";
         nbSyncActiveBotToPublish();
       }
-      await saveFullState();
+      const saved = await saveFullState();
       const valEl = document.getElementById('nb-welcome-validation');
       const hasWelcomeContent = Boolean(
         (b?.welcome?.message || "").trim() ||
         (Array.isArray(b?.welcome?.medias) && b.welcome.medias.length > 0) ||
         (b?.welcome?.secondary_enabled && (b?.welcome?.secondary_message || "").trim())
       );
-      if (valEl && hasWelcomeContent) {
-        valEl.textContent = "✓ Alterações salvas e mídias sincronizadas com o cache!";
+      if (valEl && hasWelcomeContent && saved) {
+        valEl.textContent = "✓ Alterações salvas no servidor.";
         valEl.className = "text-xs text-emerald-400 font-semibold";
         setTimeout(() => { if (valEl) valEl.textContent = ""; }, 3000);
       }
+      const status = document.getElementById('nb-save-status');
+      if (status && saved) { status.textContent = 'Alterações salvas no servidor.'; status.className = 'text-xs text-emerald-400'; }
+      return saved;
     }
 
     document.addEventListener('click', () => {
