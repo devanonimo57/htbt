@@ -179,7 +179,7 @@ class ActiveBotManager:
             ext_bot = None
             try:
                 ext_bot = _create_bot_instance(ext_tok)
-                me = await ext_bot.get_me()
+                me = await asyncio.wait_for(ext_bot.get_me(), timeout=10.0)
                 if me.username and fb.get("username") != f"@{me.username}":
                     fb["username"] = f"@{me.username}"
                     state_changed = True
@@ -246,7 +246,7 @@ class ActiveBotManager:
         test_bot = None
         try:
             test_bot = _create_bot_instance(token)
-            me = await test_bot.get_me()
+            me = await asyncio.wait_for(test_bot.get_me(), timeout=10.0)
             publish["bot_username"] = f"@{me.username}"
             publish["bot_first_name"] = me.first_name
             publish["is_live"] = True
@@ -264,7 +264,10 @@ class ActiveBotManager:
                     await test_bot.session.close()
                 except Exception:
                     pass
-            logger.error(f"Token do Telegram inválido: {e}")
+            logger.error(f"Token do Telegram inválido ({token[:10]}...): {e}")
+            self.dp = Dispatcher()
+            self._register_handlers()
+            await self._sync_extra_bots(state)
             return {"status": "error", "message": f"Token inválido: {e}"}
 
         self.current_token = token

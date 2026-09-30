@@ -679,6 +679,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
 
 async def _startup_warm_medias_task():
     try:
+        await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
         st = await _read_state_from_db()
         warmed = await bot_manager.warm_all_state_medias(st)
         if warmed > 0:
@@ -704,8 +705,7 @@ async def init_db():
     # Garante criação/leitura do token administrativo no disco se não definido em variável de ambiente
     _get_expected_admin_token()
 
-    # Se o bot estiver ativo no banco, já inicia o polling automaticamente
-    await bot_manager.configure_and_start(_read_state_from_db, _write_state_to_db)
+    # Inicia o polling dos bots e aquecimento de mídias em background para não travar o startup do Uvicorn
     _asyncio.create_task(_startup_warm_medias_task())
 
 @app.on_event("startup")
