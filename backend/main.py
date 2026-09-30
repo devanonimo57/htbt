@@ -1565,6 +1565,11 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
     }
 
     all_ok = all(bool(c.get("ok")) for c in checks)
+    if temp_bot:
+        try:
+            await temp_bot.session.close()
+        except Exception:
+            pass
     return {
         "status": "ok",
         "ok": all_ok,

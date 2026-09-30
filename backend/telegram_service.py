@@ -681,7 +681,7 @@ class ActiveBotManager:
         reply_markup: Optional[InlineKeyboardMarkup] = None,
         bot_instance: Optional[Bot] = None
     ):
-        target_bot = bot_instance or self.bot
+        target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         if not target_bot:
             return None
         extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
@@ -1198,10 +1198,12 @@ class ActiveBotManager:
         m: Dict[str, Any],
         caption: Optional[str] = None,
         has_spoiler: bool = False,
-        reply_markup: Optional[InlineKeyboardMarkup] = None
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        bot_instance: Optional[Bot] = None
     ) -> Optional[str]:
         if not isinstance(m, dict):
             return None
+        target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         url = m.get("url")
         cached_fid = (m.get("telegram_file_id") or "").strip()
         is_video = self._is_video_media(m)
@@ -1212,7 +1214,7 @@ class ActiveBotManager:
         if cached_fid:
             try:
                 await self._send_by_cached_fid(
-                    self.bot,
+                    target_bot,
                     chat_id=chat_id,
                     fid=cached_fid,
                     send_as=send_as,
@@ -1232,7 +1234,8 @@ class ActiveBotManager:
         try:
             if self.state_getter:
                 state = await self.state_getter()
-                fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
+                ctx_tok = getattr(target_bot, "token", "") or ""
+                fb = self._get_active_flow_bot(state, bot_token=ctx_tok) if isinstance(state, dict) else None
         except Exception:
             state = None
 
@@ -1240,7 +1243,7 @@ class ActiveBotManager:
             m,
             state,
             fb=fb,
-            bot_instance=self.bot,
+            bot_instance=target_bot,
             exclude_chat_id=chat_id
         )
         if fid:
@@ -1251,7 +1254,7 @@ class ActiveBotManager:
                     pass
             eff_send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
             await self._send_by_cached_fid(
-                self.bot,
+                target_bot,
                 chat_id=chat_id,
                 fid=str(fid),
                 send_as=eff_send_as,
@@ -1269,13 +1272,13 @@ class ActiveBotManager:
         sent = None
         try:
             if is_video:
-                sent = await self.bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+                sent = await target_bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
             else:
-                sent = await self.bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+                sent = await target_bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
         except Exception as primary_err:
-            if hasattr(self.bot, "send_document"):
+            if hasattr(target_bot, "send_document"):
                 inp_doc = self._build_input_file(url, default_fn)
-                sent = await self.bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption, **extra_kw)
+                sent = await target_bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption, **extra_kw)
             else:
                 raise primary_err
 
@@ -1297,8 +1300,10 @@ class ActiveBotManager:
         self,
         chat_id: int,
         medias: List[Dict[str, Any]],
-        reply_markup: Optional[InlineKeyboardMarkup] = None
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        bot_instance: Optional[Bot] = None
     ) -> bool:
+        target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         valid_items = [
             m for m in (medias or [])[:3]
             if isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
@@ -1307,12 +1312,12 @@ class ActiveBotManager:
             return False
 
         # Se houver apenas 1 mídia, envia individualmente via cache (podendo anexar reply_markup diretamente na mídia)
-        if len(valid_items) == 1 or not hasattr(self.bot, "send_media_group"):
+        if len(valid_items) == 1 or not hasattr(target_bot, "send_media_group"):
             attached = False
             for idx, m in enumerate(valid_items):
                 try:
                     rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                    await self._send_single_media_cached(chat_id, m, reply_markup=rm)
+                    await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot)
                     if rm is not None:
                         attached = True
                 except Exception as e:
@@ -1325,7 +1330,8 @@ class ActiveBotManager:
         try:
             if self.state_getter:
                 state = await self.state_getter()
-                fb = self._get_active_flow_bot(state) if isinstance(state, dict) else None
+                ctx_tok = getattr(target_bot, "token", "") or ""
+                fb = self._get_active_flow_bot(state, bot_token=ctx_tok) if isinstance(state, dict) else None
         except Exception:
             state = None
 
@@ -1334,7 +1340,7 @@ class ActiveBotManager:
             valid_items,
             state,
             fb=fb,
-            bot_instance=self.bot,
+            bot_instance=target_bot,
             exclude_chat_id=chat_id
         )
         if warmed_cnt > 0 and state and self.state_saver:
@@ -1346,12 +1352,12 @@ class ActiveBotManager:
         try:
             group_inputs = []
             for m in valid_items:
-                inp_item = await self._build_group_media_input(m, self.bot, force_upload=False)
+                inp_item = await self._build_group_media_input(m, target_bot, force_upload=False)
                 if inp_item:
                     group_inputs.append(inp_item)
 
             if len(group_inputs) >= 2:
-                sent_msgs = await self.bot.send_media_group(chat_id=chat_id, media=group_inputs)
+                sent_msgs = await target_bot.send_media_group(chat_id=chat_id, media=group_inputs)
                 if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
                     updated = False
                     for m, sent_msg in zip(valid_items, sent_msgs):
@@ -1368,17 +1374,17 @@ class ActiveBotManager:
                             await self.state_saver(state)
                         except Exception:
                             pass
-                return
+                return False
         except Exception as group_err:
             logger.warning(f"Tentando reconversão de álbum lado a lado após erro ({group_err})...")
             try:
                 group_inputs_retry = []
                 for m in valid_items:
-                    inp_item = await self._build_group_media_input(m, self.bot, force_upload=True)
+                    inp_item = await self._build_group_media_input(m, target_bot, force_upload=True)
                     if inp_item:
                         group_inputs_retry.append(inp_item)
                 if len(group_inputs_retry) >= 2:
-                    sent_msgs = await self.bot.send_media_group(chat_id=chat_id, media=group_inputs_retry)
+                    sent_msgs = await target_bot.send_media_group(chat_id=chat_id, media=group_inputs_retry)
                     if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
                         for m, sent_msg in zip(valid_items, sent_msgs):
                             is_vid = self._is_video_media(m)
@@ -1400,18 +1406,18 @@ class ActiveBotManager:
         for idx, m in enumerate(valid_items):
             try:
                 rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                await self._send_single_media_cached(chat_id, m, reply_markup=rm)
+                await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot)
                 if rm is not None:
                     attached = True
             except Exception as e:
                 logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
         return attached
 
-    def _schedule_flow_downsell(self, user: types.User, track: str = "general"):
+    def _schedule_flow_downsell(self, user: types.User, track: str = "general", bot_token: str = ""):
         uid = str(user.id)
         self._cancel_downsell(uid)
-        bot_token = self.active_token
-        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=bot_token))
+        tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
+        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=tok))
 
     async def _flow_downsell_worker(self, user: types.User, track: str, bot_token: str = ""):
         paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
@@ -1522,9 +1528,16 @@ class ActiveBotManager:
         if not self._verify_secret_test_token(secret_arg):
             return False
 
+        msg_bot = getattr(message, "bot", None)
+        msg_bot_tok = getattr(msg_bot, "token", "") or ""
+        if msg_bot_tok:
+            _CURRENT_BOT_TOKEN_CTX.set(msg_bot_tok)
+            if msg_bot:
+                _CURRENT_BOT_CTX.set(msg_bot)
+
         state = await self.state_getter()
         lead = await self._get_or_create_lead(state, message.from_user)
-        fb = self._get_active_flow_bot(state)
+        fb = self._get_active_flow_bot(state, bot_token=msg_bot_tok)
 
         if cmd == "downsell":
             if not fb:
@@ -1670,7 +1683,7 @@ class ActiveBotManager:
         try:
             while True:
                 state = await self.state_getter()
-                if self._get_active_flow_bot(state):
+                if self._get_active_flow_bot(state, bot_token=self.current_token):
                     return
                 ds = state.get("downsell", {})
                 if not ds.get("enabled", False):
@@ -1696,7 +1709,7 @@ class ActiveBotManager:
 
                 # Recarrega estado após espera
                 state = await self.state_getter()
-                if self._get_active_flow_bot(state):
+                if self._get_active_flow_bot(state, bot_token=self.current_token):
                     return
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
                 if lead.get("stage") in paid_stages:
@@ -1737,6 +1750,14 @@ class ActiveBotManager:
     def _register_handlers(self):
         @self.dp.message(CommandStart())
         async def handle_start(message: types.Message):
+            msg_bot = getattr(message, "bot", None)
+            msg_bot_tok = getattr(msg_bot, "token", "") or ""
+            if msg_bot_tok:
+                _CURRENT_BOT_TOKEN_CTX.set(msg_bot_tok)
+                if msg_bot:
+                    _CURRENT_BOT_CTX.set(msg_bot)
+            target_bot = msg_bot or _CURRENT_BOT_CTX.get() or self.bot
+
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, message.from_user)
             self._cancel_downsell(str(message.from_user.id))
@@ -1761,7 +1782,7 @@ class ActiveBotManager:
             lead.pop("authorized_discount_expires_at", None)
             self._update_lead_insights(state, lead)
 
-            flow_bot = self._get_active_flow_bot(state)
+            flow_bot = self._get_active_flow_bot(state, bot_token=msg_bot_tok)
             if flow_bot:
                 welcome = flow_bot.get("welcome", {})
                 welcome_medias = welcome.get("medias", [])
@@ -1776,19 +1797,19 @@ class ActiveBotManager:
 
                 if not raw_main_msg and has_welcome_medias:
                     if sec_enabled and sec_msg:
-                        await self._send_flow_medias(message.chat.id, welcome_medias)
+                        await self._send_flow_medias(message.chat.id, welcome_medias, bot_instance=target_bot)
                         try:
                             await message.answer(sec_msg, parse_mode="HTML", reply_markup=kb)
                         except Exception:
                             await message.answer(sec_msg, reply_markup=kb)
                         lead.setdefault("history", []).append({"role": "assistant", "content": f"[Mídia de boas-vindas]\n\n{sec_msg}"})
                     else:
-                        attached_kb = await self._send_flow_medias(message.chat.id, welcome_medias, reply_markup=kb)
+                        attached_kb = await self._send_flow_medias(message.chat.id, welcome_medias, reply_markup=kb, bot_instance=target_bot)
                         if not attached_kb and kb:
                             await message.answer("👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
                         lead.setdefault("history", []).append({"role": "assistant", "content": "[Mídia de boas-vindas]"})
                 else:
-                    await self._send_flow_medias(message.chat.id, welcome_medias)
+                    await self._send_flow_medias(message.chat.id, welcome_medias, bot_instance=target_bot)
                     main_msg = self._render_flow_vars(
                         raw_main_msg or "Olá {saudacao}, {nome}! Escolha seu plano abaixo:",
                         message.from_user,
@@ -1813,7 +1834,7 @@ class ActiveBotManager:
 
                 self._advance_stage(lead, "Viu os planos")
                 await self.state_saver(state)
-                self._schedule_flow_downsell(message.from_user, track="general")
+                self._schedule_flow_downsell(message.from_user, track="general", bot_token=msg_bot_tok)
                 return
 
             style = state.get("style", {})
@@ -1831,7 +1852,8 @@ class ActiveBotManager:
 
             delay = self._get_cadence_delay(state)
             for line in chosen_lines:
-                await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+                if target_bot:
+                    await target_bot.send_chat_action(chat_id=message.chat.id, action="typing")
                 await asyncio.sleep(delay)
                 await message.answer(line)
                 lead.setdefault("history", []).append({"role": "assistant", "content": line})
@@ -1841,6 +1863,14 @@ class ActiveBotManager:
 
         @self.dp.message(F.text)
         async def handle_text(message: types.Message):
+            msg_bot = getattr(message, "bot", None)
+            msg_bot_tok = getattr(msg_bot, "token", "") or ""
+            if msg_bot_tok:
+                _CURRENT_BOT_TOKEN_CTX.set(msg_bot_tok)
+                if msg_bot:
+                    _CURRENT_BOT_CTX.set(msg_bot)
+            target_bot = msg_bot or _CURRENT_BOT_CTX.get() or self.bot
+
             user_text = message.text.strip()
             if user_text.lower() in ("/reset", "/reiniciar", "/limpar"):
                 await handle_start(message)
@@ -1850,7 +1880,7 @@ class ActiveBotManager:
                 return
 
             state_check = await self.state_getter()
-            if self._get_active_flow_bot(state_check):
+            if self._get_active_flow_bot(state_check, bot_token=msg_bot_tok):
                 return
 
             uid = str(message.from_user.id)
@@ -1886,7 +1916,8 @@ class ActiveBotManager:
                     return
 
                 delay = self._get_cadence_delay(state)
-                await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+                if target_bot:
+                    await target_bot.send_chat_action(chat_id=message.chat.id, action="typing")
                 await asyncio.sleep(delay)
 
                 ai_res = await generate_ai_reply(
@@ -1910,7 +1941,8 @@ class ActiveBotManager:
                             message.chat.id,
                             media,
                             caption=raw_cap or None,
-                            has_spoiler=bool(media.get("spoiler", False))
+                            has_spoiler=bool(media.get("spoiler", False)),
+                            bot_instance=target_bot
                         )
                         if fid and media.get("id"):
                             for sm in state.get("medias", []):
@@ -2221,7 +2253,12 @@ class ActiveBotManager:
             disc_pct = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
 
             state = await self.state_getter()
-            fb = self._get_active_flow_bot(state)
+            cb_bot_tok = getattr(getattr(callback, "bot", None), "token", "") or ""
+            if cb_bot_tok:
+                _CURRENT_BOT_TOKEN_CTX.set(cb_bot_tok)
+                if getattr(callback, "bot", None):
+                    _CURRENT_BOT_CTX.set(callback.bot)
+            fb = self._get_active_flow_bot(state, bot_token=cb_bot_tok)
             if not fb:
                 return
 
@@ -2252,7 +2289,12 @@ class ActiveBotManager:
             bump_idx = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
 
             state = await self.state_getter()
-            fb = self._get_active_flow_bot(state)
+            cb_bot_tok = getattr(getattr(callback, "bot", None), "token", "") or ""
+            if cb_bot_tok:
+                _CURRENT_BOT_TOKEN_CTX.set(cb_bot_tok)
+                if getattr(callback, "bot", None):
+                    _CURRENT_BOT_CTX.set(callback.bot)
+            fb = self._get_active_flow_bot(state, bot_token=cb_bot_tok)
             if not fb:
                 return
             lead = await self._get_or_create_lead(state, callback.from_user)
@@ -2302,8 +2344,9 @@ class ActiveBotManager:
         if bump_index >= len(active_bumps):
             return
         bump = active_bumps[bump_index]
+        target_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
         chat_id = callback.message.chat.id if callback.message else callback.from_user.id
-        await self._send_flow_medias(chat_id, bump.get("medias", []))
+        await self._send_flow_medias(chat_id, bump.get("medias", []), bot_instance=target_bot)
 
         color_emoji = {"Azul": "🔵 ", "Verde": "🟢 ", "Vermelho": "🔴 ", "Padrão": ""}
         acc_text = (bump.get("accept_text") or "Adicionar ao pedido").strip()
@@ -2331,7 +2374,7 @@ class ActiveBotManager:
                 valor_str=val_fmt
             )
 
-        await self._safe_send_html(chat_id, offer_msg, reply_markup=kb)
+        await self._safe_send_html(chat_id, offer_msg, reply_markup=kb, bot_instance=target_bot)
 
     async def _generate_flow_checkout(
         self,
@@ -2496,14 +2539,17 @@ class ActiveBotManager:
             pix_code_fmt=pix_code_formatted
         )
 
-        await self._send_flow_medias(chat_id, pay_cfg.get("generated_medias", []))
+        target_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
+        bot_tok_val = str(getattr(target_bot, "token", "") or _CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or "").strip()
+
+        await self._send_flow_medias(chat_id, pay_cfg.get("generated_medias", []), bot_instance=target_bot)
 
         safe_cb = f"checkpix:{tx_id[:50]}"
         confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅ Verificar pagamento", callback_data=safe_cb)]
         ])
 
-        await self._safe_send_html(chat_id, rendered_gen, reply_markup=confirm_kb)
+        await self._safe_send_html(chat_id, rendered_gen, reply_markup=confirm_kb, bot_instance=target_bot)
 
         if pay_cfg.get("secondary_enabled") and (pay_cfg.get("secondary_message") or "").strip():
             sec_txt = self._render_flow_vars(
@@ -2514,7 +2560,7 @@ class ActiveBotManager:
                 valor_str=valor_str,
                 pix_code_fmt=pix_code_formatted
             )
-            await self._safe_send_html(chat_id, sec_txt)
+            await self._safe_send_html(chat_id, sec_txt, bot_instance=target_bot)
 
         lead.setdefault("history", []).append({
             "role": "assistant",
@@ -2522,7 +2568,7 @@ class ActiveBotManager:
         })
         await self.state_saver(state)
 
-        self._schedule_flow_downsell(callback.from_user, track="pix")
+        self._schedule_flow_downsell(callback.from_user, track="pix", bot_token=bot_tok_val)
         self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
 
     def _start_pix_poll_task(
@@ -2685,11 +2731,13 @@ class ActiveBotManager:
                         if cand_tok and cand_tok != "***configured***":
                             tx_bot_token = cand_tok
                             break
+            resolved_bot = None
             if tx_bot_token and tx_bot_token != "***configured***":
                 _CURRENT_BOT_TOKEN_CTX.set(tx_bot_token)
                 resolved_bot = self._get_bot_by_token(tx_bot_token)
                 if resolved_bot:
                     _CURRENT_BOT_CTX.set(resolved_bot)
+            target_bot = resolved_bot or _CURRENT_BOT_CTX.get() or self.bot
 
             # A confirmação assíncrona de Pix deve registrar a entrega no arquivo,
             # sem recriar um cliente ativo excluído pelo administrador.
@@ -2704,7 +2752,7 @@ class ActiveBotManager:
             is_upsell_payment = bool(tx_record.get("is_upsell"))
 
             if is_upsell_payment:
-                await self.bot.send_message(
+                await (target_bot or self.bot).send_message(
                     chat_id=user_id,
                     text="💜 <b>Upsell confirmado!</b>\n\nSeu conteúdo extra exclusivo já está liberado!",
                     parse_mode="HTML"
@@ -2764,9 +2812,10 @@ class ActiveBotManager:
                 invite_url = ""
                 if eff_type == "Link externo" and ext_url:
                     invite_url = ext_url
-                elif ch_target and self.bot:
+                elif ch_target and (target_bot or self.bot):
                     try:
-                        invite = await self.bot.create_chat_invite_link(
+                        active_bot_deliv = target_bot or self.bot
+                        invite = await active_bot_deliv.create_chat_invite_link(
                             chat_id=ch_target,
                             member_limit=1,
                             expire_date=datetime.utcnow() + timedelta(minutes=15)
@@ -2786,7 +2835,7 @@ class ActiveBotManager:
                     return False
 
                 pay_cfg = flow_bot.get("payments", {})
-                await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []))
+                await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []), bot_instance=target_bot)
 
                 btn_txt = (pay_cfg.get("access_button_text") or "Acessar conteúdo").strip()
                 kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -2806,13 +2855,14 @@ class ActiveBotManager:
                     plan_name=plan_label,
                     valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
                 )
-                await self._safe_send_html(user_id, rendered_app, reply_markup=kb)
+                await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
 
                 bump_deliv = (tx_record.get("deliverable") or "").strip()
                 if bump_deliv:
                     await self._safe_send_html(
                         user_id,
-                        f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}"
+                        f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
+                        bot_instance=target_bot
                     )
 
                 dur_str = str(tx_record.get("plan_duration") or "Vitalício")
@@ -2868,7 +2918,7 @@ class ActiveBotManager:
             delivery_type = tx_record.get("delivery_type") or pub.get("delivery_type", "Link de acesso")
 
             if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
-                await self.bot.send_message(
+                await (target_bot or self.bot).send_message(
                     chat_id=user_id,
                     text=f"💜 <b>Pagamento confirmado!</b>\n\n{dest}",
                     parse_mode="HTML"
@@ -2877,9 +2927,10 @@ class ActiveBotManager:
                 invite_url = ""
                 if dest.startswith("http"):
                     invite_url = dest
-                elif dest and self.bot:
+                elif dest and (target_bot or self.bot):
                     try:
-                        invite = await self.bot.create_chat_invite_link(
+                        active_bot_deliv = target_bot or self.bot
+                        invite = await active_bot_deliv.create_chat_invite_link(
                             chat_id=dest,
                             member_limit=1,
                             expire_date=datetime.utcnow() + timedelta(days=1)
