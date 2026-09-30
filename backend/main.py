@@ -1599,7 +1599,8 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
 
 
 class LeadActionRequest(BaseModel):
-    telegram_id: str
+    telegram_id: Optional[str] = ""
+    user_id: Optional[str] = ""
     action: str  # "send_message" | "toggle_block"
     message: Optional[str] = ""
 
@@ -1609,7 +1610,11 @@ async def handle_lead_action(req: LeadActionRequest):
     from telegram_service import _create_bot_instance
     state = await _read_state_from_db()
     leads = (state.get("memory") or {}).get("leads") or []
-    target_lead = next((l for l in leads if str(l.get("telegram_id")) == str(req.telegram_id)), None)
+    tid = str(req.telegram_id or req.user_id or "").strip()
+    target_lead = next(
+        (l for l in leads if str(l.get("telegram_id") or l.get("user_id") or "") == tid),
+        None
+    )
     if not target_lead:
         raise HTTPException(status_code=404, detail="Lead não encontrado.")
 
@@ -1638,7 +1643,7 @@ async def handle_lead_action(req: LeadActionRequest):
         temp_bot = None
         try:
             temp_bot = _create_bot_instance(tok)
-            await temp_bot.send_message(chat_id=int(req.telegram_id), text=txt, parse_mode="HTML")
+            await temp_bot.send_message(chat_id=int(tid), text=txt, parse_mode="HTML")
             target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
             state = await _write_state_to_db(state, preserve_runtime=False)
             return {"status": "ok", "state": _redact_state_secrets(state)}
@@ -1656,6 +1661,11 @@ async def handle_lead_action(req: LeadActionRequest):
 
 class RemarketingSendRequest(BaseModel):
     campaign_id: str
+    bot_id: Optional[str] = "all"
+    segment: Optional[str] = "Pendentes"
+    message: Optional[str] = ""
+    include_plans: Optional[bool] = True
+    discount_pct: Optional[int] = 0
 
 
 @app.post("/api/flow-bots/remarketing/send", dependencies=[Depends(verify_admin_auth)])
@@ -1669,11 +1679,12 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     if not camp:
         raise HTTPException(status_code=404, detail="Campanha não encontrada.")
 
-    target_bot_id = str(camp.get("bot_id") or "all").strip()
-    segment = str(camp.get("segment") or "all").strip()
-    discount_str = str(camp.get("discount") or "Sem desconto").strip()
-    include_buttons = bool(camp.get("include_plan_buttons", True))
-    msg_tmpl = (camp.get("message") or "").strip()
+    target_bot_id = str(camp.get("bot_id") or req.bot_id or "all").strip()
+    segment = str(camp.get("segment") or req.segment or "all").strip().lower()
+    disc_val = int(camp.get("discount_pct") or req.discount_pct or 0)
+    discount_str = f"{disc_val}%" if disc_val > 0 else str(camp.get("discount") or "Sem desconto").strip()
+    include_buttons = bool(camp.get("include_plans", camp.get("include_plan_buttons", True)))
+    msg_tmpl = (camp.get("message") or req.message or "").strip()
 
     leads = (state.get("memory") or {}).get("leads") or []
     paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
@@ -1686,13 +1697,13 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
         if target_bot_id != "all" and l.get("bot_id") and str(l.get("bot_id")) != target_bot_id:
             continue
         st = str(l.get("stage") or "Conversando")
-        is_paid = st in paid_stages
-        is_pend = st in pending_stages
-        if segment == "paid" and not is_paid:
+        is_paid = st in paid_stages or bool(l.get("purchased"))
+        is_pend = st in pending_stages or "pix" in st.lower() or "aguardando" in st.lower()
+        if segment in ("paid", "pagos") and not is_paid:
             continue
-        if segment == "pending" and not is_pend:
+        if segment in ("pending", "pendentes") and not is_pend:
             continue
-        if segment == "new" and (is_paid or is_pend):
+        if segment in ("new", "novos") and (is_paid or is_pend):
             continue
         if segment == "unpaid" and is_paid:
             continue
@@ -1721,7 +1732,7 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
             kb = bot_manager._build_flow_plans_kb(fb, discount_str=discount_str)
 
         for l in matched_leads:
-            uid_str = str(l.get("telegram_id") or "").strip()
+            uid_str = str(l.get("telegram_id") or l.get("user_id") or "").strip()
             if not uid_str.lstrip("-").isdigit():
                 continue
             uid = int(uid_str)
@@ -1745,12 +1756,14 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 pass
 
     camp["sent_count"] = int(camp.get("sent_count") or 0) + sent_ok
+    camp["total_targets"] = len(matched_leads)
     camp["status"] = "Finalizada"
     camp["last_sent_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
     state = await _write_state_to_db(state, preserve_runtime=False)
     return {
         "status": "ok",
         "sent_count": sent_ok,
+        "total_targets": len(matched_leads),
         "target_count": len(matched_leads),
         "state": _redact_state_secrets(state)
     }

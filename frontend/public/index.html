@@ -110,7 +110,9 @@
       border: 1px solid #261b1d;
       border-radius: 12px;
     }
-    .nb-input {
+    .nb-input,
+    .nb-select,
+    .nb-textarea {
       width: 100%;
       background-color: #0a0708;
       border: 1px solid #2b1d20;
@@ -119,9 +121,29 @@
       color: #f4f4f0;
       font-size: 13px;
       outline: none;
+      color-scheme: dark;
       transition: border-color 0.15s;
     }
-    .nb-input:focus {
+    .nb-select {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      padding-right: 34px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 12px 12px;
+    }
+    .nb-select option,
+    .nb-input option,
+    select option {
+      background-color: #110c0d;
+      color: #f4f4f0;
+    }
+    .nb-input:focus,
+    .nb-select:focus,
+    .nb-textarea:focus {
       border-color: #ef4444;
     }
     .nb-var-chip {
@@ -7960,12 +7982,12 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbClassifyLeadStatus(lead, txList) {
       if (lead.blocked || (lead.stage || "").toLowerCase().includes("bloqueado")) return "Bloqueado";
-      const uid = String(lead.user_id || "");
-      const userTxs = txList.filter(tx => String(tx.user_id || "") === uid);
-      const hasPaid = Boolean(lead.purchased) || userTxs.some(tx => tx.status === "paid" || tx.delivered);
-      if (hasPaid) return "Pago";
+      const uid = String(lead.telegram_id || lead.user_id || "");
+      const userTxs = txList.filter(tx => String(tx.user_id || tx.telegram_id || "") === uid);
       const stg = (lead.stage || "").toLowerCase();
-      const hasPend = userTxs.length > 0 || stg.includes("pix") || stg.includes("aguardando");
+      const hasPaid = Boolean(lead.purchased) || stg.includes("aprovad") || stg.includes("concluíd") || userTxs.some(tx => tx.status === "paid" || tx.delivered);
+      if (hasPaid) return "Pago";
+      const hasPend = userTxs.length > 0 || stg.includes("pix") || stg.includes("checkout") || stg.includes("aguardando") || stg.includes("escolheu");
       if (hasPend) return "Pendente";
       return "Novo";
     }
@@ -8025,8 +8047,8 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // Enriquecer leads com dados da última transação e do bot
       const enrichedLeads = leads.map(l => {
-        const uid = String(l.user_id || "");
-        const userTxs = allTxList.filter(tx => String(tx.user_id || "") === uid);
+        const uid = String(l.telegram_id || l.user_id || "");
+        const userTxs = allTxList.filter(tx => String(tx.user_id || tx.telegram_id || "") === uid);
         const latestPaidTx = userTxs.find(tx => tx.status === "paid" || tx.delivered);
         const latestTx = latestPaidTx || userTxs[0] || null;
         const botId = l.bot_id || (latestTx && latestTx.bot_id) || (bots[0]?.id || "");
@@ -8119,7 +8141,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                   <div class="font-bold text-white">${escapeHtml(item.first_name)}</div>
                   <div class="text-[11px] text-zinc-500">${escapeHtml(item.username)}</div>
                 </td>
-                <td class="py-3.5 px-3 font-mono text-[11px] text-zinc-400">${escapeHtml(item.user_id)}</td>
+                <td class="py-3.5 px-3 font-mono text-[11px] text-zinc-400">${escapeHtml(item.user_id || '—')}</td>
                 <td class="py-3.5 px-3 font-mono text-[11px] text-zinc-400">${escapeHtml(item.tx_code)}</td>
                 <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.plan_name)}</td>
                 <td class="py-3.5 px-3 text-zinc-300">${escapeHtml(item.bot_username)}</td>
@@ -8150,25 +8172,32 @@ quer que eu te mostre as opções de acesso?</textarea>
       const plansSet = new Set();
 
       bots.forEach(b => {
+        const botName = b.username || "@bot";
         (b.plans || []).forEach(p => {
           if (p.name) plansSet.add(p.name);
           const chId = (p.delivery_channel_id || "").trim();
           const chName = (p.delivery_channel_name || "").trim();
-          if (chId && chId !== "-1003939135982") {
-            groupsMap.set(chId, chName ? `${chName} (${chId})` : chId);
+          if (chId) {
+            groupsMap.set(chId, chName ? `${chName} (${botName})` : `Grupo ${chId} (${botName})`);
           } else if (chName) {
-            groupsMap.set(chName, chName);
+            groupsMap.set(chName, `${chName} (${botName})`);
           }
         });
         const fb = b.fallback_delivery || {};
-        if (fb.channel_id && fb.channel_id !== "-1003939135982") {
-          groupsMap.set(fb.channel_id, fb.channel_name ? `${fb.channel_name} (${fb.channel_id})` : fb.channel_id);
+        if (fb.channel_id) {
+          groupsMap.set(fb.channel_id, fb.channel_name ? `${fb.channel_name} (${botName})` : `Grupo ${fb.channel_id}`);
+        } else if (fb.channel_name) {
+          groupsMap.set(fb.channel_name, `${fb.channel_name} (${botName})`);
         }
+      });
+
+      (STATE.business?.offers || []).forEach(o => {
+        if (o && o.name) plansSet.add(o.name);
       });
 
       allTxList.forEach(tx => {
         if (tx.offer_name) plansSet.add(tx.offer_name);
-        if (tx.delivery_channel_id && tx.delivery_channel_id !== "-1003939135982") {
+        if (tx.delivery_channel_id) {
           groupsMap.set(tx.delivery_channel_id, tx.delivery_channel_name ? `${tx.delivery_channel_name} (${tx.delivery_channel_id})` : tx.delivery_channel_id);
         } else if (tx.delivery_channel_name) {
           groupsMap.set(tx.delivery_channel_name, tx.delivery_channel_name);
@@ -8189,8 +8218,8 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // Construir lista de registros de acesso a partir das transações
       const accessRecords = allTxList.map(tx => {
-        const uid = String(tx.user_id || "");
-        const leadObj = leads.find(l => String(l.user_id || "") === uid) || {};
+        const uid = String(tx.user_id || tx.telegram_id || "");
+        const leadObj = leads.find(l => String(l.telegram_id || l.user_id || "") === uid) || {};
         const botObj = bots.find(b => b.id === tx.bot_id) || bots[0] || {};
         const isPaid = tx.status === "paid" || Boolean(tx.delivered);
         let accStatus = tx.access_status || (isPaid ? "Ativo" : "Pendente");
@@ -8200,8 +8229,8 @@ quer que eu te mostre as opções de acesso?</textarea>
             accStatus = "Expirado";
           }
         }
-        const chId = tx.delivery_channel_id || botObj.fallback_delivery?.channel_id || "";
-        const chName = tx.delivery_channel_name || botObj.fallback_delivery?.channel_name || (chId ? `Grupo ${chId}` : "Canal VIP");
+        const chId = tx.delivery_channel_id || botObj.plans?.[0]?.delivery_channel_id || botObj.fallback_delivery?.channel_id || "";
+        const chName = tx.delivery_channel_name || botObj.plans?.[0]?.delivery_channel_name || botObj.fallback_delivery?.channel_name || (chId ? `Grupo ${chId}` : "Canal VIP");
         const expLabel = (!tx.expires_at || tx.expires_at === "Vitalício")
           ? "Vitalício"
           : String(tx.expires_at).replace("T", " ").slice(0, 16);
@@ -8291,7 +8320,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <button type="button" onclick="nbResendAccess('${escapeHtml(r.tx_id)}')" class="px-2.5 py-1.5 rounded-lg bg-[#1d1316] hover:bg-[#ef4444] border border-[#382126] text-[11px] font-semibold text-zinc-200 hover:text-white transition" title="Gerar novo link único e reenviar no Telegram do cliente">
                       <i class="fa-regular fa-paper-plane mr-1"></i> Reenviar Acesso
                     </button>
-                    <select onchange="if(this.value) nbUpdateAccessStatus('${escapeHtml(r.tx_id)}', this.value)" class="px-2 py-1 rounded-lg bg-[#120c0e] border border-[#2c1d20] text-[11px] text-zinc-300">
+                    <select onchange="if(this.value) nbUpdateAccessStatus('${escapeHtml(r.tx_id)}', this.value)" class="nb-select !w-auto !py-1 !px-2.5 !pr-7 !text-[11px]">
                       <option value="">Alterar status...</option>
                       <option value="Ativo">Marcar Ativo</option>
                       <option value="Pendente">Marcar Pendente</option>
@@ -8311,7 +8340,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbOpenLeadChatModal(userId) {
       NB_ACTIVE_CHAT_USER_ID = String(userId || "");
       const leads = STATE.memory?.leads || [];
-      const lead = leads.find(l => String(l.user_id || "") === NB_ACTIVE_CHAT_USER_ID);
+      const lead = leads.find(l => String(l.telegram_id || l.user_id || "") === NB_ACTIVE_CHAT_USER_ID);
       if (!lead) return;
 
       document.getElementById('nb-lead-chat-title').textContent = `${lead.first_name || 'Lead'} (${lead.username || ''})`;
