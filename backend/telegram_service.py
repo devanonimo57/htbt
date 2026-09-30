@@ -2,7 +2,9 @@ import asyncio
 import base64
 import html
 import logging
+import os
 import random
+import secrets
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
@@ -1433,6 +1435,164 @@ class ActiveBotManager:
         if task and not task.done():
             task.cancel()
 
+    def _verify_secret_test_token(self, candidate: str) -> bool:
+        cand = (candidate or "").strip()
+        if not cand:
+            return False
+        env_tok = (os.getenv("ADMIN_TOKEN") or os.getenv("ADMIN_PASSWORD") or "").strip()
+        if env_tok and secrets.compare_digest(cand, env_tok):
+            return True
+        token_file = os.path.join(os.path.dirname(__file__), ".admin_token")
+        try:
+            if os.path.exists(token_file):
+                with open(token_file, "r", encoding="utf-8") as f:
+                    saved_tok = f.read().strip()
+                    if saved_tok and secrets.compare_digest(cand, saved_tok):
+                        return True
+        except Exception:
+            pass
+        return False
+
+    async def _handle_secret_test_command(self, message: types.Message, user_text: str) -> bool:
+        parts = (user_text or "").strip().split(None, 1)
+        if len(parts) < 2:
+            return False
+        cmd = parts[0].lower().lstrip("/")
+        secret_arg = parts[1].strip()
+        if cmd not in ("aprovar", "testepago", "downsell"):
+            return False
+        if not self._verify_secret_test_token(secret_arg):
+            return False
+
+        state = await self.state_getter()
+        lead = await self._get_or_create_lead(state, message.from_user)
+        fb = self._get_active_flow_bot(state)
+
+        if cmd == "downsell":
+            if not fb:
+                await message.answer("⚠️ Este bot está no modo IA. O comando /downsell rápido é para o modo Botões.")
+                return True
+            use_pix_track = (
+                lead.get("stage") == "Gerou checkout"
+                and bool((fb.get("downsell_pix") or {}).get("sequences"))
+            )
+            track = "pix" if use_pix_track else "general"
+            ds_cfg = fb.get("downsell_pix" if track == "pix" else "downsell_general", {})
+            seqs = ds_cfg.get("sequences") or []
+            if not seqs:
+                await message.answer("⚠️ Nenhuma sequência de Downsell cadastrada neste bot.")
+                return True
+            seq = seqs[0]
+            msg_tmpl = (seq.get("message") or "").strip()
+            seq_medias = seq.get("medias") or []
+            has_seq_medias = any(
+                isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+                for m in seq_medias[:3]
+            )
+            disc_str = seq.get("discount", "Sem desconto")
+            disc_pct = self._parse_discount_pct(disc_str)
+            if disc_pct > 0:
+                auth_discounts = lead.setdefault("authorized_flow_discounts", [])
+                if disc_pct not in auth_discounts:
+                    auth_discounts.append(disc_pct)
+            kb = self._build_flow_plans_kb(
+                fb,
+                filter_plan_ids=seq.get("plan_ids") or None,
+                discount_str=disc_str
+            )
+            if not msg_tmpl and has_seq_medias:
+                attached_kb = await self._send_flow_medias(message.chat.id, seq_medias, reply_markup=kb)
+                if not attached_kb and kb:
+                    await self.bot.send_message(chat_id=message.chat.id, text="👇 <b>Escolha seu plano abaixo:</b>", parse_mode="HTML", reply_markup=kb)
+            else:
+                await self._send_flow_medias(message.chat.id, seq_medias)
+                txt = self._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você:", message.from_user, fb)
+                await self.bot.send_message(chat_id=message.chat.id, text=txt, parse_mode="HTML", reply_markup=kb)
+            await self.state_saver(state)
+            return True
+
+        # Comando /aprovar <senha> ou /testepago <senha>
+        tx_map = state.setdefault("tx_records", {})
+        target_tx_id = str(lead.get("last_tx_id") or "").strip()
+        tx_rec = tx_map.get(target_tx_id) or self.tx_records.get(target_tx_id)
+
+        if not tx_rec or tx_rec.get("status") == "paid" or tx_rec.get("delivered"):
+            # Procura qualquer transação pendente deste usuário
+            target_tx_id = ""
+            tx_rec = None
+            for tid, rec in reversed(list(tx_map.items())):
+                if isinstance(rec, dict) and int(rec.get("user_id") or 0) == int(message.from_user.id):
+                    if rec.get("status") != "paid" and not rec.get("delivered"):
+                        target_tx_id = tid
+                        tx_rec = rec
+                        break
+
+        if not tx_rec:
+            # Cria uma transação de teste vinculada ao primeiro plano para testar a entrega na hora
+            target_tx_id = f"test_{int(datetime.utcnow().timestamp())}_{message.from_user.id}"
+            if fb:
+                plans = fb.get("plans") or []
+                plan = plans[0] if plans else {}
+                plan_name = (plan.get("name") or "Plano VIP").strip()
+                price = float(plan.get("price") or 9.90)
+                fb_deliv = fb.get("fallback_delivery", {})
+                dest_type = (plan.get("delivery_dest_type") or "Canal ou grupo").strip()
+                if dest_type == "Herdar do fluxo":
+                    eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
+                    ch_target = (fb_deliv.get("channel_id") or "").strip()
+                    ext_url = (fb_deliv.get("external_url") or "").strip()
+                else:
+                    eff_type = dest_type
+                    raw_ch = (plan.get("delivery_channel_id") or "").strip()
+                    fb_ch = (fb_deliv.get("channel_id") or "").strip()
+                    ch_target = fb_ch if (not raw_ch or raw_ch == "-1003939135982") and fb_ch else (raw_ch or fb_ch)
+                    ext_url = (plan.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
+                tx_rec = {
+                    "tx_id": target_tx_id,
+                    "user_id": int(message.from_user.id),
+                    "mode": "flow",
+                    "bot_id": str(fb.get("id") or ""),
+                    "bot_token": str(_CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or ""),
+                    "plan_id": str(plan.get("id") or "plan_1"),
+                    "offer_name": plan_name,
+                    "amount": round(price, 2),
+                    "cents": max(50, int(round(price * 100))),
+                    "is_upsell": False,
+                    "is_test": True,
+                    "deliverable": str(lead.get("accepted_bump_deliverable") or ""),
+                    "delivery_dest_type": eff_type,
+                    "delivery_channel_id": ch_target,
+                    "delivery_external_url": ext_url,
+                    "status": "pending",
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            else:
+                offers = state.get("business", {}).get("offers") or []
+                first_offer = offers[0] if offers else {}
+                price = float(first_offer.get("price") or 19.90)
+                tx_rec = {
+                    "tx_id": target_tx_id,
+                    "user_id": int(message.from_user.id),
+                    "mode": "ai",
+                    "offer_name": first_offer.get("name") or "Acesso VIP",
+                    "amount": round(price, 2),
+                    "cents": max(50, int(round(price * 100))),
+                    "is_upsell": False,
+                    "is_test": True,
+                    "delivery_type": state.get("publish", {}).get("delivery_type", "Link de acesso"),
+                    "delivery_destination": state.get("publish", {}).get("delivery_destination", ""),
+                    "status": "pending",
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+
+        tx_rec["is_test"] = True
+        self.tx_records[target_tx_id] = tx_rec
+        tx_map[target_tx_id] = tx_rec
+        lead["last_tx_id"] = target_tx_id
+        await self.state_saver(state)
+        await self.deliver_purchase_and_upsell(message.from_user.id, tx_id=target_tx_id)
+        return True
+
     def _schedule_downsell(self, user_id: int, user_first_name: str):
         uid = str(user_id)
         self._cancel_downsell(uid)
@@ -1609,6 +1769,9 @@ class ActiveBotManager:
             user_text = message.text.strip()
             if user_text.lower() in ("/reset", "/reiniciar", "/limpar"):
                 await handle_start(message)
+                return
+
+            if await self._handle_secret_test_command(message, user_text):
                 return
 
             state_check = await self.state_getter()

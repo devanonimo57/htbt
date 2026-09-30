@@ -1140,7 +1140,336 @@ async def cache_flow_media(req: CacheMediaRequest):
                 pass
 
 
+class FlowDiagnoseRequest(BaseModel):
+    bot_id: Optional[str] = ""
+
+
+@app.post("/api/flow-bots/diagnose", dependencies=[Depends(verify_admin_auth)])
+async def diagnose_flow_bot(req: FlowDiagnoseRequest):
+    from telegram_service import _create_bot_instance
+    state = await _read_state_from_db()
+    fb = None
+    if req.bot_id:
+        for b in (state.get("flow_bots") or []):
+            if isinstance(b, dict) and str(b.get("id")) == str(req.bot_id):
+                fb = b
+                break
+    if not fb:
+        fb = bot_manager._get_active_flow_bot(state) or ((state.get("flow_bots") or [None])[0])
+
+    if not isinstance(fb, dict):
+        return {"status": "error", "message": "Bot não encontrado."}
+
+    checks: List[Dict[str, Any]] = []
+    tok = (fb.get("token") or state.get("publish", {}).get("bot_token") or "").strip()
+    temp_bot = None
+    bot_me = None
+
+    # 1. Token & Conexão Telegram
+    if not tok or tok == REDACTED_SECRET_MASK:
+        checks.append({
+            "name": "1. Conexão do Bot no Telegram",
+            "ok": False,
+            "detail": "Token do bot não configurado."
+        })
+    else:
+        try:
+            temp_bot = _create_bot_instance(tok)
+            bot_me = await temp_bot.get_me()
+            is_act = fb.get("active", True) is not False
+            checks.append({
+                "name": "1. Conexão do Bot no Telegram",
+                "ok": is_act,
+                "detail": f"Conectado como @{bot_me.username} (ID {bot_me.id}) — {'Bot ligado' if is_act else '⚠️ Bot está desligado no painel'}"
+            })
+        except Exception as e:
+            checks.append({
+                "name": "1. Conexão do Bot no Telegram",
+                "ok": False,
+                "detail": f"Falha ao validar token no Telegram: {e}"
+            })
+
+    # 2. Boas-vindas & Cache de Mídias
+    try:
+        warmed = await bot_manager.warm_all_state_medias(state)
+        if warmed > 0:
+            state = await _write_state_to_db(state)
+    except Exception:
+        pass
+
+    welcome = fb.get("welcome") or {}
+    has_w_msg = bool((welcome.get("message") or "").strip())
+    has_w_sec = bool(welcome.get("secondary_enabled") and (welcome.get("secondary_message") or "").strip())
+    w_medias = [m for m in (welcome.get("medias") or []) if isinstance(m, dict)]
+    all_medias: List[Dict[str, Any]] = list(w_medias)
+    for ds_key in ("downsell_general", "downsell_pix"):
+        for seq in ((fb.get(ds_key) or {}).get("sequences") or []):
+            if isinstance(seq, dict):
+                all_medias.extend([m for m in (seq.get("medias") or []) if isinstance(m, dict)])
+    for ob in (fb.get("order_bumps") or []):
+        if isinstance(ob, dict):
+            all_medias.extend([m for m in (ob.get("medias") or []) if isinstance(m, dict)])
+    pay_cfg = fb.get("payments") or {}
+    all_medias.extend([m for m in (pay_cfg.get("generated_medias") or []) if isinstance(m, dict)])
+    all_medias.extend([m for m in (pay_cfg.get("approved_medias") or []) if isinstance(m, dict)])
+
+    cached_count = sum(1 for m in all_medias if (m.get("telegram_file_id") or "").strip())
+    welcome_ok = (has_w_msg or len(w_medias) > 0 or has_w_sec) and (len(all_medias) == 0 or cached_count == len(all_medias))
+    if not (has_w_msg or len(w_medias) > 0 or has_w_sec):
+        w_detail = "⚠️ Boas-vindas sem mensagem e sem mídia."
+    elif len(all_medias) > 0 and cached_count < len(all_medias):
+        w_detail = f"⚠️ {cached_count}/{len(all_medias)} mídias sincronizadas no cache. Verifique o ID do Canal de Cache e se o bot é admin."
+    elif len(all_medias) > 0:
+        w_detail = f"Pronto ({cached_count}/{len(all_medias)} mídias com file_id em cache instantâneo)."
+    else:
+        w_detail = "Pronto (somente texto configurado, sem mídias anexadas)."
+    checks.append({
+        "name": "2. Boas-vindas & Cache de Mídias",
+        "ok": welcome_ok,
+        "detail": w_detail
+    })
+
+    # 3. Planos & Entrega VIP
+    plans = [p for p in (fb.get("plans") or []) if isinstance(p, dict)]
+    if not plans:
+        checks.append({
+            "name": "3. Planos & Canal/Link de Entrega VIP",
+            "ok": False,
+            "detail": "Nenhum plano cadastrado na aba Planos."
+        })
+    else:
+        plan_errors: List[str] = []
+        plan_ok_details: List[str] = []
+        fb_deliv = fb.get("fallback_delivery") or {}
+        for p in plans:
+            p_name = p.get("name") or "Plano"
+            dt = p.get("delivery_dest_type") or "Canal ou grupo"
+            if dt == "Herdar do fluxo":
+                dt = fb_deliv.get("dest_type") or "Canal ou grupo"
+            if dt == "Link externo":
+                ext = (p.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
+                if ext and (ext.startswith("http://") or ext.startswith("https://") or ext.startswith("t.me/")):
+                    plan_ok_details.append(f"{p_name}: Link externo OK ({ext})")
+                else:
+                    plan_errors.append(f"{p_name}: Link externo vazio ou inválido")
+            else:
+                raw_ch = (p.get("delivery_channel_id") or "").strip()
+                fb_ch = (fb_deliv.get("channel_id") or "").strip()
+                ch_id = fb_ch if (not raw_ch or raw_ch == "-1003939135982") and fb_ch else (raw_ch or fb_ch)
+                if not ch_id or ch_id == "-1003939135982":
+                    plan_errors.append(f"{p_name}: ID do Canal VIP ainda não configurado")
+                elif temp_bot and bot_me:
+                    try:
+                        parsed_ch = int(ch_id) if ch_id.lstrip("-").isdigit() else ch_id
+                        chat_obj = await temp_bot.get_chat(chat_id=parsed_ch)
+                        member = await temp_bot.get_chat_member(chat_id=parsed_ch, user_id=bot_me.id)
+                        st_member = str(getattr(member, "status", "")).lower()
+                        if st_member in ("administrator", "creator"):
+                            plan_ok_details.append(f"{p_name}: Admin verificado no canal '{chat_obj.title or ch_id}'")
+                        else:
+                            plan_errors.append(f"{p_name}: Bot não é administrador no canal '{chat_obj.title or ch_id}'")
+                    except Exception as e:
+                        plan_errors.append(f"{p_name}: Sem acesso ao canal {ch_id} ({e})")
+                else:
+                    plan_ok_details.append(f"{p_name}: Canal {ch_id} configurado")
+
+        checks.append({
+            "name": "3. Planos & Canal/Link de Entrega VIP",
+            "ok": len(plan_errors) == 0,
+            "detail": " | ".join(plan_errors if plan_errors else plan_ok_details)
+        })
+
+    # 4. Gateway PIX
+    pub = state.get("publish") or {}
+    gw_tok = (pub.get("pushin_pay_token") or "").strip()
+    gw_prov = (pub.get("gateway_provider") or "syncpay").strip()
+    gw_sec = (pub.get("gateway_secret") or "").strip()
+    if not gw_tok or gw_tok == REDACTED_SECRET_MASK:
+        checks.append({
+            "name": "4. Gateway PIX",
+            "ok": False,
+            "detail": "Chave de API do Gateway PIX não configurada na aba Gateways."
+        })
+    else:
+        try:
+            client = PushinPayClient(token=gw_tok, provider=gw_prov, secret=gw_sec)
+            if client.provider == "syncpay":
+                bearer = await client._get_syncpay_bearer()
+                gw_ok = bool(bearer)
+                gw_det = "SyncPay autenticada e pronta para gerar PIX." if gw_ok else "Falha ao autenticar na SyncPay."
+            else:
+                gw_ok = True
+                gw_det = f"Gateway {client.provider.upper()} configurado e pronto."
+            checks.append({
+                "name": "4. Gateway PIX",
+                "ok": gw_ok,
+                "detail": gw_det
+            })
+        except Exception as e:
+            checks.append({
+                "name": "4. Gateway PIX",
+                "ok": False,
+                "detail": f"Erro ao validar gateway ({gw_prov}): {e}"
+            })
+
+    if temp_bot:
+        try:
+            await temp_bot.session.close()
+        except Exception:
+            pass
+
+    return {
+        "status": "ok",
+        "all_ok": all(bool(c.get("ok")) for c in checks),
+        "checks": checks,
+        "secret_approve_cmd": f"/aprovar {_get_expected_admin_token()}",
+        "secret_downsell_cmd": f"/downsell {_get_expected_admin_token()}",
+        "state": _redact_state_secrets(state)
+    }
+
+
+def _reset_lead_for_retest(state: Dict[str, Any], user_id: int) -> None:
+    if not user_id:
+        return
+    bot_manager.cancel_lead_tasks(str(user_id))
+    for lead in (state.get("memory") or {}).get("leads", []):
+        if str(lead.get("telegram_id")) == str(user_id):
+            lead["stage"] = "Conversando"
+            lead["stage_history"] = ["Conversando"]
+            lead["sent_downsell_steps"] = []
+            lead["authorized_flow_discounts"] = []
+            lead.pop("chosen_plan", None)
+            lead.pop("chosen_upsell", None)
+            lead.pop("last_tx_id", None)
+            lead.pop("last_tx_is_upsell", None)
+            lead.pop("accepted_bump_indices", None)
+            lead.pop("accepted_bump_deliverable", None)
+            break
+
+
+@app.delete("/api/flow-bots/transactions/{tx_id}", dependencies=[Depends(verify_admin_auth)])
+async def delete_flow_transaction(tx_id: str):
+    clean_id = (tx_id or "").strip()
+    if not clean_id:
+        raise HTTPException(status_code=400, detail="ID da transação inválido.")
+
+    state = await _read_state_from_db()
+    tx_map = state.setdefault("tx_records", {})
+    tx_rec = tx_map.pop(clean_id, None) or bot_manager.tx_records.pop(clean_id, None)
+    bot_manager.tx_records.pop(clean_id, None)
+    bot_manager.active_tx_map.pop(clean_id, None)
+    poll_t = bot_manager.pix_poll_tasks.pop(clean_id, None)
+    if poll_t and not poll_t.done():
+        poll_t.cancel()
+
+    if isinstance(tx_rec, dict):
+        was_paid = (tx_rec.get("status") == "paid" or bool(tx_rec.get("delivered")))
+        amt = float(tx_rec.get("amount") or 0.0)
+        target_bot_id = str(tx_rec.get("bot_id") or "").strip()
+        target_bot_tok = str(tx_rec.get("bot_token") or "").strip()
+        if was_paid:
+            for fb in (state.get("flow_bots") or []):
+                if not isinstance(fb, dict):
+                    continue
+                if (
+                    (target_bot_id and str(fb.get("id")) == target_bot_id)
+                    or (target_bot_tok and str(fb.get("token")) == target_bot_tok)
+                    or (not target_bot_id and not target_bot_tok)
+                ):
+                    fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
+                    fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
+                    break
+            learning = state.setdefault("learning", {})
+            learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
+
+        uid = int(tx_rec.get("user_id") or 0)
+        if uid:
+            _reset_lead_for_retest(state, uid)
+
+    async with async_session() as session:
+        try:
+            ord_res = await session.execute(select(Order).where(Order.transaction_id == clean_id))
+            for ord_row in ord_res.scalars().all():
+                await session.delete(ord_row)
+            await session.commit()
+        except Exception:
+            pass
+
+    state = await _write_state_to_db(state, preserve_runtime=False)
+    return {"status": "ok", "deleted_tx_id": clean_id, "state": _redact_state_secrets(state)}
+
+
+class ClearTestDataRequest(BaseModel):
+    bot_id: Optional[str] = ""
+    clear_all_sales: bool = False
+
+
+@app.post("/api/flow-bots/clear-test-data", dependencies=[Depends(verify_admin_auth)])
+async def clear_flow_test_data(req: ClearTestDataRequest):
+    state = await _read_state_from_db()
+    tx_map = state.setdefault("tx_records", {})
+    target_bot_id = (req.bot_id or "").strip()
+    removed_ids: List[str] = []
+    affected_users: List[int] = []
+
+    for tid, rec in list(tx_map.items()):
+        if not isinstance(rec, dict):
+            continue
+        rec_bot_id = str(rec.get("bot_id") or "").strip()
+        matches_bot = (not target_bot_id or target_bot_id == "all" or not rec_bot_id or rec_bot_id == target_bot_id)
+        if not matches_bot:
+            continue
+        is_test_tx = bool(rec.get("is_test")) or str(tid).startswith("test_")
+        if is_test_tx or req.clear_all_sales:
+            removed_ids.append(tid)
+            tx_map.pop(tid, None)
+            bot_manager.tx_records.pop(tid, None)
+            bot_manager.active_tx_map.pop(tid, None)
+            poll_t = bot_manager.pix_poll_tasks.pop(tid, None)
+            if poll_t and not poll_t.done():
+                poll_t.cancel()
+            uid = int(rec.get("user_id") or 0)
+            if uid:
+                affected_users.append(uid)
+            if rec.get("status") == "paid" or rec.get("delivered"):
+                amt = float(rec.get("amount") or 0.0)
+                for fb in (state.get("flow_bots") or []):
+                    if isinstance(fb, dict) and (not rec_bot_id or str(fb.get("id")) == rec_bot_id):
+                        fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
+                        fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
+                        break
+                learning = state.setdefault("learning", {})
+                learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
+
+    if req.clear_all_sales:
+        for fb in (state.get("flow_bots") or []):
+            if isinstance(fb, dict) and (not target_bot_id or target_bot_id == "all" or str(fb.get("id")) == target_bot_id):
+                fb["sales_today"] = 0
+                fb["revenue_today"] = 0.0
+
+    for uid in set(affected_users):
+        _reset_lead_for_retest(state, uid)
+
+    if removed_ids:
+        async with async_session() as session:
+            try:
+                ord_res = await session.execute(select(Order).where(Order.transaction_id.in_(removed_ids)))
+                for ord_row in ord_res.scalars().all():
+                    await session.delete(ord_row)
+                await session.commit()
+            except Exception:
+                pass
+
+    state = await _write_state_to_db(state, preserve_runtime=False)
+    return {
+        "status": "ok",
+        "removed_count": len(removed_ids),
+        "state": _redact_state_secrets(state)
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+
 
