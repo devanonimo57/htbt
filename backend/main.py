@@ -272,7 +272,7 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
     for fb in incoming.get("flow_bots", []):
         if isinstance(fb, dict):
             tok = (fb.get("token") or "").strip()
-            if tok == REDACTED_SECRET_MASK:
+            if tok == REDACTED_SECRET_MASK or not tok:
                 old_bot = (
                     ex_bots_by_id.get(str(fb.get("id")))
                     or ex_bots_by_tg_id.get(str(fb.get("bot_id")))
@@ -284,7 +284,17 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
                 else:
                     pub_tok = (ex_pub.get("bot_token") or "").strip()
                     fb_tg_id = str(fb.get("bot_id") or "").strip()
-                    if pub_tok and (not fb_tg_id or pub_tok.startswith(fb_tg_id + ":")):
+                    other_tokens = {
+                        str(b.get("token") or "").strip()
+                        for b in (incoming.get("flow_bots") or [])
+                        if isinstance(b, dict) and b is not fb
+                    }
+                    if (
+                        pub_tok
+                        and pub_tok != REDACTED_SECRET_MASK
+                        and pub_tok not in other_tokens
+                        and (not fb_tg_id or fb_tg_id == "8686296179" or pub_tok.startswith(fb_tg_id + ":"))
+                    ):
                         fb["token"] = pub_tok
                     else:
                         fb["token"] = ""

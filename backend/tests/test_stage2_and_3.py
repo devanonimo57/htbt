@@ -407,11 +407,25 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
             fb2 = mgr._get_active_flow_bot(self.server_state)
             self.assertEqual(fb2.get("username"), "@taxaaprovacao_bot")
             self.assertEqual(fb2.get("welcome", {}).get("message"), "AAA")
+
+            # Mensagens de texto livre ("oi", "quem é você?", "/support") em bot Modo Botão NUNCA devem acionar IA
+            handle_text_fn = next(fn for fn in mgr.dp.message_handlers if fn.__name__ == "handle_text")
+            fake_msg = types.SimpleNamespace(
+                text="quem é você?",
+                from_user=tg_srv.types.User(id=9001, is_bot=False, first_name="Mari"),
+                chat=types.SimpleNamespace(id=9001),
+                answer=AsyncMock(),
+            )
+            with patch.object(tg_srv, "generate_ai_reply", AsyncMock(return_value={"reply": "Sou IA"})) as mock_ai:
+                await handle_text_fn(fake_msg)
+                self.assertEqual(mock_ai.call_count, 0, "Bot em Modo Botão chamou generate_ai_reply em mensagem de texto!")
+                self.assertFalse(fake_msg.answer.called, "Bot em Modo Botão respondeu texto de IA!")
         finally:
             _CURRENT_BOT_TOKEN_CTX.reset(t2)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

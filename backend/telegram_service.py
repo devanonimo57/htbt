@@ -239,6 +239,13 @@ class ActiveBotManager:
             publish["bot_username"] = f"@{me.username}"
             publish["bot_first_name"] = me.first_name
             publish["is_live"] = True
+            for fb in (state.get("flow_bots") or []):
+                if isinstance(fb, dict) and (fb.get("token") == token or str(fb.get("bot_id")) == str(me.id)):
+                    fb["bot_id"] = str(me.id)
+                    if me.username:
+                        fb["username"] = f"@{me.username}"
+                    if me.first_name:
+                        fb["first_name"] = me.first_name
             await self.state_saver(state)
         except Exception as e:
             logger.error(f"Token do Telegram inválido: {e}")
@@ -558,10 +565,14 @@ class ActiveBotManager:
         bot_id: str = ""
     ) -> Optional[Dict[str, Any]]:
         flow_bots = state.get("flow_bots", [])
-        if not isinstance(flow_bots, list):
+        if not isinstance(flow_bots, list) or not flow_bots:
             return None
 
-        eff_token = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or "").strip()
+        ctx_tok = _CURRENT_BOT_TOKEN_CTX.get() or ""
+        bot_inst_tok = getattr(self.bot, "token", None)
+        if not isinstance(bot_inst_tok, str):
+            bot_inst_tok = ""
+        eff_token = (bot_token or ctx_tok or bot_inst_tok or self.current_token or "").strip()
         eff_token_prefix = eff_token.split(":")[0].strip() if ":" in eff_token else ""
         eff_bot_id = (bot_id or "").strip()
 
@@ -579,19 +590,11 @@ class ActiveBotManager:
                 ):
                     if not fb.get("active", True) or fb.get("mode", "flow") != "flow":
                         return None
-                    if (
-                        (fb.get("welcome", {}).get("message") or "").strip()
-                        or fb.get("plans")
-                        or len(flow_bots) > 1
-                    ):
-                        return fb
-                    return None
+                    return fb
 
         for fb in flow_bots:
-            if isinstance(fb, dict) and fb.get("active") and fb.get("mode", "flow") == "flow":
-                # Usa modo fluxo se houver mensagem de boas-vindas ou planos cadastrados
-                if (fb.get("welcome", {}).get("message") or "").strip() or fb.get("plans"):
-                    return fb
+            if isinstance(fb, dict) and fb.get("active", True) and fb.get("mode", "flow") == "flow":
+                return fb
         return None
 
     def _render_flow_vars(
@@ -1411,6 +1414,8 @@ class ActiveBotManager:
         try:
             while True:
                 state = await self.state_getter()
+                if self._get_active_flow_bot(state):
+                    return
                 ds = state.get("downsell", {})
                 if not ds.get("enabled", False):
                     return
@@ -1435,6 +1440,8 @@ class ActiveBotManager:
 
                 # Recarrega estado após espera
                 state = await self.state_getter()
+                if self._get_active_flow_bot(state):
+                    return
                 lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
                 if lead.get("stage") in paid_stages:
                     return
@@ -1550,6 +1557,10 @@ class ActiveBotManager:
                 await handle_start(message)
                 return
 
+            state_check = await self.state_getter()
+            if self._get_active_flow_bot(state_check):
+                return
+
             uid = str(message.from_user.id)
             async with self._get_lead_lock(uid):
                 state = await self.state_getter()
@@ -1645,6 +1656,10 @@ class ActiveBotManager:
 
         @self.dp.message(F.voice | F.audio | F.photo | F.sticker | F.video)
         async def handle_non_text(message: types.Message):
+            state_check = await self.state_getter()
+            if self._get_active_flow_bot(state_check):
+                return
+
             uid = str(message.from_user.id)
             async with self._get_lead_lock(uid):
                 state = await self.state_getter()
@@ -2269,6 +2284,8 @@ class ActiveBotManager:
     async def _upsell_worker(self, user_id: int):
         try:
             state = await self.state_getter()
+            if self._get_active_flow_bot(state):
+                return
             upsell = state.get("upsell", {})
             if not upsell.get("enabled", False):
                 return
@@ -2276,6 +2293,8 @@ class ActiveBotManager:
             await asyncio.sleep(max(5, delay_mins * 60))
 
             state = await self.state_getter()
+            if self._get_active_flow_bot(state):
+                return
             upsell = state.get("upsell", {})
             if not upsell.get("enabled", False):
                 return
