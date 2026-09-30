@@ -525,6 +525,8 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
         pub["bot_token"] = active_fb["token"]
         pub["bot_username"] = active_fb.get("username", pub.get("bot_username", ""))
         pub["is_live"] = True
+    elif any(isinstance(b, dict) and b.get("token") for b in flow_bots):
+        pub["is_live"] = False
 
     # Evita que a instância antiga do Render roube o getUpdates da VPS dedicada
     if os.getenv("RENDER"):
