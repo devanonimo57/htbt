@@ -8220,6 +8220,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     // ABA 2: PLANOS DE PAGAMENTO
     // =========================================================
     function nbRenderPlansTab(b) {
+      if (!b) b = nbGetCurrentBot();
+      if (!b) return;
       const plans = b.plans || (b.plans = []);
       const fb = b.fallback_delivery || {};
 
@@ -8513,6 +8515,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbGetActiveDownsellObj(b) {
+      if (!b) b = nbGetCurrentBot();
+      if (!b) return { enabled: false, sequences: [] };
       if (NB_DOWNSELL_TRACK === 'pix') {
         if (!b.downsell_pix) b.downsell_pix = { enabled: false, sequences: [] };
         return b.downsell_pix;
@@ -8522,6 +8526,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbRenderDownsellTab(b) {
+      if (!b) b = nbGetCurrentBot();
+      if (!b) return;
       const isPix = NB_DOWNSELL_TRACK === 'pix';
       document.getElementById('nb-ds-pill-general').className = !isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
       document.getElementById('nb-ds-pill-pix').className = isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
@@ -8758,7 +8764,8 @@ quer que eu te mostre as opções de acesso?</textarea>
             banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> Sequência #${sIdx + 1} disparada no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. ${data.warmed_medias ? `(${data.warmed_medias} mídia(s) aquecida(s) no Telegram)` : ''}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
           }
           await loadInitialState();
-          nbRenderDownsellTab();
+          const refreshedBot = nbGetCurrentBot();
+          if (refreshedBot) nbRenderDownsellTab(refreshedBot);
         } else {
           if (banner) {
             banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
@@ -8812,7 +8819,8 @@ quer que eu te mostre as opções de acesso?</textarea>
             banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> ${data.sent_count} sequência(s) disparada(s) no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. Todas as mídias aquecidas no Telegram.</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
           }
           await loadInitialState();
-          nbRenderDownsellTab();
+          const refreshedBot = nbGetCurrentBot();
+          if (refreshedBot) nbRenderDownsellTab(refreshedBot);
         } else {
           if (banner) {
             banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
@@ -8869,6 +8877,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbRenderOrderBumpTab(b) {
+      if (!b) b = nbGetCurrentBot();
+      if (!b) return;
       const bumps = b.order_bumps || (b.order_bumps = []);
       const plans = b.plans || [];
       document.getElementById('nb-ob-count-badge').textContent = `${String(bumps.length).padStart(2, '0')} / 10`;
@@ -9045,6 +9055,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbRenderPaymentsTab(b) {
+      if (!b) b = nbGetCurrentBot();
+      if (!b) return;
       const pay = b.payments || (b.payments = {});
       document.getElementById('nb-pay-gen-msg').value = pay.generated_message || "";
       document.getElementById('nb-pay-gen-counter').textContent = `${(pay.generated_message || "").length}/4000 caracteres`;

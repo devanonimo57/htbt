@@ -1379,33 +1379,51 @@ async def test_send_downsell(req: DownsellTestSendRequest):
             )
             kb = bot_manager._build_flow_plans_kb(target_fb, filter_plan_ids=plan_ids, discount_str=disc_str)
 
-            header_text = (
-                f"🧪 <b>[TESTE DOWNSELL · SEQ #{idx + 1}]</b>\n"
-                f"Trilha: <b>{track_title}</b>\n"
-                f"Bot: <b>{bot_uname}</b>\n"
-                f"Disparo após: <b>{delay_min} min</b> · Desconto: <b>{disc_str}</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━\n\n"
-                f"{rendered_msg}"
-            )
-
-            if medias:
-                await bot_manager._send_flow_medias(chat_id=parsed_channel, medias=medias, bot_instance=bot_inst)
-
-            try:
-                await bot_inst.send_message(
+            if not msg_raw and medias:
+                attached_kb = await bot_manager._send_flow_medias(
                     chat_id=parsed_channel,
-                    text=header_text,
-                    parse_mode="HTML",
+                    medias=medias,
                     reply_markup=kb,
-                    disable_notification=True
+                    bot_instance=bot_inst
                 )
-            except Exception:
-                await bot_inst.send_message(
-                    chat_id=parsed_channel,
-                    text=header_text,
-                    reply_markup=kb,
-                    disable_notification=True
-                )
+                if not attached_kb and kb:
+                    try:
+                        await bot_inst.send_message(
+                            chat_id=parsed_channel,
+                            text="👇 <b>Escolha seu plano abaixo:</b>",
+                            parse_mode="HTML",
+                            reply_markup=kb,
+                            disable_notification=True
+                        )
+                    except Exception:
+                        await bot_inst.send_message(
+                            chat_id=parsed_channel,
+                            text="👇 Escolha seu plano abaixo:",
+                            reply_markup=kb,
+                            disable_notification=True
+                        )
+            else:
+                if medias:
+                    await bot_manager._send_flow_medias(
+                        chat_id=parsed_channel,
+                        medias=medias,
+                        bot_instance=bot_inst
+                    )
+                try:
+                    await bot_inst.send_message(
+                        chat_id=parsed_channel,
+                        text=rendered_msg,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                        disable_notification=True
+                    )
+                except Exception:
+                    await bot_inst.send_message(
+                        chat_id=parsed_channel,
+                        text=rendered_msg,
+                        reply_markup=kb,
+                        disable_notification=True
+                    )
             sent_count += 1
 
         # Salva o estado atualizado com os novos file_ids no banco
