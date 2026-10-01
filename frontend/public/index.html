@@ -7282,7 +7282,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived);
 
       host.innerHTML = bots.map((b, index) => {
-        const diag = NB_FLOW_DIAG_RESULTS[b.id] || null;
+        try {
+          const diag = NB_FLOW_DIAG_RESULTS[b.id] || null;
         const stMap = diag?.stage_status || {};
         const plans = Array.isArray(b.plans) ? b.plans : [];
         const botLeads = allLeads.filter(l => l.bot_id === b.id || l.bot_username === b.username);
@@ -7401,7 +7402,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           stepNum += 1;
         }
 
-        // Pagamento · PIX Gerado + Pós-PIX (com ou sem Downsell ativo)
+        // Downsell Geral + Pagamento · PIX Gerado + Pós-PIX (com ou sem Downsell ativo)
+        let downsellGeralHtml = '';
         let pixNodeHtml = '';
         let postPixHtml = '';
         if (b.mode !== 'ai') {
@@ -7466,7 +7468,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>`;
           };
 
-          let downsellGeralHtml = '';
+          downsellGeralHtml = '';
           if (dgEnabled) {
             const dgDetailHtml = renderSeqList(dgSeqs, 'Downsell Geral (Sem gerar Pix)');
             const dsGeneralDiagEntry = (localDsError && dgSeqs.length === 0) ? { ok: false, status: 'error', detail: 'Downsell Geral ativado sem sequência cadastrada' } : null;
@@ -7580,6 +7582,10 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
           </section>
         `;
+        } catch (botErr) {
+          console.error(`Erro ao renderizar bot ${b?.id} no flow:`, botErr);
+          return `<section class="nb-card p-6 border border-rose-800/60 bg-rose-950/20 text-rose-300 text-xs text-center"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Erro ao carregar visualização de ${escapeHtml(b.username || 'bot')}: ${escapeHtml(botErr?.message || botErr)}</section>`;
+        }
       }).join('') || '<p class="text-zinc-400 text-center py-8">Nenhum bot selecionado.</p>';
     }
 
@@ -7661,7 +7667,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       NB_FLOW_SELECT_MODE = false;
       const banner = document.getElementById('nb-flow-verify-banner');
       if (banner) banner.classList.add('hidden');
-      nbRenderFlowCanvas();
+      try {
+        nbRenderFlowCanvas();
+      } catch (err) {
+        console.error("Erro ao renderizar canvas de fluxo:", err);
+      }
       nbSwitchMainView('flow');
     }
 
