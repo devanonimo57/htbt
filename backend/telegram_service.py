@@ -7,7 +7,7 @@ import random
 import secrets
 from contextvars import ContextVar
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set
 
 import httpx
 from aiogram import Bot, Dispatcher, types, F
@@ -57,6 +57,44 @@ def _create_bot_instance(token: str) -> Bot:
         return Bot(token=token)
 
 
+class _RefCountedAsyncLock:
+    """Lock assíncrono com contagem de referências.
+    Garante que um lock NUNCA seja descartado prematuramente enquanto houver
+    tarefas executando ou aguardando na fila pela mesma chave.
+    """
+    def __init__(self, key: str, container: dict):
+        self.key = key
+        self.container = container
+        self.lock = asyncio.Lock()
+        self.refs = 0
+
+    async def __aenter__(self):
+        await self.lock.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self.lock.release()
+        finally:
+            self.refs = max(0, self.refs - 1)
+            if self.refs <= 0 and not self.lock.locked():
+                self.container.pop(self.key, None)
+
+    async def acquire(self):
+        return await self.lock.acquire()
+
+    def release(self):
+        try:
+            self.lock.release()
+        finally:
+            self.refs = max(0, self.refs - 1)
+            if self.refs <= 0 and not self.lock.locked():
+                self.container.pop(self.key, None)
+
+    def locked(self) -> bool:
+        return self.lock.locked()
+
+
 class ActiveBotManager:
     """
     Gerencia as instâncias ativas dos Bots do Telegram em background (suporte multi-bot simultâneo),
@@ -82,8 +120,10 @@ class ActiveBotManager:
         self.upsell_tasks: Dict[str, asyncio.Task] = {}
         self.active_tx_map: Dict[str, int] = {}
         self.tx_records: Dict[str, Dict[str, Any]] = {}
-        self.lead_locks: Dict[str, asyncio.Lock] = {}
-        self.tx_locks: Dict[str, asyncio.Lock] = {}
+        self.lead_locks: Dict[str, _RefCountedAsyncLock] = {}
+        self.tx_locks: Dict[str, _RefCountedAsyncLock] = {}
+        self._active_update_tasks: Set[asyncio.Task] = set()
+        self._delivery_retry_task: Optional[asyncio.Task] = None
         self.state_getter = None
         self.state_saver = None
 
@@ -123,32 +163,27 @@ class ActiveBotManager:
                         return b_inst
         return self.bot
 
-    def _get_lead_lock(self, uid: str, bot_id: Optional[str] = None) -> asyncio.Lock:
+    def _get_lead_lock(self, uid: str, bot_id: Optional[str] = None) -> _RefCountedAsyncLock:
         lock_key = f"{bot_id}:{uid}" if (bot_id and str(bot_id).strip()) else str(uid)
-        if len(self.lead_locks) > 2000:
-            # Limpa locks ociosos para não acumular na RAM
-            idle_keys = [k for k, lk in self.lead_locks.items() if not lk.locked()][:1000]
-            for k in idle_keys:
-                self.lead_locks.pop(k, None)
-        lock = self.lead_locks.get(lock_key)
-        if not lock:
-            lock = asyncio.Lock()
-            self.lead_locks[lock_key] = lock
-        return lock
+        if not hasattr(self, "lead_locks") or not isinstance(self.lead_locks, dict):
+            self.lead_locks = {}
+        entry = self.lead_locks.get(lock_key)
+        if not entry:
+            entry = _RefCountedAsyncLock(lock_key, self.lead_locks)
+            self.lead_locks[lock_key] = entry
+        entry.refs += 1
+        return entry
 
-    def _get_tx_lock(self, tx_id: str) -> asyncio.Lock:
+    def _get_tx_lock(self, tx_id: str) -> _RefCountedAsyncLock:
         clean = str(tx_id or "").strip()
-        if not hasattr(self, "tx_locks"):
+        if not hasattr(self, "tx_locks") or not isinstance(self.tx_locks, dict):
             self.tx_locks = {}
-        if len(self.tx_locks) > 2000:
-            idle_keys = [k for k, lk in self.tx_locks.items() if not lk.locked()][:1000]
-            for k in idle_keys:
-                self.tx_locks.pop(k, None)
-        lock = self.tx_locks.get(clean)
-        if not lock:
-            lock = asyncio.Lock()
-            self.tx_locks[clean] = lock
-        return lock
+        entry = self.tx_locks.get(clean)
+        if not entry:
+            entry = _RefCountedAsyncLock(clean, self.tx_locks)
+            self.tx_locks[clean] = entry
+        entry.refs += 1
+        return entry
 
     async def _sync_extra_bots(self, state: Dict[str, Any]):
         flow_bots = state.get("flow_bots") if isinstance(state, dict) else []
@@ -293,6 +328,8 @@ class ActiveBotManager:
         self.polling_task = asyncio.create_task(self._run_polling(bot_inst=test_bot, bot_token=token))
         await self._sync_extra_bots(state)
         self._resume_pending_pix_polls(state)
+        if not self._delivery_retry_task or self._delivery_retry_task.done():
+            self._delivery_retry_task = asyncio.create_task(self._delivery_retry_loop())
         logger.info(f"Bot iniciado em produção: @{me.username}")
         return {
             "status": "running",
@@ -323,7 +360,59 @@ class ActiveBotManager:
             self.tx_records[str(tx_id)] = rec
             self._start_pix_poll_task(uid, str(tx_id), pushin_token, gw_provider, gw_secret)
 
+    async def _delivery_retry_loop(self):
+        """Worker em background que varre periodicamente transações 'paid' com 'delivered=False'.
+        Garante entrega at-least-once mesmo após reinício ou falhas temporárias na API do Telegram.
+        """
+        while True:
+            try:
+                await asyncio.sleep(45)
+                if not self.state_getter:
+                    continue
+                state = await self.state_getter()
+                tx_map = state.get("tx_records") or {}
+                now = datetime.utcnow()
+                for tid, rec in list(tx_map.items()):
+                    if not isinstance(rec, dict):
+                        continue
+                    if rec.get("status") == "paid" and not rec.get("delivered"):
+                        last_attempt = rec.get("last_delivery_attempt_at")
+                        if last_attempt:
+                            try:
+                                dt_att = datetime.fromisoformat(last_attempt.replace("Z", "+00:00")).replace(tzinfo=None)
+                                if (now - dt_att).total_seconds() < 30:
+                                    continue
+                            except Exception:
+                                pass
+                        uid = int(rec.get("user_id") or 0)
+                        if uid:
+                            logger.info(f"Background retry worker tentando entrega de tx_id={tid} para user={uid}")
+                            await self.deliver_purchase_and_upsell(uid, tx_id=tid)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning(f"Aviso no delivery retry worker: {e}")
+                await asyncio.sleep(10)
+
     async def stop(self):
+        if hasattr(self, "_delivery_retry_task") and self._delivery_retry_task and not self._delivery_retry_task.done():
+            self._delivery_retry_task.cancel()
+            try:
+                await self._delivery_retry_task
+            except asyncio.CancelledError:
+                pass
+        self._delivery_retry_task = None
+
+        if hasattr(self, "_active_update_tasks") and self._active_update_tasks:
+            pending = list(self._active_update_tasks)
+            for t in pending:
+                t.cancel()
+            try:
+                await asyncio.wait(pending, timeout=2.0)
+            except Exception:
+                pass
+            self._active_update_tasks.clear()
+
         for t in self.downsell_tasks.values():
             t.cancel()
         self.downsell_tasks.clear()
@@ -401,6 +490,12 @@ class ActiveBotManager:
         except Exception as e:
             logger.warning(f"Aviso ao limpar webhook para {bot_identifier}: {e}")
 
+        update_sem = asyncio.Semaphore(30)
+
+        async def _bounded_feed(upd):
+            async with update_sem:
+                await self._safe_feed_update(upd, bot_inst=target_bot, bot_token=target_token)
+
         while True:
             try:
                 updates = await target_bot.get_updates(
@@ -410,7 +505,9 @@ class ActiveBotManager:
                 )
                 for u in updates:
                     offset = u.update_id + 1
-                    asyncio.create_task(self._safe_feed_update(u, bot_inst=target_bot, bot_token=target_token))
+                    t = asyncio.create_task(_bounded_feed(u))
+                    self._active_update_tasks.add(t)
+                    t.add_done_callback(self._active_update_tasks.discard)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -646,29 +743,38 @@ class ActiveBotManager:
         eff_token_prefix = eff_token.split(":")[0].strip() if ":" in eff_token else ""
         eff_bot_id = (bot_id or "").strip()
 
-        if eff_bot_id or eff_token:
-            matched_entries = []
+        # 1. Se bot_id foi especificado, casa estritamente pelo identificador configurado
+        if eff_bot_id:
             for fb in flow_bots:
                 if not isinstance(fb, dict):
                     continue
                 fb_id = str(fb.get("id") or "").strip()
-                fb_tg_id = str(fb.get("bot_id") or "").strip()
-                fb_tok = str(fb.get("token") or "").strip()
-                if (
-                    (eff_bot_id and fb_id == eff_bot_id)
-                    or (eff_token and fb_tok == eff_token)
-                    or (eff_token_prefix and fb_tg_id == eff_token_prefix)
-                ):
-                    matched_entries.append(fb)
-            if matched_entries:
-                for fb in matched_entries:
+                if fb_id == eff_bot_id:
                     if fb.get("active", True) and fb.get("mode", "flow") == "flow":
                         return fb
-                return None
+                    return None
+            return None
 
-        for fb in flow_bots:
-            if isinstance(fb, dict) and fb.get("active", True) and fb.get("mode", "flow") == "flow":
-                return fb
+        # 2. Se token foi especificado, casa estritamente pelo token ou prefixo numérico do bot
+        if eff_token:
+            for fb in flow_bots:
+                if not isinstance(fb, dict):
+                    continue
+                fb_tok = str(fb.get("token") or "").strip()
+                fb_tg_id = str(fb.get("bot_id") or "").strip()
+                if fb_tok == eff_token or (eff_token_prefix and fb_tg_id == eff_token_prefix):
+                    if fb.get("active", True) and fb.get("mode", "flow") == "flow":
+                        return fb
+                    return None
+            return None
+
+        # 3. Se nenhum identificador foi fornecido, apenas retorna se houver um único bot ativo sem ambiguidade
+        active_flows = [
+            fb for fb in flow_bots
+            if isinstance(fb, dict) and fb.get("active", True) and fb.get("mode", "flow") == "flow"
+        ]
+        if len(active_flows) == 1:
+            return active_flows[0]
         return None
 
     def _render_flow_vars(
@@ -2692,7 +2798,12 @@ class ActiveBotManager:
                 try:
                     data = await client.check_transaction_status(tx_id)
                     if str((data or {}).get("status", "")).lower() == "paid":
-                        await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id)
+                        if await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id):
+                            return
+                        for retry_wait in (4.0, 8.0, 15.0):
+                            await asyncio.sleep(retry_wait)
+                            if await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id):
+                                return
                         return
                 except asyncio.CancelledError:
                     raise
@@ -3036,6 +3147,7 @@ class ActiveBotManager:
                 pub = state.get("publish", {})
                 dest = (tx_record.get("delivery_destination") or pub.get("delivery_destination", "")).strip()
                 delivery_type = tx_record.get("delivery_type") or pub.get("delivery_type", "Link de acesso")
+                invite_url = ""
 
                 if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
                     await (target_bot or self.bot).send_message(
@@ -3044,7 +3156,6 @@ class ActiveBotManager:
                         parse_mode="HTML"
                     )
                 else:
-                    invite_url = ""
                     if dest.startswith("http"):
                         invite_url = dest
                     elif dest and (target_bot or self.bot):

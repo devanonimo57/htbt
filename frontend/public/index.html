@@ -5316,7 +5316,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         return `
         <div class="sb-card border border-[#181c28] bg-[#0b0d14] rounded-2xl overflow-visible">
           <div class="h-72 bg-[#07080c] relative overflow-hidden rounded-t-2xl">
-            <img src="${m.url}" alt="${escapeHtml(m.name)}" class="w-full h-full object-cover ${m.spoiler ? 'blur-xl scale-105' : ''} transition duration-300">
+            <img src="${escapeHtml(m.url || '')}" alt="${escapeHtml(m.name)}" class="w-full h-full object-cover ${m.spoiler ? 'blur-xl scale-105' : ''} transition duration-300">
             ${m.type === 'Vídeos' ? `<div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 px-3 py-1.5 rounded-lg"><i class="fa-solid fa-play"></i> <span>0:00 / 0:11</span> <i class="fa-solid fa-volume-high"></i></div>` : ''}
           </div>
           <div class="p-5 space-y-4">
@@ -5378,7 +5378,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <div>
                   <label class="text-xs font-bold text-white block">Sinais da conversa</label>
                   <span class="text-[11px] text-slate-400 block mt-0.5 mb-1.5 leading-snug">Opcional, separadas por vírgula.</span>
-                  <input type="text" value="${m.signals || ''}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+                  <input type="text" value="${escapeHtml(m.signals || '')}" oninput="STATE.medias[${idx}].signals=this.value; markUnsaved()" placeholder="vídeo, confiança, prévia" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
                 </div>
               </div>
 
@@ -5400,7 +5400,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div>
                 <label class="text-xs font-bold text-white block">Legenda enviada junto</label>
                 <span class="text-xs text-slate-400 block mt-0.5 mb-2">Opcional. Use {nome} para personalizar.</span>
-                <input type="text" value="${m.caption || ''}" oninput="STATE.medias[${idx}].caption=this.value; markUnsaved()" placeholder="olha essa prévia..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+                <input type="text" value="${escapeHtml(m.caption || '')}" oninput="STATE.medias[${idx}].caption=this.value; markUnsaved()" placeholder="olha essa prévia..." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
               </div>
 
               <div class="rounded-xl bg-[#090b10] border border-[#1b2030] p-3.5 flex items-center justify-between gap-3">
@@ -5675,11 +5675,11 @@ quer que eu te mostre as opções de acesso?</textarea>
 
           <div class="${isExp ? 'space-y-3 pt-1' : 'hidden'}">
             <div class="flex justify-center">
-              <img src="${m.url}" class="w-28 h-48 object-cover rounded-lg border border-[#181c28]">
+              <img src="${escapeHtml(m.url || '')}" class="w-28 h-48 object-cover rounded-lg border border-[#181c28]">
             </div>
             <div>
               <label class="text-[11px] text-slate-400 block mb-1.5">Legenda opcional • enviada com esta mídia</label>
-              <textarea rows="2" oninput="updateUpsellMediaField(${idx}, 'caption', this.value)" class="sb-input !bg-[#07090e] !border-[#181c28] text-xs resize-y">${m.caption || ''}</textarea>
+              <textarea rows="2" oninput="updateUpsellMediaField(${idx}, 'caption', this.value)" class="sb-input !bg-[#07090e] !border-[#181c28] text-xs resize-y">${escapeHtml(m.caption || '')}</textarea>
             </div>
             <div class="flex justify-between items-center pt-1">
               <span class="text-xs text-slate-300">Ocultar com spoiler</span>

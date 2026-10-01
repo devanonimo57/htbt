@@ -727,6 +727,7 @@ async def admin_login(req: AdminLoginRequest):
 @app.get("/api/state", dependencies=[Depends(verify_admin_auth)])
 async def get_full_state():
     raw_state = await _read_state_from_db()
+    reconcile_daily_counters(raw_state)
     return _redact_state_secrets(raw_state)
 
 @app.post("/api/state", dependencies=[Depends(verify_admin_auth)])
@@ -1844,74 +1845,75 @@ async def delete_flow_transaction(tx_id: str):
     if not clean_id:
         raise HTTPException(status_code=400, detail="ID da transação inválido.")
 
-    # 1. Carregar estado original e clonar profundamente para isolamento transacional
-    state = await _read_state_from_db()
-    staged_state = copy.deepcopy(state)
+    async with bot_manager._get_tx_lock(clean_id):
+        # 1. Carregar estado original e clonar profundamente para isolamento transacional
+        state = await _read_state_from_db()
+        staged_state = copy.deepcopy(state)
 
-    tx_map = staged_state.setdefault("tx_records", {})
-    tx_rec = tx_map.pop(clean_id, None) or bot_manager.tx_records.get(clean_id)
+        tx_map = staged_state.setdefault("tx_records", {})
+        tx_rec = tx_map.pop(clean_id, None) or bot_manager.tx_records.get(clean_id)
 
-    if isinstance(tx_rec, dict):
-        was_paid = (tx_rec.get("status") == "paid" or bool(tx_rec.get("delivered")))
-        amt = float(tx_rec.get("amount") or 0.0)
-        target_bot_id = str(tx_rec.get("bot_id") or "").strip()
-        target_bot_tok = str(tx_rec.get("bot_token") or "").strip()
-        is_upsell = bool(tx_rec.get("is_upsell"))
+        if isinstance(tx_rec, dict):
+            was_paid = (tx_rec.get("status") == "paid" or bool(tx_rec.get("delivered")))
+            amt = float(tx_rec.get("amount") or 0.0)
+            target_bot_id = str(tx_rec.get("bot_id") or "").strip()
+            target_bot_tok = str(tx_rec.get("bot_token") or "").strip()
+            is_upsell = bool(tx_rec.get("is_upsell"))
 
-        # Validar se o pagamento foi realizado hoje (horário de Brasília UTC-3)
-        paid_at_raw = str(tx_rec.get("paid_at") or tx_rec.get("created_at") or "").strip()
-        is_paid_today = False
-        if paid_at_raw:
-            try:
-                dt_p = datetime.fromisoformat(paid_at_raw.replace("Z", "+00:00"))
-                if dt_p.tzinfo is None:
-                    dt_p_brt = dt_p - timedelta(hours=3)
-                else:
-                    dt_p_brt = dt_p.astimezone(timezone(timedelta(hours=-3)))
-                now_brt = datetime.now(timezone(timedelta(hours=-3)))
-                is_paid_today = (dt_p_brt.date() == now_brt.date())
-            except Exception:
-                is_paid_today = False
+            # Validar se o pagamento foi realizado hoje (horário de Brasília UTC-3)
+            paid_at_raw = str(tx_rec.get("paid_at") or tx_rec.get("created_at") or "").strip()
+            is_paid_today = False
+            if paid_at_raw:
+                try:
+                    dt_p = datetime.fromisoformat(paid_at_raw.replace("Z", "+00:00"))
+                    if dt_p.tzinfo is None:
+                        dt_p_brt = dt_p - timedelta(hours=3)
+                    else:
+                        dt_p_brt = dt_p.astimezone(timezone(timedelta(hours=-3)))
+                    now_brt = datetime.now(timezone(timedelta(hours=-3)))
+                    is_paid_today = (dt_p_brt.date() == now_brt.date())
+                except Exception:
+                    is_paid_today = False
 
-        # Prova estrita: apenas desconta se houver registro explícito de que a venda foi contabilizada pelo sistema
-        was_counted = bool(tx_rec.get("sales_counted"))
+            # Prova estrita: apenas desconta se houver registro explícito de que a venda foi contabilizada pelo sistema
+            was_counted = bool(tx_rec.get("sales_counted"))
 
-        if was_paid and was_counted:
-            # Apenas desconta do contador diário se comprovadamente contabilizada e com pagamento ocorrido hoje (BRT)
-            if not is_upsell and is_paid_today:
-                for fb in (staged_state.get("flow_bots") or []):
-                    if not isinstance(fb, dict):
-                        continue
-                    if (
-                        (target_bot_id and str(fb.get("id")) == target_bot_id)
-                        or (target_bot_tok and str(fb.get("token")) == target_bot_tok)
-                        or (not target_bot_id and not target_bot_tok)
-                    ):
-                        fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
-                        fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
-                        break
-            learning = staged_state.setdefault("learning", {})
-            learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
+            if was_paid and was_counted:
+                # Apenas desconta do contador diário se comprovadamente contabilizada e com pagamento ocorrido hoje (BRT)
+                if not is_upsell and is_paid_today:
+                    for fb in (staged_state.get("flow_bots") or []):
+                        if not isinstance(fb, dict):
+                            continue
+                        if (
+                            (target_bot_id and str(fb.get("id")) == target_bot_id)
+                            or (target_bot_tok and str(fb.get("token")) == target_bot_tok)
+                            or (not target_bot_id and not target_bot_tok)
+                        ):
+                            fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
+                            fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
+                            break
+                learning = staged_state.setdefault("learning", {})
+                learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
 
-        uid = int(tx_rec.get("user_id") or 0)
-        if uid:
-            _reset_lead_for_retest(staged_state, uid)
+            uid = int(tx_rec.get("user_id") or 0)
+            if uid:
+                _reset_lead_for_retest(staged_state, uid)
 
-    # 2. Exclusão unificada e atômica em transação única no banco de dados (Order + BotConfig JSON)
-    try:
-        staged_state = await _write_state_to_db(staged_state, preserve_runtime=False, delete_tx_ids=[clean_id])
-    except Exception as e:
-        logger.error(f"Erro ao persistir exclusão atômica de {clean_id}: {e}")
-        raise HTTPException(status_code=500, detail="Falha ao excluir transação no banco de dados.")
+        # 2. Exclusão unificada e atômica em transação única no banco de dados (Order + BotConfig JSON)
+        try:
+            staged_state = await _write_state_to_db(staged_state, preserve_runtime=False, delete_tx_ids=[clean_id])
+        except Exception as e:
+            logger.error(f"Erro ao persistir exclusão atômica de {clean_id}: {e}")
+            raise HTTPException(status_code=500, detail="Falha ao excluir transação no banco de dados.")
 
-    # 4. Limpar referências voláteis em memória e cancelar polling ativo
-    bot_manager.tx_records.pop(clean_id, None)
-    bot_manager.active_tx_map.pop(clean_id, None)
-    poll_t = bot_manager.pix_poll_tasks.pop(clean_id, None)
-    if poll_t and not poll_t.done():
-        poll_t.cancel()
+        # 4. Limpar referências voláteis em memória e cancelar polling ativo
+        bot_manager.tx_records.pop(clean_id, None)
+        bot_manager.active_tx_map.pop(clean_id, None)
+        poll_t = bot_manager.pix_poll_tasks.pop(clean_id, None)
+        if poll_t and not poll_t.done():
+            poll_t.cancel()
 
-    return {"status": "ok", "deleted_tx_id": clean_id, "state": _redact_state_secrets(staged_state)}
+        return {"status": "ok", "deleted_tx_id": clean_id, "state": _redact_state_secrets(staged_state)}
 
 
 class ClearTestDataRequest(BaseModel):
