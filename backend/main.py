@@ -571,12 +571,6 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
     elif any(isinstance(b, dict) and b.get("token") for b in flow_bots):
         pub["is_live"] = False
 
-    # Evita que a instância antiga do Render roube o getUpdates da VPS dedicada
-    if os.getenv("RENDER"):
-        pub["is_live"] = False
-        for b in flow_bots:
-            b["active"] = False
-
     memory = state.setdefault("memory", {"leads": []})
     leads = memory.get("leads", [])
     # Nunca descarte clientes silenciosamente: um novo /start ou uma

@@ -526,17 +526,17 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.server_state["tx_records"]["tx_fail_invite"]["delivered"])
         self.assertEqual(mgr.bot.send_message.call_count, 0)
 
-        # 5. Verificação de XSS escapado em renderOffers e persistência no render.yaml
+        # 5. Verificação de XSS escapado em renderOffers e persistência no docker-compose.yml
         with open(FRONTEND_HTML, "r", encoding="utf-8") as f:
             html_src = f.read()
         self.assertIn('value="${escapeHtml(o.name || \'\')}"', html_src)
         self.assertIn('>${escapeHtml(o.description || \'\')}</textarea>', html_src)
 
-        render_yaml_path = os.path.abspath(os.path.join(BACKEND_DIR, "..", "render.yaml"))
-        with open(render_yaml_path, "r", encoding="utf-8") as f:
-            render_src = f.read()
-        self.assertIn("mountPath: /var/data", render_src)
-        self.assertIn("sqlite+aiosqlite:////var/data/hotbot.db", render_src)
+        docker_compose_path = os.path.abspath(os.path.join(BACKEND_DIR, "..", "docker-compose.yml"))
+        with open(docker_compose_path, "r", encoding="utf-8") as f:
+            compose_src = f.read()
+        self.assertIn("hotbot_data:/app/data", compose_src)
+        self.assertIn("sqlite+aiosqlite:////app/data/hotbot.db", compose_src)
 
 
 if __name__ == "__main__":
