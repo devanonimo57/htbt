@@ -83,6 +83,7 @@ class ActiveBotManager:
         self.active_tx_map: Dict[str, int] = {}
         self.tx_records: Dict[str, Dict[str, Any]] = {}
         self.lead_locks: Dict[str, asyncio.Lock] = {}
+        self.tx_locks: Dict[str, asyncio.Lock] = {}
         self.state_getter = None
         self.state_saver = None
 
@@ -122,16 +123,31 @@ class ActiveBotManager:
                         return b_inst
         return self.bot
 
-    def _get_lead_lock(self, uid: str) -> asyncio.Lock:
-        if len(self.lead_locks) > 1000:
+    def _get_lead_lock(self, uid: str, bot_id: Optional[str] = None) -> asyncio.Lock:
+        lock_key = f"{bot_id}:{uid}" if (bot_id and str(bot_id).strip()) else str(uid)
+        if len(self.lead_locks) > 2000:
             # Limpa locks ociosos para não acumular na RAM
-            idle_keys = [k for k, lk in self.lead_locks.items() if not lk.locked()][:500]
+            idle_keys = [k for k, lk in self.lead_locks.items() if not lk.locked()][:1000]
             for k in idle_keys:
                 self.lead_locks.pop(k, None)
-        lock = self.lead_locks.get(uid)
+        lock = self.lead_locks.get(lock_key)
         if not lock:
             lock = asyncio.Lock()
-            self.lead_locks[uid] = lock
+            self.lead_locks[lock_key] = lock
+        return lock
+
+    def _get_tx_lock(self, tx_id: str) -> asyncio.Lock:
+        clean = str(tx_id or "").strip()
+        if not hasattr(self, "tx_locks"):
+            self.tx_locks = {}
+        if len(self.tx_locks) > 2000:
+            idle_keys = [k for k, lk in self.tx_locks.items() if not lk.locked()][:1000]
+            for k in idle_keys:
+                self.tx_locks.pop(k, None)
+        lock = self.tx_locks.get(clean)
+        if not lock:
+            lock = asyncio.Lock()
+            self.tx_locks[clean] = lock
         return lock
 
     async def _sync_extra_bots(self, state: Dict[str, Any]):
@@ -546,7 +562,11 @@ class ActiveBotManager:
         for lead in leads:
             lead_uid = str(lead.get("telegram_id") or "")
             lead_bid = str(lead.get("bot_id") or "")
-            if lead_uid == uid and (not bot_id_str or not lead_bid or lead_bid == bot_id_str):
+            matches = (lead_uid == uid) and (
+                (bool(bot_id_str) and lead_bid == bot_id_str)
+                or (not bot_id_str and not lead_bid)
+            )
+            if matches:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
                 lead["last_interaction"] = datetime.utcnow().strftime("%d/%m %H:%M")
@@ -1509,10 +1529,15 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro no Flow Downsell ({track}): {e}")
 
-    def _cancel_downsell(self, user_id: str):
-        task = self.downsell_tasks.pop(user_id, None)
-        if task and not task.done():
-            task.cancel()
+    def _cancel_downsell(self, user_id: Any, bot_id: Optional[str] = None):
+        uid = str(user_id)
+        keys_to_pop = [uid]
+        if bot_id:
+            keys_to_pop.append(f"{bot_id}:{uid}")
+        for k in keys_to_pop:
+            task = self.downsell_tasks.pop(k, None)
+            if task and not task.done():
+                task.cancel()
 
     def _verify_secret_test_token(self, candidate: str) -> bool:
         cand = (candidate or "").strip()
@@ -2645,7 +2670,7 @@ class ActiveBotManager:
         tx_record = (state.get("tx_records") or {}).get(tx_id) or self.tx_records.get(tx_id)
         if not tx_record:
             return False
-        if tx_record.get("status") in ("paid", "cancelled", "canceled") or tx_record.get("delivered"):
+        if tx_record.get("status") in ("cancelled", "canceled") or tx_record.get("delivered"):
             return False
         uid = int(tx_record.get("user_id") or 0)
         if not uid:
@@ -2662,7 +2687,7 @@ class ActiveBotManager:
             for base_wait in intervals:
                 await asyncio.sleep(base_wait + random.uniform(0.0, 1.2))
                 existing_tx = self.tx_records.get(tx_id)
-                if existing_tx and (existing_tx.get("status") in ("paid", "cancelled", "canceled") or existing_tx.get("delivered")):
+                if existing_tx and (existing_tx.get("status") in ("cancelled", "canceled") or existing_tx.get("delivered")):
                     return
                 try:
                     data = await client.check_transaction_status(tx_id)
@@ -2677,17 +2702,6 @@ class ActiveBotManager:
             pass
         finally:
             self.pix_poll_tasks.pop(tx_id, None)
-            rec = self.tx_records.get(tx_id)
-            if rec and rec.get("status") == "pending" and not rec.get("delivered"):
-                rec["status"] = "expired"
-                try:
-                    if self.state_getter and self.state_saver:
-                        st = await self.state_getter()
-                        if tx_id in (st.get("tx_records") or {}):
-                            st["tx_records"][tx_id]["status"] = "expired"
-                            await self.state_saver(st)
-                except Exception:
-                    pass
 
     def _schedule_upsell(self, user_id: int):
         uid = str(user_id)
@@ -2755,13 +2769,18 @@ class ActiveBotManager:
         if not tx_id or str(tx_id).startswith("sim_"):
             return False
 
-        async with self._get_lead_lock(str(user_id)):
-            state = await self.state_getter()
+        async with self._get_tx_lock(tx_id):
+            state = await self.state_getter() if self.state_getter else {}
             tx_record = (state.setdefault("tx_records", {})).get(tx_id) or self.tx_records.get(tx_id)
             if not tx_record or int(tx_record.get("user_id", 0)) != int(user_id):
                 return False
-            if tx_record.get("status") in ("paid", "cancelled", "canceled") or tx_record.get("delivered"):
+
+            if tx_record.get("status") in ("cancelled", "canceled"):
                 return False
+
+            # Idempotência total de entrega
+            if tx_record.get("delivered"):
+                return True
 
             tx_bot_token = str(tx_record.get("bot_token") or "").strip()
             tx_bot_id = str(tx_record.get("bot_id") or "").strip()
@@ -2780,279 +2799,306 @@ class ActiveBotManager:
                     _CURRENT_BOT_CTX.set(resolved_bot)
             target_bot = resolved_bot or _CURRENT_BOT_CTX.get() or self.bot
 
-            # A confirmação assíncrona de Pix deve registrar a entrega no arquivo,
-            # sem recriar um cliente ativo excluído pelo administrador.
-            memory = state.setdefault("memory", {})
-            active_lead = next((item for item in memory.get("leads", []) if str(item.get("telegram_id")) == str(user_id)), None)
-            archived_lead = next((item for item in memory.get("deleted_leads", []) if str(item.get("telegram_id")) == str(user_id)), None)
-            lead = active_lead or archived_lead
-            if lead is None:
-                lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
-            self._cancel_downsell(str(user_id))
-
-            is_upsell_payment = bool(tx_record.get("is_upsell"))
-
-            if is_upsell_payment:
-                await (target_bot or self.bot).send_message(
-                    chat_id=user_id,
-                    text="💜 <b>Upsell confirmado!</b>\n\nSeu conteúdo extra exclusivo já está liberado!",
-                    parse_mode="HTML"
-                )
-                tx_record["status"] = "paid"
-                tx_record["delivered"] = True
-                tx_record["paid_at"] = datetime.utcnow().isoformat()
-                self.tx_records[tx_id] = tx_record
-                state["tx_records"][tx_id] = tx_record
-
-                poll_t = self.pix_poll_tasks.pop(tx_id, None)
-                if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
-                    poll_t.cancel()
-
-                self._advance_stage(lead, "Comprou upsell")
-                learning = state.setdefault("learning", {})
-                learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
-                if int(learning.get("unpaid_checkouts", 0)) > 0:
-                    learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
-                self._update_lead_insights(state, lead)
-                lead.setdefault("history", []).append({
-                    "role": "assistant",
-                    "content": "[Upsell pago e entregue com sucesso]"
-                })
-                await self.state_saver(state)
-                return True
-
-            flow_bot = self._get_active_flow_bot(state, bot_token=tx_bot_token, bot_id=tx_bot_id)
             is_flow_tx = (tx_record.get("mode") == "flow")
-            if is_flow_tx and flow_bot:
+            flow_bot = self._get_active_flow_bot(state, bot_token=tx_bot_token, bot_id=tx_bot_id) if is_flow_tx else None
+            effective_bot_id = tx_bot_id or (str(flow_bot.get("id") or "") if flow_bot else "")
+
+            # Lead retrieval sob lock do par (bot_id, user_id)
+            async with self._get_lead_lock(str(user_id), bot_id=effective_bot_id):
+                memory = state.setdefault("memory", {})
+                active_lead = next((item for item in memory.get("leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
+                archived_lead = next((item for item in memory.get("deleted_leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
+                lead = active_lead or archived_lead
+                if lead is None:
+                    lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"), bot_token=tx_bot_token)
+                self._cancel_downsell(str(user_id), bot_id=effective_bot_id)
+
+                is_upsell_payment = bool(tx_record.get("is_upsell"))
                 paid_val = float(tx_record.get("amount") or (lead.get("flow_plan_price") or 9.90))
-                if tx_record.get("delivery_dest_type"):
-                    eff_type = tx_record.get("delivery_dest_type", "Canal ou grupo")
-                    ch_target = (tx_record.get("delivery_channel_id") or "").strip()
-                    ext_url = (tx_record.get("delivery_external_url") or "").strip()
-                else:
-                    target_plan_id = str(tx_record.get("plan_id") or lead.get("flow_plan_id"))
-                    plan_obj = None
-                    for p in flow_bot.get("plans", []):
-                        if str(p.get("id")) == target_plan_id:
-                            plan_obj = p
-                            break
-                    if not plan_obj and flow_bot.get("plans"):
-                        plan_obj = flow_bot["plans"][0]
 
-                    fb_deliv = flow_bot.get("fallback_delivery", {})
-                    dest_type = (plan_obj.get("delivery_dest_type") if plan_obj else "Herdar do fluxo") or "Herdar do fluxo"
-                    if dest_type == "Herdar do fluxo":
-                        eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
-                        ch_target = (fb_deliv.get("channel_id") or "").strip()
-                        ext_url = (fb_deliv.get("external_url") or "").strip()
-                    else:
-                        eff_type = dest_type
-                        ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
-                        ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
-
-                invite_url = ""
-                if eff_type == "Link externo" and ext_url:
-                    invite_url = ext_url
-                elif ch_target and (target_bot or self.bot):
-                    try:
-                        active_bot_deliv = target_bot or self.bot
-                        invite = await active_bot_deliv.create_chat_invite_link(
-                            chat_id=ch_target,
-                            member_limit=1,
-                            expire_date=datetime.utcnow() + timedelta(minutes=15)
-                        )
-                        invite_url = (invite.invite_link or "").strip()
-                    except Exception as e:
-                        logger.warning(f"Erro gerando link de convite no canal {ch_target}: {e}")
-                        invite_url = ""
-
-                if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
-                    logger.error(f"Entrega automática pendente para tx_id={tx_id}: link de convite não pôde ser gerado no canal {ch_target}.")
+                # ========================================================
+                # FASE 1: LIQUIDAÇÃO FINANCEIRA ATÔMICA (EXATAMENTE UMA VEZ)
+                # ========================================================
+                already_counted = bool(tx_record.get("sales_counted")) or (
+                    tx_record.get("status") == "paid" and "sales_counted" not in tx_record
+                )
+                if not already_counted:
                     tx_record["status"] = "paid"
-                    tx_record["paid_at"] = datetime.utcnow().isoformat()
-                    tx_record["access_status"] = "Pendente (Admin no Canal)"
-                    tx_record["delivered"] = False
-                    self.tx_records[tx_id] = tx_record
-                    state["tx_records"][tx_id] = tx_record
+                    tx_record["sales_counted"] = True
+                    tx_record.setdefault("paid_at", datetime.utcnow().isoformat())
 
-                    flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
-                    flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
-                    self._advance_stage(lead, "Pagamento aprovado")
-                    learning = state.setdefault("learning", {})
-                    learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
-                    if int(learning.get("unpaid_checkouts", 0)) > 0:
-                        learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+                    if is_upsell_payment:
+                        learning = state.setdefault("learning", {})
+                        learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
+                        if int(learning.get("unpaid_checkouts", 0)) > 0:
+                            learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+                        self._advance_stage(lead, "Comprou upsell")
+                    elif is_flow_tx and flow_bot:
+                        flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
+                        flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
+                        self._advance_stage(lead, "Pagamento aprovado")
+                        learning = state.setdefault("learning", {})
+                        learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
+                        if int(learning.get("unpaid_checkouts", 0)) > 0:
+                            learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+                    elif not is_flow_tx:
+                        self._advance_stage(lead, "Pagamento aprovado")
+                        learning = state.setdefault("learning", {})
+                        learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
+                        if int(learning.get("unpaid_checkouts", 0)) > 0:
+                            learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+
                     self._update_lead_insights(state, lead)
 
-                    sup_contact = state.get("publish", {}).get("support_username", "@suporte")
-                    plan_label = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
-                    await self._safe_send_html(
-                        user_id,
-                        f"✅ <b>Pagamento Aprovado!</b>\n\n"
-                        f"Parabéns {html.escape(lead.get('first_name') or 'Cliente')}! Seu pagamento do plano <b>{html.escape(plan_label)}</b> no valor de <b>R$ {paid_val:.2f}</b> foi confirmado com sucesso!\n\n"
-                        f"⚠️ O link automático de acesso está sendo gerado pelo suporte. Se demorar, contate {sup_contact} para liberação imediata.",
-                        bot_instance=target_bot
-                    )
-                    await self.state_saver(state)
+                    # Cancela polling de PIX se ainda ativo
                     poll_t = self.pix_poll_tasks.pop(tx_id, None)
                     if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
                         poll_t.cancel()
-                    return True
 
-                pay_cfg = flow_bot.get("payments", {})
-                await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []), bot_instance=target_bot)
-
-                btn_txt = (pay_cfg.get("access_button_text") or "Acessar conteúdo").strip()
-                kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text=btn_txt, url=invite_url)]
-                ])
-                fake_user = types.User(id=user_id, is_bot=False, first_name=lead.get("first_name") or "Assinante")
-                app_tmpl = pay_cfg.get("approved_message") or (
-                    "✅ <b>Pagamento Aprovado!</b>\n\n"
-                    "Parabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n"
-                    "🎉 Você já tem acesso ao conteúdo!"
-                )
-                plan_label = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
-                rendered_app = self._render_flow_vars(
-                    app_tmpl,
-                    fake_user,
-                    flow_bot,
-                    plan_name=plan_label,
-                    valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
-                )
-                await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
-
-                bump_deliv = (tx_record.get("deliverable") or "").strip()
-                if bump_deliv:
-                    await self._safe_send_html(
-                        user_id,
-                        f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
-                        bot_instance=target_bot
-                    )
-
-                dur_str = str(tx_record.get("plan_duration") or "Vitalício")
-                exp_days = 0
-                if "7" in dur_str or "semanal" in dur_str.lower():
-                    exp_days = 7
-                elif "30" in dur_str or "mensal" in dur_str.lower():
-                    exp_days = 30
-                elif "90" in dur_str or "trimestral" in dur_str.lower():
-                    exp_days = 90
-                elif "180" in dur_str or "semestral" in dur_str.lower():
-                    exp_days = 180
-                elif "365" in dur_str or "anual" in dur_str.lower():
-                    exp_days = 365
-
-                tx_record["status"] = "paid"
-                tx_record["delivered"] = True
-                tx_record["access_status"] = "Ativo"
-                tx_record["invite_url"] = invite_url
-                tx_record["paid_at"] = datetime.utcnow().isoformat()
-                tx_record["expires_at"] = (datetime.utcnow() + timedelta(days=exp_days)).isoformat() if exp_days > 0 else "Vitalício"
-                if not tx_record.get("delivery_channel_name"):
-                    tx_record["delivery_channel_name"] = (
-                        (flow_bot.get("fallback_delivery") or {}).get("channel_name")
-                        or ch_target
-                        or "Link Externo"
-                    )
-                self.tx_records[tx_id] = tx_record
-                state["tx_records"][tx_id] = tx_record
-
-                poll_t = self.pix_poll_tasks.pop(tx_id, None)
-                if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
-                    poll_t.cancel()
-
-                flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
-                flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
-                self._advance_stage(lead, "Pagamento aprovado")
-                self._advance_stage(lead, "Entrega concluída")
-                learning = state.setdefault("learning", {})
-                learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
-                if int(learning.get("unpaid_checkouts", 0)) > 0:
-                    learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
-                self._update_lead_insights(state, lead)
-                lead.setdefault("history", []).append({
-                    "role": "assistant",
-                    "content": f"[Pagamento aprovado Flow ({plan_label}) — Entrega concluída]"
-                })
-                await self.state_saver(state)
-                return True
-
-            pub = state.get("publish", {})
-            dest = (tx_record.get("delivery_destination") or pub.get("delivery_destination", "")).strip()
-            delivery_type = tx_record.get("delivery_type") or pub.get("delivery_type", "Link de acesso")
-
-            if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
-                await (target_bot or self.bot).send_message(
-                    chat_id=user_id,
-                    text=f"💜 <b>Pagamento confirmado!</b>\n\n{dest}",
-                    parse_mode="HTML"
-                )
-            else:
-                invite_url = ""
-                if dest.startswith("http"):
-                    invite_url = dest
-                elif dest and (target_bot or self.bot):
-                    try:
-                        active_bot_deliv = target_bot or self.bot
-                        invite = await active_bot_deliv.create_chat_invite_link(
-                            chat_id=dest,
-                            member_limit=1,
-                            expire_date=datetime.utcnow() + timedelta(days=1)
-                        )
-                        invite_url = (invite.invite_link or "").strip()
-                    except Exception as e:
-                        logger.warning(f"Não foi possível criar link único no canal {dest}: {e}")
-                        invite_url = ""
-
-                if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
-                    logger.error(f"Entrega abortada para tx_id={tx_id}: link de convite válido não pôde ser gerado.")
-                    tx_record["access_status"] = "Pendente"
-                    tx_record["delivered"] = False
+                    # Persiste estado da Fase 1 imediatamente
                     self.tx_records[tx_id] = tx_record
                     state["tx_records"][tx_id] = tx_record
                     await self.state_saver(state)
-                    return False
 
-                kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
-                ])
+                # ========================================================
+                # FASE 2: DESPACHO E ENTREGA (AT-LEAST-ONCE DELIVERY)
+                # ========================================================
+                tx_record["delivery_attempts"] = int(tx_record.get("delivery_attempts") or 0) + 1
+                tx_record["last_delivery_attempt_at"] = datetime.utcnow().isoformat()
 
-                await self.bot.send_message(
-                    chat_id=user_id,
-                    text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
-                    parse_mode="HTML",
-                    reply_markup=kb
-                )
+                if is_upsell_payment:
+                    try:
+                        await (target_bot or self.bot).send_message(
+                            chat_id=user_id,
+                            text="💜 <b>Upsell confirmado!</b>\n\nSeu conteúdo extra exclusivo já está liberado!",
+                            parse_mode="HTML"
+                        )
+                        tx_record["delivered"] = True
+                        tx_record["access_status"] = "Entregue"
+                        lead.setdefault("history", []).append({
+                            "role": "assistant",
+                            "content": "[Upsell pago e entregue com sucesso]"
+                        })
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+                        await self.state_saver(state)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Erro no despacho de upsell para tx_id={tx_id}: {e}")
+                        tx_record["delivery_error"] = str(e)
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+                        await self.state_saver(state)
+                        return False
 
-            tx_record["status"] = "paid"
-            tx_record["delivered"] = True
-            tx_record["paid_at"] = datetime.utcnow().isoformat()
-            self.tx_records[tx_id] = tx_record
-            state["tx_records"][tx_id] = tx_record
+                if is_flow_tx:
+                    if not flow_bot:
+                        logger.error(f"Entrega abortada para tx_id={tx_id}: Bot de fluxo associado está inativo ou indisponível.")
+                        tx_record["access_status"] = "Pendente (Bot de Origem Indisponível)"
+                        tx_record["delivered"] = False
+                        tx_record["delivery_error"] = "Bot de fluxo associado está inativo ou desativado."
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+                        await self.state_saver(state)
+                        return False
 
-            poll_t = self.pix_poll_tasks.pop(tx_id, None)
-            if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
-                poll_t.cancel()
+                    if tx_record.get("delivery_dest_type"):
+                        eff_type = tx_record.get("delivery_dest_type", "Canal ou grupo")
+                        ch_target = (tx_record.get("delivery_channel_id") or "").strip()
+                        ext_url = (tx_record.get("delivery_external_url") or "").strip()
+                    else:
+                        target_plan_id = str(tx_record.get("plan_id") or lead.get("flow_plan_id"))
+                        plan_obj = None
+                        for p in flow_bot.get("plans", []):
+                            if str(p.get("id")) == target_plan_id:
+                                plan_obj = p
+                                break
+                        if not plan_obj and flow_bot.get("plans"):
+                            plan_obj = flow_bot["plans"][0]
 
-            self._advance_stage(lead, "Pagamento aprovado")
-            self._advance_stage(lead, "Entrega concluída")
-            learning = state.setdefault("learning", {})
-            learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
-            if int(learning.get("unpaid_checkouts", 0)) > 0:
-                learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
-            self._update_lead_insights(state, lead)
-            lead.setdefault("history", []).append({
-                "role": "assistant",
-                "content": "[Pagamento aprovado — Entrega concluída]"
-            })
-            await self.state_saver(state)
+                        fb_deliv = flow_bot.get("fallback_delivery", {})
+                        dest_type = (plan_obj.get("delivery_dest_type") if plan_obj else "Herdar do fluxo") or "Herdar do fluxo"
+                        if dest_type == "Herdar do fluxo":
+                            eff_type = fb_deliv.get("dest_type", "Canal ou grupo")
+                            ch_target = (fb_deliv.get("channel_id") or "").strip()
+                            ext_url = (fb_deliv.get("external_url") or "").strip()
+                        else:
+                            eff_type = dest_type
+                            ch_target = (plan_obj.get("delivery_channel_id") or fb_deliv.get("channel_id") or "").strip()
+                            ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
 
-            # Dispara Upsell em task rastreada (sem bloquear a conclusão da entrega/webhook)
-            upsell = state.get("upsell", {})
-            if upsell.get("enabled", False):
-                self._schedule_upsell(user_id)
-            return True
+                    invite_url = ""
+                    if eff_type == "Link externo" and ext_url:
+                        invite_url = ext_url
+                    elif ch_target and (target_bot or self.bot):
+                        try:
+                            active_bot_deliv = target_bot or self.bot
+                            invite = await active_bot_deliv.create_chat_invite_link(
+                                chat_id=ch_target,
+                                member_limit=1,
+                                expire_date=datetime.utcnow() + timedelta(minutes=15)
+                            )
+                            invite_url = (invite.invite_link or "").strip()
+                        except Exception as e:
+                            logger.warning(f"Erro gerando link de convite no canal {ch_target}: {e}")
+                            invite_url = ""
+
+                    if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+                        logger.error(f"Entrega automática pendente para tx_id={tx_id}: link de convite não pôde ser gerado no canal {ch_target}.")
+                        tx_record["access_status"] = "Pendente (Admin no Canal)"
+                        tx_record["delivered"] = False
+                        tx_record["delivery_error"] = f"Não foi possível gerar link de convite no canal {ch_target}."
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+
+                        sup_contact = state.get("publish", {}).get("support_username", "@suporte")
+                        plan_label = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
+                        try:
+                            await self._safe_send_html(
+                                user_id,
+                                f"✅ <b>Pagamento Aprovado!</b>\n\n"
+                                f"Parabéns {html.escape(lead.get('first_name') or 'Cliente')}! Seu pagamento do plano <b>{html.escape(plan_label)}</b> no valor de <b>R$ {paid_val:.2f}</b> foi confirmado com sucesso!\n\n"
+                                f"⚠️ O link automático de acesso está sendo gerado pelo suporte. Se demorar, contate {sup_contact} para liberação imediata.",
+                                bot_instance=target_bot
+                            )
+                        except Exception:
+                            pass
+                        await self.state_saver(state)
+                        return False
+
+                    pay_cfg = flow_bot.get("payments", {})
+                    await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []), bot_instance=target_bot)
+
+                    btn_txt = (pay_cfg.get("access_button_text") or "Acessar conteúdo").strip()
+                    kb = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text=btn_txt, url=invite_url)]
+                    ])
+                    fake_user = types.User(id=user_id, is_bot=False, first_name=lead.get("first_name") or "Assinante")
+                    app_tmpl = pay_cfg.get("approved_message") or (
+                        "✅ <b>Pagamento Aprovado!</b>\n\n"
+                        "Parabéns {nome}! Seu pagamento do plano <b>{plano}</b> no valor de <b>{valor}</b> foi confirmado.\n\n"
+                        "🎉 Você já tem acesso ao conteúdo!"
+                    )
+                    plan_label = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
+                    rendered_app = self._render_flow_vars(
+                        app_tmpl,
+                        fake_user,
+                        flow_bot,
+                        plan_name=plan_label,
+                        valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
+                    )
+                    await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
+
+                    bump_deliv = (tx_record.get("deliverable") or "").strip()
+                    if bump_deliv:
+                        await self._safe_send_html(
+                            user_id,
+                            f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
+                            bot_instance=target_bot
+                        )
+
+                    dur_str = str(tx_record.get("plan_duration") or "Vitalício")
+                    exp_days = 0
+                    if "7" in dur_str or "semanal" in dur_str.lower():
+                        exp_days = 7
+                    elif "30" in dur_str or "mensal" in dur_str.lower():
+                        exp_days = 30
+                    elif "90" in dur_str or "trimestral" in dur_str.lower():
+                        exp_days = 90
+                    elif "180" in dur_str or "semestral" in dur_str.lower():
+                        exp_days = 180
+                    elif "365" in dur_str or "anual" in dur_str.lower():
+                        exp_days = 365
+
+                    tx_record["delivered"] = True
+                    tx_record["access_status"] = "Ativo"
+                    tx_record["invite_url"] = invite_url
+                    tx_record["expires_at"] = (datetime.utcnow() + timedelta(days=exp_days)).isoformat() if exp_days > 0 else "Vitalício"
+                    tx_record.pop("delivery_error", None)
+                    if not tx_record.get("delivery_channel_name"):
+                        tx_record["delivery_channel_name"] = (
+                            (flow_bot.get("fallback_delivery") or {}).get("channel_name")
+                            or ch_target
+                            or "Link Externo"
+                        )
+                    self.tx_records[tx_id] = tx_record
+                    state["tx_records"][tx_id] = tx_record
+
+                    self._advance_stage(lead, "Entrega concluída")
+                    lead.setdefault("history", []).append({
+                        "role": "assistant",
+                        "content": f"[Pagamento aprovado Flow ({plan_label}) — Entrega concluída]"
+                    })
+                    await self.state_saver(state)
+                    return True
+
+                # Caso IA (não-flow)
+                pub = state.get("publish", {})
+                dest = (tx_record.get("delivery_destination") or pub.get("delivery_destination", "")).strip()
+                delivery_type = tx_record.get("delivery_type") or pub.get("delivery_type", "Link de acesso")
+
+                if delivery_type == "Mensagem no bot" and dest and not dest.startswith("http"):
+                    await (target_bot or self.bot).send_message(
+                        chat_id=user_id,
+                        text=f"💜 <b>Pagamento confirmado!</b>\n\n{dest}",
+                        parse_mode="HTML"
+                    )
+                else:
+                    invite_url = ""
+                    if dest.startswith("http"):
+                        invite_url = dest
+                    elif dest and (target_bot or self.bot):
+                        try:
+                            active_bot_deliv = target_bot or self.bot
+                            invite = await active_bot_deliv.create_chat_invite_link(
+                                chat_id=dest,
+                                member_limit=1,
+                                expire_date=datetime.utcnow() + timedelta(days=1)
+                            )
+                            invite_url = (invite.invite_link or "").strip()
+                        except Exception as e:
+                            logger.warning(f"Não foi possível criar link único no canal {dest}: {e}")
+                            invite_url = ""
+
+                    if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+                        logger.error(f"Entrega abortada para tx_id={tx_id}: link de convite válido não pôde ser gerado.")
+                        tx_record["access_status"] = "Pendente"
+                        tx_record["delivered"] = False
+                        tx_record["delivery_error"] = f"Não foi possível gerar link no canal {dest}."
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+                        await self.state_saver(state)
+                        return False
+
+                    kb = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
+                    ])
+
+                    await self.bot.send_message(
+                        chat_id=user_id,
+                        text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
+                        parse_mode="HTML",
+                        reply_markup=kb
+                    )
+
+                tx_record["delivered"] = True
+                tx_record["access_status"] = "Ativo"
+                tx_record["invite_url"] = invite_url
+                tx_record.pop("delivery_error", None)
+                self.tx_records[tx_id] = tx_record
+                state["tx_records"][tx_id] = tx_record
+
+                self._advance_stage(lead, "Entrega concluída")
+                lead.setdefault("history", []).append({
+                    "role": "assistant",
+                    "content": "[Pagamento aprovado — Entrega concluída]"
+                })
+                await self.state_saver(state)
+
+                upsell = state.get("upsell", {})
+                if upsell.get("enabled", False):
+                    self._schedule_upsell(user_id)
+                return True
 
 
 bot_manager = ActiveBotManager()

@@ -332,20 +332,25 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         res_unregistered = await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_unknown_999")
         self.assertFalse(res_unregistered, "deliver_purchase_and_upsell aceitou tx_id sem tx_record registrado!")
 
-        # 2. Se o envio no Telegram falhar, o status não pode ficar 'paid' impedindo nova tentativa
+        # 2. Se o envio no Telegram falhar, o status fica 'paid' mas delivered=False, permitindo nova tentativa sem duplicar vendas
         mgr.bot.send_message = AsyncMock(side_effect=RuntimeError("Telegram network timeout"))
         with self.assertRaises(RuntimeError):
             await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_live_1001")
         self.assertEqual(
             self.server_state["tx_records"]["tx_live_1001"]["status"],
-            "pending",
-            "Transação foi marcada como 'paid' antes de o envio no Telegram concluir com sucesso!"
+            "paid",
+            "Transação deve ter status 'paid' com contabilidade confirmada!"
+        )
+        self.assertFalse(
+            bool(self.server_state["tx_records"]["tx_live_1001"].get("delivered")),
+            "Entrega deve permanecer False para permitir nova tentativa!"
         )
 
-        # Na segunda tentativa com Telegram operacional, a entrega deve concluir e marcar 'paid'
+        # Na segunda tentativa com Telegram operacional, a entrega deve concluir e marcar 'delivered=True'
         mgr.bot.send_message = AsyncMock()
         res_retry = await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_live_1001")
         self.assertTrue(res_retry)
+        self.assertTrue(self.server_state["tx_records"]["tx_live_1001"]["delivered"])
         self.assertEqual(self.server_state["tx_records"]["tx_live_1001"]["status"], "paid")
 
         # 3. Privacidade: sem chave de IA e sem opt-in, nunca deve chamar text.pollinations.ai
@@ -419,7 +424,7 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
             with patch.object(tg_srv, "generate_ai_reply", AsyncMock(return_value={"reply": "Sou IA"})) as mock_ai:
                 await handle_text_fn(fake_msg)
                 self.assertEqual(mock_ai.call_count, 0, "Bot em Modo Botão chamou generate_ai_reply em mensagem de texto!")
-                self.assertFalse(fake_msg.answer.called, "Bot em Modo Botão respondeu texto de IA!")
+                self.assertTrue(fake_msg.answer.called, "Bot em Modo Botão deve responder com menu de botões para guiar o usuário!")
         finally:
             _CURRENT_BOT_TOKEN_CTX.reset(t2)
 
