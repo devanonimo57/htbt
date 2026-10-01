@@ -5316,7 +5316,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         return `
         <div class="sb-card border border-[#181c28] bg-[#0b0d14] rounded-2xl overflow-visible">
           <div class="h-72 bg-[#07080c] relative overflow-hidden rounded-t-2xl">
-            <img src="${m.url}" alt="${m.name}" class="w-full h-full object-cover ${m.spoiler ? 'blur-xl scale-105' : ''} transition duration-300">
+            <img src="${m.url}" alt="${escapeHtml(m.name)}" class="w-full h-full object-cover ${m.spoiler ? 'blur-xl scale-105' : ''} transition duration-300">
             ${m.type === 'Vídeos' ? `<div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[11px] text-white bg-black/60 px-3 py-1.5 rounded-lg"><i class="fa-solid fa-play"></i> <span>0:00 / 0:11</span> <i class="fa-solid fa-volume-high"></i></div>` : ''}
           </div>
           <div class="p-5 space-y-4">
@@ -5326,8 +5326,8 @@ quer que eu te mostre as opções de acesso?</textarea>
                   <i class="fa-regular fa-image text-[11px]"></i>
                 </div>
                 <div>
-                  <p id="media-title-${idx}" class="text-xs font-bold text-white">${m.name}</p>
-                  <p id="media-sub-${idx}" class="text-[11px] text-slate-400 mt-0.5 leading-snug">${m.description || 'Descreva exatamente o que esta mídia mostra antes de ativá-la.'}</p>
+                  <p id="media-title-${idx}" class="text-xs font-bold text-white">${escapeHtml(m.name)}</p>
+                  <p id="media-sub-${idx}" class="text-[11px] text-slate-400 mt-0.5 leading-snug">${escapeHtml(m.description || 'Descreva exatamente o que esta mídia mostra antes de ativá-la.')}</p>
                 </div>
               </div>
               <label class="toggle-switch shrink-0">
@@ -5344,13 +5344,13 @@ quer que eu te mostre as opções de acesso?</textarea>
             <div class="${m.expanded ? 'space-y-4 pt-1' : 'hidden'}">
               <div>
                 <label class="text-xs font-bold text-white block mb-2">Nome interno</label>
-                <input type="text" value="${m.name}" oninput="STATE.medias[${idx}].name=this.value; document.getElementById('media-title-${idx}').textContent=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
+                <input type="text" value="${escapeHtml(m.name)}" oninput="STATE.medias[${idx}].name=this.value; document.getElementById('media-title-${idx}').textContent=this.value; markUnsaved()" class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb]">
               </div>
 
               <div>
                 <label class="text-xs font-bold text-white block">O que esta mídia mostra?</label>
                 <span class="text-xs text-slate-400 block mt-0.5 mb-2 leading-relaxed">Seja literal. A IA usa esta descrição para decidir se o arquivo combina com a conversa.</span>
-                <textarea rows="3" oninput="STATE.medias[${idx}].description=this.value; document.getElementById('media-sub-${idx}').textContent=this.value||'Descreva exatamente o que esta mídia mostra antes de ativá-la.'; markUnsaved()" placeholder="Descreva exatamente o que esta mídia mostra antes de ativá-la." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y leading-relaxed">${m.description || ''}</textarea>
+                <textarea rows="3" oninput="STATE.medias[${idx}].description=this.value; document.getElementById('media-sub-${idx}').textContent=this.value||'Descreva exatamente o que esta mídia mostra antes de ativá-la.'; markUnsaved()" placeholder="Descreva exatamente o que esta mídia mostra antes de ativá-la." class="sb-input !bg-[#090b10] !border-[#1b2030] focus:!border-[#2563eb] resize-y leading-relaxed">${escapeHtml(m.description || '')}</textarea>
               </div>
 
               <div class="grid grid-cols-2 gap-3 items-start">
@@ -9803,6 +9803,10 @@ quer que eu te mostre as opções de acesso?</textarea>
           })
         });
         const data = await res.json();
+        if (data && data.status === "error") {
+          alert(`Não foi possível enviar a mensagem ao lead: ${data.message || 'Erro no Telegram'}`);
+          return;
+        }
         if (data && data.state) {
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };

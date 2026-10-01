@@ -854,12 +854,9 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[s
                 matched = next((b for b in bots if isinstance(b, dict) and bot_id and str(b.get("id")) == bot_id), None)
                 if not matched and bot_token:
                     matched = next((b for b in bots if isinstance(b, dict) and b.get("token") == bot_token), None)
-                if not matched and len(bots) == 1:
-                    matched = bots[0]
-                if not matched:
-                    raise HTTPException(status_code=409, detail="Não foi possível identificar o bot de uma venda. Exclusão cancelada para não alterar a contabilidade errada.")
-                matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
-                matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
+                if matched:
+                    matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
+                    matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
         removed.append(tx_id)
         tx_map.pop(tx_id)
     return removed
@@ -1793,19 +1790,20 @@ async def delete_flow_transaction(tx_id: str):
         was_paid = (tx_rec.get("status") == "paid" or bool(tx_rec.get("delivered")))
         amt = float(tx_rec.get("amount") or 0.0)
         target_bot_id = str(tx_rec.get("bot_id") or "").strip()
-        target_bot_tok = str(tx_rec.get("bot_token") or "").strip()
+        is_upsell = bool(tx_rec.get("is_upsell"))
         if was_paid:
-            for fb in (state.get("flow_bots") or []):
-                if not isinstance(fb, dict):
-                    continue
-                if (
-                    (target_bot_id and str(fb.get("id")) == target_bot_id)
-                    or (target_bot_tok and str(fb.get("token")) == target_bot_tok)
-                    or (not target_bot_id and not target_bot_tok)
-                ):
-                    fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
-                    fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
-                    break
+            if not is_upsell:
+                for fb in (state.get("flow_bots") or []):
+                    if not isinstance(fb, dict):
+                        continue
+                    if (
+                        (target_bot_id and str(fb.get("id")) == target_bot_id)
+                        or (target_bot_tok and str(fb.get("token")) == target_bot_tok)
+                        or (not target_bot_id and not target_bot_tok)
+                    ):
+                        fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
+                        fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
+                        break
             learning = state.setdefault("learning", {})
             learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
 
@@ -1843,7 +1841,7 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
         if not isinstance(rec, dict):
             continue
         rec_bot_id = str(rec.get("bot_id") or "").strip()
-        matches_bot = (not target_bot_id or target_bot_id == "all" or not rec_bot_id or rec_bot_id == target_bot_id)
+        matches_bot = (not target_bot_id or target_bot_id == "all" or rec_bot_id == target_bot_id)
         if not matches_bot:
             continue
         is_test_tx = bool(rec.get("is_test")) or str(tid).startswith("test_")

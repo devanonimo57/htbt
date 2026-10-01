@@ -2677,6 +2677,17 @@ class ActiveBotManager:
             pass
         finally:
             self.pix_poll_tasks.pop(tx_id, None)
+            rec = self.tx_records.get(tx_id)
+            if rec and rec.get("status") == "pending" and not rec.get("delivered"):
+                rec["status"] = "expired"
+                try:
+                    if self.state_getter and self.state_saver:
+                        st = await self.state_getter()
+                        if tx_id in (st.get("tx_records") or {}):
+                            st["tx_records"][tx_id]["status"] = "expired"
+                            await self.state_saver(st)
+                except Exception:
+                    pass
 
     def _schedule_upsell(self, user_id: int):
         uid = str(user_id)
