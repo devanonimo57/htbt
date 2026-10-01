@@ -2274,8 +2274,20 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 l["from_remarketing"] = True
                 l.setdefault("history", []).append({"role": "assistant", "content": f"[Remarketing: {camp.get('name', 'Campanha')}] {rendered}"})
                 sent_ok += 1
-            except Exception:
-                pass
+                await _asyncio.sleep(0.05)
+            except Exception as e:
+                err_s = str(e).lower()
+                if "retry after" in err_s or "too many requests" in err_s:
+                    digits = "".join(ch for ch in err_s if ch.isdigit())
+                    retry_wait = max(1.0, float(digits)) if digits else 2.0
+                    await _asyncio.sleep(retry_wait)
+                    try:
+                        await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
+                        sent_ok += 1
+                    except Exception:
+                        pass
+                else:
+                    pass
     finally:
         for b_inst in temp_bots.values():
             try:

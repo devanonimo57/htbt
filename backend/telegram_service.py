@@ -533,17 +533,20 @@ class ActiveBotManager:
             for k, v in sorted(plan_counts.items(), key=lambda x: x[1], reverse=True)[:5]
         ]
 
-    async def _get_or_create_lead(self, state: Dict[str, Any], user: types.User) -> Dict[str, Any]:
+    async def _get_or_create_lead(self, state: Dict[str, Any], user: types.User, bot_token: str = "") -> Dict[str, Any]:
         memory = state.setdefault("memory", {"leads": []})
         leads: List[Dict[str, Any]] = memory.setdefault("leads", [])
         uid = str(user.id)
-        active_fb = self._get_active_flow_bot(state)
+        effective_tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
+        active_fb = self._get_active_flow_bot(state, bot_token=effective_tok)
         bot_id_str = str(active_fb.get("id") or "") if active_fb else ""
         bot_uname_str = str(active_fb.get("username") or state.get("publish", {}).get("bot_username") or "@bot") if active_fb else str(state.get("publish", {}).get("bot_username") or "@bot")
         bot_mode_str = "flow" if active_fb else "ai"
 
         for lead in leads:
-            if str(lead.get("telegram_id")) == uid:
+            lead_uid = str(lead.get("telegram_id") or "")
+            lead_bid = str(lead.get("bot_id") or "")
+            if lead_uid == uid and (not bot_id_str or not lead_bid or lead_bid == bot_id_str):
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
                 lead["last_interaction"] = datetime.utcnow().strftime("%d/%m %H:%M")
@@ -1892,7 +1895,17 @@ class ActiveBotManager:
                 return
 
             state_check = await self.state_getter()
-            if self._get_active_flow_bot(state_check, bot_token=msg_bot_tok):
+            fb_check = self._get_active_flow_bot(state_check, bot_token=msg_bot_tok)
+            if fb_check:
+                kb = self._build_flow_plans_kb(fb_check)
+                try:
+                    await message.answer(
+                        "👇 <b>Escolha uma das opções abaixo para continuar seu acesso:</b>",
+                        parse_mode="HTML",
+                        reply_markup=kb
+                    )
+                except Exception:
+                    await message.answer("👇 Escolha uma das opções abaixo para continuar seu acesso:", reply_markup=kb)
                 return
 
             uid = str(message.from_user.id)
@@ -2112,11 +2125,13 @@ class ActiveBotManager:
             gw_secret = pub.get("gateway_secret", "").strip()
             cents = max(50, int(round(price * 100)))
             target_chat_id = callback.message.chat.id if callback.message else callback.from_user.id
+            cb_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
+            cb_tok = str(getattr(cb_bot, "token", "") or _CURRENT_BOT_TOKEN_CTX.get() or self.current_token or "").strip()
 
             # Fail-closed: nunca gera transação sim_ nem PIX falso se o gateway falhar ou não estiver configurado
             if not pushin_token:
                 await self.state_saver(state)
-                await self.bot.send_message(
+                await (cb_bot or self.bot).send_message(
                     chat_id=target_chat_id,
                     text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
                 )
@@ -2135,7 +2150,7 @@ class ActiveBotManager:
             except Exception as e:
                 logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
                 await self.state_saver(state)
-                await self.bot.send_message(
+                await (cb_bot or self.bot).send_message(
                     chat_id=target_chat_id,
                     text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
                 )
@@ -2153,6 +2168,8 @@ class ActiveBotManager:
                 "tx_id": tx_id,
                 "user_id": int(callback.from_user.id),
                 "mode": "ai",
+                "bot_id": str(cb_tok.split(":")[0] if ":" in cb_tok else ""),
+                "bot_token": cb_tok,
                 "offer_id": oid,
                 "offer_name": chosen_offer_name,
                 "amount": round(price, 2),
@@ -2447,11 +2464,12 @@ class ActiveBotManager:
         gw_secret = pub.get("gateway_secret", "").strip()
         cents = max(50, int(round(total_price * 100)))
         chat_id = callback.message.chat.id if callback.message else callback.from_user.id
+        target_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
 
         # Fail-closed: nunca cria PIX sim_ caso o gateway falhe ou não esteja configurado
         if not pushin_token:
             await self.state_saver(state)
-            await self.bot.send_message(
+            await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
             )
@@ -2470,7 +2488,7 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
             await self.state_saver(state)
-            await self.bot.send_message(
+            await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
             )
