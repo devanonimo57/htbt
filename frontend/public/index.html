@@ -611,10 +611,16 @@
                 </label>
               </div>
             </div>
-            <div class="border-t border-[#1e1d15] pt-3">
+            <div class="border-t border-[#1e1d15] pt-3 flex flex-wrap items-center justify-between gap-3">
               <p id="nb-ds-header-desc" class="text-xs text-zinc-400">Sequências enviadas após o /start para leads que não compraram. Recupere vendas com ofertas alternativas.</p>
+              <button type="button" id="nb-ds-test-all-btn" onclick="nbTestAllDownsellSequences()" class="px-3 py-1.5 rounded-lg bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-xs font-bold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara todas as sequências desta trilha no canal de cache usando este bot">
+                <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
+                <span>Disparar todas no canal de cache</span>
+              </button>
             </div>
           </div>
+
+          <div id="nb-ds-test-banner" class="hidden p-3.5 rounded-xl text-xs space-y-1"></div>
 
           <!-- LISTA DE SEQUÊNCIAS DO DOWNSELL -->
           <div id="nb-ds-sequences-container" class="space-y-4"></div>
@@ -8558,9 +8564,13 @@ quer que eu te mostre as opções de acesso?</textarea>
                 <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
                 <h4 class="text-xs font-bold text-white">Sequência ${sIdx + 1}</h4>
               </div>
-              <div class="flex items-center gap-3 text-xs text-zinc-500">
-                <button type="button" onclick="nbDuplicateDownsellSeq(${sIdx})" class="hover:text-white" title="Duplicar sequência"><i class="fa-regular fa-copy"></i></button>
-                <button type="button" onclick="nbDeleteDownsellSeq(${sIdx})" class="hover:text-rose-400 text-rose-500/80" title="Excluir sequência"><i class="fa-regular fa-trash-can"></i></button>
+              <div class="flex items-center gap-2 text-xs">
+                <button type="button" id="nb-ds-test-btn-${sIdx}" onclick="nbTestDownsellSequence(${sIdx})" class="px-2.5 py-1 rounded-md bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-[11px] font-semibold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara teste desta sequência no canal de cache">
+                  <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
+                  <span>Testar no canal</span>
+                </button>
+                <button type="button" onclick="nbDuplicateDownsellSeq(${sIdx})" class="p-1 hover:text-white text-zinc-400" title="Duplicar sequência"><i class="fa-regular fa-copy"></i></button>
+                <button type="button" onclick="nbDeleteDownsellSeq(${sIdx})" class="p-1 hover:text-rose-400 text-rose-500/80" title="Excluir sequência"><i class="fa-regular fa-trash-can"></i></button>
               </div>
             </div>
 
@@ -8712,6 +8722,114 @@ quer que eu te mostre as opções de acesso?</textarea>
       const ds = nbGetActiveDownsellObj(b);
       ds.sequences.splice(sIdx, 1);
       nbRenderDownsellTab(b);
+    }
+
+    async function nbTestDownsellSequence(sIdx) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const btn = document.getElementById(`nb-ds-test-btn-${sIdx}`);
+      const banner = document.getElementById('nb-ds-test-banner');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i><span>Enviando...</span>';
+      }
+      if (banner) {
+        banner.className = 'p-3.5 rounded-xl border border-purple-500/40 bg-purple-950/40 text-xs text-purple-200 flex items-center gap-2';
+        banner.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Disparando teste da Sequência #${sIdx + 1} no canal de cache pelo bot <strong>${escapeHtml(b.username || '@bot')}</strong>...</span>`;
+        banner.classList.remove('hidden');
+      }
+
+      try {
+        await nbSaveCurrentBot();
+        const res = await adminFetch('/api/flow-bots/downsell/test-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bot_id: b.id,
+            track: NB_DOWNSELL_TRACK,
+            seq_idx: sIdx
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          if (banner) {
+            banner.className = 'p-3.5 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
+            banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> Sequência #${sIdx + 1} disparada no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. ${data.warmed_medias ? `(${data.warmed_medias} mídia(s) aquecida(s) no Telegram)` : ''}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+          }
+          await loadInitialState();
+          nbRenderDownsellTab();
+        } else {
+          if (banner) {
+            banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
+            banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro ao testar:</strong> ${escapeHtml(data?.message || data?.detail || 'Falha ao enviar')}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+          }
+        }
+      } catch (err) {
+        if (banner) {
+          banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
+          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro de conexão:</strong> ${escapeHtml(err?.message || err)}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+      }
+    }
+
+    async function nbTestAllDownsellSequences() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const btn = document.getElementById('nb-ds-test-all-btn');
+      const banner = document.getElementById('nb-ds-test-banner');
+      const originalText = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Disparando todas no canal...</span>';
+      }
+      if (banner) {
+        banner.className = 'p-3.5 rounded-xl border border-purple-500/40 bg-purple-950/40 text-xs text-purple-200 flex items-center gap-2';
+        banner.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Disparando todas as sequências no canal de cache pelo bot <strong>${escapeHtml(b.username || '@bot')}</strong>...</span>`;
+        banner.classList.remove('hidden');
+      }
+
+      try {
+        await nbSaveCurrentBot();
+        const res = await adminFetch('/api/flow-bots/downsell/test-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bot_id: b.id,
+            track: NB_DOWNSELL_TRACK,
+            seq_idx: -1
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          if (banner) {
+            banner.className = 'p-3.5 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
+            banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> ${data.sent_count} sequência(s) disparada(s) no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. Todas as mídias aquecidas no Telegram.</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+          }
+          await loadInitialState();
+          nbRenderDownsellTab();
+        } else {
+          if (banner) {
+            banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
+            banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro ao testar:</strong> ${escapeHtml(data?.message || data?.detail || 'Falha ao enviar')}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+          }
+        }
+      } catch (err) {
+        if (banner) {
+          banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
+          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro de conexão:</strong> ${escapeHtml(err?.message || err)}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+      }
     }
 
     // =========================================================

@@ -1281,6 +1281,157 @@ async def cache_flow_media(req: CacheMediaRequest):
                 pass
 
 
+class DownsellTestSendRequest(BaseModel):
+    bot_id: Optional[str] = ""
+    track: str = "general"
+    seq_idx: int = -1
+    channel_id: Optional[str] = ""
+
+
+@app.post("/api/flow-bots/downsell/test-send", dependencies=[Depends(verify_admin_auth)])
+async def test_send_downsell(req: DownsellTestSendRequest):
+    from aiogram import types
+    from telegram_service import _create_bot_instance
+
+    state = await _read_state_from_db()
+    flow_bots = [b for b in (state.get("flow_bots") or []) if isinstance(b, dict)]
+    target_fb = None
+    if req.bot_id:
+        target_fb = next((b for b in flow_bots if str(b.get("id")) == str(req.bot_id)), None)
+    if not target_fb:
+        target_fb = bot_manager._get_active_flow_bot(state) or (flow_bots[0] if flow_bots else None)
+
+    if not target_fb:
+        raise HTTPException(status_code=404, detail="Nenhum bot encontrado para teste.")
+
+    tok = (
+        str(target_fb.get("token") or "").strip()
+        or str(state.get("publish", {}).get("bot_token") or "").strip()
+        or bot_manager.current_token
+        or ""
+    )
+    if not tok or tok == REDACTED_SECRET_MASK or ":" not in tok:
+        raise HTTPException(status_code=400, detail="Token do bot não está configurado.")
+
+    cache_channels = []
+    if req.channel_id and str(req.channel_id).strip():
+        cache_channels = [str(req.channel_id).strip()]
+    else:
+        cache_channels = bot_manager._get_candidate_cache_channels(state, target_fb)
+
+    if not cache_channels:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum canal de cache configurado. Configure o Canal de Cache na aba Configurações ou Planos deste bot."
+        )
+
+    target_channel = cache_channels[0]
+    parsed_channel = int(target_channel) if str(target_channel).lstrip("-").isdigit() else str(target_channel)
+
+    temp_bot = None
+    bot_inst = bot_manager._get_bot_by_token(tok) if (bot_manager._primary_bot or bot_manager.extra_bots) else None
+    if bot_inst and tok not in (bot_manager.current_token, *bot_manager.extra_bots.keys()):
+        bot_inst = None
+    if not bot_inst:
+        temp_bot = _create_bot_instance(tok)
+        bot_inst = temp_bot
+
+    try:
+        me = await bot_inst.get_me()
+        bot_uname = f"@{me.username}" if me and me.username else f"ID {me.id}"
+
+        track_key = "downsell_general" if req.track == "general" else "downsell_pix"
+        track_title = "Downsell Geral (Sem gerar PIX)" if req.track == "general" else "Downsell PIX (Gerou e não pagou)"
+        ds_obj = target_fb.get(track_key) or {}
+        seqs = ds_obj.get("sequences") or []
+
+        if not seqs:
+            raise HTTPException(status_code=400, detail=f"Nenhuma sequência cadastrada em {track_title}.")
+
+        if req.seq_idx >= 0:
+            if req.seq_idx >= len(seqs):
+                raise HTTPException(status_code=400, detail=f"Sequência #{req.seq_idx + 1} não encontrada.")
+            to_test = [(req.seq_idx, seqs[req.seq_idx])]
+        else:
+            to_test = list(enumerate(seqs))
+
+        sent_count = 0
+        warmed_medias = 0
+
+        for idx, seq in to_test:
+            msg_raw = str(seq.get("message") or "").strip()
+            medias = [m for m in (seq.get("medias") or []) if isinstance(m, dict)]
+            delay_min = int(seq.get("delay_minutes") or 10)
+            disc_str = str(seq.get("discount") or "Sem desconto")
+            plan_ids = seq.get("plan_ids")
+
+            # Aquece mídias no canal de cache sob a identidade deste bot específico
+            for m in medias:
+                fid = await bot_manager.warm_media_item_in_channel(m, state, fb=target_fb, bot_instance=bot_inst)
+                if fid:
+                    warmed_medias += 1
+
+            fake_user = types.User(id=me.id, is_bot=False, first_name="Cliente", username="cliente")
+            rendered_msg = bot_manager._render_flow_vars(
+                msg_raw or "⏰ <b>Oferta Especial de Recuperação!</b>\nVocê recebeu uma condição exclusiva para finalizar seu plano agora:",
+                fake_user,
+                target_fb
+            )
+            kb = bot_manager._build_flow_plans_kb(target_fb, filter_plan_ids=plan_ids, discount_str=disc_str)
+
+            header_text = (
+                f"🧪 <b>[TESTE DOWNSELL · SEQ #{idx + 1}]</b>\n"
+                f"Trilha: <b>{track_title}</b>\n"
+                f"Bot: <b>{bot_uname}</b>\n"
+                f"Disparo após: <b>{delay_min} min</b> · Desconto: <b>{disc_str}</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{rendered_msg}"
+            )
+
+            if medias:
+                await bot_manager._send_flow_medias(chat_id=parsed_channel, medias=medias, bot_instance=bot_inst)
+
+            try:
+                await bot_inst.send_message(
+                    chat_id=parsed_channel,
+                    text=header_text,
+                    parse_mode="HTML",
+                    reply_markup=kb,
+                    disable_notification=True
+                )
+            except Exception:
+                await bot_inst.send_message(
+                    chat_id=parsed_channel,
+                    text=header_text,
+                    reply_markup=kb,
+                    disable_notification=True
+                )
+            sent_count += 1
+
+        # Salva o estado atualizado com os novos file_ids no banco
+        await _write_state_to_db(state)
+
+        return {
+            "status": "success",
+            "bot_username": bot_uname,
+            "channel_id": str(target_channel),
+            "sent_count": sent_count,
+            "warmed_medias": warmed_medias,
+            "message": f"{sent_count} sequência(s) disparada(s) no canal de cache pelo bot {bot_uname} com sucesso!"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao disparar teste de downsell: {e}")
+        return {"status": "error", "message": f"Falha ao enviar teste ao canal de cache: {e}"}
+    finally:
+        if temp_bot:
+            try:
+                await temp_bot.session.close()
+            except Exception:
+                pass
+
+
 class FlowDiagnoseRequest(BaseModel):
     bot_id: Optional[str] = ""
 
