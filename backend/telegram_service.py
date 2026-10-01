@@ -373,10 +373,17 @@ class ActiveBotManager:
         if not target_bot:
             return
         offset: Optional[int] = None
+        bot_identifier = ""
+        try:
+            me = await target_bot.get_me()
+            bot_identifier = f"@{me.username}" if me and me.username else f"ID {me.id}"
+        except Exception:
+            bot_identifier = f"Token ...{target_token[-6:]}" if len(target_token) > 6 else "Bot"
+
         try:
             await target_bot.delete_webhook(drop_pending_updates=False)
         except Exception as e:
-            logger.warning(f"Aviso ao limpar webhook: {e}")
+            logger.warning(f"Aviso ao limpar webhook para {bot_identifier}: {e}")
 
         while True:
             try:
@@ -391,8 +398,13 @@ class ActiveBotManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.warning(f"Polling aguardando liberação de instância ({e})...")
-                await asyncio.sleep(3)
+                err_text = str(e)
+                if "Conflict" in err_text or "terminated by other getUpdates" in err_text:
+                    logger.warning(f"Polling [{bot_identifier}]: Conflito de instância (o Telegram detectou outro processo rodando com este mesmo bot: {err_text}). Aguardando 5s...")
+                    await asyncio.sleep(5)
+                else:
+                    logger.warning(f"Polling [{bot_identifier}] aguardando liberação de instância ({err_text})...")
+                    await asyncio.sleep(3)
 
     def _get_cadence_delay(self, state: Dict[str, Any]) -> float:
         cadence = state.get("style", {}).get("cadence", "Natural")
