@@ -1792,6 +1792,14 @@ def reconcile_daily_counters(state: Dict[str, Any], target_bot_id: Optional[str]
         was_paid = (status == "paid" or delivered)
         if not was_paid:
             continue
+        if rec.get("attribution_uncertain"):
+            unreconciled_anomalies.append({"tx_id": tid, "reason": "uncertain_bot_identity"})
+            continue
+        if rec.get("sales_counted") is False:
+            # An explicit uncounted flag can mean the originating bot is
+            # ambiguous. Preserve the paid record without inventing attribution.
+            unreconciled_anomalies.append({"tx_id": tid, "reason": "paid_but_not_attributed"})
+            continue
 
         paid_at_raw = str(rec.get("paid_at") or rec.get("created_at") or "").strip()
         if not paid_at_raw:
@@ -2038,20 +2046,30 @@ async def resend_vip_access(req: AccessResendRequest):
         uid = int(rec.get("user_id") or 0)
         if not uid:
             continue
+        rec_bot_id = str(rec.get("bot_id") or "").strip()
+        rec_token = str(rec.get("bot_token") or "").strip()
+        if not rec_token or rec_token == REDACTED_SECRET_MASK or ":" not in rec_token:
+            continue  # config ID alone cannot prove the purchase's original bot
         fb = None
-        for b in (state.get("flow_bots") or []):
-            if isinstance(b, dict) and str(b.get("id")) == str(rec.get("bot_id") or ""):
-                fb = b
+        for candidate in (state.get("flow_bots") or []):
+            if not isinstance(candidate, dict):
+                continue
+            config_token = str(candidate.get("token") or "").strip()
+            if rec_bot_id:
+                matches = str(candidate.get("id") or "") == rec_bot_id
+            else:
+                matches = bool(rec_token and rec_token != REDACTED_SECRET_MASK and config_token == rec_token)
+            if matches:
+                fb = candidate
                 break
         if not fb:
-            fb = bot_manager._get_active_flow_bot(state)
-        tok = (
-            str(rec.get("bot_token") or "").strip()
-            or (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
-            or str(state.get("publish", {}).get("bot_token") or "").strip()
-        )
+            continue
+        tok = str(fb.get("token") or "").strip()
         if not tok or tok == REDACTED_SECRET_MASK:
             continue
+        if rec_token and rec_token != REDACTED_SECRET_MASK:
+            if rec_token != tok and rec_token.split(":", 1)[0] != tok.split(":", 1)[0]:
+                continue  # identity mismatch: paid purchase requires manual correction, not a blind send
 
         temp_bot = None
         try:
@@ -2059,7 +2077,6 @@ async def resend_vip_access(req: AccessResendRequest):
             eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
             ch_target = (rec.get("delivery_channel_id") or "").strip()
             ext_url = (rec.get("delivery_external_url") or "").strip()
-            saved_url = (rec.get("invite_url") or "").strip()
             invite_url = ""
 
             if eff_type == "Link externo" and ext_url:
@@ -2075,9 +2092,6 @@ async def resend_vip_access(req: AccessResendRequest):
                     invite_url = (inv.invite_link or "").strip()
                 except Exception:
                     invite_url = ""
-
-            if not invite_url and saved_url and saved_url != "https://t.me/+link_exclusivo_vip":
-                invite_url = saved_url
 
             if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
                 continue

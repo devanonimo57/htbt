@@ -188,6 +188,7 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
         app_main._STATE_CACHE = copy.deepcopy(self.server_state)
 
         mock_bot = AsyncMock()
+        mock_bot.token = "777:MOCK_ALPHA_TOKEN"
         # Primeira passagem: Telegram falha ao criar convite (ex: bot não é admin do canal)
         mock_bot.create_chat_invite_link.side_effect = RuntimeError("Bot is not an admin in channel")
         bot_manager.extra_bots["777:MOCK_ALPHA_TOKEN"] = mock_bot
@@ -205,7 +206,10 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fb_state["sales_today"], 1)
         self.assertEqual(fb_state["revenue_today"], 50.00)
 
-        # Segunda passagem: Telegram recuperado, duas chamadas simultâneas (webhook + polling)
+        # Segunda passagem após o intervalo mínimo: Telegram recuperado, duas notificações simultâneas
+        app_main._STATE_CACHE["tx_records"][tx_id]["last_delivery_attempt_at"] = (
+            datetime.utcnow() - timedelta(minutes=2)
+        ).isoformat()
         mock_invite = SimpleNamespace(invite_link="https://t.me/+valid_vip_link")
         mock_bot.create_chat_invite_link.side_effect = None
         mock_bot.create_chat_invite_link.return_value = mock_invite
@@ -287,6 +291,7 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
             "user_id": 6006,
             "mode": "flow",
             "bot_id": "fb_inactive",
+            "bot_token": "888:MOCK_INACTIVE_TOKEN",
             "amount": 29.90,
             "status": "pending",
             "delivered": False,
@@ -370,6 +375,7 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
         fresh_mgr.state_getter = bot_manager.state_getter
         fresh_mgr.state_saver = bot_manager.state_saver
         mock_bot = AsyncMock()
+        mock_bot.token = "777:MOCK_ALPHA_TOKEN"
         mock_invite = SimpleNamespace(invite_link="https://t.me/+reboot_vip")
         mock_bot.create_chat_invite_link.return_value = mock_invite
         fresh_mgr.extra_bots["777:MOCK_ALPHA_TOKEN"] = mock_bot
