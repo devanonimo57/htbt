@@ -1,9 +1,12 @@
 import os
 import json
+import logging
 import secrets
 import hmac
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
+
+logger = logging.getLogger("SharkBotAPI")
 
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -632,7 +635,6 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             else:
                 state = _preserve_existing_secrets(state, existing_state)
             state = _normalize_providers(state)
-            _STATE_CACHE = state
 
             if not config:
                 config = BotConfig()
@@ -675,6 +677,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 for order in order_result.scalars().all():
                     await session.delete(order)
             await session.commit()
+            _STATE_CACHE = state
         return _STATE_CACHE
 
 async def _startup_warm_medias_task():
@@ -800,20 +803,21 @@ def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -
 
 @app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_lead(telegram_id: str):
-    state = await _read_state_from_db()
-    memory = state.setdefault("memory", {"leads": []})
-    leads = memory.get("leads", [])
-    matched = [lead for lead in leads if str(lead.get("telegram_id")) == str(telegram_id)]
-    if not matched:
-        raise HTTPException(status_code=404, detail="Lead não encontrado.")
-    archived = memory.setdefault("deleted_leads", [])
-    bot_manager.cancel_lead_tasks(str(telegram_id))
-    _cancel_pending_lead_transactions(state, telegram_id)
-    for lead in matched:
-        _archive_lead(archived, lead)
-    memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != str(telegram_id)]
-    await _write_state_to_db(state)
-    return {"status": "success", "state": _redact_state_secrets(state)}
+    async with bot_manager._get_lead_lock(str(telegram_id)):
+        state = await _read_state_from_db()
+        memory = state.setdefault("memory", {"leads": []})
+        leads = memory.get("leads", [])
+        matched = [lead for lead in leads if str(lead.get("telegram_id")) == str(telegram_id)]
+        if not matched:
+            raise HTTPException(status_code=404, detail="Lead não encontrado.")
+        archived = memory.setdefault("deleted_leads", [])
+        bot_manager.cancel_lead_tasks(str(telegram_id))
+        _cancel_pending_lead_transactions(state, telegram_id)
+        for lead in matched:
+            _archive_lead(archived, lead)
+        memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != str(telegram_id)]
+        await _write_state_to_db(state)
+        return {"status": "success", "state": _redact_state_secrets(state)}
 
 @app.post("/api/leads/{telegram_id}/restore", dependencies=[Depends(verify_admin_auth)])
 async def restore_lead(telegram_id: str):

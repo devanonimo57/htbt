@@ -666,7 +666,7 @@ class ActiveBotManager:
             saudacao = "Boa tarde"
         else:
             saudacao = "Boa noite"
-        nome = (user.first_name or "Cliente").strip()
+        nome = html.escape((user.first_name or "Cliente").strip())
         rep = {
             "{saudacao}": saudacao,
             "{nome}": nome,
@@ -675,9 +675,9 @@ class ActiveBotManager:
             "{uf}": "SP",
             "{cidade}": "São Paulo",
             "{localizacao}": "São Paulo - SP",
-            "{bot.nome}": bot_cfg.get("first_name") or "VIP Bot",
-            "{bot.username}": bot_cfg.get("username") or "@bot",
-            "{plano}": plan_name,
+            "{bot.nome}": html.escape(str(bot_cfg.get("first_name") or "VIP Bot")),
+            "{bot.username}": html.escape(str(bot_cfg.get("username") or "@bot")),
+            "{plano}": html.escape(str(plan_name)),
             "{valor}": valor_str,
             "{pix_code}": pix_code_fmt,
         }
@@ -2838,13 +2838,37 @@ class ActiveBotManager:
                         invite_url = ""
 
                 if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
-                    logger.error(f"Entrega abortada para tx_id={tx_id}: link de convite válido não pôde ser gerado.")
-                    tx_record["access_status"] = "Pendente"
+                    logger.error(f"Entrega automática pendente para tx_id={tx_id}: link de convite não pôde ser gerado no canal {ch_target}.")
+                    tx_record["status"] = "paid"
+                    tx_record["paid_at"] = datetime.utcnow().isoformat()
+                    tx_record["access_status"] = "Pendente (Admin no Canal)"
                     tx_record["delivered"] = False
                     self.tx_records[tx_id] = tx_record
                     state["tx_records"][tx_id] = tx_record
+
+                    flow_bot["sales_today"] = int(flow_bot.get("sales_today") or 0) + 1
+                    flow_bot["revenue_today"] = round(float(flow_bot.get("revenue_today") or 0.0) + paid_val, 2)
+                    self._advance_stage(lead, "Pagamento aprovado")
+                    learning = state.setdefault("learning", {})
+                    learning["confirmed_purchases"] = int(learning.get("confirmed_purchases", 0)) + 1
+                    if int(learning.get("unpaid_checkouts", 0)) > 0:
+                        learning["unpaid_checkouts"] = int(learning.get("unpaid_checkouts", 0)) - 1
+                    self._update_lead_insights(state, lead)
+
+                    sup_contact = state.get("publish", {}).get("support_username", "@suporte")
+                    plan_label = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
+                    await self._safe_send_html(
+                        user_id,
+                        f"✅ <b>Pagamento Aprovado!</b>\n\n"
+                        f"Parabéns {html.escape(lead.get('first_name') or 'Cliente')}! Seu pagamento do plano <b>{html.escape(plan_label)}</b> no valor de <b>R$ {paid_val:.2f}</b> foi confirmado com sucesso!\n\n"
+                        f"⚠️ O link automático de acesso está sendo gerado pelo suporte. Se demorar, contate {sup_contact} para liberação imediata.",
+                        bot_instance=target_bot
+                    )
                     await self.state_saver(state)
-                    return False
+                    poll_t = self.pix_poll_tasks.pop(tx_id, None)
+                    if poll_t and not poll_t.done() and poll_t is not asyncio.current_task():
+                        poll_t.cancel()
+                    return True
 
                 pay_cfg = flow_bot.get("payments", {})
                 await self._send_flow_medias(user_id, pay_cfg.get("approved_medias", []), bot_instance=target_bot)

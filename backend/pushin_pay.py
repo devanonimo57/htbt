@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 import uuid
 import httpx
@@ -123,10 +124,18 @@ class PushinPayClient:
 
         if self.provider == "syncpay":
             bearer = await self._get_syncpay_bearer()
+            effective_webhook = webhook_url
+            if not effective_webhook:
+                base = (os.getenv("WEBHOOK_BASE_URL") or "").strip().rstrip("/")
+                if not base:
+                    host = (os.getenv("VPS_HOST") or os.getenv("HOST") or "154.64.32.171").strip()
+                    port = (os.getenv("PORT") or "8000").strip()
+                    base = f"http://{host}:{port}"
+                effective_webhook = f"{base}/api/webhook/syncpay"
             payload = {
                 "amount": amount_float,
                 "description": "Acesso VIP Privado",
-                "webhook_url": webhook_url or "https://hotbot-saas.onrender.com/api/webhook/syncpay",
+                "webhook_url": effective_webhook,
                 "client": {
                     "name": client_name or "Cliente VIP",
                     "cpf": "11144477735",
