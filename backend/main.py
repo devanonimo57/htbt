@@ -848,15 +848,27 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[s
         if was_paid:
             learning = state.setdefault("learning", {})
             learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
-            if record.get("mode") == "flow" and not record.get("is_upsell"):
-                bot_id = str(record.get("bot_id") or "")
-                bot_token = str(record.get("bot_token") or "")
-                matched = next((b for b in bots if isinstance(b, dict) and bot_id and str(b.get("id")) == bot_id), None)
-                if not matched and bot_token:
-                    matched = next((b for b in bots if isinstance(b, dict) and b.get("token") == bot_token), None)
-                if matched:
-                    matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
-                    matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
+            if record.get("mode") == "flow" and not record.get("is_upsell") and record.get("sales_counted") is True:
+                # created_at is the Pix creation time, not proof of the payment date.
+                paid_at_raw = str(record.get("paid_at") or "").strip()
+                try:
+                    paid_at = datetime.fromisoformat(paid_at_raw.replace("Z", "+00:00"))
+                    paid_brt = (paid_at - timedelta(hours=3) if paid_at.tzinfo is None
+                                else paid_at.astimezone(timezone(timedelta(hours=-3))))
+                    is_paid_today = paid_brt.date() == datetime.now(timezone(timedelta(hours=-3))).date()
+                except (ValueError, TypeError):
+                    is_paid_today = False
+                if is_paid_today:
+                    bot_id = str(record.get("bot_id") or "").strip()
+                    bot_token = str(record.get("bot_token") or "").strip()
+                    origin_id = bot_token.split(":", 1)[0] if ":" in bot_token else ""
+                    matches = [b for b in bots if isinstance(b, dict) and origin_id.isdecimal()
+                               and (not bot_id or str(b.get("id") or "") == bot_id)
+                               and str(b.get("token") or "").startswith(origin_id + ":")]
+                    if len(matches) == 1:
+                        matched = matches[0]
+                        matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
+                        matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
         removed.append(tx_id)
         tx_map.pop(tx_id)
     return removed

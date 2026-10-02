@@ -1,6 +1,6 @@
 """Archive/restore API regressions; run with unittest discovery."""
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -15,7 +15,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         self.state["memory"]["leads"] = [copy.deepcopy(self.lead), {"telegram_id": "43"}]
         self.state["tx_records"] = {"tx1": {"telegram_id": "42", "amount": 49}}
         self.state["learning"]["confirmed_purchases"] = 8
-        self.state["flow_bots"] = [{"id": "bot1", "sales_today": 8, "revenue_today": 392}]
+        self.state["flow_bots"] = [{"id": "bot1", "token": "111:BOT_TEST", "sales_today": 8, "revenue_today": 392}]
         self.read = patch.object(app_main, "_read_state_from_db", AsyncMock(side_effect=lambda: self.state))
         self.write = patch.object(app_main, "_write_state_to_db", AsyncMock(side_effect=self._save))
         self.cancel = patch.object(app_main.bot_manager, "cancel_lead_tasks")
@@ -78,7 +78,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_permanent_removes_clients_transactions_and_dashboard_totals(self):
         self.state["tx_records"] = {
-            "tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "mode": "flow"},
+            "tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "bot_token": "111:BOT_TEST", "mode": "flow", "sales_counted": True, "paid_at": datetime.now(timezone(timedelta(hours=-3))).isoformat()},
             "tx2": {"user_id": 42, "status": "pending", "amount": 12, "bot_id": "bot1", "mode": "flow"},
             "other": {"user_id": 43, "status": "paid", "amount": 25, "bot_id": "bot1", "mode": "flow"},
         }
@@ -121,7 +121,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_stale_panel_save_cannot_restore_deleted_sales(self):
         stale = copy.deepcopy(self.state)
-        self.state["tx_records"] = {"tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "mode": "flow"}}
+        self.state["tx_records"] = {"tx1": {"user_id": 42, "status": "paid", "delivered": True, "amount": 49, "bot_id": "bot1", "bot_token": "111:BOT_TEST", "mode": "flow", "sales_counted": True, "paid_at": datetime.now(timezone(timedelta(hours=-3))).isoformat()}}
         stale["tx_records"] = copy.deepcopy(self.state["tx_records"])
         await app_main.delete_lead("42")
         await app_main.permanently_delete_lead("42")
