@@ -712,11 +712,13 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 merged = {**DEFAULT_SHARKBOT_STATE, **saved}
                 _STATE_CACHE = _StateSnapshot(_normalize_providers(await _hydrate_records(session, merged)))
                 _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+                _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
             except Exception:
                 _STATE_CACHE = _StateSnapshot(_normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE))))
                 _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+                _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
@@ -874,6 +876,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             await session.commit()
             _STATE_CACHE = _StateSnapshot(state)
             _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+            _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
             _STATE_COMMITTED_OWNER = _STATE_CACHE
         return _STATE_CACHE
 
@@ -994,26 +997,30 @@ async def _pix_filters(period: str, bot_id: str, date: str = ''):
         except ValueError:
             raise HTTPException(status_code=422, detail='Data inválida')
         effective = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
-        filters.extend((effective >= date, effective < (parsed + timedelta(days=1)).isoformat()))
+        local_day = func.date(effective, '-3 hours')
+        filters.extend((local_day >= date, local_day < (parsed + timedelta(days=1)).isoformat()))
     elif period not in ('Total', 'Tudo'):
         today = datetime.now(timezone(timedelta(hours=-3))).date()
         if period == 'Hoje':
             start = today.isoformat()
         elif period == 'Ontem':
             start = (today - timedelta(days=1)).isoformat()
-            filters.append(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at) < today.isoformat())
+            local_day = func.date(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at), '-3 hours')
+            filters.append(local_day < today.isoformat())
         elif period in ('Semana', '7 dias'):
             start = (today - timedelta(days=7)).isoformat()
         elif period in ('Mês', '30d'):
             start = (today - timedelta(days=30)).isoformat()
         else:
             raise HTTPException(status_code=422, detail='Período inválido')
-        filters.append(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at) >= start)
+        effective = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
+        filters.append(func.date(effective, '-3 hours') >= start)
     return filters
 
 
 def _metrics_date_filters(period, date, timestamp):
     """Bound a single event timestamp; generated and paid events have different dates."""
+    local_day = func.date(timestamp, '-3 hours')
     if date:
         try:
             parsed = datetime.strptime(date, '%Y-%m-%d').date()
@@ -1021,18 +1028,18 @@ def _metrics_date_filters(period, date, timestamp):
                 raise ValueError('date format')
         except ValueError:
             raise HTTPException(status_code=422, detail='Data inválida')
-        return [timestamp >= date, timestamp < (parsed + timedelta(days=1)).isoformat()]
+        return [local_day >= date, local_day < (parsed + timedelta(days=1)).isoformat()]
     if period in ('Total', 'Tudo'):
         return []
     today = datetime.now(timezone(timedelta(hours=-3))).date()
     spans = {'Hoje': 0, 'Ontem': 1, 'Semana': 7, '7 dias': 7, 'Mês': 30, '30d': 30}
     if period not in spans:
         raise HTTPException(status_code=422, detail='Período inválido')
-    filters = [timestamp >= (today - timedelta(days=spans[period])).isoformat()]
+    filters = [local_day >= (today - timedelta(days=spans[period])).isoformat()]
     if period == 'Ontem':
-        filters.append(timestamp < today.isoformat())
+        filters.append(local_day < today.isoformat())
     elif period == 'Hoje':
-        filters.append(timestamp < (today + timedelta(days=1)).isoformat())
+        filters.append(local_day < (today + timedelta(days=1)).isoformat())
     return filters
 
 
@@ -1068,9 +1075,9 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         paid_total = await totals(paid_filters)
         pending_total = await totals(pending_filters)
         total_paid = (await session.execute(select(amount).where(paid))).scalar_one()
-        day = func.substr(paid_ts, 1, 10)
-        hour_paid = func.substr(paid_ts, 12, 2)
-        hour_created = func.substr(PixRecord.created_at, 12, 2)
+        day = func.date(paid_ts, '-3 hours')
+        hour_paid = func.strftime('%H', paid_ts, '-3 hours')
+        hour_created = func.strftime('%H', PixRecord.created_at, '-3 hours')
         day_rows = (await session.execute(select(day, count, amount).where(*paid_filters, day != '')
                     .group_by(day).order_by(amount.desc(), day.desc()).limit(5))).all()
         bot_rows = (await session.execute(select(PixRecord.origin_bot_id, count, amount).where(*paid_filters)
@@ -1102,10 +1109,10 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
 
 @app.get('/api/transactions', dependencies=[Depends(verify_admin_auth)])
 async def list_panel_transactions(period: str = 'Total', bot_id: str = 'all', status: str = 'all',
-                                  page: int = 1, page_size: int = 25):
+                                  page: int = 1, page_size: int = 25, date: str = ''):
     if page < 1 or not 1 <= page_size <= 100:
         raise HTTPException(status_code=422, detail='Paginação inválida')
-    filters = await _pix_filters(period, bot_id)
+    filters = await _pix_filters(period, bot_id, date)
     if status != 'all':
         filters.append(PixRecord.status == status)
     async with async_session() as session:

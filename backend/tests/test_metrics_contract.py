@@ -71,6 +71,18 @@ class MetricsContractTests(unittest.IsolatedAsyncioTestCase):
             {'amount': 20, 'paid_count': 1}, {'amount': 10, 'paid_count': 1}])
         self.assertNotIn('data_json', str(metrics))
 
+    async def test_brazilian_day_and_hour_include_utc_offset_payments(self):
+        state = await main._read_state_from_db()
+        state['tx_records']['p1'].update(created_at='2026-09-20T10:00:00-03:00', paid_at='2026-09-21T01:30:00+00:00')
+        state['tx_records']['p2'].update(created_at='2026-09-20T10:00:00-03:00', paid_at='2026-09-20T23:30:00-03:00')
+        await main._write_state_to_db(state)
+        metrics = await main.get_panel_metrics(period='Tudo', bot_id='all', date='2026-09-20')
+        self.assertEqual(metrics['paid_count'], 2)
+        self.assertEqual(metrics['by_day'], [{'day': '2026-09-20', 'paid_count': 2, 'paid_amount': 30}])
+        self.assertEqual([(x['hour'], x['paid_count']) for x in metrics['by_hour'] if x['paid_count']], [(22, 1), (23, 1)])
+        page = await main.list_panel_transactions(period='Tudo', bot_id='all', status='paid', date='2026-09-20')
+        self.assertEqual(page['total'], 2)
+
     async def test_paid_period_uses_payment_date_not_checkout_date(self):
         state = await main._read_state_from_db()
         state['tx_records']['p1'].update(created_at='2026-09-19T10:00:00-03:00', paid_at='2026-09-20T10:00:00-03:00')

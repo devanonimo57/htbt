@@ -134,6 +134,18 @@ class RowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(record['delivered'])
         self.assertEqual(record['delivery_attempts'], 1)
 
+    async def test_live_stale_lead_writer_cannot_reopen_cancelled_pix(self):
+        live = await main._read_state_from_db()
+        fresh = copy.deepcopy(live)
+        fresh['tx_records']['p3']['status'] = 'cancelled'
+        await main._write_state_to_db(fresh)
+        live['memory']['leads'][0]['first_name'] = 'Late update'
+        await main._write_state_to_db(live)
+        main._STATE_CACHE = None
+        result = await main._read_state_from_db()
+        self.assertEqual(result['tx_records']['p3']['status'], 'cancelled')
+        self.assertEqual(result['memory']['leads'][0]['first_name'], 'Late update')
+
     async def test_stale_lead_write_cannot_revert_unrelated_cancelled_pix(self):
         stale = copy.deepcopy(await main._read_state_from_db())
         fresh = copy.deepcopy(await main._read_state_from_db())
