@@ -3,7 +3,7 @@ import copy
 import json
 import unittest
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, event
 
 import main
 from models import BotConfig, ClientRecord, PixRecord
@@ -45,6 +45,38 @@ class RowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         state = await main._read_state_from_db()
         self.assertEqual(len(state['memory']['leads']), 2)
         self.assertEqual(set(state['tx_records']), {'p1', 'p2', 'p3'})
+
+    async def test_single_pix_change_only_queries_its_own_row(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        state['tx_records']['p3']['status'] = 'paid'
+        statements = []
+        def record(conn, cursor, statement, parameters, context, executemany):
+            if any(table in statement.lower() for table in ('pix_records', 'client_records', 'orders')):
+                statements.append((statement.lower(), str(parameters)))
+        event.listen(main.engine.sync_engine, 'before_cursor_execute', record)
+        try:
+            await main._write_state_to_db(state)
+        finally:
+            event.remove(main.engine.sync_engine, 'before_cursor_execute', record)
+        self.assertFalse(any('client_records' in sql for sql, _ in statements), statements)
+        self.assertFalse(any('p1' in params or 'p2' in params for _, params in statements), statements)
+        self.assertTrue(any('p3' in params for _, params in statements), statements)
+
+    async def test_single_lead_change_does_not_query_pix_or_other_leads(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        state['memory']['leads'][0]['first_name'] = 'Updated'
+        statements = []
+        def record(conn, cursor, statement, parameters, context, executemany):
+            if any(table in statement.lower() for table in ('pix_records', 'client_records', 'orders')):
+                statements.append((statement.lower(), str(parameters)))
+        event.listen(main.engine.sync_engine, 'before_cursor_execute', record)
+        try:
+            await main._write_state_to_db(state)
+        finally:
+            event.remove(main.engine.sync_engine, 'before_cursor_execute', record)
+        self.assertFalse(any('pix_records' in sql or 'orders' in sql for sql, _ in statements), statements)
+        self.assertFalse(any('222' in params for _, params in statements), statements)
+        self.assertTrue(any('111' in params for _, params in statements), statements)
 
     async def test_selected_bot_soft_delete_then_permanent_removes_only_its_rows(self):
         await main.delete_lead('7', bot_id='a')
@@ -101,6 +133,18 @@ class RowPersistenceTests(unittest.IsolatedAsyncioTestCase):
         record = (await main._read_state_from_db())['tx_records']['p1']
         self.assertTrue(record['delivered'])
         self.assertEqual(record['delivery_attempts'], 1)
+
+    async def test_stale_lead_write_cannot_revert_unrelated_cancelled_pix(self):
+        stale = copy.deepcopy(await main._read_state_from_db())
+        fresh = copy.deepcopy(await main._read_state_from_db())
+        fresh['tx_records']['p3']['status'] = 'cancelled'
+        await main._write_state_to_db(fresh)
+        stale['memory']['leads'][0]['first_name'] = 'Late update'
+        await main._write_state_to_db(stale)
+        main._STATE_CACHE = None
+        result = await main._read_state_from_db()
+        self.assertEqual(result['tx_records']['p3']['status'], 'cancelled')
+        self.assertEqual(result['memory']['leads'][0]['first_name'], 'Late update')
 
     async def test_bulk_sales_wipe_is_rejected(self):
         with self.assertRaises(main.HTTPException) as exc:

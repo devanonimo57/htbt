@@ -456,7 +456,22 @@ def health_ping():
 import asyncio as _asyncio
 
 _STATE_CACHE: Optional[Dict[str, Any]] = None
+_STATE_COMMITTED: Dict[str, Any] = {}
+_STATE_COMMITTED_OWNER = None
 _DB_LOCK = _asyncio.Lock()
+
+
+class _StateSnapshot(dict):
+    """Keep a copy's row ancestry for three-way merging of stale writers."""
+
+    _row_base: Optional[Dict[str, Any]] = None
+
+    def __deepcopy__(self, memo):
+        result = type(self)(copy.deepcopy(dict(self), memo))
+        memo[id(self)] = result
+        # A separate memo is essential: the baseline must not alias the copy.
+        result._row_base = copy.deepcopy(self._row_base if self._row_base is not None else dict(self))
+        return result
 MAX_ACTIVE_LEADS = 500
 MAX_HISTORY_PER_LEAD = 60
 
@@ -623,13 +638,24 @@ async def _hydrate_records(session: AsyncSession, state: Dict[str, Any]) -> Dict
     return state
 
 
-async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None) -> None:
+def _client_map(state):
+    return {
+        (_origin_for_lead(lead, state), str(lead['telegram_id']), archived): lead
+        for archived, key in ((False, 'leads'), (True, 'deleted_leads'))
+        for lead in state.get('memory', {}).get(key, [])
+        if lead.get('telegram_id')
+    }
+
+
+async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None, *, dirty_clients=None, dirty_pix=None) -> None:
     for archived, key in ((False, "leads"), (True, "deleted_leads")):
         for lead in state.get("memory", {}).get(key, []):
             uid = str(lead.get("telegram_id") or "").strip()
             if not uid:
                 continue
             origin = _origin_for_lead(lead, state)
+            if dirty_clients is not None and (origin, uid, archived) not in dirty_clients:
+                continue
             row = await session.get(ClientRecord, (origin, uid, archived))
             data = json.dumps(lead, ensure_ascii=False)
             if row is None:
@@ -646,6 +672,8 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             await session.delete(row)
     for tid, rec in state.get("tx_records", {}).items():
         if not tid or not isinstance(rec, dict) or str(tid) in (delete_tx_ids or []):
+            continue
+        if dirty_pix is not None and str(tid) not in dirty_pix:
             continue
         row = await session.get(PixRecord, str(tid))
         data = json.dumps(rec, ensure_ascii=False)
@@ -667,7 +695,7 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
 
 
 async def _read_state_from_db() -> Dict[str, Any]:
-    global _STATE_CACHE
+    global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     if _STATE_CACHE is not None:
         return _STATE_CACHE
     async with _DB_LOCK:
@@ -682,14 +710,18 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 saved = json.loads(config.full_state_json)
             try:
                 merged = {**DEFAULT_SHARKBOT_STATE, **saved}
-                _STATE_CACHE = _normalize_providers(await _hydrate_records(session, merged))
+                _STATE_CACHE = _StateSnapshot(_normalize_providers(await _hydrate_records(session, merged)))
+                _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+                _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
             except Exception:
-                _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
+                _STATE_CACHE = _StateSnapshot(_normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE))))
+                _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+                _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
 async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None) -> Dict[str, Any]:
-    global _STATE_CACHE
+    global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
             result = await session.execute(select(BotConfig))
@@ -702,6 +734,27 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     existing_state = await _hydrate_records(session, json.loads(config.full_state_json))
                 except Exception:
                     existing_state = {}
+
+            baseline = (getattr(state, '_row_base', None) or
+                        (_STATE_COMMITTED if _STATE_COMMITTED_OWNER is _STATE_CACHE else existing_state))
+            old_clients = _client_map(baseline)
+            dirty_clients = {key for key, lead in _client_map(state).items() if lead != old_clients.get(key)}
+            old_pix = baseline.get('tx_records', {})
+            dirty_pix = {str(tid) for tid, rec in state.get('tx_records', {}).items() if rec != old_pix.get(tid)}
+
+            # Do not turn a stale copy's untouched rows into writes (or into
+            # stale values in the returned cache). Only explicit deletion drops rows.
+            live_clients = _client_map(existing_state)
+            for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
+                incoming = state.get('memory', {}).get(key, [])
+                for idx, lead in enumerate(incoming):
+                    identity = (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived)
+                    if identity not in dirty_clients and identity in live_clients:
+                        incoming[idx] = copy.deepcopy(live_clients[identity])
+            tx_map = state.setdefault('tx_records', {})
+            for tid, record in existing_state.get('tx_records', {}).items():
+                if str(tid) not in dirty_pix and str(tid) not in (delete_tx_ids or []):
+                    tx_map[tid] = copy.deepcopy(record)
 
             if preserve_runtime:
                 state = _merge_config_preserving_runtime(state, existing_state)
@@ -771,7 +824,8 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 config = BotConfig()
                 session.add(config)
 
-            await _persist_records(session, state, delete_tx_ids, delete_client_keys)
+            await _persist_records(session, state, delete_tx_ids, delete_client_keys,
+                                   dirty_clients=dirty_clients, dirty_pix=dirty_pix)
             config_state = copy.deepcopy(state)
             config_state.pop("tx_records", None)
             config_state.setdefault("memory", {}).pop("leads", None)
@@ -788,7 +842,9 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             # Sincroniza transações em tx_records na tabela relacional Order
             tx_map = state.get("tx_records")
             if isinstance(tx_map, dict):
-                for tx_id, tx_rec in list(tx_map.items())[-100:]:
+                for tx_id, tx_rec in tx_map.items():
+                    if str(tx_id) not in dirty_pix or str(tx_id) in (delete_tx_ids or []):
+                        continue
                     if not isinstance(tx_rec, dict) or not tx_id:
                         continue
                     try:
@@ -816,7 +872,9 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 for order in order_result.scalars().all():
                     await session.delete(order)
             await session.commit()
-            _STATE_CACHE = state
+            _STATE_CACHE = _StateSnapshot(state)
+            _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+            _STATE_COMMITTED_OWNER = _STATE_CACHE
         return _STATE_CACHE
 
 async def _startup_warm_medias_task():
@@ -1176,11 +1234,11 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str, bot_id: s
                 except (ValueError, TypeError):
                     is_paid_today = False
                 if is_paid_today:
-                    bot_id = str(record.get("bot_id") or "").strip()
+                    transaction_bot_id = str(record.get("bot_id") or "").strip()
                     bot_token = str(record.get("bot_token") or "").strip()
                     origin_id = bot_token.split(":", 1)[0] if ":" in bot_token else ""
                     matches = [b for b in bots if isinstance(b, dict) and origin_id.isdecimal()
-                               and (not bot_id or str(b.get("id") or "") == bot_id)
+                               and (not transaction_bot_id or str(b.get("id") or "") == transaction_bot_id)
                                and str(b.get("token") or "").startswith(origin_id + ":")]
                     if len(matches) == 1:
                         matched = matches[0]

@@ -34,7 +34,7 @@ const context = {STATE:{flow_bots:[{id:'a',username:'@a',sales_today:999,revenue
   nbMatchesDateFilter:(date,period)=>period==='Total'||(date||'').startsWith(today),
 };
 vm.createContext(context);
-vm.runInContext(extract('function nbDistinctTransactions(', 'async function nbDeleteTransaction('),context);
+vm.runInContext(extract('function nbDistinctTransactions(', 'async function nbClearBotTestSales('),context);
 context.nbRenderFinanceView();
 assert.equal(el('nb-fin-rev-value').textContent,'R$ 10,00');
 assert.equal(el('nb-fin-paid-count').textContent,'1');

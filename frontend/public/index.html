@@ -5989,17 +5989,6 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (err) { alert('Não foi possível excluir permanentemente o lead. Tente novamente.'); }
     }
 
-    async function clearAllLeads() {
-      if (!confirm('Mover todos os leads ativos para Excluídos e encerrar o acompanhamento dos Pix pendentes? Pix já gerados podem continuar pagáveis no provedor.')) return;
-      try {
-        const res = await adminFetch('/api/leads', { method: 'DELETE' });
-        if (!res.ok) throw new Error('Falha ao excluir leads');
-        const data = await res.json();
-        if (data.state) STATE = data.state; else await nbRefreshLeadsState();
-        saveLocalBackup(); renderMemoryLeads(); renderLearningKpis(); nbRenderClientsView();
-      } catch (err) { alert('Não foi possível mover os leads para Excluídos. Tente novamente.'); }
-    }
-
     function renderLearningKpis() {
       const l = STATE.learning || {};
       const leads = STATE.memory?.leads || [];
@@ -10817,24 +10806,6 @@ quer que eu te mostre as opções de acesso?</textarea>
           txCont.innerHTML += `<div class="flex justify-center gap-4 p-4 text-xs text-white"><button type="button" onclick="nbFinancePage(${NB_FIN_PAGE - 1})" ${NB_FIN_PAGE <= 1 ? 'disabled' : ''}>Anterior</button><span>${NB_FIN_PAGE} / ${pages}</span><button type="button" onclick="nbFinancePage(${NB_FIN_PAGE + 1})" ${NB_FIN_PAGE >= pages ? 'disabled' : ''}>Próxima</button></div>`;
         }
       }
-    }
-
-    async function nbDeleteTransaction(txId) {
-      if (!txId) return;
-      try {
-        const res = await adminFetch(`/api/flow-bots/transactions/${encodeURIComponent(txId)}`, {
-          method: "DELETE"
-        });
-        const data = await res.json();
-        if (data && data.status === "ok" && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
-          saveLocalBackup();
-          nbRefreshFinance();
-          nbRefreshMetrics();
-          nbRenderBotsList();
-        }
-      } catch (e) {}
     }
 
     async function nbClearBotTestSales(clearAll = false, customBotId = null) {
