@@ -249,7 +249,11 @@ def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(tx_recs, dict):
         for rec in tx_recs.values():
             if isinstance(rec, dict) and "bot_token" in rec:
-                if (str(rec.get("bot_token") or "")).strip():
+                raw_token = str(rec.get("bot_token") or "").strip()
+                numeric_id = raw_token.split(":", 1)[0] if ":" in raw_token else ""
+                if numeric_id.isdecimal():
+                    rec["origin_bot_numeric_id"] = numeric_id
+                if raw_token:
                     rec["bot_token"] = REDACTED_SECRET_MASK
                 else:
                     rec["bot_token"] = ""
@@ -844,15 +848,27 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[s
         if was_paid:
             learning = state.setdefault("learning", {})
             learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
-            if record.get("mode") == "flow" and not record.get("is_upsell"):
-                bot_id = str(record.get("bot_id") or "")
-                bot_token = str(record.get("bot_token") or "")
-                matched = next((b for b in bots if isinstance(b, dict) and bot_id and str(b.get("id")) == bot_id), None)
-                if not matched and bot_token:
-                    matched = next((b for b in bots if isinstance(b, dict) and b.get("token") == bot_token), None)
-                if matched:
-                    matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
-                    matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
+            if record.get("mode") == "flow" and not record.get("is_upsell") and record.get("sales_counted") is True:
+                # created_at is the Pix creation time, not proof of the payment date.
+                paid_at_raw = str(record.get("paid_at") or "").strip()
+                try:
+                    paid_at = datetime.fromisoformat(paid_at_raw.replace("Z", "+00:00"))
+                    paid_brt = (paid_at - timedelta(hours=3) if paid_at.tzinfo is None
+                                else paid_at.astimezone(timezone(timedelta(hours=-3))))
+                    is_paid_today = paid_brt.date() == datetime.now(timezone(timedelta(hours=-3))).date()
+                except (ValueError, TypeError):
+                    is_paid_today = False
+                if is_paid_today:
+                    bot_id = str(record.get("bot_id") or "").strip()
+                    bot_token = str(record.get("bot_token") or "").strip()
+                    origin_id = bot_token.split(":", 1)[0] if ":" in bot_token else ""
+                    matches = [b for b in bots if isinstance(b, dict) and origin_id.isdecimal()
+                               and (not bot_id or str(b.get("id") or "") == bot_id)
+                               and str(b.get("token") or "").startswith(origin_id + ":")]
+                    if len(matches) == 1:
+                        matched = matches[0]
+                        matched["sales_today"] = max(0, int(matched.get("sales_today") or 0) - 1)
+                        matched["revenue_today"] = max(0.0, round(float(matched.get("revenue_today") or 0.0) - float(record.get("amount") or 0.0), 2))
         removed.append(tx_id)
         tx_map.pop(tx_id)
     return removed
@@ -1792,6 +1808,14 @@ def reconcile_daily_counters(state: Dict[str, Any], target_bot_id: Optional[str]
         was_paid = (status == "paid" or delivered)
         if not was_paid:
             continue
+        if rec.get("attribution_uncertain"):
+            unreconciled_anomalies.append({"tx_id": tid, "reason": "uncertain_bot_identity"})
+            continue
+        if rec.get("sales_counted") is False:
+            # An explicit uncounted flag can mean the originating bot is
+            # ambiguous. Preserve the paid record without inventing attribution.
+            unreconciled_anomalies.append({"tx_id": tid, "reason": "paid_but_not_attributed"})
+            continue
 
         paid_at_raw = str(rec.get("paid_at") or rec.get("created_at") or "").strip()
         if not paid_at_raw:
@@ -2038,20 +2062,30 @@ async def resend_vip_access(req: AccessResendRequest):
         uid = int(rec.get("user_id") or 0)
         if not uid:
             continue
+        rec_bot_id = str(rec.get("bot_id") or "").strip()
+        rec_token = str(rec.get("bot_token") or "").strip()
+        if not rec_token or rec_token == REDACTED_SECRET_MASK or ":" not in rec_token:
+            continue  # config ID alone cannot prove the purchase's original bot
         fb = None
-        for b in (state.get("flow_bots") or []):
-            if isinstance(b, dict) and str(b.get("id")) == str(rec.get("bot_id") or ""):
-                fb = b
+        for candidate in (state.get("flow_bots") or []):
+            if not isinstance(candidate, dict):
+                continue
+            config_token = str(candidate.get("token") or "").strip()
+            if rec_bot_id:
+                matches = str(candidate.get("id") or "") == rec_bot_id
+            else:
+                matches = bool(rec_token and rec_token != REDACTED_SECRET_MASK and config_token == rec_token)
+            if matches:
+                fb = candidate
                 break
         if not fb:
-            fb = bot_manager._get_active_flow_bot(state)
-        tok = (
-            str(rec.get("bot_token") or "").strip()
-            or (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
-            or str(state.get("publish", {}).get("bot_token") or "").strip()
-        )
+            continue
+        tok = str(fb.get("token") or "").strip()
         if not tok or tok == REDACTED_SECRET_MASK:
             continue
+        if rec_token and rec_token != REDACTED_SECRET_MASK:
+            if rec_token != tok and rec_token.split(":", 1)[0] != tok.split(":", 1)[0]:
+                continue  # identity mismatch: paid purchase requires manual correction, not a blind send
 
         temp_bot = None
         try:
@@ -2059,7 +2093,6 @@ async def resend_vip_access(req: AccessResendRequest):
             eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
             ch_target = (rec.get("delivery_channel_id") or "").strip()
             ext_url = (rec.get("delivery_external_url") or "").strip()
-            saved_url = (rec.get("invite_url") or "").strip()
             invite_url = ""
 
             if eff_type == "Link externo" and ext_url:
@@ -2075,9 +2108,6 @@ async def resend_vip_access(req: AccessResendRequest):
                     invite_url = (inv.invite_link or "").strip()
                 except Exception:
                     invite_url = ""
-
-            if not invite_url and saved_url and saved_url != "https://t.me/+link_exclusivo_vip":
-                invite_url = saved_url
 
             if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
                 continue
@@ -2170,9 +2200,17 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
     return {"status": "ok", "access_status": resolved_status, "state": _redact_state_secrets(state)}
 
 
+def _crm_verified_bot_origin(lead: Dict[str, Any]) -> str:
+    """Only an immutable identity captured on this lead can prove its origin."""
+    recorded = str(lead.get("origin_bot_numeric_id") or "")
+    return recorded if recorded.isdecimal() else ""
+
+
 class LeadActionRequest(BaseModel):
     telegram_id: Optional[str] = ""
     user_id: Optional[str] = ""
+    bot_id: Optional[str] = ""
+    origin_bot_numeric_id: Optional[str] = ""
     action: str  # "send_message" | "toggle_block"
     message: Optional[str] = ""
 
@@ -2183,12 +2221,19 @@ async def handle_lead_action(req: LeadActionRequest):
     state = await _read_state_from_db()
     leads = (state.get("memory") or {}).get("leads") or []
     tid = str(req.telegram_id or req.user_id or "").strip()
-    target_lead = next(
-        (l for l in leads if str(l.get("telegram_id") or l.get("user_id") or "") == tid),
-        None
-    )
-    if not target_lead:
-        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+    requested_bot_id = str(req.bot_id or "").strip()
+    requested_origin_id = str(req.origin_bot_numeric_id or "").strip()
+    matches = [
+        lead for lead in leads
+        if str(lead.get("telegram_id") or lead.get("user_id") or "") == tid
+        and (not requested_bot_id or str(lead.get("bot_id") or "") == requested_bot_id)
+        and (not requested_origin_id or str(lead.get("origin_bot_numeric_id") or "") == requested_origin_id)
+    ]
+    if not matches:
+        raise HTTPException(status_code=404, detail="Lead não encontrado para este bot.")
+    if len(matches) != 1:
+        raise HTTPException(status_code=409, detail="Lead ambíguo: selecione o bot de origem.")
+    target_lead = matches[0]
 
     if req.action == "toggle_block":
         target_lead["blocked"] = not bool(target_lead.get("blocked", False))
@@ -2199,34 +2244,24 @@ async def handle_lead_action(req: LeadActionRequest):
         txt = (req.message or "").strip()
         if not txt:
             return {"status": "error", "message": "Mensagem vazia."}
-        fb = None
         lead_bot_id = str(target_lead.get("bot_id") or "").strip()
-        lead_bot_uname = str(target_lead.get("bot_username") or "").strip().lower()
-        for b in (state.get("flow_bots") or []):
-            if not isinstance(b, dict):
-                continue
-            if (lead_bot_id and str(b.get("id")) == lead_bot_id) or (lead_bot_uname and str(b.get("username") or "").strip().lower() == lead_bot_uname):
-                fb = b
-                break
-        tx_bot_tok = ""
-        if not fb:
-            for rec in reversed(list((state.get("tx_records") or {}).values())):
-                if isinstance(rec, dict) and str(rec.get("user_id") or "") == tid:
-                    rec_bid = str(rec.get("bot_id") or "").strip()
-                    tx_bot_tok = str(rec.get("bot_token") or "").strip()
-                    if rec_bid:
-                        fb = next((b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == rec_bid), None)
-                    if fb or tx_bot_tok:
-                        break
-        if not fb:
-            fb = bot_manager._get_active_flow_bot(state)
-        tok = (
-            (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
-            or tx_bot_tok
-            or str(state.get("publish", {}).get("bot_token") or "").strip()
+        if not lead_bot_id:
+            return {"status": "error", "message": "Bot de origem não identificado para este lead."}
+        fb = next(
+            (b for b in (state.get("flow_bots") or [])
+             if isinstance(b, dict) and str(b.get("id") or "") == lead_bot_id),
+            None
         )
+        if not fb:
+            return {"status": "error", "message": "Bot de origem não encontrado."}
+        tok = str(fb.get("token") or "").strip()
         if not tok or tok == REDACTED_SECRET_MASK:
             return {"status": "error", "message": "Token do bot não configurado."}
+        configured_bot_numeric_id = tok.split(":", 1)[0] if ":" in tok else ""
+        recorded_bot_numeric_id = _crm_verified_bot_origin(target_lead)
+        if (not configured_bot_numeric_id.isdecimal()
+                or recorded_bot_numeric_id != configured_bot_numeric_id):
+            return {"status": "error", "message": "Identidade do bot de origem não verificável para este lead."}
         temp_bot = None
         try:
             temp_bot = _create_bot_instance(tok)
@@ -2277,8 +2312,20 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     msg_tmpl = (camp.get("message") or req.message or "").strip()
 
     flow_bots_list = [b for b in (state.get("flow_bots") or []) if isinstance(b, dict)]
-    target_bot_obj = next((b for b in flow_bots_list if str(b.get("id")) == target_bot_id), None) if target_bot_id != "all" else None
-    target_bot_uname = str(target_bot_obj.get("username") or "").strip().lower() if target_bot_obj else ""
+
+    def verified_lead_bot(lead: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        lead_bot_id = str(lead.get("bot_id") or "").strip()
+        if not lead_bot_id or (target_bot_id != "all" and lead_bot_id != target_bot_id):
+            return None
+        matches = [b for b in flow_bots_list if str(b.get("id") or "") == lead_bot_id]
+        if len(matches) != 1:
+            return None
+        config = matches[0]
+        tok = str(config.get("token") or "").strip()
+        numeric_id = tok.split(":", 1)[0] if ":" in tok else ""
+        if not numeric_id.isdecimal() or numeric_id != _crm_verified_bot_origin(lead):
+            return None
+        return config
 
     leads = (state.get("memory") or {}).get("leads") or []
     paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
@@ -2286,15 +2333,8 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
 
     matched_leads: List[Dict[str, Any]] = []
     for l in leads:
-        if not isinstance(l, dict) or l.get("blocked"):
+        if not isinstance(l, dict) or l.get("blocked") or not verified_lead_bot(l):
             continue
-        if target_bot_id != "all":
-            l_bid = str(l.get("bot_id") or "").strip()
-            l_buname = str(l.get("bot_username") or "").strip().lower()
-            if l_bid and l_bid != target_bot_id:
-                continue
-            if not l_bid and target_bot_uname and l_buname and l_buname != target_bot_uname:
-                continue
         st = str(l.get("stage") or "Conversando")
         is_paid = st in paid_stages or bool(l.get("purchased"))
         is_pend = st in pending_stages or "pix" in st.lower() or "aguardando" in st.lower()
@@ -2308,14 +2348,6 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
             continue
         matched_leads.append(l)
 
-    default_fb = target_bot_obj or bot_manager._get_active_flow_bot(state) or (flow_bots_list[0] if flow_bots_list else None)
-    default_tok = (
-        (str(default_fb.get("token") or "").strip() if isinstance(default_fb, dict) else "")
-        or str(state.get("publish", {}).get("bot_token") or "").strip()
-    )
-    if not default_tok or default_tok == REDACTED_SECRET_MASK:
-        return {"status": "error", "message": "Token do bot não configurado."}
-
     temp_bots: Dict[str, Any] = {}
     sent_ok = 0
     disc_pct = bot_manager._parse_discount_pct(discount_str)
@@ -2326,21 +2358,10 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 continue
             uid = int(uid_str)
 
-            lead_fb = target_bot_obj
+            lead_fb = verified_lead_bot(l)
             if not lead_fb:
-                l_bid = str(l.get("bot_id") or "").strip()
-                l_buname = str(l.get("bot_username") or "").strip().lower()
-                for b in flow_bots_list:
-                    if (l_bid and str(b.get("id")) == l_bid) or (l_buname and str(b.get("username") or "").strip().lower() == l_buname):
-                        lead_fb = b
-                        break
-            if not lead_fb:
-                lead_fb = default_fb
-
-            lead_tok = (
-                (str(lead_fb.get("token") or "").strip() if isinstance(lead_fb, dict) else "")
-                or default_tok
-            )
+                continue
+            lead_tok = str(lead_fb.get("token") or "").strip()
             if not lead_tok or lead_tok == REDACTED_SECRET_MASK:
                 continue
 

@@ -150,17 +150,24 @@ class ActiveBotManager:
     def _get_bot_by_token(self, token: str) -> Optional[Bot]:
         clean = (token or "").strip()
         if clean:
-            if clean == self.current_token and self._primary_bot:
+            primary_tok = str(getattr(self._primary_bot, "token", "") or "")
+            if self._primary_bot and ":" in primary_tok and ":" in clean and (
+                primary_tok.split(":", 1)[0] == clean.split(":", 1)[0]
+            ):
                 return self._primary_bot
             if clean in self.extra_bots:
-                return self.extra_bots[clean]
+                candidate = self.extra_bots[clean]
+                instance_tok = str(getattr(candidate, "token", "") or "")
+                if ":" in instance_tok and instance_tok.split(":", 1)[0] == clean.split(":", 1)[0]:
+                    return candidate
             if ":" in clean:
-                prefix = clean.split(":")[0]
-                if self.current_token.startswith(prefix + ":") and self._primary_bot:
-                    return self._primary_bot
+                prefix = clean.split(":", 1)[0]
                 for k, b_inst in self.extra_bots.items():
-                    if k.startswith(prefix + ":"):
+                    instance_tok = str(getattr(b_inst, "token", "") or "")
+                    if k.startswith(prefix + ":") and instance_tok.startswith(prefix + ":"):
                         return b_inst
+            # A missing origin bot must never become the current/primary bot.
+            return None
         return self.bot
 
     def _get_lead_lock(self, uid: str, bot_id: Optional[str] = None) -> _RefCountedAsyncLock:
@@ -373,21 +380,30 @@ class ActiveBotManager:
                 tx_map = state.get("tx_records") or {}
                 now = datetime.utcnow()
                 for tid, rec in list(tx_map.items()):
-                    if not isinstance(rec, dict):
+                    if not isinstance(rec, dict) or rec.get("status") != "paid" or rec.get("delivered"):
                         continue
-                    if rec.get("status") == "paid" and not rec.get("delivered"):
+                    try:
+                        attempts = int(rec.get("automatic_delivery_attempts", rec.get("delivery_attempts") or 0))
+                        if attempts != 1 and not (attempts == 0 and rec.get("initial_delivery_pending") is True):
+                            # A known zero-attempt payment can get its initial send
+                            # after its origin bot recovers. Legacy zero-attempt
+                            # records have no reliable history: leave for review.
+                            continue
                         last_attempt = rec.get("last_delivery_attempt_at")
                         if last_attempt:
-                            try:
-                                dt_att = datetime.fromisoformat(last_attempt.replace("Z", "+00:00")).replace(tzinfo=None)
-                                if (now - dt_att).total_seconds() < 30:
-                                    continue
-                            except Exception:
-                                pass
+                            dt_att = datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00")).replace(tzinfo=None)
+                            if (now - dt_att).total_seconds() < 45:
+                                continue
                         uid = int(rec.get("user_id") or 0)
                         if uid:
                             logger.info(f"Background retry worker tentando entrega de tx_id={tid} para user={uid}")
                             await self.deliver_purchase_and_upsell(uid, tx_id=tid)
+                    except (TypeError, ValueError) as e:
+                        logger.warning(f"Entrega pendente com dados inválidos tx_id={tid}: {e}")
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        logger.warning(f"Falha na entrega de tx_id={tid}: {e}")
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -655,14 +671,19 @@ class ActiveBotManager:
         bot_id_str = str(active_fb.get("id") or "") if active_fb else ""
         bot_uname_str = str(active_fb.get("username") or state.get("publish", {}).get("bot_username") or "@bot") if active_fb else str(state.get("publish", {}).get("bot_username") or "@bot")
         bot_mode_str = "flow" if active_fb else "ai"
+        actual_token = (effective_tok or getattr(self.bot, "token", "") or self.current_token or "")
+        origin_bot_numeric_id = str(actual_token).split(":", 1)[0] if ":" in str(actual_token) else ""
+        if not origin_bot_numeric_id.isdecimal():
+            origin_bot_numeric_id = ""
 
         for lead in leads:
             lead_uid = str(lead.get("telegram_id") or "")
             lead_bid = str(lead.get("bot_id") or "")
+            lead_origin = str(lead.get("origin_bot_numeric_id") or "")
             matches = (lead_uid == uid) and (
                 (bool(bot_id_str) and lead_bid == bot_id_str)
                 or (not bot_id_str and not lead_bid)
-            )
+            ) and bool(origin_bot_numeric_id) and lead_origin == origin_bot_numeric_id
             if matches:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
@@ -687,6 +708,7 @@ class ActiveBotManager:
             "created_at": datetime.utcnow().isoformat(),
             "last_interaction": datetime.utcnow().strftime("%d/%m %H:%M"),
             "bot_id": bot_id_str,
+            "origin_bot_numeric_id": origin_bot_numeric_id,
             "bot_username": bot_uname_str,
             "bot_mode": bot_mode_str,
             "blocked": False,
@@ -750,6 +772,17 @@ class ActiveBotManager:
                     continue
                 fb_id = str(fb.get("id") or "").strip()
                 if fb_id == eff_bot_id:
+                    # Both identifiers present in a purchase must identify the same bot.
+                    explicit_token = str(bot_token or "").strip()
+                    if explicit_token and explicit_token != "***configured***":
+                        fb_tok = str(fb.get("token") or "").strip()
+                        fb_tg_id = str(fb.get("bot_id") or "").strip()
+                        prefix = explicit_token.split(":", 1)[0] if ":" in explicit_token else ""
+                        # The configured token is the actual Telegram identity;
+                        # bot_id is only metadata and can be stale after a swap.
+                        if not (prefix and fb_tok.startswith(prefix + ":")
+                                and (not fb_tg_id or fb_tg_id == prefix)):
+                            return None
                     if fb.get("active", True) and fb.get("mode", "flow") == "flow":
                         return fb
                     return None
@@ -762,7 +795,9 @@ class ActiveBotManager:
                     continue
                 fb_tok = str(fb.get("token") or "").strip()
                 fb_tg_id = str(fb.get("bot_id") or "").strip()
-                if fb_tok == eff_token or (eff_token_prefix and fb_tg_id == eff_token_prefix):
+                if eff_token_prefix and fb_tok.startswith(eff_token_prefix + ":"):
+                    if fb_tg_id and fb_tg_id != eff_token_prefix:
+                        return None
                     if fb.get("active", True) and fb.get("mode", "flow") == "flow":
                         return fb
                     return None
@@ -2798,12 +2833,8 @@ class ActiveBotManager:
                 try:
                     data = await client.check_transaction_status(tx_id)
                     if str((data or {}).get("status", "")).lower() == "paid":
-                        if await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id):
-                            return
-                        for retry_wait in (4.0, 8.0, 15.0):
-                            await asyncio.sleep(retry_wait)
-                            if await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id):
-                                return
+                        # The retry worker handles the single delayed retry.
+                        await self.deliver_purchase_and_upsell(user_id, tx_id=tx_id)
                         return
                 except asyncio.CancelledError:
                     raise
@@ -2895,30 +2926,89 @@ class ActiveBotManager:
 
             tx_bot_token = str(tx_record.get("bot_token") or "").strip()
             tx_bot_id = str(tx_record.get("bot_id") or "").strip()
-            if (not tx_bot_token or tx_bot_token == "***configured***") and tx_bot_id:
-                for fb_cand in (state.get("flow_bots") or []):
-                    if isinstance(fb_cand, dict) and str(fb_cand.get("id") or "") == tx_bot_id:
-                        cand_tok = str(fb_cand.get("token") or "").strip()
-                        if cand_tok and cand_tok != "***configured***":
-                            tx_bot_token = cand_tok
-                            break
+            # A flow configuration ID is not an immutable Telegram identity:
+            # never fill a missing purchase token from a mutable configuration.
             resolved_bot = None
             if tx_bot_token and tx_bot_token != "***configured***":
                 _CURRENT_BOT_TOKEN_CTX.set(tx_bot_token)
                 resolved_bot = self._get_bot_by_token(tx_bot_token)
                 if resolved_bot:
                     _CURRENT_BOT_CTX.set(resolved_bot)
-            target_bot = resolved_bot or _CURRENT_BOT_CTX.get() or self.bot
-
             is_flow_tx = (tx_record.get("mode") == "flow")
             flow_bot = self._get_active_flow_bot(state, bot_token=tx_bot_token, bot_id=tx_bot_id) if is_flow_tx else None
+            target_bot = resolved_bot
             effective_bot_id = tx_bot_id or (str(flow_bot.get("id") or "") if flow_bot else "")
+            missing_origin = not tx_bot_token or tx_bot_token == "***configured***"
+            ai_identity_conflict = (
+                not is_flow_tx and tx_bot_id.isdigit()
+                and not missing_origin and tx_bot_id != tx_bot_token.split(":", 1)[0]
+            )
+
+            if missing_origin or ai_identity_conflict or (is_flow_tx and not flow_bot):
+                # Payment remains confirmed; ownership is ambiguous, so do not
+                # attribute revenue or dispatch using another bot's configuration.
+                if tx_record.get("status") != "paid":
+                    tx_record["status"] = "paid"
+                    tx_record.setdefault("sales_counted", False)
+                    tx_record.setdefault("paid_at", datetime.utcnow().isoformat())
+                inactive_origin = any(
+                    isinstance(fb, dict) and str(fb.get("id") or "") == tx_bot_id
+                    and not fb.get("active", True)
+                    and bool(tx_bot_token and tx_bot_token != "***configured***")
+                    and (
+                        str(fb.get("token") or "") == tx_bot_token
+                        or str(fb.get("token") or "").startswith(tx_bot_token.split(":", 1)[0] + ":")
+                    )
+                    for fb in (state.get("flow_bots") or [])
+                )
+                if inactive_origin:
+                    tx_record["initial_delivery_pending"] = True
+                else:
+                    tx_record["attribution_uncertain"] = True
+                tx_record["access_status"] = (
+                    "Pendente (Bot de Origem Indisponível)" if inactive_origin
+                    else "Pendente (Bot de origem não confere)"
+                )
+                tx_record["delivery_error"] = "Identidade do bot de origem indisponível ou divergente."
+                self.tx_records[tx_id] = tx_record
+                state["tx_records"][tx_id] = tx_record
+                await self.state_saver(state)
+                return False
+
+            if not is_flow_tx and not target_bot:
+                if tx_record.get("status") != "paid":
+                    tx_record["status"] = "paid"
+                    tx_record.setdefault("sales_counted", False)
+                    tx_record.setdefault("paid_at", datetime.utcnow().isoformat())
+                tx_record["initial_delivery_pending"] = True
+                tx_record["access_status"] = "Pendente (Bot de origem indisponível)"
+                tx_record["delivery_error"] = "Bot de origem não está em execução."
+                self.tx_records[tx_id] = tx_record
+                state["tx_records"][tx_id] = tx_record
+                await self.state_saver(state)
+                return False
+
+            # Matching purchase identity is now verified; keep the payment
+            # marker unchanged because legacy records may have been counted.
+            tx_record.pop("attribution_uncertain", None)
 
             # Lead retrieval sob lock do par (bot_id, user_id)
             async with self._get_lead_lock(str(user_id), bot_id=effective_bot_id):
                 memory = state.setdefault("memory", {})
-                active_lead = next((item for item in memory.get("leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
-                archived_lead = next((item for item in memory.get("deleted_leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
+                tx_origin_numeric_id = tx_bot_token.split(":", 1)[0] if ":" in tx_bot_token else ""
+
+                def matches_purchase_lead(item: Dict[str, Any]) -> bool:
+                    if (str(item.get("telegram_id") or "") != str(user_id)
+                            or not tx_origin_numeric_id.isdecimal()
+                            or str(item.get("origin_bot_numeric_id") or "") != tx_origin_numeric_id):
+                        return False
+                    lead_config_id = str(item.get("bot_id") or "")
+                    if is_flow_tx:
+                        return lead_config_id == effective_bot_id
+                    return not lead_config_id or lead_config_id == effective_bot_id
+
+                active_lead = next((item for item in memory.get("leads", []) if matches_purchase_lead(item)), None)
+                archived_lead = next((item for item in memory.get("deleted_leads", []) if matches_purchase_lead(item)), None)
                 lead = active_lead or archived_lead
                 if lead is None:
                     lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"), bot_token=tx_bot_token)
@@ -2971,11 +3061,49 @@ class ActiveBotManager:
                     state["tx_records"][tx_id] = tx_record
                     await self.state_saver(state)
 
+                if is_flow_tx and not target_bot:
+                    tx_record["initial_delivery_pending"] = True
+                    tx_record["access_status"] = "Pendente (Bot de origem indisponível)"
+                    tx_record["delivery_error"] = "Bot de origem não está em execução."
+                    self.tx_records[tx_id] = tx_record
+                    state["tx_records"][tx_id] = tx_record
+                    await self.state_saver(state)
+                    return False
+
+                # The payment is counted independently of fulfillment. Only the
+                # initial automatic send and one delayed retry are permitted per Pix.
+                try:
+                    auto_attempts = max(0, int(tx_record.get("automatic_delivery_attempts", tx_record.get("delivery_attempts") or 0)))
+                except (TypeError, ValueError):
+                    auto_attempts = 2  # ambiguous legacy data: require manual review
+                if auto_attempts >= 2:
+                    if tx_record.get("access_status") != "Pendente (Reenvio manual)":
+                        tx_record["access_status"] = "Pendente (Reenvio manual)"
+                        await self.state_saver(state)
+                    return False
+                if auto_attempts and tx_record.get("last_delivery_attempt_at"):
+                    try:
+                        last_attempt = datetime.fromisoformat(str(tx_record["last_delivery_attempt_at"]).replace("Z", "+00:00")).replace(tzinfo=None)
+                        if (datetime.utcnow() - last_attempt).total_seconds() < 45:
+                            return False
+                    except (TypeError, ValueError):
+                        pass
+
+                # Reserve the attempt durably BEFORE contacting Telegram, so a
+                # crash after sending cannot spend the same automatic retry again.
+                tx_record["automatic_delivery_attempts"] = auto_attempts + 1
+                tx_record.pop("initial_delivery_pending", None)
+                tx_record["delivery_attempts"] = int(tx_record.get("delivery_attempts") or 0) + 1
+                tx_record["last_delivery_attempt_at"] = datetime.utcnow().isoformat()
+                if auto_attempts + 1 >= 2:
+                    tx_record["access_status"] = "Pendente (Reenvio manual)"
+                self.tx_records[tx_id] = tx_record
+                state["tx_records"][tx_id] = tx_record
+                await self.state_saver(state)
+
                 # ========================================================
                 # FASE 2: DESPACHO E ENTREGA (AT-LEAST-ONCE DELIVERY)
                 # ========================================================
-                tx_record["delivery_attempts"] = int(tx_record.get("delivery_attempts") or 0) + 1
-                tx_record["last_delivery_attempt_at"] = datetime.utcnow().isoformat()
 
                 if is_upsell_payment:
                     try:
@@ -3185,7 +3313,7 @@ class ActiveBotManager:
                         [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
                     ])
 
-                    await self.bot.send_message(
+                    await target_bot.send_message(
                         chat_id=user_id,
                         text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
                         parse_mode="HTML",

@@ -9242,6 +9242,10 @@ quer que eu te mostre as opções de acesso?</textarea>
     let NB_CLIENTS_SUBTAB = "leads";
     let NB_LEADS_PERIOD = "Tudo";
     let NB_ACTIVE_CHAT_USER_ID = "";
+    let NB_ACTIVE_CHAT_BOT_ID = "";
+    let NB_ACTIVE_CHAT_ORIGIN_BOT_ID = "";
+    let NB_VISIBLE_LEADS = [];
+    let NB_EXCLUDED_LEADS = [];
     let NB_EDITING_RMK_ID = null;
 
     function nbUpdateHeaderRevenueWidget() {
@@ -9370,10 +9374,19 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderClientsView();
     }
 
+    function nbTransactionMatchesLead(tx, lead) {
+      const uid = String(lead.telegram_id || lead.user_id || "");
+      const botId = String(lead.bot_id || "");
+      const originId = String(lead.origin_bot_numeric_id || "");
+      const txOriginId = String(tx.origin_bot_numeric_id || "");
+      return !!(uid && botId && originId && txOriginId === originId
+        && String(tx.user_id || tx.telegram_id || "") === uid
+        && String(tx.bot_id || "") === botId);
+    }
+
     function nbClassifyLeadStatus(lead, txList) {
       if (lead.blocked || (lead.stage || "").toLowerCase().includes("bloqueado")) return "Bloqueado";
-      const uid = String(lead.telegram_id || lead.user_id || "");
-      const userTxs = txList.filter(tx => String(tx.user_id || tx.telegram_id || "") === uid);
+      const userTxs = txList.filter(tx => nbTransactionMatchesLead(tx, lead));
       const stg = (lead.stage || "").toLowerCase();
       const hasPaid = Boolean(lead.purchased) || stg.includes("aprovad") || stg.includes("concluíd") || userTxs.some(tx => tx.status === "paid" || tx.delivered);
       if (hasPaid) return "Pago";
@@ -9438,13 +9451,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       // Enriquecer leads com dados da última transação e do bot
       const enrichLead = l => {
         const uid = String(l.telegram_id || l.user_id || "");
-        const userTxs = allTxList.filter(tx => String(tx.user_id || tx.telegram_id || "") === uid);
+        const botId = String(l.bot_id || "");
+        const userTxs = allTxList.filter(tx => nbTransactionMatchesLead(tx, l));
         const latestPaidTx = userTxs.find(tx => tx.status === "paid" || tx.delivered);
         const latestTx = latestPaidTx || userTxs[0] || null;
-        const botId = l.bot_id || (latestTx && latestTx.bot_id) || (bots[0]?.id || "");
-        const botObj = bots.find(b => b.id === botId) || bots[0] || null;
-        const botUsername = l.bot_username || (botObj ? botObj.username : "@bot");
-        const flowMode = l.bot_mode || (botObj ? botObj.mode : "flow");
+        const botObj = botId ? (bots.find(b => String(b.id || "") === botId) || null) : null;
+        const botUsername = l.bot_username || (botObj ? botObj.username : "Origem desconhecida");
+        const flowMode = l.bot_mode || (botObj ? botObj.mode : "desconhecido");
         const status = nbClassifyLeadStatus(l, allTxList);
         const planName = (latestTx && latestTx.offer_name) || l.selected_plan || "—";
         const txCode = latestTx ? String(latestTx.tx_id || "").slice(0, 14) : "—";
@@ -9467,15 +9480,16 @@ quer que eu te mostre as opções de acesso?</textarea>
       };
       const enrichedLeads = leads.map(enrichLead);
       const excluded = (STATE.memory?.deleted_leads || []).map(enrichLead);
+      NB_EXCLUDED_LEADS = excluded;
       const excludedBody = document.getElementById('nb-excluded-table-body');
-      if (excludedBody) excludedBody.innerHTML = excluded.length ? excluded.map(item => `
+      if (excludedBody) excludedBody.innerHTML = excluded.length ? excluded.map((item, rowIndex) => `
         <tr class="border-b border-[#211730] text-zinc-300">
           <td class="p-3"><div class="font-bold text-white">${escapeHtml(item.first_name)}</div><div>${escapeHtml(item.username)}</div></td>
           <td class="p-3 font-mono">${escapeHtml(item.user_id)}</td><td class="p-3 font-mono">${escapeHtml(item.tx_code)}</td>
           <td class="p-3">${escapeHtml(item.plan_name)}</td><td class="p-3">${escapeHtml(item.bot_username)}</td>
           <td class="p-3">${item.flow_mode === 'ai' ? 'Fluxo IA' : 'Fluxo Principal'}</td><td class="p-3">${escapeHtml(item.status)}</td>
           <td class="p-3">${escapeHtml(item.date_display)}</td>
-          <td class="p-3 whitespace-nowrap"><button type="button" class="text-sky-300 mr-3" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}', true)">Ver histórico</button><button type="button" class="text-emerald-400 mr-3" onclick="nbRestoreExcludedLead('${escapeHtml(item.user_id)}')">Restaurar</button><button type="button" class="text-rose-400" onclick="nbPermanentlyDeleteLead('${escapeHtml(item.user_id)}')">Excluir permanentemente</button></td>
+          <td class="p-3 whitespace-nowrap"><button type="button" class="text-sky-300 mr-3" onclick="nbOpenLeadChatModalByRow(${rowIndex}, true)">Ver histórico</button><button type="button" class="text-emerald-400 mr-3" onclick="nbRestoreExcludedLead('${escapeHtml(item.user_id)}')">Restaurar</button><button type="button" class="text-rose-400" onclick="nbPermanentlyDeleteLead('${escapeHtml(item.user_id)}')">Excluir permanentemente</button></td>
         </tr>`).join('') : '<tr><td colspan="9" class="p-8 text-center text-zinc-500">Nenhum lead excluído.</td></tr>';
 
       const periodFilteredLeads = enrichedLeads.filter(item => nbMatchesDateFilter(item.date_iso, NB_LEADS_PERIOD));
@@ -9512,6 +9526,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         }
         return true;
       });
+      NB_VISIBLE_LEADS = finalLeads;
 
       const tbodyLeads = document.getElementById('nb-leads-table-body');
       const footerLeads = document.getElementById('nb-leads-footer-count');
@@ -9528,7 +9543,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </tr>
           `;
         } else {
-          tbodyLeads.innerHTML = finalLeads.map(item => {
+          tbodyLeads.innerHTML = finalLeads.map((item, rowIndex) => {
             const stMap = {
               "Novo": "bg-purple-950/70 text-purple-300 border-purple-800/50",
               "Pendente": "bg-amber-950/70 text-amber-300 border-amber-800/50",
@@ -9555,7 +9570,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </td>
                 <td class="py-3.5 px-3 text-[11px] text-zinc-400">${escapeHtml(item.date_display)}</td>
                 <td class="py-3.5 px-4 text-right">
-                  <button type="button" onclick="nbOpenLeadChatModal('${escapeHtml(item.user_id)}')" class="px-3 py-1.5 rounded-lg bg-[#1c1215] hover:bg-[#a855f7] border border-[#382126] hover:border-[#a855f7] text-[11px] font-bold text-zinc-200 hover:text-white inline-flex items-center gap-1.5 transition">
+                  <button type="button" onclick="nbOpenLeadChatModalByRow(${rowIndex}, false)" class="px-3 py-1.5 rounded-lg bg-[#1c1215] hover:bg-[#a855f7] border border-[#382126] hover:border-[#a855f7] text-[11px] font-bold text-zinc-200 hover:text-white inline-flex items-center gap-1.5 transition">
                     <i class="fa-regular fa-comment-dots"></i>
                     <span>Abrir Chat</span>
                   </button>
@@ -9622,8 +9637,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       // Construir lista de registros de acesso a partir das transações
       const accessRecords = allTxList.map(tx => {
         const uid = String(tx.user_id || tx.telegram_id || "");
-        const leadObj = leads.find(l => String(l.telegram_id || l.user_id || "") === uid) || {};
-        const botObj = bots.find(b => b.id === tx.bot_id) || bots[0] || {};
+        const txBotId = String(tx.bot_id || "");
+        const leadObj = txBotId ? (leads.find(l => nbTransactionMatchesLead(tx, l)) || {}) : {};
+        const botObj = txBotId ? (bots.find(b =>
+          String(b.id || "") === txBotId && String(b.bot_id || "") === String(tx.origin_bot_numeric_id || "")
+        ) || {}) : {};
         const isPaid = tx.status === "paid" || Boolean(tx.delivered);
         let accStatus = tx.access_status || (isPaid ? "Ativo" : "Pendente");
         if (tx.expires_at && tx.expires_at !== "Vitalício" && accStatus === "Ativo") {
@@ -9742,21 +9760,33 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
     }
 
-    function nbOpenLeadChatModal(userId, archived = false) {
+    function nbOpenLeadChatModalByRow(rowIndex, archived = false) {
+      const item = (archived ? NB_EXCLUDED_LEADS : NB_VISIBLE_LEADS)[rowIndex];
+      if (item) nbOpenLeadChatModal(item.user_id, item.bot_id, item.raw.origin_bot_numeric_id, archived);
+    }
+
+    function nbOpenLeadChatModal(userId, botId = "", originBotId = "", archived = false) {
       const selectedId = String(userId || "");
+      const selectedBotId = String(botId || "");
+      const selectedOriginId = String(originBotId || "");
       const leads = archived ? (STATE.memory?.deleted_leads || []) : (STATE.memory?.leads || []);
-      const lead = leads.find(l => String(l.telegram_id || l.user_id || "") === selectedId);
-      if (!lead) return;
+      const matches = leads.filter(l => String(l.telegram_id || l.user_id || "") === selectedId
+        && String(l.bot_id || "") === selectedBotId
+        && String(l.origin_bot_numeric_id || "") === selectedOriginId);
+      if (matches.length !== 1) return;
+      const lead = matches[0];
       NB_ACTIVE_CHAT_USER_ID = archived ? "" : selectedId;
+      NB_ACTIVE_CHAT_BOT_ID = archived ? "" : selectedBotId;
+      NB_ACTIVE_CHAT_ORIGIN_BOT_ID = archived ? "" : selectedOriginId;
       document.getElementById('nb-lead-chat-title').textContent = `${lead.first_name || 'Lead'} (${lead.username || ''})`;
-      document.getElementById('nb-lead-chat-sub').textContent = `Telegram ID: ${selectedId} · Etapa: ${lead.stage || 'Iniciou /start'}${archived ? ' · Excluído (somente leitura)' : ''}`;
+      document.getElementById('nb-lead-chat-sub').textContent = `Telegram ID: ${selectedId} · Bot: ${lead.bot_username || selectedBotId || 'origem desconhecida'} · Etapa: ${lead.stage || 'Iniciou /start'}${archived ? ' · Excluído (somente leitura)' : ''}`;
       const blkBtn = document.getElementById('nb-lead-chat-block-btn');
       if (blkBtn) {
-        blkBtn.classList.toggle('hidden', archived);
+        blkBtn.classList.toggle('hidden', archived || !selectedBotId);
         if (!archived) blkBtn.textContent = lead.blocked ? "Desbloquear Lead" : "Bloquear Lead";
       }
       const sendBtn = document.getElementById('nb-lead-chat-send-btn');
-      if (sendBtn) sendBtn.parentElement.classList.toggle('hidden', archived);
+      if (sendBtn) sendBtn.parentElement.classList.toggle('hidden', archived || !selectedBotId);
 
       const histEl = document.getElementById('nb-lead-chat-history');
       const hist = lead.history || [];
@@ -9790,7 +9820,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const inp = document.getElementById('nb-lead-chat-input');
       const btn = document.getElementById('nb-lead-chat-send-btn');
       const text = (inp?.value || "").trim();
-      if (!text || !NB_ACTIVE_CHAT_USER_ID) return;
+      if (!text || !NB_ACTIVE_CHAT_USER_ID || !NB_ACTIVE_CHAT_BOT_ID) return;
       if (btn) btn.disabled = true;
       try {
         const res = await adminFetch("/api/flow-bots/leads/action", {
@@ -9798,13 +9828,15 @@ quer que eu te mostre as opções de acesso?</textarea>
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: NB_ACTIVE_CHAT_USER_ID,
+            bot_id: NB_ACTIVE_CHAT_BOT_ID,
+            origin_bot_numeric_id: NB_ACTIVE_CHAT_ORIGIN_BOT_ID,
             action: "send_message",
             message: text
           })
         });
         const data = await res.json();
-        if (data && data.status === "error") {
-          alert(`Não foi possível enviar a mensagem ao lead: ${data.message || 'Erro no Telegram'}`);
+        if (!res.ok || data?.status === "error") {
+          alert(`Não foi possível enviar a mensagem ao lead: ${data?.message || data?.detail || 'Erro no Telegram'}`);
           return;
         }
         if (data && data.state) {
@@ -9813,7 +9845,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           saveLocalBackup();
         }
         if (inp) inp.value = "";
-        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID);
+        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID, NB_ACTIVE_CHAT_BOT_ID, NB_ACTIVE_CHAT_ORIGIN_BOT_ID);
         nbRenderClientsView();
       } catch (e) {} finally {
         if (btn) btn.disabled = false;
@@ -9821,23 +9853,29 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbToggleLeadBlock() {
-      if (!NB_ACTIVE_CHAT_USER_ID) return;
+      if (!NB_ACTIVE_CHAT_USER_ID || !NB_ACTIVE_CHAT_BOT_ID) return;
       try {
         const res = await adminFetch("/api/flow-bots/leads/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: NB_ACTIVE_CHAT_USER_ID,
+            bot_id: NB_ACTIVE_CHAT_BOT_ID,
+            origin_bot_numeric_id: NB_ACTIVE_CHAT_ORIGIN_BOT_ID,
             action: "toggle_block"
           })
         });
         const data = await res.json();
+        if (!res.ok || data?.status === "error") {
+          alert(data?.message || data?.detail || "Não foi possível alterar este lead.");
+          return;
+        }
         if (data && data.state) {
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
         }
-        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID);
+        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID, NB_ACTIVE_CHAT_BOT_ID, NB_ACTIVE_CHAT_ORIGIN_BOT_ID);
         nbRenderClientsView();
       } catch (e) {}
     }

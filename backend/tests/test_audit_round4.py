@@ -93,6 +93,7 @@ class TestAuditRound4Fixes(unittest.IsolatedAsyncioTestCase):
             "tx_id": "tx_ai_msg",
             "user_id": 7777,
             "mode": "ai",
+            "bot_token": "123456:TOKEN_BOT_1",
             "amount": 29.90,
             "status": "pending",
             "delivered": False,
@@ -101,6 +102,7 @@ class TestAuditRound4Fixes(unittest.IsolatedAsyncioTestCase):
         }
 
         fake_bot = MagicMock()
+        fake_bot.token = "123456:TOKEN_BOT_1"
         fake_bot.send_message = AsyncMock()
 
         self.mgr.bot = fake_bot

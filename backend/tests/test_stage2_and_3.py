@@ -98,6 +98,7 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
                 "tx_id": "tx_live_1001",
                 "user_id": 1001,
                 "mode": "ai",
+                "bot_token": "123456:MOCK",
                 "offer_id": "offer_vip_1",
                 "offer_name": "VIP Completo",
                 "amount": 50.0,
@@ -346,7 +347,10 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
             "Entrega deve permanecer False para permitir nova tentativa!"
         )
 
-        # Na segunda tentativa com Telegram operacional, a entrega deve concluir e marcar 'delivered=True'
+        # A única tentativa automática seguinte ocorre após a pausa mínima.
+        self.server_state["tx_records"]["tx_live_1001"]["last_delivery_attempt_at"] = (
+            datetime.utcnow() - timedelta(minutes=2)
+        ).isoformat()
         mgr.bot.send_message = AsyncMock()
         res_retry = await mgr.deliver_purchase_and_upsell(1001, tx_id="tx_live_1001")
         self.assertTrue(res_retry)
