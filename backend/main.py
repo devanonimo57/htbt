@@ -249,7 +249,11 @@ def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(tx_recs, dict):
         for rec in tx_recs.values():
             if isinstance(rec, dict) and "bot_token" in rec:
-                if (str(rec.get("bot_token") or "")).strip():
+                raw_token = str(rec.get("bot_token") or "").strip()
+                numeric_id = raw_token.split(":", 1)[0] if ":" in raw_token else ""
+                if numeric_id.isdecimal():
+                    rec["origin_bot_numeric_id"] = numeric_id
+                if raw_token:
                     rec["bot_token"] = REDACTED_SECRET_MASK
                 else:
                     rec["bot_token"] = ""
@@ -2184,9 +2188,17 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
     return {"status": "ok", "access_status": resolved_status, "state": _redact_state_secrets(state)}
 
 
+def _crm_verified_bot_origin(lead: Dict[str, Any]) -> str:
+    """Only an immutable identity captured on this lead can prove its origin."""
+    recorded = str(lead.get("origin_bot_numeric_id") or "")
+    return recorded if recorded.isdecimal() else ""
+
+
 class LeadActionRequest(BaseModel):
     telegram_id: Optional[str] = ""
     user_id: Optional[str] = ""
+    bot_id: Optional[str] = ""
+    origin_bot_numeric_id: Optional[str] = ""
     action: str  # "send_message" | "toggle_block"
     message: Optional[str] = ""
 
@@ -2197,12 +2209,19 @@ async def handle_lead_action(req: LeadActionRequest):
     state = await _read_state_from_db()
     leads = (state.get("memory") or {}).get("leads") or []
     tid = str(req.telegram_id or req.user_id or "").strip()
-    target_lead = next(
-        (l for l in leads if str(l.get("telegram_id") or l.get("user_id") or "") == tid),
-        None
-    )
-    if not target_lead:
-        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+    requested_bot_id = str(req.bot_id or "").strip()
+    requested_origin_id = str(req.origin_bot_numeric_id or "").strip()
+    matches = [
+        lead for lead in leads
+        if str(lead.get("telegram_id") or lead.get("user_id") or "") == tid
+        and (not requested_bot_id or str(lead.get("bot_id") or "") == requested_bot_id)
+        and (not requested_origin_id or str(lead.get("origin_bot_numeric_id") or "") == requested_origin_id)
+    ]
+    if not matches:
+        raise HTTPException(status_code=404, detail="Lead não encontrado para este bot.")
+    if len(matches) != 1:
+        raise HTTPException(status_code=409, detail="Lead ambíguo: selecione o bot de origem.")
+    target_lead = matches[0]
 
     if req.action == "toggle_block":
         target_lead["blocked"] = not bool(target_lead.get("blocked", False))
@@ -2213,34 +2232,24 @@ async def handle_lead_action(req: LeadActionRequest):
         txt = (req.message or "").strip()
         if not txt:
             return {"status": "error", "message": "Mensagem vazia."}
-        fb = None
         lead_bot_id = str(target_lead.get("bot_id") or "").strip()
-        lead_bot_uname = str(target_lead.get("bot_username") or "").strip().lower()
-        for b in (state.get("flow_bots") or []):
-            if not isinstance(b, dict):
-                continue
-            if (lead_bot_id and str(b.get("id")) == lead_bot_id) or (lead_bot_uname and str(b.get("username") or "").strip().lower() == lead_bot_uname):
-                fb = b
-                break
-        tx_bot_tok = ""
-        if not fb:
-            for rec in reversed(list((state.get("tx_records") or {}).values())):
-                if isinstance(rec, dict) and str(rec.get("user_id") or "") == tid:
-                    rec_bid = str(rec.get("bot_id") or "").strip()
-                    tx_bot_tok = str(rec.get("bot_token") or "").strip()
-                    if rec_bid:
-                        fb = next((b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == rec_bid), None)
-                    if fb or tx_bot_tok:
-                        break
-        if not fb:
-            fb = bot_manager._get_active_flow_bot(state)
-        tok = (
-            (str(fb.get("token") or "").strip() if isinstance(fb, dict) else "")
-            or tx_bot_tok
-            or str(state.get("publish", {}).get("bot_token") or "").strip()
+        if not lead_bot_id:
+            return {"status": "error", "message": "Bot de origem não identificado para este lead."}
+        fb = next(
+            (b for b in (state.get("flow_bots") or [])
+             if isinstance(b, dict) and str(b.get("id") or "") == lead_bot_id),
+            None
         )
+        if not fb:
+            return {"status": "error", "message": "Bot de origem não encontrado."}
+        tok = str(fb.get("token") or "").strip()
         if not tok or tok == REDACTED_SECRET_MASK:
             return {"status": "error", "message": "Token do bot não configurado."}
+        configured_bot_numeric_id = tok.split(":", 1)[0] if ":" in tok else ""
+        recorded_bot_numeric_id = _crm_verified_bot_origin(target_lead)
+        if (not configured_bot_numeric_id.isdecimal()
+                or recorded_bot_numeric_id != configured_bot_numeric_id):
+            return {"status": "error", "message": "Identidade do bot de origem não verificável para este lead."}
         temp_bot = None
         try:
             temp_bot = _create_bot_instance(tok)
@@ -2291,8 +2300,20 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     msg_tmpl = (camp.get("message") or req.message or "").strip()
 
     flow_bots_list = [b for b in (state.get("flow_bots") or []) if isinstance(b, dict)]
-    target_bot_obj = next((b for b in flow_bots_list if str(b.get("id")) == target_bot_id), None) if target_bot_id != "all" else None
-    target_bot_uname = str(target_bot_obj.get("username") or "").strip().lower() if target_bot_obj else ""
+
+    def verified_lead_bot(lead: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        lead_bot_id = str(lead.get("bot_id") or "").strip()
+        if not lead_bot_id or (target_bot_id != "all" and lead_bot_id != target_bot_id):
+            return None
+        matches = [b for b in flow_bots_list if str(b.get("id") or "") == lead_bot_id]
+        if len(matches) != 1:
+            return None
+        config = matches[0]
+        tok = str(config.get("token") or "").strip()
+        numeric_id = tok.split(":", 1)[0] if ":" in tok else ""
+        if not numeric_id.isdecimal() or numeric_id != _crm_verified_bot_origin(lead):
+            return None
+        return config
 
     leads = (state.get("memory") or {}).get("leads") or []
     paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
@@ -2300,15 +2321,8 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
 
     matched_leads: List[Dict[str, Any]] = []
     for l in leads:
-        if not isinstance(l, dict) or l.get("blocked"):
+        if not isinstance(l, dict) or l.get("blocked") or not verified_lead_bot(l):
             continue
-        if target_bot_id != "all":
-            l_bid = str(l.get("bot_id") or "").strip()
-            l_buname = str(l.get("bot_username") or "").strip().lower()
-            if l_bid and l_bid != target_bot_id:
-                continue
-            if not l_bid and target_bot_uname and l_buname and l_buname != target_bot_uname:
-                continue
         st = str(l.get("stage") or "Conversando")
         is_paid = st in paid_stages or bool(l.get("purchased"))
         is_pend = st in pending_stages or "pix" in st.lower() or "aguardando" in st.lower()
@@ -2322,14 +2336,6 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
             continue
         matched_leads.append(l)
 
-    default_fb = target_bot_obj or bot_manager._get_active_flow_bot(state) or (flow_bots_list[0] if flow_bots_list else None)
-    default_tok = (
-        (str(default_fb.get("token") or "").strip() if isinstance(default_fb, dict) else "")
-        or str(state.get("publish", {}).get("bot_token") or "").strip()
-    )
-    if not default_tok or default_tok == REDACTED_SECRET_MASK:
-        return {"status": "error", "message": "Token do bot não configurado."}
-
     temp_bots: Dict[str, Any] = {}
     sent_ok = 0
     disc_pct = bot_manager._parse_discount_pct(discount_str)
@@ -2340,21 +2346,10 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 continue
             uid = int(uid_str)
 
-            lead_fb = target_bot_obj
+            lead_fb = verified_lead_bot(l)
             if not lead_fb:
-                l_bid = str(l.get("bot_id") or "").strip()
-                l_buname = str(l.get("bot_username") or "").strip().lower()
-                for b in flow_bots_list:
-                    if (l_bid and str(b.get("id")) == l_bid) or (l_buname and str(b.get("username") or "").strip().lower() == l_buname):
-                        lead_fb = b
-                        break
-            if not lead_fb:
-                lead_fb = default_fb
-
-            lead_tok = (
-                (str(lead_fb.get("token") or "").strip() if isinstance(lead_fb, dict) else "")
-                or default_tok
-            )
+                continue
+            lead_tok = str(lead_fb.get("token") or "").strip()
             if not lead_tok or lead_tok == REDACTED_SECRET_MASK:
                 continue
 

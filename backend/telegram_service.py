@@ -671,14 +671,19 @@ class ActiveBotManager:
         bot_id_str = str(active_fb.get("id") or "") if active_fb else ""
         bot_uname_str = str(active_fb.get("username") or state.get("publish", {}).get("bot_username") or "@bot") if active_fb else str(state.get("publish", {}).get("bot_username") or "@bot")
         bot_mode_str = "flow" if active_fb else "ai"
+        actual_token = (effective_tok or getattr(self.bot, "token", "") or self.current_token or "")
+        origin_bot_numeric_id = str(actual_token).split(":", 1)[0] if ":" in str(actual_token) else ""
+        if not origin_bot_numeric_id.isdecimal():
+            origin_bot_numeric_id = ""
 
         for lead in leads:
             lead_uid = str(lead.get("telegram_id") or "")
             lead_bid = str(lead.get("bot_id") or "")
+            lead_origin = str(lead.get("origin_bot_numeric_id") or "")
             matches = (lead_uid == uid) and (
                 (bool(bot_id_str) and lead_bid == bot_id_str)
                 or (not bot_id_str and not lead_bid)
-            )
+            ) and bool(origin_bot_numeric_id) and lead_origin == origin_bot_numeric_id
             if matches:
                 lead["first_name"] = user.first_name or lead.get("first_name", "Visitante")
                 lead["username"] = f"@{user.username}" if user.username else lead.get("username", "")
@@ -703,6 +708,7 @@ class ActiveBotManager:
             "created_at": datetime.utcnow().isoformat(),
             "last_interaction": datetime.utcnow().strftime("%d/%m %H:%M"),
             "bot_id": bot_id_str,
+            "origin_bot_numeric_id": origin_bot_numeric_id,
             "bot_username": bot_uname_str,
             "bot_mode": bot_mode_str,
             "blocked": False,
@@ -2989,8 +2995,20 @@ class ActiveBotManager:
             # Lead retrieval sob lock do par (bot_id, user_id)
             async with self._get_lead_lock(str(user_id), bot_id=effective_bot_id):
                 memory = state.setdefault("memory", {})
-                active_lead = next((item for item in memory.get("leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
-                archived_lead = next((item for item in memory.get("deleted_leads", []) if str(item.get("telegram_id")) == str(user_id) and (not effective_bot_id or str(item.get("bot_id") or "") == effective_bot_id)), None)
+                tx_origin_numeric_id = tx_bot_token.split(":", 1)[0] if ":" in tx_bot_token else ""
+
+                def matches_purchase_lead(item: Dict[str, Any]) -> bool:
+                    if (str(item.get("telegram_id") or "") != str(user_id)
+                            or not tx_origin_numeric_id.isdecimal()
+                            or str(item.get("origin_bot_numeric_id") or "") != tx_origin_numeric_id):
+                        return False
+                    lead_config_id = str(item.get("bot_id") or "")
+                    if is_flow_tx:
+                        return lead_config_id == effective_bot_id
+                    return not lead_config_id or lead_config_id == effective_bot_id
+
+                active_lead = next((item for item in memory.get("leads", []) if matches_purchase_lead(item)), None)
+                archived_lead = next((item for item in memory.get("deleted_leads", []) if matches_purchase_lead(item)), None)
                 lead = active_lead or archived_lead
                 if lead is None:
                     lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"), bot_token=tx_bot_token)
