@@ -2481,15 +2481,21 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 await _asyncio.sleep(0.05)
             except Exception as e:
                 err_s = str(e).lower()
-                if "retry after" in err_s or "too many requests" in err_s:
+                if any(x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
+                    l["blocked"] = True
+                    l["stage"] = "Bloqueou o bot"
+                elif "retry after" in err_s or "too many requests" in err_s:
                     digits = "".join(ch for ch in err_s if ch.isdigit())
                     retry_wait = max(1.0, float(digits)) if digits else 2.0
                     await _asyncio.sleep(retry_wait)
                     try:
                         await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
                         sent_ok += 1
-                    except Exception:
-                        pass
+                    except Exception as e_after:
+                        err_sa = str(e_after).lower()
+                        if any(x in err_sa for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
+                            l["blocked"] = True
+                            l["stage"] = "Bloqueou o bot"
                 else:
                     pass
     finally:

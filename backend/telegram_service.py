@@ -33,6 +33,20 @@ except ImportError:
             self.parse_mode = parse_mode
             self.has_spoiler = has_spoiler
 
+try:
+    from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter, TelegramBadRequest
+except ImportError:
+    class TelegramForbiddenError(Exception):
+        pass
+
+    class TelegramRetryAfter(Exception):
+        def __init__(self, message="", retry_after=5, **kwargs):
+            super().__init__(message)
+            self.retry_after = retry_after
+
+    class TelegramBadRequest(Exception):
+        pass
+
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply, _compute_effective_min_price
 
@@ -850,6 +864,27 @@ class ActiveBotManager:
             out = out.replace(k, str(v))
         return out
 
+    async def _mark_lead_blocked(self, chat_id: Any):
+        try:
+            uid_str = str(chat_id).strip()
+            self._cancel_downsell(uid_str)
+            self._cancel_upsell(uid_str)
+            if self.state_getter and self.state_saver:
+                state = await self.state_getter()
+                memory = state.get("memory") or {}
+                changed = False
+                for ld in memory.get("leads", []):
+                    if str(ld.get("telegram_id") or "") == uid_str:
+                        if not ld.get("blocked"):
+                            ld["blocked"] = True
+                            ld["stage"] = "Bloqueou o bot"
+                            changed = True
+                        break
+                if changed:
+                    await self.state_saver(state)
+        except Exception as err:
+            logger.warning(f"Aviso ao registrar bloqueio de lead {chat_id}: {err}")
+
     async def _safe_send_html(
         self,
         chat_id: Any,
@@ -863,8 +898,39 @@ class ActiveBotManager:
         extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
         try:
             return await target_bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", **extra_kw)
-        except Exception:
-            return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
+        except Exception as e:
+            err_s = str(e).lower()
+            if isinstance(e, TelegramForbiddenError) or any(
+                x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
+            ):
+                await self._mark_lead_blocked(chat_id)
+                return None
+
+            if isinstance(e, TelegramRetryAfter) or "retry after" in err_s or "flood control" in err_s:
+                wait_sec = getattr(e, "retry_after", 3.0)
+                if not isinstance(wait_sec, (int, float)):
+                    digits = "".join(ch for ch in err_s if ch.isdigit())
+                    wait_sec = float(digits) if digits else 2.0
+                await asyncio.sleep(min(float(wait_sec), 10.0))
+                try:
+                    return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
+                except Exception as e_after:
+                    err_sa = str(e_after).lower()
+                    if isinstance(e_after, TelegramForbiddenError) or any(
+                        x in err_sa for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
+                    ):
+                        await self._mark_lead_blocked(chat_id)
+                    return None
+
+            try:
+                return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
+            except Exception as e2:
+                err_s2 = str(e2).lower()
+                if isinstance(e2, TelegramForbiddenError) or any(
+                    x in err_s2 for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
+                ):
+                    await self._mark_lead_blocked(chat_id)
+                return None
 
     def _parse_discount_pct(self, disc_str: str) -> int:
         if not disc_str or "sem" in disc_str.lower():
@@ -1591,9 +1657,13 @@ class ActiveBotManager:
 
     def _schedule_flow_downsell(self, user: types.User, track: str = "general", bot_token: str = ""):
         uid = str(user.id)
-        self._cancel_downsell(uid)
         tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
-        self.downsell_tasks[uid] = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=tok))
+        bot_prefix = tok.split(":", 1)[0] if (tok and ":" in tok) else ""
+        self._cancel_downsell(uid, bot_id=bot_prefix)
+        task = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=tok))
+        self.downsell_tasks[uid] = task
+        if bot_prefix:
+            self.downsell_tasks[f"{bot_prefix}:{uid}"] = task
 
     async def _flow_downsell_worker(self, user: types.User, track: str, bot_token: str = ""):
         paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
@@ -1626,8 +1696,8 @@ class ActiveBotManager:
                 elapsed_mins += wait_mins
 
                 state = await self.state_getter()
-                lead = await self._get_or_create_lead(state, user)
-                if lead.get("stage") in paid_stages:
+                lead = await self._get_or_create_lead(state, user, bot_token=bot_token)
+                if lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
                 if track == "general" and lead.get("stage") == "Gerou checkout":
                     return
@@ -1636,6 +1706,7 @@ class ActiveBotManager:
                 if not fb:
                     return
                 eff_tok = (str(fb.get("token") or "").strip() or bot_token or self.current_token).strip()
+                live_bot = None
                 if eff_tok:
                     _CURRENT_BOT_TOKEN_CTX.set(eff_tok)
                     live_bot = self._get_bot_by_token(eff_tok)
@@ -1655,14 +1726,14 @@ class ActiveBotManager:
                 )
                 lead["from_downsell"] = True
                 if not msg_tmpl and has_seq_medias:
-                    attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb)
+                    attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb, bot_instance=live_bot)
                     if not attached_kb and kb:
-                        await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb)
+                        await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb, bot_instance=live_bot)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} — Mídia]"})
                 else:
-                    await self._send_flow_medias(user.id, seq_medias)
+                    await self._send_flow_medias(user.id, seq_medias, bot_instance=live_bot)
                     txt = self._render_flow_vars(msg_tmpl, user, fb)
-                    await self._safe_send_html(user.id, txt, reply_markup=kb)
+                    await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
                 await self.state_saver(state)
         except asyncio.CancelledError:
@@ -1671,11 +1742,14 @@ class ActiveBotManager:
             logger.error(f"Erro no Flow Downsell ({track}): {e}")
 
     def _cancel_downsell(self, user_id: Any, bot_id: Optional[str] = None):
-        uid = str(user_id)
+        uid = str(user_id).strip()
         keys_to_pop = [uid]
         if bot_id:
             keys_to_pop.append(f"{bot_id}:{uid}")
-        for k in keys_to_pop:
+        for k in list(self.downsell_tasks.keys()):
+            if k == uid or k.endswith(f":{uid}"):
+                keys_to_pop.append(k)
+        for k in set(keys_to_pop):
             task = self.downsell_tasks.pop(k, None)
             if task and not task.done():
                 task.cancel()
@@ -1846,12 +1920,19 @@ class ActiveBotManager:
         await self.deliver_purchase_and_upsell(message.from_user.id, tx_id=target_tx_id)
         return True
 
-    def _schedule_downsell(self, user_id: int, user_first_name: str):
+    def _schedule_downsell(self, user_id: int, user_first_name: str, bot_token: str = ""):
         uid = str(user_id)
-        self._cancel_downsell(uid)
-        self.downsell_tasks[uid] = asyncio.create_task(self._downsell_worker(user_id, user_first_name))
+        tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
+        bot_prefix = tok.split(":", 1)[0] if (tok and ":" in tok) else ""
+        self._cancel_downsell(uid, bot_id=bot_prefix)
+        task = asyncio.create_task(
+            self._downsell_worker(user_id, user_first_name, bot_token=tok)
+        )
+        self.downsell_tasks[uid] = task
+        if bot_prefix:
+            self.downsell_tasks[f"{bot_prefix}:{uid}"] = task
 
-    async def _downsell_worker(self, user_id: int, user_first_name: str):
+    async def _downsell_worker(self, user_id: int, user_first_name: str, bot_token: str = ""):
         paid_stages = (
             "Compra aprovada",
             "Pagamento aprovado",
@@ -1864,14 +1945,19 @@ class ActiveBotManager:
         try:
             while True:
                 state = await self.state_getter()
-                if self._get_active_flow_bot(state, bot_token=self.current_token):
+                effective_tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.current_token or "").strip()
+                if self._get_active_flow_bot(state, bot_token=effective_tok):
                     return
                 ds = state.get("downsell", {})
                 if not ds.get("enabled", False):
                     return
 
-                lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") in paid_stages:
+                lead = await self._get_or_create_lead(
+                    state,
+                    types.User(id=user_id, is_bot=False, first_name=user_first_name),
+                    bot_token=effective_tok
+                )
+                if lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
 
                 sent_steps = lead.setdefault("sent_downsell_steps", [])
@@ -1890,18 +1976,33 @@ class ActiveBotManager:
 
                 # Recarrega estado após espera
                 state = await self.state_getter()
-                if self._get_active_flow_bot(state, bot_token=self.current_token):
+                if self._get_active_flow_bot(state, bot_token=effective_tok):
                     return
-                lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name=user_first_name))
-                if lead.get("stage") in paid_stages:
+                lead = await self._get_or_create_lead(
+                    state,
+                    types.User(id=user_id, is_bot=False, first_name=user_first_name),
+                    bot_token=effective_tok
+                )
+                if lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
+
+                target_bot = None
+                if effective_tok:
+                    target_bot = self._get_bot_by_token(effective_tok)
+                if not target_bot and lead.get("origin_bot_numeric_id"):
+                    target_bot = self._get_bot_by_token(f"{lead['origin_bot_numeric_id']}:")
+                if not target_bot:
+                    target_bot = self.bot
 
                 msg_text = next_step.get("message", "").replace("{nome}", user_first_name)
                 accompany = next_step.get("accompany", "Botão com os planos atuais")
                 has_plans = "planos" in accompany.lower() or "oferta" in accompany.lower()
                 markup = self._build_offers_keyboard(state) if has_plans else None
 
-                await self.bot.send_message(chat_id=user_id, text=msg_text, reply_markup=markup)
+                sent = await self._safe_send_html(user_id, msg_text, reply_markup=markup, bot_instance=target_bot)
+                if not sent and lead.get("blocked"):
+                    return
+
                 if has_plans:
                     self._advance_stage(lead, "Viu os planos")
                 lead["from_downsell"] = True
@@ -1913,10 +2014,18 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro no Downsell worker: {e}")
 
-    def _cancel_upsell(self, user_id: str):
-        task = self.upsell_tasks.pop(str(user_id), None)
-        if task and not task.done():
-            task.cancel()
+    def _cancel_upsell(self, user_id: Any, bot_id: Optional[str] = None):
+        uid = str(user_id).strip()
+        keys_to_pop = [uid]
+        if bot_id:
+            keys_to_pop.append(f"{bot_id}:{uid}")
+        for k in list(self.upsell_tasks.keys()):
+            if k == uid or k.endswith(f":{uid}"):
+                keys_to_pop.append(k)
+        for k in set(keys_to_pop):
+            task = self.upsell_tasks.pop(k, None)
+            if task and not task.done():
+                task.cancel()
 
     def cancel_lead_tasks(self, user_id: str):
         uid = str(user_id)
@@ -2040,7 +2149,7 @@ class ActiveBotManager:
                 lead.setdefault("history", []).append({"role": "assistant", "content": line})
 
             await self.state_saver(state)
-            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
+            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.message(F.text)
         async def handle_text(message: types.Message):
@@ -2166,19 +2275,26 @@ class ActiveBotManager:
                     await message.answer(reply_text)
                 lead["history"].append({"role": "assistant", "content": reply_text})
                 await self.state_saver(state)
-
-            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
+            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.message(F.voice | F.audio | F.photo | F.sticker | F.video)
         async def handle_non_text(message: types.Message):
+            msg_bot = getattr(message, "bot", None)
+            msg_bot_tok = getattr(msg_bot, "token", "") or ""
+            if msg_bot_tok:
+                _CURRENT_BOT_TOKEN_CTX.set(msg_bot_tok)
+                if msg_bot:
+                    _CURRENT_BOT_CTX.set(msg_bot)
+            target_bot = msg_bot or _CURRENT_BOT_CTX.get() or self.bot
+
             state_check = await self.state_getter()
-            if self._get_active_flow_bot(state_check):
+            if self._get_active_flow_bot(state_check, bot_token=msg_bot_tok):
                 return
 
             uid = str(message.from_user.id)
             async with self._get_lead_lock(uid):
                 state = await self.state_getter()
-                lead = await self._get_or_create_lead(state, message.from_user)
+                lead = await self._get_or_create_lead(state, message.from_user, bot_token=msg_bot_tok)
                 self._cancel_downsell(uid)
 
                 if message.voice or message.audio:
@@ -2190,7 +2306,8 @@ class ActiveBotManager:
 
                 lead.setdefault("history", []).append({"role": "user", "content": synthetic_msg})
                 delay = self._get_cadence_delay(state)
-                await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+                if target_bot:
+                    await target_bot.send_chat_action(chat_id=message.chat.id, action="typing")
                 await asyncio.sleep(delay)
 
                 ai_res = await generate_ai_reply(
@@ -2201,7 +2318,7 @@ class ActiveBotManager:
                 )
                 reply_text = ai_res.get("reply", "")
                 state = await self.state_getter()
-                lead = await self._get_or_create_lead(state, message.from_user)
+                lead = await self._get_or_create_lead(state, message.from_user, bot_token=msg_bot_tok)
                 offer_card = ai_res.get("offer_card")
                 is_upsell_ctx = lead.get("stage") in ("Entrega concluída", "Recebeu upsell", "Escolheu upsell", "Checkout de upsell")
                 markup = self._build_offers_keyboard(state, offer_card, is_upsell=is_upsell_ctx) if offer_card else None
@@ -2211,7 +2328,7 @@ class ActiveBotManager:
                 await message.answer(reply_text, reply_markup=markup)
                 lead["history"].append({"role": "assistant", "content": reply_text})
                 await self.state_saver(state)
-            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor")
+            self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.callback_query(F.data.startswith("buy:"))
         async def handle_buy_callback(callback: types.CallbackQuery):
@@ -2368,8 +2485,9 @@ class ActiveBotManager:
             ])
 
             safe_pix_html = html.escape(pix_code)
+            target_bot = cb_bot or self.bot
             try:
-                await self.bot.send_message(
+                await target_bot.send_message(
                     chat_id=target_chat_id,
                     text=(
                         f"🔒 <b>Pagamento Seguro via PIX</b>\n\n"
@@ -2384,18 +2502,21 @@ class ActiveBotManager:
                 )
             except Exception as e:
                 logger.error(f"Fallback texto simples no envio do PIX: {e}")
-                await self.bot.send_message(
-                    chat_id=target_chat_id,
-                    text=(
-                        f"🔒 Pagamento Seguro via PIX\n\n"
-                        f"Plano: {chosen_offer_name}\n"
-                        f"Valor: R$ {price_fmt}\n\n"
-                        f"Copie o código PIX Copia e Cola abaixo:\n\n"
-                        f"{pix_code}\n\n"
-                        f"Assim que concluir, clique abaixo para liberar seu acesso!"
-                    ),
-                    reply_markup=confirm_kb
-                )
+                try:
+                    await target_bot.send_message(
+                        chat_id=target_chat_id,
+                        text=(
+                            f"🔒 Pagamento Seguro via PIX\n\n"
+                            f"Plano: {chosen_offer_name}\n"
+                            f"Valor: R$ {price_fmt}\n\n"
+                            f"Copie o código PIX Copia e Cola abaixo:\n\n"
+                            f"{pix_code}\n\n"
+                            f"Assim que concluir, clique abaixo para liberar seu acesso!"
+                        ),
+                        reply_markup=confirm_kb
+                    )
+                except Exception as e_fb:
+                    logger.error(f"Falha definitiva no envio do PIX: {e_fb}")
 
             self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
 
@@ -2845,15 +2966,21 @@ class ActiveBotManager:
         finally:
             self.pix_poll_tasks.pop(tx_id, None)
 
-    def _schedule_upsell(self, user_id: int):
+    def _schedule_upsell(self, user_id: int, bot_token: str = ""):
         uid = str(user_id)
-        self._cancel_upsell(uid)
-        self.upsell_tasks[uid] = asyncio.create_task(self._upsell_worker(user_id))
+        tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
+        bot_prefix = tok.split(":", 1)[0] if (tok and ":" in tok) else ""
+        self._cancel_upsell(uid, bot_id=bot_prefix)
+        task = asyncio.create_task(self._upsell_worker(user_id, bot_token=tok))
+        self.upsell_tasks[uid] = task
+        if bot_prefix:
+            self.upsell_tasks[f"{bot_prefix}:{uid}"] = task
 
-    async def _upsell_worker(self, user_id: int):
+    async def _upsell_worker(self, user_id: int, bot_token: str = ""):
         try:
             state = await self.state_getter()
-            if self._get_active_flow_bot(state):
+            effective_tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.current_token or "").strip()
+            if self._get_active_flow_bot(state, bot_token=effective_tok):
                 return
             upsell = state.get("upsell", {})
             if not upsell.get("enabled", False):
@@ -2862,15 +2989,30 @@ class ActiveBotManager:
             await asyncio.sleep(max(5, delay_mins * 60))
 
             state = await self.state_getter()
-            if self._get_active_flow_bot(state):
+            if self._get_active_flow_bot(state, bot_token=effective_tok):
                 return
             upsell = state.get("upsell", {})
             if not upsell.get("enabled", False):
                 return
-            lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"))
+            lead = await self._get_or_create_lead(
+                state,
+                types.User(id=user_id, is_bot=False, first_name="Assinante"),
+                bot_token=effective_tok
+            )
+            if lead.get("blocked"):
+                return
+
+            target_bot = None
+            if effective_tok:
+                target_bot = self._get_bot_by_token(effective_tok)
+            if not target_bot and lead.get("origin_bot_numeric_id"):
+                target_bot = self._get_bot_by_token(f"{lead['origin_bot_numeric_id']}:")
+            if not target_bot:
+                target_bot = self.bot
+
             up_medias = [m for m in upsell.get("medias", []) if isinstance(m, dict) and (m.get("url") or m.get("telegram_file_id"))]
             if len(up_medias) >= 2:
-                await self._send_flow_medias(user_id, up_medias)
+                await self._send_flow_medias(user_id, up_medias, bot_instance=target_bot)
             else:
                 for m in up_medias:
                     try:
@@ -2878,7 +3020,8 @@ class ActiveBotManager:
                             user_id,
                             m,
                             caption=m.get("caption") or None,
-                            has_spoiler=bool(m.get("spoiler", False))
+                            has_spoiler=bool(m.get("spoiler", False)),
+                            bot_instance=target_bot
                         )
                     except Exception:
                         pass
@@ -2889,11 +3032,11 @@ class ActiveBotManager:
                 if str(o.get("id")) == target_up_id:
                     matched_up_offer = {**o, "specific_match": True}
                     break
-            await self.bot.send_message(
-                chat_id=user_id,
-                text=upsell_msg,
-                reply_markup=self._build_offers_keyboard(state, only_offer=matched_up_offer, is_upsell=True)
-            )
+            markup = self._build_offers_keyboard(state, only_offer=matched_up_offer, is_upsell=True)
+            sent = await self._safe_send_html(user_id, upsell_msg, reply_markup=markup, bot_instance=target_bot)
+            if not sent and lead.get("blocked"):
+                return
+
             self._advance_stage(lead, "Recebeu upsell")
             lead.setdefault("history", []).append({
                 "role": "assistant",
@@ -2905,7 +3048,7 @@ class ActiveBotManager:
         except Exception as e:
             logger.error(f"Erro no Upsell worker: {e}")
         finally:
-            self.upsell_tasks.pop(str(user_id), None)
+            self._cancel_upsell(user_id)
 
     async def deliver_purchase_and_upsell(self, user_id: int, tx_id: Optional[str] = None) -> bool:
         if not tx_id or str(tx_id).startswith("sim_"):
@@ -3336,7 +3479,7 @@ class ActiveBotManager:
 
                 upsell = state.get("upsell", {})
                 if upsell.get("enabled", False):
-                    self._schedule_upsell(user_id)
+                    self._schedule_upsell(user_id, bot_token=tx_bot_token)
                 return True
 
 
