@@ -1174,9 +1174,14 @@ def _matches_tx_scope(rec: Dict[str, Any], uid: str, bot_id: str, state: Dict[st
 def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
     """Arquiva sem perder sessões anteriores se o mesmo usuário voltou ao bot."""
     telegram_id = str(lead.get("telegram_id"))
-    old = next((item for item in archived if str(item.get("telegram_id")) == telegram_id and
-                str(item.get("origin_bot_numeric_id") or item.get("bot_id") or "") ==
-                str(lead.get("origin_bot_numeric_id") or lead.get("bot_id") or "")), None)
+    lead_bot = str(lead.get("origin_bot_numeric_id") or lead.get("bot_id") or "")
+    def _matches_archived(item):
+        if str(item.get("telegram_id")) != telegram_id:
+            return False
+        item_bot = str(item.get("origin_bot_numeric_id") or item.get("bot_id") or "")
+        return (item_bot == lead_bot) or not item_bot or not lead_bot
+
+    old = next((item for item in archived if _matches_archived(item)), None)
     new_record = json.loads(json.dumps(lead))
     new_record["deleted_at"] = datetime.now(timezone.utc).isoformat()
     if old is None:

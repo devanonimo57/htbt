@@ -91,7 +91,7 @@ class TestAuditBotIndependenceAndBlocks(unittest.IsolatedAsyncioTestCase):
 
     async def test_safe_send_html_handles_forbidden_error(self):
         """_safe_send_html intercepta TelegramForbiddenError e marca lead como bloqueado sem crash."""
-        self.extra_bot.send_message.side_effect = TelegramForbiddenError("Forbidden: bot was blocked by the user")
+        self.extra_bot.send_message.side_effect = TelegramForbiddenError(method=MagicMock(), message="Forbidden: bot was blocked by the user")
 
         lead = self.state["memory"]["leads"][0]
         self.assertFalse(lead["blocked"])

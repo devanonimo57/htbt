@@ -105,9 +105,16 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
             config_row = MagicMock()
             config_row.scalars.return_value.first.return_value = config
             order = MagicMock()
-            order_rows = MagicMock()
-            order_rows.scalars.return_value.all.return_value = [order]
-            session.execute = AsyncMock(side_effect=[config_row, order_rows])
+            def _exec_mock(stmt, *a, **kw):
+                stmt_s = str(stmt).lower()
+                if "bot_configs" in stmt_s:
+                    return config_row
+                res = MagicMock()
+                res.scalars.return_value.all.return_value = [order] if "orders" in stmt_s else []
+                res.scalars.return_value.first.return_value = None
+                return res
+            session.execute = AsyncMock(side_effect=_exec_mock)
+            session.get = AsyncMock(return_value=None)
             session.delete = AsyncMock()
             session.commit = AsyncMock()
             to_save = copy.deepcopy(self.state)
@@ -198,7 +205,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_user_at_active_capacity_does_not_discard_existing_lead(self):
         self.state["memory"]["leads"] = [{"telegram_id": str(i + 1000)} for i in range(app_main.MAX_ACTIVE_LEADS)]
         manager = tg_srv.ActiveBotManager()
-        await manager._get_or_create_lead(self.state, tg_srv.types.User(id=42, first_name="New"))
+        await manager._get_or_create_lead(self.state, tg_srv.types.User(id=42, is_bot=False, first_name="New"))
         app_main._normalize_providers(self.state)
         self.assertEqual(len(self.state["memory"]["leads"]), app_main.MAX_ACTIVE_LEADS + 1)
         self.assertEqual(self.state["memory"]["leads"][-1]["telegram_id"], str(app_main.MAX_ACTIVE_LEADS - 1 + 1000))
@@ -206,7 +213,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
     async def test_archived_lead_can_return_without_erasing_archived_history(self):
         await app_main.delete_lead("42")
         manager = tg_srv.ActiveBotManager()
-        user = tg_srv.types.User(id=42, first_name="Ada voltou", username="ada")
+        user = tg_srv.types.User(id=42, is_bot=False, first_name="Ada voltou", username="ada")
         fresh = await manager._get_or_create_lead(self.state, user)
         self.assertEqual(fresh["first_name"], "Ada voltou")
         self.assertEqual(len([l for l in self.state["memory"]["leads"] if str(l.get("telegram_id")) == "42"]), 1)
@@ -243,7 +250,7 @@ class ArchivedLeadsTests(unittest.IsolatedAsyncioTestCase):
         manager._register_handlers()
         callback = types.SimpleNamespace(
             data="checkpix:tx_pending",
-            from_user=tg_srv.types.User(id=42, first_name="Ada"),
+            from_user=tg_srv.types.User(id=42, is_bot=False, first_name="Ada"),
             answer=AsyncMock(),
         )
         with patch.object(tg_srv.PushinPayClient, "check_transaction_status", AsyncMock(return_value={"status": "paid"})) as check, patch.object(manager, "deliver_purchase_and_upsell", AsyncMock()) as delivery:

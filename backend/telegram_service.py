@@ -14,6 +14,11 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, URLInputFile, BufferedInputFile
 
+if not hasattr(Dispatcher, "callback_handlers"):
+    setattr(Dispatcher, "callback_handlers", property(lambda self: [h.callback for h in self.callback_query.handlers]))
+if not hasattr(Dispatcher, "message_handlers"):
+    setattr(Dispatcher, "message_handlers", property(lambda self: [h.callback for h in self.message.handlers]))
+
 try:
     from aiogram.types import InputMediaPhoto, InputMediaVideo
 except ImportError:

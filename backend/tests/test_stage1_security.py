@@ -329,7 +329,16 @@ class Stage1SecurityTests(unittest.IsolatedAsyncioTestCase):
 
     async def _setup_manager(self):
         mgr = tg_srv.ActiveBotManager()
-        mgr.bot = tg_srv.Bot(token="123456:MOCK")
+        bot = MagicMock()
+        bot.token = "123456:MOCK"
+        bot.send_message = AsyncMock()
+        bot.send_photo = AsyncMock()
+        bot.send_video = AsyncMock()
+        bot.send_chat_action = AsyncMock()
+        bot.create_chat_invite_link = AsyncMock(
+            side_effect=lambda chat_id, **kw: types.SimpleNamespace(invite_link=f"https://t.me/+invite_{chat_id}")
+        )
+        mgr.bot = bot
         mgr.dp = tg_srv.Dispatcher()
 
         async def _getter():

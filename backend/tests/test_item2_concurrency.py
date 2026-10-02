@@ -23,7 +23,14 @@ class TestItem2Concurrency(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         # Reset memory cache and database state
         import main
-        main._STATE_CACHE = None
+        from models import ClientRecord, PixRecord
+        await main._create_schema()
+        main._STATE_CACHE = {}
+        async with main.async_session() as session:
+            for model in (BotConfig, ClientRecord, PixRecord, Order):
+                for row in (await session.execute(select(model))).scalars().all():
+                    await session.delete(row)
+            await session.commit()
         base_state = copy.deepcopy(DEFAULT_SHARKBOT_STATE)
         base_state["memory"] = {
             "leads": [
