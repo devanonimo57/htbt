@@ -19,9 +19,9 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select
+from sqlalchemy import select, func
 
-from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order
+from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order, ClientRecord, PixRecord
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply
 from telegram_service import bot_manager
@@ -595,6 +595,75 @@ def _normalize_providers(state: Dict[str, Any]) -> Dict[str, Any]:
             lead["history"] = msg_hist[-MAX_HISTORY_PER_LEAD:]
     return state
 
+def _origin_for_lead(lead: Dict[str, Any], state: Dict[str, Any]) -> str:
+    numeric = str(lead.get("origin_bot_numeric_id") or "").strip()
+    if numeric.isdecimal():
+        return numeric
+    bot_id = str(lead.get("bot_id") or "").strip()
+    # A configured ID can be reassigned: historical records without public
+    # numeric origin stay unattributed instead of inheriting the new bot.
+    return f"legacy:{bot_id}"
+
+
+def _origin_for_tx(rec: Dict[str, Any]) -> str:
+    numeric = str(rec.get("origin_bot_numeric_id") or "").strip()
+    token = str(rec.get("bot_token") or "").split(":", 1)[0]
+    if not numeric.isdecimal() and token.isdecimal():
+        numeric = token
+    return numeric if numeric.isdecimal() else f"legacy:{rec.get('bot_id') or ''}"
+
+
+async def _hydrate_records(session: AsyncSession, state: Dict[str, Any]) -> Dict[str, Any]:
+    clients = (await session.execute(select(ClientRecord))).scalars().all()
+    pix = (await session.execute(select(PixRecord))).scalars().all()
+    memory = state.setdefault("memory", {})
+    memory["leads"] = [json.loads(row.data_json) for row in clients if not row.archived]
+    memory["deleted_leads"] = [json.loads(row.data_json) for row in clients if row.archived]
+    state["tx_records"] = {row.tx_id: json.loads(row.data_json) for row in pix}
+    return state
+
+
+async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None) -> None:
+    for archived, key in ((False, "leads"), (True, "deleted_leads")):
+        for lead in state.get("memory", {}).get(key, []):
+            uid = str(lead.get("telegram_id") or "").strip()
+            if not uid:
+                continue
+            origin = _origin_for_lead(lead, state)
+            row = await session.get(ClientRecord, (origin, uid, archived))
+            data = json.dumps(lead, ensure_ascii=False)
+            if row is None:
+                session.add(ClientRecord(origin_bot_id=origin, telegram_id=uid, archived=archived, data_json=data))
+            elif row.data_json != data:
+                row.data_json = data
+    for origin, uid, archived in delete_client_keys or []:
+        row = await session.get(ClientRecord, (origin, uid, archived))
+        if row:
+            await session.delete(row)
+    for tid in delete_tx_ids or []:
+        row = await session.get(PixRecord, str(tid))
+        if row:
+            await session.delete(row)
+    for tid, rec in state.get("tx_records", {}).items():
+        if not tid or not isinstance(rec, dict) or str(tid) in (delete_tx_ids or []):
+            continue
+        row = await session.get(PixRecord, str(tid))
+        data = json.dumps(rec, ensure_ascii=False)
+        if row is None:
+            row = PixRecord(tx_id=str(tid))
+            session.add(row)
+        if row.data_json != data:
+            row.data_json = data
+            row.origin_bot_id = _origin_for_tx(rec)
+            row.bot_id = str(rec.get("bot_id") or "")
+            row.telegram_id = str(rec.get("user_id") or rec.get("telegram_id") or "")
+            row.status = str(rec.get("status") or "pending")
+            row.amount = float(rec.get("amount") or 0)
+            row.is_test = bool(rec.get("is_test") or str(tid).startswith("test_"))
+            row.is_upsell = bool(rec.get("is_upsell"))
+            row.paid_at = str(rec.get("paid_at") or "")
+
+
 async def _read_state_from_db() -> Dict[str, Any]:
     global _STATE_CACHE
     if _STATE_CACHE is not None:
@@ -606,18 +675,18 @@ async def _read_state_from_db() -> Dict[str, Any]:
             result = await session.execute(select(BotConfig))
             config = result.scalars().first()
             if not config or not config.full_state_json or config.full_state_json == "{}":
-                _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
-                return _STATE_CACHE
-            try:
+                saved = {}
+            else:
                 saved = json.loads(config.full_state_json)
+            try:
                 merged = {**DEFAULT_SHARKBOT_STATE, **saved}
-                _STATE_CACHE = _normalize_providers(merged)
+                _STATE_CACHE = _normalize_providers(await _hydrate_records(session, merged))
                 return _STATE_CACHE
             except Exception:
                 _STATE_CACHE = _normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE)))
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None) -> Dict[str, Any]:
     global _STATE_CACHE
     async with _DB_LOCK:
         async with async_session() as session:
@@ -628,7 +697,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 existing_state = _STATE_CACHE
             elif config and config.full_state_json:
                 try:
-                    existing_state = json.loads(config.full_state_json)
+                    existing_state = await _hydrate_records(session, json.loads(config.full_state_json))
                 except Exception:
                     existing_state = {}
 
@@ -660,6 +729,22 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                             if ex_rec.get("invite_url"):
                                 st_rec["invite_url"] = ex_rec.get("invite_url")
 
+                        if isinstance(st_rec, dict):
+                            # Delivery and accounting markers are monotonic even if
+                            # both snapshots already say paid. A stale webhook must
+                            # never schedule a second access grant.
+                            if ex_rec.get("delivered"):
+                                st_rec["delivered"] = True
+                            if ex_rec.get("sales_counted"):
+                                st_rec["sales_counted"] = True
+                            st_rec["delivery_attempts"] = max(
+                                int(st_rec.get("delivery_attempts") or 0),
+                                int(ex_rec.get("delivery_attempts") or 0),
+                            )
+                            for field in ("access_status", "invite_url", "delivered_at"):
+                                if ex_rec.get(field) and not st_rec.get(field):
+                                    st_rec[field] = ex_rec[field]
+
                 ex_learning = existing_state.get("learning") if isinstance(existing_state.get("learning"), dict) else {}
                 st_learning = state.setdefault("learning", {})
                 if not delete_tx_ids and isinstance(ex_learning, dict):
@@ -668,13 +753,28 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     if ex_confirmed > st_confirmed:
                         st_learning["confirmed_purchases"] = ex_confirmed
 
+            # Missing rows in a stale snapshot do not imply deletion. The
+            # selected client's rows are removed only by explicit keys.
+            deleted_keys = set(delete_client_keys or [])
+            for archived, key in ((False, "leads"), (True, "deleted_leads")):
+                incoming = state.setdefault("memory", {}).setdefault(key, [])
+                known = {(_origin_for_lead(x, state), str(x.get("telegram_id")), archived) for x in incoming}
+                for old in existing_state.get("memory", {}).get(key, []):
+                    identity = (_origin_for_lead(old, existing_state), str(old.get("telegram_id")), archived)
+                    if identity not in known and identity not in deleted_keys:
+                        incoming.append(copy.deepcopy(old))
             state = _normalize_providers(state)
 
             if not config:
                 config = BotConfig()
                 session.add(config)
 
-            config.full_state_json = json.dumps(state, ensure_ascii=False)
+            await _persist_records(session, state, delete_tx_ids, delete_client_keys)
+            config_state = copy.deepcopy(state)
+            config_state.pop("tx_records", None)
+            config_state.setdefault("memory", {}).pop("leads", None)
+            config_state["memory"].pop("deleted_leads", None)
+            config.full_state_json = json.dumps(config_state, ensure_ascii=False)
             publish = state.get("publish", {})
             config.is_active = bool(publish.get("is_live", False))
             config.telegram_bot_token = publish.get("bot_token", "")
@@ -741,6 +841,17 @@ async def init_db():
             )
             session.add(config)
             await session.commit()
+        else:
+            # Atomic, idempotent migration of the pre-row aggregate. Keep legacy
+            # JSON until both row sets have been committed in the same transaction.
+            old = json.loads(config.full_state_json or "{}")
+            if "tx_records" in old or "leads" in old.get("memory", {}):
+                await _persist_records(session, old, None)
+                old.pop("tx_records", None)
+                old.setdefault("memory", {}).pop("leads", None)
+                old["memory"].pop("deleted_leads", None)
+                config.full_state_json = json.dumps(old, ensure_ascii=False)
+                await session.commit()
 
     # Garante criação/leitura do token administrativo no disco se não definido em variável de ambiente
     _get_expected_admin_token()
@@ -766,11 +877,17 @@ async def admin_login(req: AdminLoginRequest):
     return {"status": "ok", "authenticated": True}
 
 
+def _panel_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    result = _redact_state_secrets(state)
+    result.pop("tx_records", None)
+    return result
+
+
 @app.get("/api/state", dependencies=[Depends(verify_admin_auth)])
 async def get_full_state():
     raw_state = await _read_state_from_db()
     reconcile_daily_counters(raw_state)
-    return _redact_state_secrets(raw_state)
+    return _panel_state(raw_state)
 
 @app.post("/api/state", dependencies=[Depends(verify_admin_auth)])
 async def save_full_state(state: Dict[str, Any]):
@@ -788,23 +905,61 @@ async def save_full_state(state: Dict[str, Any]):
         "status": "success",
         "bot_status": bot_status,
         "warmed_medias": warmed,
-        "state": _redact_state_secrets(updated_state),
+        "state": _panel_state(updated_state),
         "updated_at": datetime.utcnow().isoformat()
     }
+
+@app.get("/api/flow-bots/metrics", dependencies=[Depends(verify_admin_auth)])
+async def get_flow_metrics(bot_id: str = "all"):
+    """Indexed aggregates: no payment payload is fetched or sent to the browser."""
+    async with async_session() as session:
+        query = select(
+            func.count(PixRecord.tx_id),
+            func.coalesce(func.sum(PixRecord.amount), 0),
+        ).where(PixRecord.status == "paid", PixRecord.is_test == False)
+        if bot_id and bot_id != "all":
+            state = await _read_state_from_db()
+            bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
+            if not bot:
+                raise HTTPException(status_code=404, detail="Bot não encontrado.")
+            query = query.where(PixRecord.origin_bot_id == str(bot.get("bot_id")))
+        paid_count, paid_amount = (await session.execute(query)).one()
+        return {"paid_count": paid_count, "paid_amount": round(float(paid_amount), 2)}
+
 
 @app.get("/api/config", dependencies=[Depends(verify_admin_auth)])
 async def get_config_compat():
     raw_state = await _read_state_from_db()
-    return _redact_state_secrets(raw_state)
+    return _panel_state(raw_state)
 
 @app.post("/api/config", dependencies=[Depends(verify_admin_auth)])
 async def post_config_compat(data: Dict[str, Any]):
     return await save_full_state(data)
 
+def _matches_lead_scope(lead: Dict[str, Any], uid: str, bot_id: str, state: Dict[str, Any]) -> bool:
+    if str(lead.get("telegram_id")) != uid:
+        return False
+    if not bot_id or bot_id == "all":
+        return True
+    bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
+    return bool(bot and _origin_for_lead(lead, state) == str(bot.get("bot_id")))
+
+
+def _matches_tx_scope(rec: Dict[str, Any], uid: str, bot_id: str, state: Dict[str, Any]) -> bool:
+    if str(rec.get("user_id") or rec.get("telegram_id")) != uid:
+        return False
+    if not bot_id or bot_id == "all":
+        return True
+    bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
+    return bool(bot and _origin_for_tx(rec) == str(bot.get("bot_id")))
+
+
 def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
     """Arquiva sem perder sessões anteriores se o mesmo usuário voltou ao bot."""
     telegram_id = str(lead.get("telegram_id"))
-    old = next((item for item in archived if str(item.get("telegram_id")) == telegram_id), None)
+    old = next((item for item in archived if str(item.get("telegram_id")) == telegram_id and
+                str(item.get("origin_bot_numeric_id") or item.get("bot_id") or "") ==
+                str(lead.get("origin_bot_numeric_id") or lead.get("bot_id") or "")), None)
     new_record = json.loads(json.dumps(lead))
     new_record["deleted_at"] = datetime.now(timezone.utc).isoformat()
     if old is None:
@@ -821,11 +976,11 @@ def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
     old.update(new_record)
 
 
-def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[str]:
+def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str, bot_id: str = "") -> List[str]:
     """Interrompe monitoramento local no estado desacoplado; não cancela a cobrança no gateway."""
     cancelled: List[str] = []
     for tx_id, record in (state.get("tx_records") or {}).items():
-        if not isinstance(record, dict) or str(record.get("user_id") or record.get("telegram_id")) != str(telegram_id):
+        if not isinstance(record, dict) or not _matches_tx_scope(record, str(telegram_id), bot_id, state):
             continue
         if record.get("status") != "pending" or record.get("delivered"):
             continue
@@ -836,7 +991,7 @@ def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -
 
 
 @app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
-async def delete_lead(telegram_id: str):
+async def delete_lead(telegram_id: str, bot_id: str = ""):
     clean_uid = str(telegram_id or "").strip()
     if not clean_uid:
         raise HTTPException(status_code=400, detail="ID de lead inválido.")
@@ -844,7 +999,7 @@ async def delete_lead(telegram_id: str):
     current = await _read_state_from_db()
     lead_tx_ids = [
         str(tx_id) for tx_id, rec in (current.get("tx_records") or {}).items()
-        if isinstance(rec, dict) and str(rec.get("user_id") or rec.get("telegram_id")) == clean_uid
+        if isinstance(rec, dict) and _matches_tx_scope(rec, clean_uid, bot_id, current)
     ]
 
     async with bot_manager._get_lead_lock(clean_uid):
@@ -857,19 +1012,20 @@ async def delete_lead(telegram_id: str):
             staged = copy.deepcopy(fresh_state)
             memory = staged.setdefault("memory", {"leads": []})
             leads = memory.get("leads", [])
-            matched = [lead for lead in leads if str(lead.get("telegram_id")) == clean_uid]
+            matched = [lead for lead in leads if _matches_lead_scope(lead, clean_uid, bot_id, staged)]
             if not matched:
                 raise HTTPException(status_code=404, detail="Lead não encontrado.")
             archived = memory.setdefault("deleted_leads", [])
 
-            cancelled_tx_ids = _cancel_pending_lead_transactions(staged, clean_uid)
+            cancelled_tx_ids = _cancel_pending_lead_transactions(staged, clean_uid, bot_id)
             for lead in matched:
                 _archive_lead(archived, lead)
-            memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != clean_uid]
+            memory["leads"] = [lead for lead in leads if not _matches_lead_scope(lead, clean_uid, bot_id, staged)]
             staged.setdefault("learning", {})["evaluated_results"] = len(memory["leads"])
 
             # 1. Commit no banco de dados PRIMEIRO (conforme diretriz AGENTS.md)
-            saved_state = await _write_state_to_db(staged)
+            removed_keys = [(_origin_for_lead(lead, staged), clean_uid, False) for lead in matched]
+            saved_state = await _write_state_to_db(staged, delete_client_keys=removed_keys)
 
             # 2. Apenas após confirmação no banco, limpa runtime em memória
             bot_manager.cancel_lead_tasks(clean_uid)
@@ -883,10 +1039,10 @@ async def delete_lead(telegram_id: str):
                     cached["status"] = "cancelled"
                     cached["cancelled_at"] = datetime.now(timezone.utc).isoformat()
 
-            return {"status": "success", "state": _redact_state_secrets(saved_state)}
+            return {"status": "success", "state": _panel_state(saved_state)}
 
 @app.post("/api/leads/{telegram_id}/restore", dependencies=[Depends(verify_admin_auth)])
-async def restore_lead(telegram_id: str):
+async def restore_lead(telegram_id: str, bot_id: str = ""):
     clean_uid = str(telegram_id or "").strip()
     if not clean_uid:
         raise HTTPException(status_code=400, detail="ID de lead inválido.")
@@ -896,26 +1052,28 @@ async def restore_lead(telegram_id: str):
         staged = copy.deepcopy(current)
         memory = staged.setdefault("memory", {"leads": []})
         archived = memory.setdefault("deleted_leads", [])
-        matched = [lead for lead in archived if str(lead.get("telegram_id")) == clean_uid]
+        matched = [lead for lead in archived if _matches_lead_scope(lead, clean_uid, bot_id, staged)]
         if not matched:
             raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
         leads = memory.setdefault("leads", [])
-        if any(str(lead.get("telegram_id")) == clean_uid for lead in leads):
+        if any(_origin_for_lead(lead, staged) == _origin_for_lead(item, staged)
+               and str(lead.get("telegram_id")) == clean_uid for lead in leads for item in matched):
             raise HTTPException(status_code=409, detail="Lead ativo já existe.")
-        memory["deleted_leads"] = [lead for lead in archived if str(lead.get("telegram_id")) != clean_uid]
+        memory["deleted_leads"] = [lead for lead in archived if not _matches_lead_scope(lead, clean_uid, bot_id, staged)]
         leads[:0] = [{key: value for key, value in lead.items() if key != "deleted_at"} for lead in matched]
         # Commit no banco de dados primeiro
-        saved_state = await _write_state_to_db(staged)
-        return {"status": "success", "state": _redact_state_secrets(saved_state)}
+        removed_keys = [(_origin_for_lead(lead, staged), clean_uid, True) for lead in matched]
+        saved_state = await _write_state_to_db(staged, delete_client_keys=removed_keys)
+        return {"status": "success", "state": _panel_state(saved_state)}
 
 
-def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[str]:
+def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str, bot_id: str = "") -> List[str]:
     """Exclui lançamentos do painel e desfaz apenas os totais que foram somados."""
     tx_map = state.setdefault("tx_records", {})
     bots = state.get("flow_bots") or []
     removed: List[str] = []
     for tx_id, record in list(tx_map.items()):
-        if not isinstance(record, dict) or str(record.get("user_id") or record.get("telegram_id")) != str(telegram_id):
+        if not isinstance(record, dict) or not _matches_tx_scope(record, str(telegram_id), bot_id, state):
             continue
         was_paid = record.get("status") == "paid" or bool(record.get("delivered"))
         if was_paid:
@@ -948,7 +1106,7 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[s
 
 
 @app.delete("/api/leads/{telegram_id}/permanent", dependencies=[Depends(verify_admin_auth)])
-async def permanently_delete_lead(telegram_id: str):
+async def permanently_delete_lead(telegram_id: str, bot_id: str = ""):
     clean_uid = str(telegram_id or "").strip()
     if not clean_uid:
         raise HTTPException(status_code=400, detail="ID de lead inválido.")
@@ -956,7 +1114,7 @@ async def permanently_delete_lead(telegram_id: str):
     current = await _read_state_from_db()
     lead_tx_ids = [
         str(tx_id) for tx_id, rec in (current.get("tx_records") or {}).items()
-        if isinstance(rec, dict) and str(rec.get("user_id") or rec.get("telegram_id")) == clean_uid
+        if isinstance(rec, dict) and _matches_tx_scope(rec, clean_uid, bot_id, current)
     ]
 
     async with bot_manager._get_lead_lock(clean_uid):
@@ -969,21 +1127,26 @@ async def permanently_delete_lead(telegram_id: str):
             staged = copy.deepcopy(fresh_state)
             memory = staged.setdefault("memory", {"leads": []})
             archived = memory.get("deleted_leads", [])
-            remaining = [lead for lead in archived if str(lead.get("telegram_id")) != clean_uid]
+            remaining = [lead for lead in archived if not _matches_lead_scope(lead, clean_uid, bot_id, staged)]
             if len(remaining) == len(archived):
                 raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
-            if any(str(lead.get("telegram_id")) == clean_uid for lead in memory.get("leads", [])):
+            if any(_origin_for_lead(lead, staged) == _origin_for_lead(item, staged)
+                   and str(lead.get("telegram_id")) == clean_uid
+                   for lead in memory.get("leads", []) for item in archived
+                   if _matches_lead_scope(item, clean_uid, bot_id, staged)):
                 raise HTTPException(status_code=409, detail="O mesmo cliente voltou ao bot. Exclua o cadastro ativo antes de apagar permanentemente.")
             memory["deleted_leads"] = remaining
-            removed_tx_ids = _remove_lead_transactions(staged, clean_uid)
-            saved_state = await _write_state_to_db(staged, delete_tx_ids=removed_tx_ids)
+            removed_tx_ids = _remove_lead_transactions(staged, clean_uid, bot_id)
+            removed_keys = [(_origin_for_lead(lead, staged), clean_uid, True)
+                            for lead in archived if _matches_lead_scope(lead, clean_uid, bot_id, staged)]
+            saved_state = await _write_state_to_db(staged, delete_tx_ids=removed_tx_ids, delete_client_keys=removed_keys)
             for tx_id in removed_tx_ids:
                 bot_manager.tx_records.pop(tx_id, None)
                 bot_manager.active_tx_map.pop(tx_id, None)
                 task = bot_manager.pix_poll_tasks.pop(tx_id, None)
                 if task and not task.done():
                     task.cancel()
-            return {"status": "success", "state": _redact_state_secrets(saved_state)}
+            return {"status": "success", "state": _panel_state(saved_state)}
 
 
 @app.post("/api/leads/{telegram_id}/reset", dependencies=[Depends(verify_admin_auth)])
@@ -1012,9 +1175,8 @@ async def reset_lead_conversation(telegram_id: str):
                 break
         saved = await _write_state_to_db(staged)
         bot_manager.cancel_lead_tasks(clean_uid)
-        return {"status": "success", "state": _redact_state_secrets(saved)}
+        return {"status": "success", "state": _panel_state(saved)}
 
-@app.delete("/api/leads", dependencies=[Depends(verify_admin_auth)])
 async def clear_all_leads():
     state = await _read_state_from_db()
     memory = state.setdefault("memory", {"leads": []})
@@ -1026,7 +1188,7 @@ async def clear_all_leads():
         _archive_lead(archived, lead)
     memory["leads"] = []
     await _write_state_to_db(state)
-    return {"status": "success", "state": _redact_state_secrets(state)}
+    return {"status": "success", "state": _panel_state(state)}
 
 class SimulateChatRequest(BaseModel):
     message: str
@@ -1305,7 +1467,7 @@ async def verify_flow_channel(req: VerifyChannelRequest):
             "title": chat.title or chat.username or resolved_id,
             "verified_at": datetime.now().strftime("%d/%m, %H:%M"),
             "warmed_medias": warmed,
-            "state": _redact_state_secrets(state)
+            "state": _panel_state(state)
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -1855,7 +2017,7 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
         "stage_status": stage_status,
         "secret_approve_cmd": f"/aprovar {_get_expected_admin_token()}",
         "secret_downsell_cmd": f"/downsell {_get_expected_admin_token()}",
-        "state": _redact_state_secrets(state)
+        "state": _panel_state(state)
     }
 
 
@@ -1957,7 +2119,6 @@ def reconcile_daily_counters(state: Dict[str, Any], target_bot_id: Optional[str]
     }
 
 
-@app.delete("/api/flow-bots/transactions/{tx_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_flow_transaction(tx_id: str):
     clean_id = (tx_id or "").strip()
     if not clean_id:
@@ -2033,7 +2194,7 @@ async def delete_flow_transaction(tx_id: str):
         if uid:
             bot_manager.cancel_lead_tasks(str(uid))
 
-        return {"status": "ok", "deleted_tx_id": clean_id, "state": _redact_state_secrets(staged_state)}
+        return {"status": "ok", "deleted_tx_id": clean_id, "state": _panel_state(staged_state)}
 
 
 class ClearTestDataRequest(BaseModel):
@@ -2043,6 +2204,8 @@ class ClearTestDataRequest(BaseModel):
 
 @app.post("/api/flow-bots/clear-test-data", dependencies=[Depends(verify_admin_auth)])
 async def clear_flow_test_data(req: ClearTestDataRequest):
+    if req.clear_all_sales:
+        raise HTTPException(status_code=400, detail="Exclusão em massa de vendas desabilitada.")
     state = await _read_state_from_db()
     tx_map = state.setdefault("tx_records", {})
     target_bot_id = (req.bot_id or "").strip()
@@ -2117,7 +2280,7 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
     return {
         "status": "ok",
         "removed_count": len(removed_ids),
-        "state": _redact_state_secrets(state)
+        "state": _panel_state(state)
     }
 
 
@@ -2263,7 +2426,7 @@ async def resend_vip_access(req: AccessResendRequest):
         "status": "ok",
         "sent_count": sent_count,
         "skipped_unpaid": skipped_unpaid,
-        "state": _redact_state_secrets(state)
+        "state": _panel_state(state)
     }
 
 
@@ -2318,7 +2481,7 @@ async def update_vip_access_status(req: AccessStatusUpdateRequest):
                         pass
 
     state = await _write_state_to_db(state, preserve_runtime=False)
-    return {"status": "ok", "access_status": resolved_status, "state": _redact_state_secrets(state)}
+    return {"status": "ok", "access_status": resolved_status, "state": _panel_state(state)}
 
 
 def _crm_verified_bot_origin(lead: Dict[str, Any]) -> str:
@@ -2359,7 +2522,7 @@ async def handle_lead_action(req: LeadActionRequest):
     if req.action == "toggle_block":
         target_lead["blocked"] = not bool(target_lead.get("blocked", False))
         state = await _write_state_to_db(state, preserve_runtime=False)
-        return {"status": "ok", "blocked": target_lead["blocked"], "state": _redact_state_secrets(state)}
+        return {"status": "ok", "blocked": target_lead["blocked"], "state": _panel_state(state)}
 
     if req.action == "send_message":
         txt = (req.message or "").strip()
@@ -2392,7 +2555,7 @@ async def handle_lead_action(req: LeadActionRequest):
                 await temp_bot.send_message(chat_id=int(tid), text=txt)
             target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
             state = await _write_state_to_db(state, preserve_runtime=False)
-            return {"status": "ok", "state": _redact_state_secrets(state)}
+            return {"status": "ok", "state": _panel_state(state)}
         except Exception as e:
             return {"status": "error", "message": str(e)}
         finally:
@@ -2402,7 +2565,7 @@ async def handle_lead_action(req: LeadActionRequest):
                 except Exception:
                     pass
 
-    return {"status": "ok", "state": _redact_state_secrets(state)}
+    return {"status": "ok", "state": _panel_state(state)}
 
 
 class RemarketingSendRequest(BaseModel):
@@ -2548,7 +2711,7 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
         "sent_count": sent_ok,
         "total_targets": len(matched_leads),
         "target_count": len(matched_leads),
-        "state": _redact_state_secrets(state)
+        "state": _panel_state(state)
     }
 
 

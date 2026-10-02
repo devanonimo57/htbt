@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey
+    Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey, Index
 )
 from sqlalchemy.orm import declarative_base
 
@@ -23,6 +23,31 @@ class BotConfig(Base):
     # JSON completo que armazena fielmente todas as 13 abas (Persona, Ofertas, FAQs, Mídias, Downsell, Upsell, Regras)
     full_state_json = Column(Text, default="{}")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ClientRecord(Base):
+    """One customer per immutable Telegram bot identity and Telegram user."""
+    __tablename__ = "client_records"
+    origin_bot_id = Column(String, primary_key=True)
+    telegram_id = Column(String, primary_key=True)
+    archived = Column(Boolean, primary_key=True, default=False)
+    data_json = Column(Text, nullable=False)
+
+
+class PixRecord(Base):
+    """One payment per gateway transaction ID; indexed for dashboard aggregates."""
+    __tablename__ = "pix_records"
+    tx_id = Column(String, primary_key=True)
+    origin_bot_id = Column(String, index=True, nullable=False, default="")
+    bot_id = Column(String, index=True, nullable=False, default="")
+    telegram_id = Column(String, index=True, nullable=False, default="")
+    status = Column(String, index=True, nullable=False, default="pending")
+    amount = Column(Float, nullable=False, default=0)
+    is_test = Column(Boolean, nullable=False, default=False)
+    is_upsell = Column(Boolean, nullable=False, default=False)
+    paid_at = Column(String, nullable=False, default="")
+    data_json = Column(Text, nullable=False)
+    __table_args__ = (Index("ix_pix_bot_user", "origin_bot_id", "telegram_id"),)
+
 
 class Offer(Base):
     """Ofertas e Planos de Assinatura"""
