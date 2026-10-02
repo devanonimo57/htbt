@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import logging
 import secrets
@@ -2485,9 +2486,14 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
                 if any(x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
                     l["blocked"] = True
                     l["stage"] = "Bloqueou o bot"
-                elif "retry after" in err_s or "too many requests" in err_s:
-                    digits = "".join(ch for ch in err_s if ch.isdigit())
-                    retry_wait = max(1.0, float(digits)) if digits else 2.0
+                elif "retry after" in err_s or "too many requests" in err_s or "flood" in err_s:
+                    raw_wait = getattr(e, "retry_after", None)
+                    if isinstance(raw_wait, (int, float)):
+                        retry_wait = float(raw_wait)
+                    else:
+                        m = re.search(r"retry\s+(?:after|in)?\s*(\d+)", err_s)
+                        retry_wait = float(m.group(1)) if m else 3.0
+                    retry_wait = min(max(1.0, retry_wait), 15.0)
                     await _asyncio.sleep(retry_wait)
                     try:
                         await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
