@@ -847,21 +847,30 @@ class ActiveBotManager:
             out = out.replace(k, str(v))
         return out
 
-    async def _mark_lead_blocked(self, chat_id: Any):
+    async def _mark_lead_blocked(self, chat_id: Any, bot_token: Optional[str] = None, bot_id: Optional[str] = None):
         try:
             uid_str = str(chat_id).strip()
-            self._cancel_downsell(uid_str)
-            self._cancel_upsell(uid_str)
+            eff_tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or "").strip()
+            bot_prefix = eff_tok.split(":", 1)[0] if (eff_tok and ":" in eff_tok) else (str(bot_id).strip() if bot_id else "")
+            self._cancel_downsell(uid_str, bot_id=bot_prefix or None)
+            self._cancel_upsell(uid_str, bot_id=bot_prefix or None)
             if self.state_getter and self.state_saver:
                 state = await self.state_getter()
                 memory = state.get("memory") or {}
                 changed = False
                 for ld in memory.get("leads", []):
-                    if str(ld.get("telegram_id") or "") == uid_str:
-                        if not ld.get("blocked"):
-                            ld["blocked"] = True
-                            ld["stage"] = "Bloqueou o bot"
-                            changed = True
+                    if str(ld.get("telegram_id") or "") != uid_str:
+                        continue
+                    if bot_prefix:
+                        lead_origin = str(ld.get("origin_bot_numeric_id") or "")
+                        lead_bid = str(ld.get("bot_id") or "")
+                        if lead_origin and lead_origin != bot_prefix and lead_bid != bot_prefix:
+                            continue
+                    if not ld.get("blocked"):
+                        ld["blocked"] = True
+                        ld["stage"] = "Bloqueou o bot"
+                        changed = True
+                    if bot_prefix:
                         break
                 if changed:
                     await self.state_saver(state)
@@ -878,6 +887,7 @@ class ActiveBotManager:
         target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         if not target_bot:
             return None
+        target_bot_token = getattr(target_bot, "token", "") or _CURRENT_BOT_TOKEN_CTX.get() or ""
         extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
         try:
             return await target_bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", **extra_kw)
@@ -886,7 +896,7 @@ class ActiveBotManager:
             if isinstance(e, TelegramForbiddenError) or any(
                 x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
             ):
-                await self._mark_lead_blocked(chat_id)
+                await self._mark_lead_blocked(chat_id, bot_token=target_bot_token)
                 return None
 
             if isinstance(e, TelegramRetryAfter) or "retry after" in err_s or "flood control" in err_s:
@@ -902,7 +912,7 @@ class ActiveBotManager:
                     if isinstance(e_after, TelegramForbiddenError) or any(
                         x in err_sa for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
                     ):
-                        await self._mark_lead_blocked(chat_id)
+                        await self._mark_lead_blocked(chat_id, bot_token=target_bot_token)
                     return None
 
             try:
@@ -912,7 +922,7 @@ class ActiveBotManager:
                 if isinstance(e2, TelegramForbiddenError) or any(
                     x in err_s2 for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")
                 ):
-                    await self._mark_lead_blocked(chat_id)
+                    await self._mark_lead_blocked(chat_id, bot_token=target_bot_token)
                 return None
 
     def _parse_discount_pct(self, disc_str: str) -> int:
@@ -1726,12 +1736,15 @@ class ActiveBotManager:
 
     def _cancel_downsell(self, user_id: Any, bot_id: Optional[str] = None):
         uid = str(user_id).strip()
-        keys_to_pop = [uid]
+        keys_to_pop = []
         if bot_id:
-            keys_to_pop.append(f"{bot_id}:{uid}")
-        for k in list(self.downsell_tasks.keys()):
-            if k == uid or k.endswith(f":{uid}"):
-                keys_to_pop.append(k)
+            bid = str(bot_id).strip()
+            keys_to_pop.append(f"{bid}:{uid}")
+        else:
+            keys_to_pop.append(uid)
+            for k in list(self.downsell_tasks.keys()):
+                if k == uid or k.endswith(f":{uid}"):
+                    keys_to_pop.append(k)
         for k in set(keys_to_pop):
             task = self.downsell_tasks.pop(k, None)
             if task and not task.done():
@@ -1999,12 +2012,15 @@ class ActiveBotManager:
 
     def _cancel_upsell(self, user_id: Any, bot_id: Optional[str] = None):
         uid = str(user_id).strip()
-        keys_to_pop = [uid]
+        keys_to_pop = []
         if bot_id:
-            keys_to_pop.append(f"{bot_id}:{uid}")
-        for k in list(self.upsell_tasks.keys()):
-            if k == uid or k.endswith(f":{uid}"):
-                keys_to_pop.append(k)
+            bid = str(bot_id).strip()
+            keys_to_pop.append(f"{bid}:{uid}")
+        else:
+            keys_to_pop.append(uid)
+            for k in list(self.upsell_tasks.keys()):
+                if k == uid or k.endswith(f":{uid}"):
+                    keys_to_pop.append(k)
         for k in set(keys_to_pop):
             task = self.upsell_tasks.pop(k, None)
             if task and not task.done():

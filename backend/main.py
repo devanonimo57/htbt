@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import json
 import logging
 import secrets
@@ -2069,13 +2070,29 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
                 affected_users.append(uid)
             if rec.get("status") == "paid" or rec.get("delivered"):
                 amt = float(rec.get("amount") or 0.0)
-                for fb in (state.get("flow_bots") or []):
-                    if isinstance(fb, dict) and (not rec_bot_id or str(fb.get("id")) == rec_bot_id):
-                        fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
-                        fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
-                        break
-                learning = state.setdefault("learning", {})
-                learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
+                paid_at_raw = str(rec.get("paid_at") or rec.get("created_at") or "").strip()
+                is_paid_today = False
+                if paid_at_raw:
+                    try:
+                        dt_p = datetime.fromisoformat(paid_at_raw.replace("Z", "+00:00"))
+                        if dt_p.tzinfo is None:
+                            dt_p_brt = dt_p - timedelta(hours=3)
+                        else:
+                            dt_p_brt = dt_p.astimezone(timezone(timedelta(hours=-3)))
+                        now_brt = datetime.now(timezone(timedelta(hours=-3)))
+                        is_paid_today = (dt_p_brt.date() == now_brt.date())
+                    except Exception:
+                        is_paid_today = False
+                was_counted = bool(rec.get("sales_counted"))
+                if was_counted and is_paid_today:
+                    for fb in (state.get("flow_bots") or []):
+                        if isinstance(fb, dict) and (not rec_bot_id or str(fb.get("id")) == rec_bot_id):
+                            fb["sales_today"] = max(0, int(fb.get("sales_today") or 0) - 1)
+                            fb["revenue_today"] = max(0.0, round(float(fb.get("revenue_today") or 0.0) - amt, 2))
+                            break
+                if was_counted:
+                    learning = state.setdefault("learning", {})
+                    learning["confirmed_purchases"] = max(0, int(learning.get("confirmed_purchases") or 0) - 1)
 
     if req.clear_all_sales:
         for fb in (state.get("flow_bots") or []):
@@ -2096,7 +2113,7 @@ async def clear_flow_test_data(req: ClearTestDataRequest):
             except Exception:
                 pass
 
-    state = await _write_state_to_db(state, preserve_runtime=False)
+    state = await _write_state_to_db(state, preserve_runtime=False, delete_tx_ids=removed_ids)
     return {
         "status": "ok",
         "removed_count": len(removed_ids),
@@ -2212,12 +2229,21 @@ async def resend_vip_access(req: AccessResendRequest):
                 [InlineKeyboardButton(text=btn_txt, url=invite_url)]
             ])
             plan_label = rec.get("offer_name") or "Plano VIP"
-            await temp_bot.send_message(
-                chat_id=uid,
-                text=f"🔑 <b>Seu acesso ao plano {plan_label} foi reenviado!</b>\n\nClique no botão abaixo para acessar:",
-                parse_mode="HTML",
-                reply_markup=kb
-            )
+            safe_plan = html.escape(str(plan_label))
+            resend_text = f"🔑 <b>Seu acesso ao plano {safe_plan} foi reenviado!</b>\n\nClique no botão abaixo para acessar:"
+            try:
+                await temp_bot.send_message(
+                    chat_id=uid,
+                    text=resend_text,
+                    parse_mode="HTML",
+                    reply_markup=kb
+                )
+            except Exception:
+                await temp_bot.send_message(
+                    chat_id=uid,
+                    text=f"🔑 Seu acesso ao plano {plan_label} foi reenviado!\n\nClique no botão abaixo para acessar:",
+                    reply_markup=kb
+                )
             rec["invite_url"] = invite_url
             rec["delivered"] = True
             rec["access_status"] = "Ativo"
