@@ -937,27 +937,19 @@
             <select id="nb-ana-filter-bot" onchange="nbRefreshMetrics()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
               <option value="all">Todos os Bots</option>
             </select>
-            <select id="nb-ana-filter-flow" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[150px] !py-1.5 !px-3 text-xs">
+            <select id="nb-ana-filter-flow" onchange="nbRefreshMetrics()" class="nb-select !w-auto min-w-[150px] !py-1.5 !px-3 text-xs">
               <option value="all">Todos os Fluxos</option>
               <option value="flow">Fluxo Principal (Botões)</option>
               <option value="ai">Fluxo IA</option>
             </select>
-            <select id="nb-ana-filter-gateway" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
-              <option value="all">Todos os Gateways</option>
-              <option value="syncpay">SyncPay</option>
-              <option value="pushinpay">PushinPay</option>
-              <option value="omegapay">OmegaPay</option>
-              <option value="asaas">Asaas</option>
+            <select id="nb-ana-filter-gateway" disabled title="Filtro por gateway indisponível: sem dimensão indexada nos registros Pix" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs opacity-50">
+              <option value="all">Gateway indisponível</option>
             </select>
-            <select id="nb-ana-filter-source" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs">
-              <option value="all">Todas as Fontes</option>
-              <option value="telegram">Telegram Direto</option>
-              <option value="remarketing">Remarketing</option>
+            <select id="nb-ana-filter-source" disabled title="Filtro por fonte indisponível: sem atribuição nos pagamentos" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs opacity-50">
+              <option value="all">Fonte indisponível</option>
             </select>
-            <select id="nb-ana-filter-type" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs">
-              <option value="all">Todos os Tipos</option>
-              <option value="plan">Plano Principal</option>
-              <option value="upsell">Upsell / OrderBump</option>
+            <select id="nb-ana-filter-type" disabled title="Filtro por tipo indisponível: sem classificação completa nos pagamentos" class="nb-select !w-auto min-w-[145px] !py-1.5 !px-3 text-xs opacity-50">
+              <option value="all">Tipo indisponível</option>
             </select>
           </div>
           <button type="button" onclick="nbResetAnalyticsFilters()" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white transition">
@@ -10204,7 +10196,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       });
       NB_ANA_SELECTED_DATE = "";
       NB_DASH_PERIOD = "Mês";
-      nbRenderDashboardView();
+      nbRefreshMetrics();
     }
 
     function nbShiftAnalyticsMonth(delta) {
@@ -10244,21 +10236,46 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbRefreshMetrics() {
+      const requestId = nbRefreshMetrics.requestId = (nbRefreshMetrics.requestId || 0) + 1;
       try {
         const bot = document.getElementById('nb-ana-filter-bot')?.value || 'all';
+        const flow = document.getElementById('nb-ana-filter-flow')?.value || 'all';
         const date = NB_ANA_SELECTED_DATE ? `&date=${encodeURIComponent(NB_ANA_SELECTED_DATE)}` : '';
-        const res = await adminFetch(`/api/metrics?period=${encodeURIComponent(NB_DASH_PERIOD)}&bot_id=${encodeURIComponent(bot)}${date}`);
+        const res = await adminFetch(`/api/metrics?period=${encodeURIComponent(NB_DASH_PERIOD)}&bot_id=${encodeURIComponent(bot)}${flow !== 'all' ? `&flow=${encodeURIComponent(flow)}` : ''}${date}`);
         if (!res.ok) throw new Error('Falha ao atualizar métricas');
-        NB_METRICS = await res.json();
+        const result = await res.json();
+        if (requestId !== nbRefreshMetrics.requestId) return;
+        NB_METRICS = result;
         nbUpdateHeaderRevenueWidget();
       } catch (error) {
+        if (requestId !== nbRefreshMetrics.requestId) return;
+        NB_METRICS = null;
+        nbRefreshMetrics.failed = true;
         console.warn('Métricas não atualizadas:', error);
-        alert('Não foi possível atualizar as métricas. Exibindo os últimos dados disponíveis.');
+        alert('Não foi possível atualizar as métricas. Dados financeiros indisponíveis.');
       }
+      if (NB_METRICS) nbRefreshMetrics.failed = false;
       nbRenderDashboardView();
     }
 
     function nbRenderDashboardView() {
+      if (nbRefreshMetrics.failed) {
+        for (const id of ['nb-dash-hero-value', 'nb-dash-kpi-sales', 'nb-dash-kpi-ticket',
+          'nb-dash-kpi-conv', 'nb-dash-kpi-pending-val', 'nb-dash-kpi-pending-cnt',
+          'nb-dash-kpi-starts', 'nb-ana-kpi-rev-gen', 'nb-ana-kpi-rev-paid',
+          'nb-ana-hour-best', 'nb-ana-hour-paid', 'nb-ana-hour-gen', 'nb-ana-hour-conv',
+          'nb-ana-week-curr', 'nb-ana-week-prev', 'nb-ana-week-diff']) {
+          const node = document.getElementById(id);
+          if (node) node.textContent = '—';
+        }
+        for (const id of ['nb-ana-hourly-chart', 'nb-ana-weekday-chart', 'nb-ana-top-bots',
+          'nb-ana-top-flows', 'nb-ana-top-plans', 'nb-ana-top-days', 'nb-ana-top-tickets',
+          'nb-dash-recent-revenue', 'nb-dash-status-summary']) {
+          const node = document.getElementById(id);
+          if (node) { node.innerHTML = ''; node.textContent = 'Métricas indisponíveis'; }
+        }
+        return;
+      }
       const periods = ["Hoje", "Ontem", "Semana", "Mês", "Tudo"];
       if (!periods.includes(NB_DASH_PERIOD)) NB_DASH_PERIOD = "Mês";
       const pillsEl = document.getElementById('nb-dash-period-pills');
@@ -10298,10 +10315,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived).filter(l => {
         if (filterBot !== 'all' && l.bot_id !== filterBot && l.bot_username !== (bots.find(x => x.id === filterBot)?.username)) return false;
         if (filterFlow !== 'all' && l.bot_id && !allowedBotIds.has(l.bot_id) && !allowedBotNames.has(l.bot_username)) return false;
-        if (filterGw !== 'all' && l.gateway && String(l.gateway).toLowerCase() !== filterGw) return false;
-        if (filterSrc === 'remarketing' && !l.from_remarketing) return false;
-        if (filterType === 'upsell' && !hasBumpLead(l)) return false;
-        if (filterType === 'downsell' && !hasDownsellLead(l)) return false;
+
         const leadDateStr = l.paid_at || l.created_at || l.last_interaction || '';
         if (NB_ANA_SELECTED_DATE) {
           if (leadDateStr && !String(leadDateStr).startsWith(NB_ANA_SELECTED_DATE)) return false;
@@ -10310,18 +10324,6 @@ quer que eu te mostre as opções de acesso?</textarea>
         }
         return true;
       });
-
-      const isPaidLead = l => {
-        const s = String(l.stage || '').toLowerCase();
-        return Boolean(l.purchased) || s.includes('pago') || s.includes('aprovad') || s.includes('comprou') || s.includes('vip');
-      };
-      const isPixLead = l => {
-        const s = String(l.stage || '').toLowerCase();
-        return isPaidLead(l) || s.includes('pix') || s.includes('checkout') || s.includes('aguardando') || s.includes('pendente');
-      };
-
-      const paidLeads = allLeads.filter(isPaidLead);
-      const pixLeads = allLeads.filter(isPixLead);
 
       const startsCount = allLeads.length;
       const matchingTx = nbDistinctTransactions(STATE.tx_records).filter(tx => {
@@ -10341,8 +10343,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const avgTicket = paidSalesCount > 0 ? confirmedRev / paidSalesCount : 0;
 
 
-      const startToSalesPct = startsCount > 0 ? ((paidSalesCount / startsCount) * 100).toFixed(1) : "0.0";
-      const approvalPct = pixGenCount > 0 ? Math.round((paidSalesCount / pixGenCount) * 100) : 0;
+
 
       const fmtBRL = v => `R$ ${Number(v || 0).toFixed(2).replace('.', ',')}`;
       const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -10353,10 +10354,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
       setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
-      setTxt('nb-dash-kpi-conv', (paidSalesCount > 0 && startsCount > 0) ? `${Math.round((paidSalesCount / startsCount) * 100)}%` : (startsCount > 0 ? "0%" : "—"));
+      setTxt('nb-dash-kpi-conv', '—'); // Lead cohorts cannot be joined to paid event windows.
       setTxt('nb-dash-kpi-pending-val', fmtBRL(pendingVal));
       setTxt('nb-dash-kpi-pending-cnt', `${NB_METRICS ? NB_METRICS.pending_count : pendingTx.length} Pix aguardando pagamento`);
-      setTxt('nb-dash-kpi-starts', paidSalesCount > 0 ? String(Math.max(1, Math.round(startsCount / paidSalesCount))) : "—");
+      setTxt('nb-dash-kpi-starts', '—');
 
       const recRevEl = document.getElementById('nb-dash-recent-revenue');
       if (recRevEl) {
@@ -10373,7 +10374,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           stSumEl.innerHTML = `
             <div class="space-y-1.5 text-xs">
               <div class="flex items-center justify-between"><span class="text-emerald-400 font-semibold">✓ Pagas / Aprovadas</span><span class="text-white font-bold">${paidSalesCount} (${fmtBRL(confirmedRev)})</span></div>
-              <div class="flex items-center justify-between"><span class="text-amber-400 font-semibold">⏳ Pix pendentes (registros)</span><span class="text-zinc-300 font-bold">${pendingTx.length} (${fmtBRL(pendingVal)})</span></div>
+              <div class="flex items-center justify-between"><span class="text-amber-400 font-semibold">⏳ Pix pendentes (registros)</span><span class="text-zinc-300 font-bold">${NB_METRICS ? NB_METRICS.pending_count : pendingTx.length} (${fmtBRL(pendingVal)})</span></div>
             </div>
           `;
         } else {
@@ -10407,16 +10408,22 @@ quer que eu te mostre as opções de acesso?</textarea>
       // 1. Top 4 KPIs
 
       setTxt('nb-ana-kpi-starts', String(startsCount));
-      setTxt('nb-ana-kpi-starts-sub', `${startToSalesPct}% DE LEADS VIRAM VENDAS`);
+      setTxt('nb-ana-kpi-starts-sub', 'CONVERSÃO DE LEADS INDISPONÍVEL');
       setTxt('nb-ana-kpi-rev-gen', fmtBRL(generatedRev));
       setTxt('nb-ana-kpi-rev-gen-sub', `TICKET MÉDIO ${fmtBRL(avgTicket)}`);
       setTxt('nb-ana-kpi-rev-paid', fmtBRL(confirmedRev));
-      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · ${approvalPct}% DE APROVAÇÃO`);
+      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · APROVAÇÃO INDISPONÍVEL`);
 
       // 2. Vendas por Hora (0h - 23h SVG)
       const hourlyGen = new Array(24).fill(0);
       const hourlyPaid = new Array(24).fill(0);
-      matchingTx.forEach(tx => {
+      (NB_METRICS?.by_hour || []).forEach(bucket => {
+        if (bucket.hour >= 0 && bucket.hour < 24) {
+          hourlyGen[bucket.hour] = bucket.generated_count;
+          hourlyPaid[bucket.hour] = bucket.paid_count;
+        }
+      });
+      if (!NB_METRICS) matchingTx.forEach(tx => {
         const raw = String(tx.paid_at || tx.created_at || '');
         const m = raw.match(/(\d{1,2}):\d{2}/);
         if (!m) return;
@@ -10428,10 +10435,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       let bestHrSales = 0;
       hourlyPaid.forEach((v, h) => { if (v > bestHrSales) { bestHrSales = v; bestHr = h; } });
 
-      setTxt('nb-ana-hour-best', `${bestHr}h (${bestHrSales} vendas)`);
+      setTxt('nb-ana-hour-best', bestHrSales ? `${bestHr}h (${bestHrSales} vendas)` : '—');
       setTxt('nb-ana-hour-paid', String(paidSalesCount));
       setTxt('nb-ana-hour-gen', String(pixGenCount));
-      setTxt('nb-ana-hour-conv', `${approvalPct}%`);
+      setTxt('nb-ana-hour-conv', '—');
 
       const hrChartEl = document.getElementById('nb-ana-hourly-chart');
       if (hrChartEl) {
@@ -10477,38 +10484,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       // 4. Vendas por Dia da Semana (Seg - Dom)
-      const wkDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-      const wkCurr = [0, 0, 0, 0, 0, 0, 0];
-      const wkPrev = [0, 0, 0, 0, 0, 0, 0];
-      if (paidSalesCount > 0) {
-        const jsDay = new Date().getDay();
-        const idx = jsDay === 0 ? 6 : jsDay - 1;
-        wkCurr[idx] = paidSalesCount;
-      }
-      const sumCurr = wkCurr.reduce((a, b) => a + b, 0);
-      const sumPrev = wkPrev.reduce((a, b) => a + b, 0);
-      const diffPct = sumPrev > 0 ? Math.round(((sumCurr - sumPrev) / sumPrev) * 100) : (sumCurr > 0 ? 100 : 0);
-      setTxt('nb-ana-week-curr', String(sumCurr));
-      setTxt('nb-ana-week-prev', String(sumPrev));
-      setTxt('nb-ana-week-diff', `${diffPct >= 0 ? '+' : ''}${diffPct}%`);
-
+      setTxt('nb-ana-week-curr', '—');
+      setTxt('nb-ana-week-prev', '—');
+      setTxt('nb-ana-week-diff', '—');
       const wkChartEl = document.getElementById('nb-ana-weekday-chart');
-      if (wkChartEl) {
-        const maxWk = Math.max(4, ...wkCurr, ...wkPrev);
-        const ptsC = wkCurr.map((v, i) => `${45 + i * 85},${110 - Math.round((v / maxWk) * 80)}`).join(' ');
-        const ptsP = wkPrev.map((v, i) => `${45 + i * 85},${110 - Math.round((v / maxWk) * 80)}`).join(' ');
-        wkChartEl.innerHTML = `
-          <svg viewBox="0 0 600 135" class="w-full h-full">
-            <line x1="30" y1="30" x2="570" y2="30" stroke="#221730" stroke-dasharray="3,3"/>
-            <line x1="30" y1="70" x2="570" y2="70" stroke="#221730" stroke-dasharray="3,3"/>
-            <line x1="30" y1="110" x2="570" y2="110" stroke="#2a1d3b"/>
-            <polyline fill="none" stroke="#71717a" stroke-width="2" stroke-dasharray="4,4" points="${ptsP}"/>
-            <polyline fill="none" stroke="#10b981" stroke-width="2.5" points="${ptsC}"/>
-            ${wkCurr.map((v, i) => `<circle cx="${45 + i * 85}" cy="${110 - Math.round((v / maxWk) * 80)}" r="3.5" fill="#10b981"/>`).join('')}
-            ${wkDays.map((d, i) => `<text x="${45 + i * 85}" y="128" fill="#a1a1aa" font-size="10" text-anchor="middle">${d}</text>`).join('')}
-          </svg>
-        `;
-      }
+      if (wkChartEl) wkChartEl.textContent = 'Comparação semanal indisponível';
 
       // Helper for ranking lists
       const renderRankList = (elId, items, emptyMsg = "Sem dados no período") => {
@@ -10530,56 +10510,30 @@ quer que eu te mostre as opções de acesso?</textarea>
       };
 
       // 5. Top 5 Bots, Fluxos, Planos, Dias
-      const topBotsItems = filteredBots
-        .map(b => ({ label: b.username || b.display_name || '@bot', sales: paidTx.filter(tx => tx.bot_id === b.id).length, rev: paidTx.filter(tx => tx.bot_id === b.id).reduce((sum, tx) => sum + Number(tx.amount || 0), 0) }))
+      const topBotsItems = (NB_METRICS?.by_bot || [])
+        .map(x => { const b = filteredBots.find(b => String(b.bot_id) === x.origin_bot_id);
+          return {label: b?.username || b?.display_name || `Bot ${x.origin_bot_id || 'sem identidade'}`,
+                  sales: x.paid_count, rev: x.paid_amount}; })
         .filter(x => x.sales > 0)
         .sort((a, b) => b.rev - a.rev)
         .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
       renderRankList('nb-ana-top-bots', paidSalesCount > 0 ? topBotsItems : []);
 
-      const topFlowsItems = filteredBots
-        .map(b => ({ label: `Fluxo Principal (${b.username || '@bot'})`, sales: paidTx.filter(tx => tx.bot_id === b.id).length, rev: paidTx.filter(tx => tx.bot_id === b.id).reduce((sum, tx) => sum + Number(tx.amount || 0), 0) }))
-        .filter(x => x.sales > 0)
-        .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
-      renderRankList('nb-ana-top-flows', topFlowsItems);
-
-      const planAgg = [];
-      paidTx.forEach(tx => { planAgg.push({label: tx.offer_name || 'Plano VIP', right: fmtBRL(tx.amount)}); });
-      renderRankList('nb-ana-top-plans', paidSalesCount > 0 ? planAgg : []);
-
-      const salesByDay = new Map();
-      paidTx.forEach(tx => {
-        const day = String(tx.paid_at || tx.created_at || '').slice(0, 10);
-        if (!day) return;
-        const previous = salesByDay.get(day) || { count: 0, revenue: 0 };
-        salesByDay.set(day, { count: previous.count + 1, revenue: previous.revenue + Number(tx.amount || 0) });
-      });
-      renderRankList('nb-ana-top-days', [...salesByDay].sort((a, b) => b[1].revenue - a[1].revenue)
-        .map(([day, value]) => ({ label: day, right: `${value.count} vds · ${fmtBRL(value.revenue)}` })));
+      renderRankList('nb-ana-top-flows', [], 'Fluxo individual indisponível (sem atribuição no Pix)');
+      renderRankList('nb-ana-top-plans', [], 'Plano indisponível (sem dimensão indexada)');
+      renderRankList('nb-ana-top-days', (NB_METRICS?.by_day || []).map(x =>
+        ({label:x.day, right:`${x.paid_count} vds · ${fmtBRL(x.paid_amount)}`})));
 
       // 6. Top 5 Tickets, Top Códigos, Funil de Conversão
-      const ticketMap = {};
-      paidTx.forEach(tx => {
-        const k = fmtBRL(tx.amount);
-        ticketMap[k] = (ticketMap[k] || 0) + 1;
-      });
-      const topTicketItems = Object.entries(ticketMap).map(([k, cnt]) => ({ label: k, right: `${cnt} plano(s)` }));
+      const topTicketItems = (NB_METRICS?.by_ticket || []).map(x => ({label:fmtBRL(x.amount),right:`${x.paid_count} plano(s)`}));
       renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
       renderRankList('nb-ana-top-codes', [], 'Sem dados de códigos');
 
-      const fStartToPix = startsCount > 0 ? Math.min(100, Math.round((pixGenCount / startsCount) * 100)) : 0;
-      const fPixToPaid = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : 0;
-      const fStartToPaid = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : 0;
-
-      setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : '0%');
-      setTxt('nb-ana-funnel-pct-2', `${fStartToPix}%`);
-      setTxt('nb-ana-funnel-pct-3', `${fStartToPaid}%`);
+      for (const id of ['nb-ana-funnel-pct-1', 'nb-ana-funnel-pct-2', 'nb-ana-funnel-pct-3',
+                        'nb-ana-funnel-step-1', 'nb-ana-funnel-step-2', 'nb-ana-funnel-step-3']) setTxt(id, '—');
       setTxt('nb-ana-funnel-cnt-start', String(startsCount));
       setTxt('nb-ana-funnel-cnt-pix', String(pixGenCount));
       setTxt('nb-ana-funnel-cnt-paid', String(paidSalesCount));
-      setTxt('nb-ana-funnel-step-1', `${fStartToPix}%`);
-      setTxt('nb-ana-funnel-step-2', `${fPixToPaid}%`);
-      setTxt('nb-ana-funnel-step-3', `${fStartToPaid}%`);
 
       // 7. Top Campanhas, Fontes, Posicionamentos, Tempo Médio
       const rmkCampaigns = (STATE.remarketing_campaigns || []).map(c => ({
@@ -10595,37 +10549,19 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-ana-time-hr', '—');
       setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
 
-      // 8. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
-      const bumpAccepted = allLeads.filter(hasBumpLead).length;
-      const downsellRec = allLeads.filter(l => hasDownsellLead(l) && isPaidLead(l)).length;
-      const pendingCount = Math.max(0, pixGenCount - paidSalesCount);
-      const setRateCard = (key, num, den, subSuffix) => {
-        const pct = den > 0 ? Math.min(100, (num / den) * 100) : 0;
-        setTxt(`nb-ana-rate-${key}`, `${pct.toFixed(1)}%`);
-        setTxt(`nb-ana-rate-${key}-sub`, `${num} DE ${den} ${subSuffix}`);
+      // Rates requiring conversion cohorts and purchase attribution are not measured.
+      for (const key of ['upsell', 'downsell', 'bump', 'recovery', 'recurrence',
+                         'retention', 'upgrade', 'churn']) {
+        setTxt(`nb-ana-rate-${key}`, '—');
+        setTxt(`nb-ana-rate-${key}-sub`, 'INDISPONÍVEL');
         const bar = document.getElementById(`nb-ana-bar-${key}`);
-        if (bar) bar.style.width = `${pct}%`;
-      };
-      setRateCard('upsell', bumpAccepted, paidSalesCount, 'VENDAS');
-      setRateCard('downsell', downsellRec, pendingCount, 'RECUSAS');
-      setRateCard('bump', bumpAccepted, pixGenCount, 'CHECKOUTS');
-      setRateCard('recovery', downsellRec, pendingCount, 'PENDENTES');
-      setRateCard('recurrence', 0, paidSalesCount, 'COMPRADORES');
-      setRateCard('retention', paidSalesCount, paidSalesCount, 'COMPRADORES');
-      setRateCard('upgrade', bumpAccepted, paidSalesCount, 'COMPRADORES');
-      setRateCard('churn', 0, paidSalesCount, 'COMPRADORES');
+        if (bar) bar.style.width = '0%';
+      }
 
-      // 10. LTV Médio, Vendas por Usuário, Tempo Médio Retorno, Contadores de Usuários
-      const buyersCount = paidSalesCount;
-      const ltvVal = buyersCount > 0 ? (confirmedRev / buyersCount) : 0;
-      setTxt('nb-ana-ltv-val', fmtBRL(ltvVal));
-      setTxt('nb-ana-sales-per-user', buyersCount > 0 ? '1.0×' : '0.0×');
-      setTxt('nb-ana-return-days', '0.0');
-      setTxt('nb-ana-cnt-buyers', String(buyersCount));
-      setTxt('nb-ana-cnt-recurring', '0');
-      setTxt('nb-ana-cnt-vips', String(buyersCount));
-      setTxt('nb-ana-cnt-upsellers', String(bumpAccepted));
-      setTxt('nb-ana-cnt-downsellers', String(downsellRec));
+      // Buyer identity and repeat purchases cannot be inferred from paid Pix count.
+      for (const id of ['nb-ana-ltv-val', 'nb-ana-sales-per-user', 'nb-ana-return-days',
+                        'nb-ana-cnt-buyers', 'nb-ana-cnt-recurring', 'nb-ana-cnt-vips',
+                        'nb-ana-cnt-upsellers', 'nb-ana-cnt-downsellers']) setTxt(id, '—');
 
       // 11. Diário de Mudanças
       const notesEl = document.getElementById('nb-ana-notes-list');

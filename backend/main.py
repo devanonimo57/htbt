@@ -1012,26 +1012,92 @@ async def _pix_filters(period: str, bot_id: str, date: str = ''):
     return filters
 
 
+def _metrics_date_filters(period, date, timestamp):
+    """Bound a single event timestamp; generated and paid events have different dates."""
+    if date:
+        try:
+            parsed = datetime.strptime(date, '%Y-%m-%d').date()
+            if parsed.isoformat() != date:
+                raise ValueError('date format')
+        except ValueError:
+            raise HTTPException(status_code=422, detail='Data inválida')
+        return [timestamp >= date, timestamp < (parsed + timedelta(days=1)).isoformat()]
+    if period in ('Total', 'Tudo'):
+        return []
+    today = datetime.now(timezone(timedelta(hours=-3))).date()
+    spans = {'Hoje': 0, 'Ontem': 1, 'Semana': 7, '7 dias': 7, 'Mês': 30, '30d': 30}
+    if period not in spans:
+        raise HTTPException(status_code=422, detail='Período inválido')
+    filters = [timestamp >= (today - timedelta(days=spans[period])).isoformat()]
+    if period == 'Ontem':
+        filters.append(timestamp < today.isoformat())
+    elif period == 'Hoje':
+        filters.append(timestamp < (today + timedelta(days=1)).isoformat())
+    return filters
+
+
 @app.get('/api/metrics', dependencies=[Depends(verify_admin_auth)])
-async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: str = ''):
-    """Database aggregate only; never transfer payment payloads to the panel."""
-    filters = await _pix_filters(period, bot_id, date)
+async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: str = '', flow: str = 'all'):
+    """SQL-only payment aggregates; no Pix payloads or per-transaction response."""
+    if flow not in ('all', 'flow', 'ai'):
+        raise HTTPException(status_code=422, detail='Fluxo inválido')
+    scope = []
+    if bot_id != 'all' or flow != 'all':
+        # Read only configuration; hydrating _read_state_from_db() would SELECT
+        # every Pix payload on a cold cache just to resolve bot identities.
+        async with async_session() as session:
+            raw = (await session.execute(select(BotConfig.full_state_json).order_by(BotConfig.id).limit(1))).scalar_one_or_none()
+        bots = json.loads(raw or '{}').get('flow_bots', [])
+        if bot_id != 'all' and not any(str(b.get('id')) == bot_id for b in bots):
+            raise HTTPException(status_code=404, detail='Bot não encontrado')
+        matching = [b for b in bots if (bot_id == 'all' or str(b.get('id')) == bot_id)
+                    and (flow == 'all' or ('ai' if b.get('mode') == 'ai' else 'flow') == flow)]
+        scope.append(PixRecord.origin_bot_id.in_([str(b.get('bot_id') or '') for b in matching]))
     paid = PixRecord.status == 'paid'
     pending = PixRecord.status == 'pending'
+    paid_ts = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
+    generated_filters = scope + _metrics_date_filters(period, date, PixRecord.created_at)
+    paid_filters = scope + [paid] + _metrics_date_filters(period, date, paid_ts)
+    pending_filters = generated_filters + [pending]
+    count = func.count(PixRecord.tx_id)
+    amount = func.coalesce(func.sum(PixRecord.amount), 0)
     async with async_session() as session:
-        row = (await session.execute(select(
-            func.count(PixRecord.tx_id),
-            func.coalesce(func.sum(PixRecord.amount), 0),
-            func.coalesce(func.sum(case((paid, 1), else_=0)), 0),
-            func.coalesce(func.sum(case((paid, PixRecord.amount), else_=0)), 0),
-            func.coalesce(func.sum(case((pending, 1), else_=0)), 0),
-            func.coalesce(func.sum(case((pending, PixRecord.amount), else_=0)), 0),
-        ).where(*filters))).one()
-        total_paid = (await session.execute(select(func.coalesce(func.sum(PixRecord.amount), 0)).where(paid))).scalar_one()
-    return dict(generated_count=row[0], generated_amount=round(float(row[1]), 2),
-                paid_count=row[2], paid_amount=round(float(row[3]), 2),
-                pending_count=row[4], pending_amount=round(float(row[5]), 2),
-                all_time_paid_amount=round(float(total_paid), 2))
+        async def totals(filters):
+            return (await session.execute(select(count, amount).where(*filters))).one()
+        generated = await totals(generated_filters)
+        paid_total = await totals(paid_filters)
+        pending_total = await totals(pending_filters)
+        total_paid = (await session.execute(select(amount).where(paid))).scalar_one()
+        day = func.substr(paid_ts, 1, 10)
+        hour_paid = func.substr(paid_ts, 12, 2)
+        hour_created = func.substr(PixRecord.created_at, 12, 2)
+        day_rows = (await session.execute(select(day, count, amount).where(*paid_filters, day != '')
+                    .group_by(day).order_by(amount.desc(), day.desc()).limit(5))).all()
+        bot_rows = (await session.execute(select(PixRecord.origin_bot_id, count, amount).where(*paid_filters)
+                    .group_by(PixRecord.origin_bot_id).order_by(amount.desc()).limit(5))).all()
+        ticket_rows = (await session.execute(select(PixRecord.amount, count).where(*paid_filters)
+                       .group_by(PixRecord.amount).order_by(count.desc(), PixRecord.amount.desc()).limit(5))).all()
+        paid_hours = (await session.execute(select(hour_paid, count).where(*paid_filters, hour_paid != '')
+                      .group_by(hour_paid).limit(24))).all()
+        generated_hours = (await session.execute(select(hour_created, count).where(*generated_filters, hour_created != '')
+                           .group_by(hour_created).limit(24))).all()
+
+    hours = {}
+    for key, value in generated_hours:
+        if str(key).isdigit() and 0 <= int(key) < 24:
+            hours.setdefault(int(key), {'hour': int(key), 'generated_count': 0, 'paid_count': 0})['generated_count'] = value
+    for key, value in paid_hours:
+        if str(key).isdigit() and 0 <= int(key) < 24:
+            hours.setdefault(int(key), {'hour': int(key), 'generated_count': 0, 'paid_count': 0})['paid_count'] = value
+    return dict(generated_count=generated[0], generated_amount=round(float(generated[1]), 2),
+                paid_count=paid_total[0], paid_amount=round(float(paid_total[1]), 2),
+                pending_count=pending_total[0], pending_amount=round(float(pending_total[1]), 2),
+                all_time_paid_amount=round(float(total_paid), 2),
+                by_day=[dict(day=d, paid_count=n, paid_amount=round(float(a), 2)) for d, n, a in day_rows],
+                by_bot=[dict(origin_bot_id=origin, paid_count=n, paid_amount=round(float(a), 2))
+                        for origin, n, a in bot_rows],
+                by_ticket=[dict(amount=round(float(a), 2), paid_count=n) for a, n in ticket_rows],
+                by_hour=[hours[h] for h in sorted(hours)])
 
 
 @app.get('/api/transactions', dependencies=[Depends(verify_admin_auth)])

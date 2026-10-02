@@ -2,7 +2,7 @@ import unittest
 from tests.test_row_persistence import RowPersistenceTests
 import main
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, event
 from models import PixRecord
 
 
@@ -52,6 +52,82 @@ class MetricsContractTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(main.HTTPException):
             await main.get_panel_metrics(period='Total', bot_id='all', date='not-a-date')
 
+    async def test_breakdowns_are_bounded_and_reconcile_with_paid_totals(self):
+        state = await main._read_state_from_db()
+        state['tx_records']['p1'].update(created_at='2026-09-20T10:00:00-03:00', paid_at='2026-09-20T10:00:00-03:00')
+        state['tx_records']['p2'].update(created_at='2026-09-20T11:00:00-03:00', paid_at='2026-09-20T11:00:00-03:00')
+        state['tx_records']['p3']['created_at'] = '2026-09-20T12:00:00-03:00'
+        await main._write_state_to_db(state)
+        metrics = await main.get_panel_metrics(period='Tudo', bot_id='all')
+        self.assertEqual(metrics['paid_count'], 2)
+        self.assertEqual(metrics['by_day'], [{'day': '2026-09-20', 'paid_count': 2, 'paid_amount': 30}])
+        self.assertEqual(metrics['by_hour'], [
+            {'hour': 10, 'generated_count': 1, 'paid_count': 1},
+            {'hour': 11, 'generated_count': 1, 'paid_count': 1},
+            {'hour': 12, 'generated_count': 1, 'paid_count': 0},
+        ])
+        self.assertEqual(metrics['by_bot'], [{'origin_bot_id': '111', 'paid_count': 2, 'paid_amount': 30}])
+        self.assertEqual(metrics['by_ticket'], [
+            {'amount': 20, 'paid_count': 1}, {'amount': 10, 'paid_count': 1}])
+        self.assertNotIn('data_json', str(metrics))
+
+    async def test_paid_period_uses_payment_date_not_checkout_date(self):
+        state = await main._read_state_from_db()
+        state['tx_records']['p1'].update(created_at='2026-09-19T10:00:00-03:00', paid_at='2026-09-20T10:00:00-03:00')
+        state['tx_records']['p2'].update(created_at='2026-09-20T10:00:00-03:00', paid_at='2026-09-21T10:00:00-03:00')
+        state['tx_records']['p3']['created_at'] = '2026-09-20T10:00:00-03:00'
+        await main._write_state_to_db(state)
+        metrics = await main.get_panel_metrics(period='Tudo', bot_id='a', date='2026-09-20')
+        self.assertEqual(metrics['paid_count'], 1)
+        self.assertEqual(metrics['paid_amount'], 10)
+        self.assertEqual(metrics['generated_count'], 1)
+        self.assertEqual(metrics['by_bot'][0]['origin_bot_id'], '111')
+
+    async def test_flow_filter_restricts_both_totals_and_breakdowns(self):
+        state = await main._read_state_from_db()
+        state['flow_bots'][1]['mode'] = 'ai'
+        state['tx_records']['p3']['status'] = 'paid'
+        await main._write_state_to_db(state)
+        flow = await main.get_panel_metrics(period='Tudo', bot_id='all', flow='flow')
+        self.assertEqual(flow['paid_count'], 2)
+        self.assertEqual(sum(x['paid_count'] for x in flow['by_bot']), 2)
+        ai = await main.get_panel_metrics(period='Tudo', bot_id='all', flow='ai')
+        self.assertEqual(ai['paid_count'], 1)
+        with self.assertRaises(main.HTTPException):
+            await main.get_panel_metrics(period='Tudo', bot_id='all', flow='invalid')
+
+    async def test_metrics_only_select_aggregate_columns_and_duplicate_payment_stays_one_row(self):
+        state = await main._read_state_from_db()
+        state['tx_records']['p3']['status'] = 'paid'
+        await main._write_state_to_db(state)
+        await main._write_state_to_db(state)  # webhook replay for the same gateway ID
+        statements = []
+        def observe(conn, cursor, statement, parameters, context, executemany):
+            if 'pix_records' in statement.lower():
+                statements.append(statement.lower())
+        event.listen(main.engine.sync_engine, 'before_cursor_execute', observe)
+        try:
+            result = await main.get_panel_metrics(period='Tudo', bot_id='all')
+        finally:
+            event.remove(main.engine.sync_engine, 'before_cursor_execute', observe)
+        self.assertEqual(result['paid_count'], 3)
+        self.assertTrue(statements)
+        self.assertTrue(all('data_json' not in sql for sql in statements), statements)
+
+    async def test_cold_cache_bot_filter_does_not_hydrate_pix_payloads(self):
+        main._STATE_CACHE = None
+        statements = []
+        def observe(conn, cursor, statement, parameters, context, executemany):
+            if 'pix_records' in statement.lower():
+                statements.append(statement.lower())
+        event.listen(main.engine.sync_engine, 'before_cursor_execute', observe)
+        try:
+            result = await main.get_panel_metrics(period='Tudo', bot_id='a')
+        finally:
+            event.remove(main.engine.sync_engine, 'before_cursor_execute', observe)
+        self.assertEqual(result['paid_count'], 2)
+        self.assertTrue(all('data_json' not in sql for sql in statements), statements)
+
     async def test_reused_configured_bot_id_cannot_claim_historical_pix(self):
         state = await main._read_state_from_db()
         state['tx_records']['p1']['bot_token'] = '222:new'
@@ -59,3 +135,5 @@ class MetricsContractTests(unittest.IsolatedAsyncioTestCase):
         async with main.async_session() as session:
             row = (await session.execute(select(PixRecord).where(PixRecord.tx_id == 'p1'))).scalar_one()
             self.assertEqual(row.origin_bot_id, '111')
+        metrics = await main.get_panel_metrics(period='Tudo', bot_id='a')
+        self.assertEqual(metrics['by_bot'][0]['origin_bot_id'], '111')
