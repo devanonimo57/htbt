@@ -6,7 +6,7 @@ import os
 import random
 import secrets
 from contextvars import ContextVar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Set
 
 import httpx
@@ -359,27 +359,8 @@ class ActiveBotManager:
         }
 
     def _resume_pending_pix_polls(self, state: Dict[str, Any]):
-        pub = state.get("publish", {})
-        pushin_token = (pub.get("pushin_pay_token") or "").strip()
-        gw_provider = (pub.get("gateway_provider") or "syncpay").strip()
-        gw_secret = (pub.get("gateway_secret") or "").strip()
-        if not pushin_token:
-            return
-        now = datetime.utcnow()
-        for tx_id, rec in (state.get("tx_records") or {}).items():
-            if not isinstance(rec, dict) or rec.get("status") != "pending":
-                continue
-            uid = int(rec.get("user_id") or 0)
-            if not uid or not tx_id or str(tx_id).startswith("sim_"):
-                continue
-            try:
-                created_dt = datetime.fromisoformat(str(rec.get("created_at") or ""))
-                if (now - created_dt) > timedelta(minutes=30):
-                    continue
-            except Exception:
-                pass
-            self.tx_records[str(tx_id)] = rec
-            self._start_pix_poll_task(uid, str(tx_id), pushin_token, gw_provider, gw_secret)
+        # Polling em background desativado: transações são tratadas 100% via webhooks
+        return
 
     async def _delivery_retry_loop(self):
         """Worker em background que varre periodicamente transações 'paid' com 'delivered=False'.
@@ -392,7 +373,7 @@ class ActiveBotManager:
                     continue
                 state = await self.state_getter()
                 tx_map = state.get("tx_records") or {}
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 for tid, rec in list(tx_map.items()):
                     if not isinstance(rec, dict) or rec.get("status") != "paid" or rec.get("delivered"):
                         continue
@@ -405,7 +386,9 @@ class ActiveBotManager:
                             continue
                         last_attempt = rec.get("last_delivery_attempt_at")
                         if last_attempt:
-                            dt_att = datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00")).replace(tzinfo=None)
+                            dt_att = datetime.fromisoformat(str(last_attempt).replace("Z", "+00:00"))
+                            if dt_att.tzinfo is None:
+                                dt_att = dt_att.replace(tzinfo=timezone.utc)
                             if (now - dt_att).total_seconds() < 45:
                                 continue
                         uid = int(rec.get("user_id") or 0)
@@ -2366,7 +2349,10 @@ class ActiveBotManager:
             discount_not_expired = True
             if exp_str:
                 try:
-                    discount_not_expired = datetime.utcnow() <= datetime.fromisoformat(str(exp_str))
+                    exp_dt = datetime.fromisoformat(str(exp_str).replace("Z", "+00:00"))
+                    if exp_dt.tzinfo is None:
+                        exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                    discount_not_expired = datetime.now(timezone.utc) <= exp_dt
                 except Exception:
                     discount_not_expired = False
 
@@ -2522,41 +2508,10 @@ class ActiveBotManager:
 
         @self.dp.callback_query(F.data.startswith("checkpix:"))
         async def handle_check_pix(callback: types.CallbackQuery):
-            parts = callback.data.split(":")
-            tx_id = (parts[1] if len(parts) > 1 else "").strip()
-            if not tx_id or tx_id.startswith("sim_"):
-                await callback.answer("Cobrança inválida ou expirada.", show_alert=True)
-                return
-
-            state = await self.state_getter()
-            tx_record = (state.get("tx_records") or {}).get(tx_id) or self.tx_records.get(tx_id)
-            if not tx_record or int(tx_record.get("user_id", 0)) != int(callback.from_user.id):
-                await callback.answer("Cobrança não localizada para este usuário.", show_alert=True)
-                return
-            if tx_record.get("status") in ("cancelled", "canceled"):
-                await callback.answer("Esta cobrança foi encerrada. Para tentar novamente, gere um novo PIX.", show_alert=True)
-                return
-
-            pub = state.get("publish", {})
-            pushin_token = pub.get("pushin_pay_token", "").strip()
-            gw_provider = pub.get("gateway_provider", "syncpay").strip()
-            gw_secret = pub.get("gateway_secret", "").strip()
-
-            if not pushin_token:
-                await callback.answer("Gateway de pagamento não configurado.", show_alert=True)
-                return
-
-            try:
-                client = PushinPayClient(token=pushin_token, provider=gw_provider, secret=gw_secret)
-                status_data = await client.check_transaction_status(tx_id)
-                if str((status_data or {}).get("status", "")).lower() == "paid":
-                    await callback.answer("Pagamento confirmado! 💜")
-                    await self.deliver_purchase_and_upsell(callback.from_user.id, tx_id=tx_id)
-                    return
-                await callback.answer("Ainda aguardando confirmação do banco. Assim que pagar, tente novamente!", show_alert=True)
-            except Exception as e:
-                logger.warning(f"Erro ao verificar status PIX ({tx_id}): {e}")
-                await callback.answer("Não foi possível consultar o banco agora. Tente novamente em instantes.", show_alert=True)
+            await callback.answer(
+                "⏳ Pagamento em processamento! Assim que o seu banco confirmar a transferência, o seu acesso VIP será enviado aqui na conversa automaticamente.",
+                show_alert=True
+            )
 
         @self.dp.callback_query(F.data.startswith("fplan:"))
         async def handle_flow_plan_click(callback: types.CallbackQuery):
@@ -2898,19 +2853,15 @@ class ActiveBotManager:
     ):
         if not tx_id or str(tx_id).startswith("sim_"):
             return
-        # Cancela qualquer polling anterior ativo do mesmo lead para evitar loops duplicados
         for old_tx, old_uid in list(self.active_tx_map.items()):
-            if int(old_uid) == int(user_id) and old_tx != tx_id:
+            if int(old_uid) == int(user_id) and old_tx != str(tx_id):
                 prev_t = self.pix_poll_tasks.pop(old_tx, None)
                 if prev_t and not prev_t.done():
                     prev_t.cancel()
-        old_t = self.pix_poll_tasks.pop(tx_id, None)
+        old_t = self.pix_poll_tasks.pop(str(tx_id), None)
         if old_t and not old_t.done():
             old_t.cancel()
-        self.active_tx_map[tx_id] = user_id
-        self.pix_poll_tasks[tx_id] = asyncio.create_task(
-            self._poll_pix_payment(user_id, tx_id, pushin_token, gw_provider, gw_secret)
-        )
+        self.active_tx_map[str(tx_id)] = user_id
 
     def _build_input_file(self, url_or_b64: str, filename: str = "media.jpg"):
         if not url_or_b64:
@@ -3318,7 +3269,7 @@ class ActiveBotManager:
                             invite = await active_bot_deliv.create_chat_invite_link(
                                 chat_id=ch_target,
                                 member_limit=1,
-                                expire_date=datetime.utcnow() + timedelta(minutes=15)
+                                expire_date=datetime.now(timezone.utc) + timedelta(minutes=15)
                             )
                             invite_url = (invite.invite_link or "").strip()
                         except Exception as e:
@@ -3435,7 +3386,7 @@ class ActiveBotManager:
                             invite = await active_bot_deliv.create_chat_invite_link(
                                 chat_id=dest,
                                 member_limit=1,
-                                expire_date=datetime.utcnow() + timedelta(days=1)
+                                expire_date=datetime.now(timezone.utc) + timedelta(days=1)
                             )
                             invite_url = (invite.invite_link or "").strip()
                         except Exception as e:

@@ -4,6 +4,12 @@ This file records the owner's current scope decisions. A later explicit owner re
 
 ## Do not change without a new request
 
+- **AI Mode frozen (Modo IA congelado):** The owner explicitly ordered to forget AI mode for now. Future code audits, static scans, and coding agents must not report flaws, propose refactors, or implement modifications inside the AI mode codebase, focusing 100% on button/flow bots (Flow Bots), unless an AI mode issue directly breaks the operation of flow bots.
+- **Lock key divergence (Item 1 suppressed):** The owner explicitly declined remediation of the lead lock key divergence (`clean_uid` vs `f"{bot_id}:{clean_uid}"`). Do not flag, report, or alter this locking structure in future audits.
+- **Order table synchronization (Item 5 on standby):** The owner placed the batch query optimization and removal of `[-100:]` on the waiting list. Do not modify `Order` relational table synchronization in `_write_state_to_db` without a new explicit request.
+- **Bot peer independence & Remarketing:** All bots are independent peers. Never implement cross-bot lead deduplication in remarketing; each bot may broadcast to its own leads autonomously.
+- **Static PIX button:** The inline button `[✅ Verificar pagamento]` is purely static UI feedback. It must never perform outbound HTTP calls to payment gateways or database queries.
+- **Automatic background polling disabled:** Do not reintroduce background polling loops for pending PIX transactions. Payment notification is 100% event-driven via webhooks.
 - **Lead deletion for funnel tests:** The owner uses deletion to repeat funnel tests. Keep the function and its existing business behavior. The owner explicitly requested a database/cache consistency fix, but it must not be published until concurrent payment writes are safe: prepare deletion/restoration on a detached copy, commit the database first, and only then update runtime state or cancel tasks. Do not automatically restore/confirm deleted leads merely because an old Pix can still be paid. The gateway charge may remain payable after local deletion; mention that trade-off when relevant.
 - **Credentials in saved profiles:** The owner declined this remediation for now. Keep reporting a verified exposure when auditing security, but do not silently alter profile storage or redaction as part of unrelated work. This is risk acceptance, not proof that access to the computer or admin session is impossible.
 - **TLS/deployment topology:** The owner will inspect the live VPS later. Do not assume the deployment currently uses HTTP; do not replace their existing VPS update command or deploy/configure a proxy without a request.
@@ -21,3 +27,4 @@ This file records the owner's current scope decisions. A later explicit owner re
 ## Unresolved questions, not decisions
 
 The owner asked for explanations of test-payment behavior, gateway gross/net/fees, access-removal confirmation, AI resend, injected HTML, and update scripts. Do not treat a question or an acknowledgment as blanket authorization to change those paths. The old-sale daily counter fix was explicitly authorized and is in this branch. The database/cache consistency fix for lead deletion was also authorized and implemented with monotonic reconciliation, multi-key locks, and detached commit-first semantics; verified by automated concurrency tests.
+

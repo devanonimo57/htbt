@@ -864,6 +864,7 @@ async def delete_lead(telegram_id: str):
             for lead in matched:
                 _archive_lead(archived, lead)
             memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != clean_uid]
+            staged.setdefault("learning", {})["evaluated_results"] = len(memory["leads"])
 
             # 1. Commit no banco de dados PRIMEIRO (conforme diretriz AGENTS.md)
             saved_state = await _write_state_to_db(staged)
@@ -2196,7 +2197,7 @@ async def resend_vip_access(req: AccessResendRequest):
                     inv = await temp_bot.create_chat_invite_link(
                         chat_id=parsed_ch,
                         member_limit=1,
-                        expire_date=datetime.utcnow() + timedelta(minutes=15)
+                        expire_date=datetime.now(timezone.utc) + timedelta(minutes=15)
                     )
                     invite_url = (inv.invite_link or "").strip()
                 except Exception:
