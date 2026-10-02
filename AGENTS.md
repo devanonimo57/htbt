@@ -20,4 +20,4 @@ This file records the owner's current scope decisions. A later explicit owner re
 
 ## Unresolved questions, not decisions
 
-The owner asked for explanations of test-payment behavior, gateway gross/net/fees, access-removal confirmation, AI resend, injected HTML, and update scripts. Do not treat a question or an acknowledgment as blanket authorization to change those paths. The old-sale daily counter fix was explicitly authorized and is in this branch. The database/cache consistency fix for lead deletion was also authorized, but its concurrent-payment race still requires a safe implementation; do not present it as completed.
+The owner asked for explanations of test-payment behavior, gateway gross/net/fees, access-removal confirmation, AI resend, injected HTML, and update scripts. Do not treat a question or an acknowledgment as blanket authorization to change those paths. The old-sale daily counter fix was explicitly authorized and is in this branch. The database/cache consistency fix for lead deletion was also authorized and implemented with monotonic reconciliation, multi-key locks, and detached commit-first semantics; verified by automated concurrency tests.

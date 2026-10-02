@@ -4,6 +4,7 @@ import logging
 import secrets
 import hmac
 import copy
+import contextlib
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 
@@ -633,6 +634,38 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 state = _merge_config_preserving_runtime(state, existing_state)
             else:
                 state = _preserve_existing_secrets(state, existing_state)
+                # Reconciliação monotônica de transações financeiras (Item 2)
+                del_set = set(str(x) for x in (delete_tx_ids or []))
+                ex_tx_map = existing_state.get("tx_records") if isinstance(existing_state.get("tx_records"), dict) else {}
+                st_tx_map = state.setdefault("tx_records", {})
+
+                for ex_id, ex_rec in ex_tx_map.items():
+                    if not isinstance(ex_rec, dict) or str(ex_id) in del_set:
+                        continue
+                    if ex_rec.get("status") == "paid" or ex_rec.get("delivered") or ex_rec.get("sales_counted") is True:
+                        st_rec = st_tx_map.get(ex_id)
+                        if not st_rec or not isinstance(st_rec, dict):
+                            st_tx_map[ex_id] = copy.deepcopy(ex_rec)
+                        elif st_rec.get("status") != "paid":
+                            st_rec["status"] = "paid"
+                            st_rec["paid_at"] = ex_rec.get("paid_at") or st_rec.get("paid_at") or datetime.utcnow().isoformat()
+                            if ex_rec.get("sales_counted"):
+                                st_rec["sales_counted"] = True
+                            if ex_rec.get("delivered"):
+                                st_rec["delivered"] = True
+                            if ex_rec.get("access_status"):
+                                st_rec["access_status"] = ex_rec.get("access_status")
+                            if ex_rec.get("invite_url"):
+                                st_rec["invite_url"] = ex_rec.get("invite_url")
+
+                ex_learning = existing_state.get("learning") if isinstance(existing_state.get("learning"), dict) else {}
+                st_learning = state.setdefault("learning", {})
+                if not delete_tx_ids and isinstance(ex_learning, dict):
+                    ex_confirmed = int(ex_learning.get("confirmed_purchases") or 0)
+                    st_confirmed = int(st_learning.get("confirmed_purchases") or 0)
+                    if ex_confirmed > st_confirmed:
+                        st_learning["confirmed_purchases"] = ex_confirmed
+
             state = _normalize_providers(state)
 
             if not config:
@@ -665,7 +698,10 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                             )
                             session.add(ord_row)
                         else:
-                            ord_row.status = str(tx_rec.get("status") or ord_row.status)
+                            if ord_row.status == "paid" and tx_rec.get("status") != "paid":
+                                pass
+                            else:
+                                ord_row.status = str(tx_rec.get("status") or ord_row.status)
                             if ord_row.status == "paid" and not ord_row.paid_at:
                                 ord_row.paid_at = datetime.utcnow()
                     except Exception:
@@ -783,57 +819,91 @@ def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
     old.update(new_record)
 
 
-def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -> None:
-    """Interrompe monitoramento local; não cancela a cobrança no gateway."""
+def _cancel_pending_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[str]:
+    """Interrompe monitoramento local no estado desacoplado; não cancela a cobrança no gateway."""
+    cancelled: List[str] = []
     for tx_id, record in (state.get("tx_records") or {}).items():
-        if not isinstance(record, dict) or str(record.get("user_id")) != str(telegram_id):
+        if not isinstance(record, dict) or str(record.get("user_id") or record.get("telegram_id")) != str(telegram_id):
             continue
         if record.get("status") != "pending" or record.get("delivered"):
             continue
         record["status"] = "cancelled"
         record["cancelled_at"] = datetime.now(timezone.utc).isoformat()
-        cached = bot_manager.tx_records.get(tx_id)
-        if isinstance(cached, dict):
-            cached.update(record)
-        bot_manager.active_tx_map.pop(tx_id, None)
-        poll = bot_manager.pix_poll_tasks.pop(tx_id, None)
-        if poll and not poll.done():
-            poll.cancel()
+        cancelled.append(str(tx_id))
+    return cancelled
 
 
 @app.delete("/api/leads/{telegram_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_lead(telegram_id: str):
-    async with bot_manager._get_lead_lock(str(telegram_id)):
-        state = await _read_state_from_db()
-        memory = state.setdefault("memory", {"leads": []})
-        leads = memory.get("leads", [])
-        matched = [lead for lead in leads if str(lead.get("telegram_id")) == str(telegram_id)]
-        if not matched:
-            raise HTTPException(status_code=404, detail="Lead não encontrado.")
-        archived = memory.setdefault("deleted_leads", [])
-        bot_manager.cancel_lead_tasks(str(telegram_id))
-        _cancel_pending_lead_transactions(state, telegram_id)
-        for lead in matched:
-            _archive_lead(archived, lead)
-        memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != str(telegram_id)]
-        await _write_state_to_db(state)
-        return {"status": "success", "state": _redact_state_secrets(state)}
+    clean_uid = str(telegram_id or "").strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="ID de lead inválido.")
+
+    current = await _read_state_from_db()
+    lead_tx_ids = [
+        str(tx_id) for tx_id, rec in (current.get("tx_records") or {}).items()
+        if isinstance(rec, dict) and str(rec.get("user_id") or rec.get("telegram_id")) == clean_uid
+    ]
+
+    async with bot_manager._get_lead_lock(clean_uid):
+        locks = [bot_manager._get_tx_lock(tid) for tid in sorted(lead_tx_ids)]
+        async with contextlib.AsyncExitStack() as stack:
+            for lk in locks:
+                await stack.enter_async_context(lk)
+
+            fresh_state = await _read_state_from_db()
+            staged = copy.deepcopy(fresh_state)
+            memory = staged.setdefault("memory", {"leads": []})
+            leads = memory.get("leads", [])
+            matched = [lead for lead in leads if str(lead.get("telegram_id")) == clean_uid]
+            if not matched:
+                raise HTTPException(status_code=404, detail="Lead não encontrado.")
+            archived = memory.setdefault("deleted_leads", [])
+
+            cancelled_tx_ids = _cancel_pending_lead_transactions(staged, clean_uid)
+            for lead in matched:
+                _archive_lead(archived, lead)
+            memory["leads"] = [lead for lead in leads if str(lead.get("telegram_id")) != clean_uid]
+
+            # 1. Commit no banco de dados PRIMEIRO (conforme diretriz AGENTS.md)
+            saved_state = await _write_state_to_db(staged)
+
+            # 2. Apenas após confirmação no banco, limpa runtime em memória
+            bot_manager.cancel_lead_tasks(clean_uid)
+            for tx_id in cancelled_tx_ids:
+                bot_manager.active_tx_map.pop(tx_id, None)
+                poll = bot_manager.pix_poll_tasks.pop(tx_id, None)
+                if poll and not poll.done():
+                    poll.cancel()
+                cached = bot_manager.tx_records.get(tx_id)
+                if isinstance(cached, dict) and cached.get("status") != "paid":
+                    cached["status"] = "cancelled"
+                    cached["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+
+            return {"status": "success", "state": _redact_state_secrets(saved_state)}
 
 @app.post("/api/leads/{telegram_id}/restore", dependencies=[Depends(verify_admin_auth)])
 async def restore_lead(telegram_id: str):
-    state = await _read_state_from_db()
-    memory = state.setdefault("memory", {"leads": []})
-    archived = memory.setdefault("deleted_leads", [])
-    matched = [lead for lead in archived if str(lead.get("telegram_id")) == str(telegram_id)]
-    if not matched:
-        raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
-    leads = memory.setdefault("leads", [])
-    if any(str(lead.get("telegram_id")) == str(telegram_id) for lead in leads):
-        raise HTTPException(status_code=409, detail="Lead ativo já existe.")
-    memory["deleted_leads"] = [lead for lead in archived if str(lead.get("telegram_id")) != str(telegram_id)]
-    leads[:0] = [{key: value for key, value in lead.items() if key != "deleted_at"} for lead in matched]
-    await _write_state_to_db(state)
-    return {"status": "success", "state": _redact_state_secrets(state)}
+    clean_uid = str(telegram_id or "").strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="ID de lead inválido.")
+
+    async with bot_manager._get_lead_lock(clean_uid):
+        current = await _read_state_from_db()
+        staged = copy.deepcopy(current)
+        memory = staged.setdefault("memory", {"leads": []})
+        archived = memory.setdefault("deleted_leads", [])
+        matched = [lead for lead in archived if str(lead.get("telegram_id")) == clean_uid]
+        if not matched:
+            raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
+        leads = memory.setdefault("leads", [])
+        if any(str(lead.get("telegram_id")) == clean_uid for lead in leads):
+            raise HTTPException(status_code=409, detail="Lead ativo já existe.")
+        memory["deleted_leads"] = [lead for lead in archived if str(lead.get("telegram_id")) != clean_uid]
+        leads[:0] = [{key: value for key, value in lead.items() if key != "deleted_at"} for lead in matched]
+        # Commit no banco de dados primeiro
+        saved_state = await _write_state_to_db(staged)
+        return {"status": "success", "state": _redact_state_secrets(saved_state)}
 
 
 def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[str]:
@@ -876,48 +946,70 @@ def _remove_lead_transactions(state: Dict[str, Any], telegram_id: str) -> List[s
 
 @app.delete("/api/leads/{telegram_id}/permanent", dependencies=[Depends(verify_admin_auth)])
 async def permanently_delete_lead(telegram_id: str):
+    clean_uid = str(telegram_id or "").strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="ID de lead inválido.")
+
     current = await _read_state_from_db()
-    state = json.loads(json.dumps(current))
-    memory = state.setdefault("memory", {"leads": []})
-    archived = memory.get("deleted_leads", [])
-    remaining = [lead for lead in archived if str(lead.get("telegram_id")) != str(telegram_id)]
-    if len(remaining) == len(archived):
-        raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
-    if any(str(lead.get("telegram_id")) == str(telegram_id) for lead in memory.get("leads", [])):
-        raise HTTPException(status_code=409, detail="O mesmo cliente voltou ao bot. Exclua o cadastro ativo antes de apagar permanentemente.")
-    memory["deleted_leads"] = remaining
-    removed_tx_ids = _remove_lead_transactions(state, telegram_id)
-    state = await _write_state_to_db(state, delete_tx_ids=removed_tx_ids)
-    for tx_id in removed_tx_ids:
-        bot_manager.tx_records.pop(tx_id, None)
-        bot_manager.active_tx_map.pop(tx_id, None)
-        task = bot_manager.pix_poll_tasks.pop(tx_id, None)
-        if task and not task.done():
-            task.cancel()
-    return {"status": "success", "state": _redact_state_secrets(state)}
+    lead_tx_ids = [
+        str(tx_id) for tx_id, rec in (current.get("tx_records") or {}).items()
+        if isinstance(rec, dict) and str(rec.get("user_id") or rec.get("telegram_id")) == clean_uid
+    ]
+
+    async with bot_manager._get_lead_lock(clean_uid):
+        locks = [bot_manager._get_tx_lock(tid) for tid in sorted(lead_tx_ids)]
+        async with contextlib.AsyncExitStack() as stack:
+            for lk in locks:
+                await stack.enter_async_context(lk)
+
+            fresh_state = await _read_state_from_db()
+            staged = copy.deepcopy(fresh_state)
+            memory = staged.setdefault("memory", {"leads": []})
+            archived = memory.get("deleted_leads", [])
+            remaining = [lead for lead in archived if str(lead.get("telegram_id")) != clean_uid]
+            if len(remaining) == len(archived):
+                raise HTTPException(status_code=404, detail="Lead arquivado não encontrado.")
+            if any(str(lead.get("telegram_id")) == clean_uid for lead in memory.get("leads", [])):
+                raise HTTPException(status_code=409, detail="O mesmo cliente voltou ao bot. Exclua o cadastro ativo antes de apagar permanentemente.")
+            memory["deleted_leads"] = remaining
+            removed_tx_ids = _remove_lead_transactions(staged, clean_uid)
+            saved_state = await _write_state_to_db(staged, delete_tx_ids=removed_tx_ids)
+            for tx_id in removed_tx_ids:
+                bot_manager.tx_records.pop(tx_id, None)
+                bot_manager.active_tx_map.pop(tx_id, None)
+                task = bot_manager.pix_poll_tasks.pop(tx_id, None)
+                if task and not task.done():
+                    task.cancel()
+            return {"status": "success", "state": _redact_state_secrets(saved_state)}
 
 
 @app.post("/api/leads/{telegram_id}/reset", dependencies=[Depends(verify_admin_auth)])
 async def reset_lead_conversation(telegram_id: str):
-    bot_manager.cancel_lead_tasks(str(telegram_id))
-    state = await _read_state_from_db()
-    memory = state.setdefault("memory", {"leads": []})
-    for lead in memory.get("leads", []):
-        if str(lead.get("telegram_id")) == str(telegram_id):
-            lead["history"] = []
-            lead["stage"] = "Conversando"
-            lead["stage_history"] = ["Conversando"]
-            lead["sent_downsell_steps"] = []
-            lead["prefs_list"] = []
-            lead["objs_list"] = []
-            lead["preferences"] = "Iniciou conversa no bot"
-            lead["objections"] = "Nenhuma identificada"
-            lead.pop("chosen_plan", None)
-            lead.pop("chosen_upsell", None)
-            lead.pop("last_tx_is_upsell", None)
-            break
-    await _write_state_to_db(state)
-    return {"status": "success", "state": _redact_state_secrets(state)}
+    clean_uid = str(telegram_id or "").strip()
+    if not clean_uid:
+        raise HTTPException(status_code=400, detail="ID de lead inválido.")
+
+    async with bot_manager._get_lead_lock(clean_uid):
+        current = await _read_state_from_db()
+        staged = copy.deepcopy(current)
+        memory = staged.setdefault("memory", {"leads": []})
+        for lead in memory.get("leads", []):
+            if str(lead.get("telegram_id")) == clean_uid:
+                lead["history"] = []
+                lead["stage"] = "Conversando"
+                lead["stage_history"] = ["Conversando"]
+                lead["sent_downsell_steps"] = []
+                lead["prefs_list"] = []
+                lead["objs_list"] = []
+                lead["preferences"] = "Iniciou conversa no bot"
+                lead["objections"] = "Nenhuma identificada"
+                lead.pop("chosen_plan", None)
+                lead.pop("chosen_upsell", None)
+                lead.pop("last_tx_is_upsell", None)
+                break
+        saved = await _write_state_to_db(staged)
+        bot_manager.cancel_lead_tasks(clean_uid)
+        return {"status": "success", "state": _redact_state_secrets(saved)}
 
 @app.delete("/api/leads", dependencies=[Depends(verify_admin_auth)])
 async def clear_all_leads():
@@ -1767,7 +1859,6 @@ async def diagnose_flow_bot(req: FlowDiagnoseRequest):
 def _reset_lead_for_retest(state: Dict[str, Any], user_id: int) -> None:
     if not user_id:
         return
-    bot_manager.cancel_lead_tasks(str(user_id))
     for lead in (state.get("memory") or {}).get("leads", []):
         if str(lead.get("telegram_id")) == str(user_id):
             lead["stage"] = "Conversando"
@@ -1936,6 +2027,8 @@ async def delete_flow_transaction(tx_id: str):
         poll_t = bot_manager.pix_poll_tasks.pop(clean_id, None)
         if poll_t and not poll_t.done():
             poll_t.cancel()
+        if uid:
+            bot_manager.cancel_lead_tasks(str(uid))
 
         return {"status": "ok", "deleted_tx_id": clean_id, "state": _redact_state_secrets(staged_state)}
 
