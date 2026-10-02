@@ -27,14 +27,16 @@ class DeleteOldSalesCounterTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_permanent_delete_of_old_sale_does_not_change_today(self):
         state = self.make_state(paid_at="2020-01-01T12:00:00Z")
+        writer = AsyncMock(side_effect=lambda s, **kw: s)
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
-             patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)):
+             patch.object(app_main, "_write_state_to_db", new=writer):
             result = await app_main.permanently_delete_lead("42")
         updated = result["state"]
         bot = updated["flow_bots"][0]
         self.assertEqual((bot["sales_today"], bot["revenue_today"]), (1, 20.0))
         self.assertEqual(updated["learning"]["confirmed_purchases"], 1)
-        self.assertNotIn("pix-old", updated["tx_records"])
+        self.assertNotIn("pix-old", writer.await_args.args[0]["tx_records"])
+        self.assertIn("pix-old", writer.await_args.kwargs["delete_tx_ids"])
     async def test_counted_sale_paid_today_decreases_today(self):
         state = self.make_state(paid_at=datetime.now(BRT).isoformat(), amount=20.0)
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \

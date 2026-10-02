@@ -51,7 +51,7 @@ class AuditRound5Tests(unittest.IsolatedAsyncioTestCase):
         async def _mock_read():
             return copy.deepcopy(self.server_state)
 
-        async def _mock_write(st, delete_tx_ids=None):
+        async def _mock_write(st, delete_tx_ids=None, delete_client_keys=None):
             self.server_state = copy.deepcopy(st)
             return self.server_state
 
