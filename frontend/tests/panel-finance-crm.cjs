@@ -29,6 +29,7 @@ const tx_records = {
 };
 const context = {STATE:{flow_bots:[{id:'a',username:'@a',sales_today:999,revenue_today:999},{id:'b',username:'@b'}],tx_records,memory:{leads:[]}},
   document:{getElementById:el}, NB_FIN_PERIOD:'Hoje',NB_FIN_STATUS:'Todos',
+  NB_FIN_TRANSACTIONS:null,NB_FIN_METRICS:null,NB_FIN_PAGE:1,NB_METRICS:null,
   escapeHtml:String, NB_DASH_PERIOD:'Hoje', NB_ANA_SELECTED_DATE:'',NB_ANA_CAL_YEAR:2026,NB_ANA_CAL_MONTH:9,
   nbMatchesDateFilter:(date,period)=>period==='Total'||(date||'').startsWith(today),
 };
@@ -73,16 +74,28 @@ vm.runInContext(extract('function nbLeadDeleteScope(', 'async function nbRefresh
   calls.length=0;
   context.adminFetch=async url=>{
     calls.push(url);
-    if(url==='/api/metrics')return {ok:false,status:404};
-    return {ok:true,json:async()=>({tx_records:{latest:{status:'paid',amount:9}},memory:{leads:[]}})};
+    return {ok:true,json:async()=>({paid_count:1,paid_amount:9,pending_count:0,pending_amount:0,generated_count:1,generated_amount:9,all_time_paid_amount:9})};
   };
   const renderOriginal = context.nbRenderDashboardView;
   context.nbRenderDashboardView=()=>{};
   context.nbUpdateHeaderRevenueWidget=()=>{};
   await context.nbRefreshMetrics();
-  assert.deepEqual(calls,['/api/metrics','/api/state']);
-  assert.equal(context.STATE.tx_records.latest.amount,9);
+  assert.deepEqual(calls,['/api/metrics?period=Hoje&bot_id=all']);
+  assert.equal(context.NB_METRICS.paid_amount,9);
   assert.equal(context.STATE.flow_bots[0].id,'a');
+  context.NB_FIN_PERIOD='Total'; context.NB_FIN_STATUS='Todos'; context.NB_FIN_PAGE=1;
+  context.adminFetch=async url=>{
+    calls.push(url);
+    return {ok:true,json:async()=>url.startsWith('/api/transactions')
+      ? {total:26,page:1,page_size:25,items:[{tx_id:'page-one',bot_id:'a',status:'paid',amount:11}]}
+      : {paid_count:26,paid_amount:286,pending_amount:0}};
+  };
+  el('nb-fin-bot-select').value='a';
+  await context.nbRefreshFinance();
+  assert(calls.some(url=>url.includes('/api/transactions?period=Total&bot_id=a&status=all&page=1&page_size=25')));
+  assert.equal(el('nb-fin-paid-count').textContent,'26');
+  assert.match(el('nb-fin-tx-container').innerHTML,/page-one/);
+  assert.match(el('nb-fin-tx-container').innerHTML,/Próxima/);
   context.nbRenderDashboardView=renderOriginal;
   console.log('Panel/Financeiro/CRM checks passed');
 })().catch(e=>{console.error(e);process.exitCode=1});

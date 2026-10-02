@@ -45,6 +45,7 @@ class PixRecord(Base):
     is_test = Column(Boolean, nullable=False, default=False)
     is_upsell = Column(Boolean, nullable=False, default=False)
     paid_at = Column(String, nullable=False, default="")
+    created_at = Column(String, nullable=False, default="")
     data_json = Column(Text, nullable=False)
     __table_args__ = (Index("ix_pix_bot_user", "origin_bot_id", "telegram_id"),)
 

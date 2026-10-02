@@ -934,7 +934,7 @@
         <!-- BARRA DE FILTROS (BOTS | FLUXOS | GATEWAYS | FONTES | TIPOS | LIMPAR) -->
         <div class="nb-card p-3 flex flex-wrap items-center justify-between gap-2.5">
           <div class="flex flex-wrap items-center gap-2.5 flex-1">
-            <select id="nb-ana-filter-bot" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
+            <select id="nb-ana-filter-bot" onchange="nbRefreshMetrics()" class="nb-select !w-auto min-w-[155px] !py-1.5 !px-3 text-xs">
               <option value="all">Todos os Bots</option>
             </select>
             <select id="nb-ana-filter-flow" onchange="nbRenderDashboardView()" class="nb-select !w-auto min-w-[150px] !py-1.5 !px-3 text-xs">
@@ -1574,7 +1574,7 @@
           </div>
           <div class="flex items-center gap-2.5 flex-wrap">
             <div id="nb-fin-period-pills" class="inline-flex p-1 rounded-xl bg-[#120c0e] border border-[#281b1e]"></div>
-            <select id="nb-fin-bot-select" onchange="nbRenderFinanceView()" class="nb-input !w-auto min-w-[160px] !py-2 !px-3 text-xs"></select>
+            <select id="nb-fin-bot-select" onchange="NB_FIN_PAGE=1;nbRefreshFinance()" class="nb-input !w-auto min-w-[160px] !py-2 !px-3 text-xs"></select>
             <button type="button" onclick="nbClearBotTestSales(false, document.getElementById('nb-fin-bot-select')?.value || 'all')" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 transition" title="Remove as vendas geradas com /aprovar e desconta da receita">
               <i class="fa-solid fa-broom text-amber-400 text-[11px]"></i>
               <span>Limpar Vendas de Teste</span>
@@ -9234,6 +9234,10 @@ quer que eu te mostre as opções de acesso?</textarea>
     let NB_DASH_PERIOD = "Hoje";
     let NB_FIN_PERIOD = "Hoje";
     let NB_FIN_STATUS = "Todos";
+    let NB_FIN_PAGE = 1;
+    let NB_METRICS = null;
+    let NB_FIN_METRICS = null;
+    let NB_FIN_TRANSACTIONS = null;
     let NB_CLIENTS_SUBTAB = "leads";
     let NB_LEADS_PERIOD = "Tudo";
     let NB_ACTIVE_CHAT_USER_ID = "";
@@ -9245,7 +9249,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbUpdateHeaderRevenueWidget() {
       const txMap = STATE.tx_records || {};
-      const totalRev = nbDistinctTransactions(txMap)
+      const totalRev = NB_METRICS ? Number(NB_METRICS.all_time_paid_amount || 0) : nbDistinctTransactions(txMap)
         .filter(tx => tx && (tx.status === "paid" || tx.delivered))
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
@@ -9325,7 +9329,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (view === 'dashboard') await nbRefreshMetrics();
       if (view === 'clients') nbRenderClientsView();
       if (view === 'remarketing') nbRenderRemarketingView();
-      if (view === 'finance') nbRenderFinanceView();
+      if (view === 'finance') await nbRefreshFinance();
       if (view === 'gateways') nbRenderGatewaysView();
       return true;
     }
@@ -10227,7 +10231,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       } else {
         NB_ANA_SELECTED_DATE = isoDate;
       }
-      nbRenderDashboardView();
+      nbRefreshMetrics();
     }
 
     async function nbAddAnalyticsNote() {
@@ -10250,18 +10254,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderDashboardView();
     }
 
-    // GET /api/metrics contract: {tx_records, memory:{leads}}.
-    // Older servers without this route fall back to the existing state API.
     async function nbRefreshMetrics() {
       try {
-        let res = await adminFetch('/api/metrics');
-        if (res.status === 404) res = await adminFetch('/api/state');
+        const bot = document.getElementById('nb-ana-filter-bot')?.value || 'all';
+        const date = NB_ANA_SELECTED_DATE ? `&date=${encodeURIComponent(NB_ANA_SELECTED_DATE)}` : '';
+        const res = await adminFetch(`/api/metrics?period=${encodeURIComponent(NB_DASH_PERIOD)}&bot_id=${encodeURIComponent(bot)}${date}`);
         if (!res.ok) throw new Error('Falha ao atualizar métricas');
-        const data = await res.json();
-        const metrics = data.metrics || data;
-        if (!metrics.tx_records || !metrics.memory?.leads) throw new Error('Métricas incompletas');
-        STATE = { ...STATE, tx_records: metrics.tx_records,
-          memory: { ...STATE.memory, leads: metrics.memory.leads } };
+        NB_METRICS = await res.json();
         nbUpdateHeaderRevenueWidget();
       } catch (error) {
         console.warn('Métricas não atualizadas:', error);
@@ -10277,7 +10276,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (pillsEl) {
         pillsEl.innerHTML = periods.map(p => {
           const act = (!NB_ANA_SELECTED_DATE && NB_DASH_PERIOD === p);
-          return `<button type="button" onclick="NB_ANA_SELECTED_DATE=''; NB_DASH_PERIOD='${p}'; nbRenderDashboardView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          return `<button type="button" onclick="NB_ANA_SELECTED_DATE=''; NB_DASH_PERIOD='${p}'; nbRefreshMetrics();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
@@ -10346,10 +10345,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       });
       const paidTx = matchingTx.filter(tx => tx.status === 'paid' || tx.delivered);
       const pendingTx = matchingTx.filter(tx => tx.status === 'pending' && !tx.delivered);
-      const paidSalesCount = paidTx.length;
-      const pixGenCount = matchingTx.length;
-      const confirmedRev = paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-      const generatedRev = matchingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const paidSalesCount = NB_METRICS ? NB_METRICS.paid_count : paidTx.length;
+      const pixGenCount = NB_METRICS ? NB_METRICS.generated_count : matchingTx.length;
+      const confirmedRev = NB_METRICS ? NB_METRICS.paid_amount : paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const generatedRev = NB_METRICS ? NB_METRICS.generated_amount : matchingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
       const avgTicket = paidSalesCount > 0 ? confirmedRev / paidSalesCount : 0;
 
 
@@ -10360,14 +10359,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
       // 0. Bloco Original Restaurado (Receita Hero, Vendas, Ticket Médio, Taxa de Conversão, Pendentes, Starts por Venda, Receita últimos dias, Status, Últimas atualizações)
-      const pendingVal = pendingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const pendingVal = NB_METRICS ? NB_METRICS.pending_amount : pendingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
       setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
       setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
       setTxt('nb-dash-kpi-conv', (paidSalesCount > 0 && startsCount > 0) ? `${Math.round((paidSalesCount / startsCount) * 100)}%` : (startsCount > 0 ? "0%" : "—"));
       setTxt('nb-dash-kpi-pending-val', fmtBRL(pendingVal));
-      setTxt('nb-dash-kpi-pending-cnt', `${pendingTx.length} Pix aguardando pagamento`);
+      setTxt('nb-dash-kpi-pending-cnt', `${NB_METRICS ? NB_METRICS.pending_count : pendingTx.length} Pix aguardando pagamento`);
       setTxt('nb-dash-kpi-starts', paidSalesCount > 0 ? String(Math.max(1, Math.round(startsCount / paidSalesCount))) : "—");
 
       const recRevEl = document.getElementById('nb-dash-recent-revenue');
@@ -10685,13 +10684,36 @@ quer que eu te mostre as opções de acesso?</textarea>
       return [...unique.values()];
     }
 
+    async function nbRefreshFinance() {
+      const bot = document.getElementById('nb-fin-bot-select')?.value || 'all';
+      const base = `period=${encodeURIComponent(NB_FIN_PERIOD)}&bot_id=${encodeURIComponent(bot)}`;
+      const status = {Pago:'paid',Pendente:'pending',Cancelado:'cancelled'}[NB_FIN_STATUS] || (NB_FIN_STATUS === 'Todos' ? 'all' : NB_FIN_STATUS.toLowerCase());
+      try {
+        const [metricsRes, txRes] = await Promise.all([
+          adminFetch(`/api/metrics?${base}`),
+          adminFetch(`/api/transactions?${base}&status=${encodeURIComponent(status)}&page=${NB_FIN_PAGE}&page_size=25`)
+        ]);
+        if (!metricsRes.ok || !txRes.ok) throw new Error('Não foi possível carregar o Financeiro');
+        NB_FIN_METRICS = await metricsRes.json();
+        NB_FIN_TRANSACTIONS = await txRes.json();
+        nbRenderFinanceView();
+      } catch (error) {
+        console.warn('Financeiro não atualizado:', error);
+        alert('Não foi possível atualizar o Financeiro.');
+      }
+    }
+    function nbFinancePage(page) {
+      NB_FIN_PAGE = page;
+      return nbRefreshFinance();
+    }
+
     function nbRenderFinanceView() {
       const periods = ["Hoje", "Ontem", "7 dias", "Mês", "Total"];
       const pillsEl = document.getElementById('nb-fin-period-pills');
       if (pillsEl) {
         pillsEl.innerHTML = periods.map(p => {
           const act = NB_FIN_PERIOD === p;
-          return `<button type="button" onclick="NB_FIN_PERIOD='${p}'; nbRenderFinanceView();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
+          return `<button type="button" onclick="NB_FIN_PERIOD='${p}'; NB_FIN_PAGE=1;nbRefreshFinance();" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${p}</button>`;
         }).join('');
       }
 
@@ -10707,22 +10729,22 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (statusEl) {
         statusEl.innerHTML = statuses.map(s => {
           const act = NB_FIN_STATUS === s;
-          return `<button type="button" onclick="NB_FIN_STATUS='${s}'; nbRenderFinanceView();" class="px-3 py-1 rounded-full text-xs font-semibold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${s}</button>`;
+          return `<button type="button" onclick="NB_FIN_STATUS='${s}'; NB_FIN_PAGE=1;nbRefreshFinance();" class="px-3 py-1 rounded-full text-xs font-semibold transition ${act ? 'bg-[#a855f7] text-white shadow-sm' : 'text-zinc-400 hover:text-white'}">${s}</button>`;
         }).join('');
       }
 
       const selectedBotId = botSel ? botSel.value : "all";
       const txMap = STATE.tx_records || {};
-      const allTxList = nbDistinctTransactions(txMap).reverse();
+      const allTxList = NB_FIN_TRANSACTIONS ? NB_FIN_TRANSACTIONS.items : nbDistinctTransactions(txMap).reverse();
       const scopedTx = allTxList.filter(tx =>
         (selectedBotId === 'all' || tx.bot_id === selectedBotId) &&
         (NB_FIN_PERIOD === 'Total' || Boolean(tx.paid_at || tx.created_at)) &&
         nbMatchesDateFilter(tx.paid_at || tx.created_at || '', NB_FIN_PERIOD));
       const paidTx = scopedTx.filter(tx => tx.status === 'paid' || tx.delivered);
       const pendingTx = scopedTx.filter(tx => tx.status === 'pending' && !tx.delivered);
-      const totalSales = paidTx.length;
-      const totalRev = paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-      const filteredTx = allTxList.filter(tx => {
+      const totalSales = NB_FIN_METRICS ? NB_FIN_METRICS.paid_count : paidTx.length;
+      const totalRev = NB_FIN_METRICS ? NB_FIN_METRICS.paid_amount : paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const filteredTx = NB_FIN_TRANSACTIONS ? allTxList : allTxList.filter(tx => {
         if (selectedBotId !== "all" && tx.bot_id !== selectedBotId) return false;
         const txDateIso = tx.paid_at || tx.created_at || "";
         if (!txDateIso && NB_FIN_PERIOD !== 'Total') return false;
@@ -10735,7 +10757,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         return true;
       });
 
-      const pendingTotal = pendingTx
+      const pendingTotal = NB_FIN_METRICS ? NB_FIN_METRICS.pending_amount : pendingTx
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
       document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;
@@ -10790,6 +10812,10 @@ quer que eu te mostre as opções de acesso?</textarea>
             `;
           }).join('');
         }
+        if (NB_FIN_TRANSACTIONS && NB_FIN_TRANSACTIONS.total > 25) {
+          const pages = Math.ceil(NB_FIN_TRANSACTIONS.total / 25);
+          txCont.innerHTML += `<div class="flex justify-center gap-4 p-4 text-xs text-white"><button type="button" onclick="nbFinancePage(${NB_FIN_PAGE - 1})" ${NB_FIN_PAGE <= 1 ? 'disabled' : ''}>Anterior</button><span>${NB_FIN_PAGE} / ${pages}</span><button type="button" onclick="nbFinancePage(${NB_FIN_PAGE + 1})" ${NB_FIN_PAGE >= pages ? 'disabled' : ''}>Próxima</button></div>`;
+        }
       }
     }
 
@@ -10804,8 +10830,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
-          nbRenderFinanceView();
-          nbRenderDashboardView();
+          nbRefreshFinance();
+          nbRefreshMetrics();
           nbRenderBotsList();
         }
       } catch (e) {}
@@ -10825,8 +10851,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
-          nbRenderFinanceView();
-          nbRenderDashboardView();
+          nbRefreshFinance();
+          nbRefreshMetrics();
           nbRenderBotsList();
           const panel = document.getElementById('nb-bot-diagnostics-panel');
           const body = document.getElementById('nb-bot-diagnostics-body');

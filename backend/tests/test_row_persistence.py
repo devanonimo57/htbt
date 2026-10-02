@@ -11,8 +11,7 @@ from models import BotConfig, ClientRecord, PixRecord
 
 class RowPersistenceTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        async with main.engine.begin() as conn:
-            await conn.run_sync(main.Base.metadata.create_all)
+        await main._create_schema()
         main._STATE_CACHE = {}
         async with main.async_session() as session:
             for model in (BotConfig, ClientRecord, PixRecord):

@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 
 from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order, ClientRecord, PixRecord
 from pushin_pay import PushinPayClient
@@ -650,11 +650,12 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
         row = await session.get(PixRecord, str(tid))
         data = json.dumps(rec, ensure_ascii=False)
         if row is None:
-            row = PixRecord(tx_id=str(tid))
+            row = PixRecord(tx_id=str(tid), origin_bot_id=_origin_for_tx(rec))
             session.add(row)
         if row.data_json != data:
             row.data_json = data
-            row.origin_bot_id = _origin_for_tx(rec)
+            # The payment's original Telegram bot identity never changes with
+            # mutable bot configuration or a stale payload.
             row.bot_id = str(rec.get("bot_id") or "")
             row.telegram_id = str(rec.get("user_id") or rec.get("telegram_id") or "")
             row.status = str(rec.get("status") or "pending")
@@ -662,6 +663,7 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             row.is_test = bool(rec.get("is_test") or str(tid).startswith("test_"))
             row.is_upsell = bool(rec.get("is_upsell"))
             row.paid_at = str(rec.get("paid_at") or "")
+            row.created_at = str(rec.get("created_at") or "")
 
 
 async def _read_state_from_db() -> Dict[str, Any]:
@@ -828,9 +830,18 @@ async def _startup_warm_medias_task():
         pass
 
 
-async def init_db():
+async def _create_schema():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Existing installations already have pix_records; create_all does not add columns.
+        from sqlalchemy import inspect, text
+        columns = await conn.run_sync(lambda sync: {c['name'] for c in inspect(sync).get_columns('pix_records')})
+        if 'created_at' not in columns:
+            await conn.execute(text("ALTER TABLE pix_records ADD COLUMN created_at VARCHAR NOT NULL DEFAULT ''"))
+
+
+async def init_db():
+    await _create_schema()
 
     async with async_session() as session:
         result = await session.execute(select(BotConfig))
@@ -908,6 +919,81 @@ async def save_full_state(state: Dict[str, Any]):
         "state": _panel_state(updated_state),
         "updated_at": datetime.utcnow().isoformat()
     }
+
+async def _pix_filters(period: str, bot_id: str, date: str = ''):
+    filters = []
+    if bot_id != 'all':
+        state = await _read_state_from_db()
+        bot = next((b for b in state.get('flow_bots', []) if str(b.get('id')) == bot_id), None)
+        if not bot:
+            raise HTTPException(status_code=404, detail='Bot não encontrado')
+        filters.append(PixRecord.origin_bot_id == str(bot.get('bot_id') or ''))
+    if date:
+        try:
+            parsed = datetime.strptime(date, '%Y-%m-%d').date()
+            if parsed.isoformat() != date:
+                raise ValueError('date format')
+        except ValueError:
+            raise HTTPException(status_code=422, detail='Data inválida')
+        effective = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
+        filters.extend((effective >= date, effective < (parsed + timedelta(days=1)).isoformat()))
+    elif period not in ('Total', 'Tudo'):
+        today = datetime.now(timezone(timedelta(hours=-3))).date()
+        if period == 'Hoje':
+            start = today.isoformat()
+        elif period == 'Ontem':
+            start = (today - timedelta(days=1)).isoformat()
+            filters.append(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at) < today.isoformat())
+        elif period in ('Semana', '7 dias'):
+            start = (today - timedelta(days=7)).isoformat()
+        elif period in ('Mês', '30d'):
+            start = (today - timedelta(days=30)).isoformat()
+        else:
+            raise HTTPException(status_code=422, detail='Período inválido')
+        filters.append(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at) >= start)
+    return filters
+
+
+@app.get('/api/metrics', dependencies=[Depends(verify_admin_auth)])
+async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: str = ''):
+    """Database aggregate only; never transfer payment payloads to the panel."""
+    filters = await _pix_filters(period, bot_id, date)
+    paid = PixRecord.status == 'paid'
+    pending = PixRecord.status == 'pending'
+    async with async_session() as session:
+        row = (await session.execute(select(
+            func.count(PixRecord.tx_id),
+            func.coalesce(func.sum(PixRecord.amount), 0),
+            func.coalesce(func.sum(case((paid, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((paid, PixRecord.amount), else_=0)), 0),
+            func.coalesce(func.sum(case((pending, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((pending, PixRecord.amount), else_=0)), 0),
+        ).where(*filters))).one()
+        total_paid = (await session.execute(select(func.coalesce(func.sum(PixRecord.amount), 0)).where(paid))).scalar_one()
+    return dict(generated_count=row[0], generated_amount=round(float(row[1]), 2),
+                paid_count=row[2], paid_amount=round(float(row[3]), 2),
+                pending_count=row[4], pending_amount=round(float(row[5]), 2),
+                all_time_paid_amount=round(float(total_paid), 2))
+
+
+@app.get('/api/transactions', dependencies=[Depends(verify_admin_auth)])
+async def list_panel_transactions(period: str = 'Total', bot_id: str = 'all', status: str = 'all',
+                                  page: int = 1, page_size: int = 25):
+    if page < 1 or not 1 <= page_size <= 100:
+        raise HTTPException(status_code=422, detail='Paginação inválida')
+    filters = await _pix_filters(period, bot_id)
+    if status != 'all':
+        filters.append(PixRecord.status == status)
+    async with async_session() as session:
+        total = (await session.execute(select(func.count(PixRecord.tx_id)).where(*filters))).scalar_one()
+        rows = (await session.execute(select(PixRecord.tx_id, PixRecord.bot_id, PixRecord.telegram_id,
+                    PixRecord.status, PixRecord.amount, PixRecord.is_test, PixRecord.paid_at,
+                    PixRecord.created_at).where(*filters).order_by(PixRecord.tx_id.desc())
+                    .offset((page - 1) * page_size).limit(page_size))).all()
+    return {'total': total, 'page': page, 'page_size': page_size, 'items': [
+        dict(tx_id=r[0], bot_id=r[1], user_id=r[2], status=r[3], amount=r[4],
+             is_test=r[5], paid_at=r[6], created_at=r[7]) for r in rows]}
+
 
 @app.get("/api/flow-bots/metrics", dependencies=[Depends(verify_admin_auth)])
 async def get_flow_metrics(bot_id: str = "all"):
