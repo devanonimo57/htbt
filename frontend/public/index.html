@@ -927,6 +927,7 @@
               <span>Métricas e relatórios</span>
             </p>
           </div>
+          <button type="button" onclick="nbRefreshMetrics()" class="px-3.5 py-2 rounded-lg border border-[#2b1e3d] text-xs font-semibold text-zinc-300 hover:text-white">Atualizar métricas</button>
           <div id="nb-dash-period-pills" class="inline-flex p-1 rounded-xl bg-[#120d1b] border border-[#2b1e3d]"></div>
         </div>
 
@@ -1024,15 +1025,7 @@
         </div>
 
         <!-- 4 TOP KPI CARDS (VISITAS | STARTS | RECEITA GERADA | RECEITA CONFIRMADA) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="nb-card p-5 space-y-3 border-t-2 border-t-[#a855f7]/60">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">VISITAS</span>
-              <span class="w-8 h-8 rounded-lg bg-[#1a1128] border border-[#352052] text-[#a855f7] flex items-center justify-center text-xs"><i class="fa-regular fa-eye"></i></span>
-            </div>
-            <div id="nb-ana-kpi-visits" class="text-3xl font-extrabold text-[#a855f7]">0</div>
-            <div id="nb-ana-kpi-visits-sub" class="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">0.0% VIRARAM STARTS</div>
-          </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
@@ -4399,9 +4392,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <button type="button" onclick="clearAllLeads()" class="px-3.5 py-2.5 rounded-xl bg-purple-950/30 hover:bg-red-900/50 border border-purple-800/40 text-xs font-bold text-purple-300 flex items-center gap-2 transition">
-                  <i class="fa-regular fa-trash-can text-[11px]"></i> Limpar todas
-                </button>
+
                 <button type="button" onclick="loadInitialState()" class="px-4 py-2.5 rounded-xl bg-[#0b0d14] hover:bg-[#141824] border border-[#1e3a8a] text-xs font-bold text-white flex items-center gap-2 transition">
                   <i class="fa-solid fa-arrows-rotate text-[11px] text-slate-300"></i> Atualizar
                 </button>
@@ -5953,11 +5944,15 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (err) {}
     }
 
-    async function deleteLead(telegramId, e) {
+    // bot_id=all targets this Telegram client across bots, never all clients.
+    function nbLeadDeleteScope(botId) {
+      return botId || document.getElementById('nb-leads-filter-bot')?.value || 'all';
+    }
+    async function deleteLead(telegramId, e, botId) {
       if (e) e.stopPropagation();
       if (!confirm(`Mover o lead ${telegramId} para Excluídos e encerrar o acompanhamento dos Pix pendentes? O QR do provedor ainda poderá ser pago.`)) return;
       try {
-        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}`, { method: 'DELETE' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}?bot_id=${encodeURIComponent(nbLeadDeleteScope(botId))}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Servidor recusou exclusão');
         const data = await res.json();
         if (data.state) STATE = data.state;
@@ -5972,10 +5967,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       STATE = { ...STATE, ...await res.json() };
     }
 
-    async function nbRestoreExcludedLead(id) {
+    async function nbRestoreExcludedLead(id, botId) {
       if (!confirm(`Restaurar o lead ${id} à base ativa?`)) return;
       try {
-        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/restore?bot_id=${encodeURIComponent(nbLeadDeleteScope(botId))}`, { method: 'POST' });
         if (!res.ok) throw new Error('Falha ao restaurar');
         const data = await res.json();
         if (data.state) STATE = data.state; else await nbRefreshLeadsState();
@@ -5983,10 +5978,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (err) { alert('Não foi possível restaurar o lead. Tente novamente.'); }
     }
 
-    async function nbPermanentlyDeleteLead(id) {
+    async function nbPermanentlyDeleteLead(id, botId) {
       if (!confirm(`Excluir PERMANENTEMENTE o lead ${id}, suas transações no painel e descontar as vendas correspondentes dos indicadores? Isso não estorna um Pix real e não pode ser desfeito.`)) return;
       try {
-        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/permanent`, { method: 'DELETE' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(id)}/permanent?bot_id=${encodeURIComponent(nbLeadDeleteScope(botId))}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Falha na exclusão definitiva');
         const data = await res.json();
         if (data.state) STATE = data.state; else await nbRefreshLeadsState();
@@ -9249,13 +9244,10 @@ quer que eu te mostre as opções de acesso?</textarea>
     let NB_EDITING_RMK_ID = null;
 
     function nbUpdateHeaderRevenueWidget() {
-      const bots = STATE.flow_bots || [];
       const txMap = STATE.tx_records || {};
-      const botsRev = bots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
-      const txPaidRev = Object.values(txMap)
+      const totalRev = nbDistinctTransactions(txMap)
         .filter(tx => tx && (tx.status === "paid" || tx.delivered))
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
-      const totalRev = Math.max(botsRev, txPaidRev);
 
       const milestones = [
         { max: 10000, label: "/ 10k" },
@@ -9330,7 +9322,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       });
 
       if (view === 'bots') nbRenderBotsList();
-      if (view === 'dashboard') nbRenderDashboardView();
+      if (view === 'dashboard') await nbRefreshMetrics();
       if (view === 'clients') nbRenderClientsView();
       if (view === 'remarketing') nbRenderRemarketingView();
       if (view === 'finance') nbRenderFinanceView();
@@ -9489,7 +9481,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           <td class="p-3">${escapeHtml(item.plan_name)}</td><td class="p-3">${escapeHtml(item.bot_username)}</td>
           <td class="p-3">${item.flow_mode === 'ai' ? 'Fluxo IA' : 'Fluxo Principal'}</td><td class="p-3">${escapeHtml(item.status)}</td>
           <td class="p-3">${escapeHtml(item.date_display)}</td>
-          <td class="p-3 whitespace-nowrap"><button type="button" class="text-sky-300 mr-3" onclick="nbOpenLeadChatModalByRow(${rowIndex}, true)">Ver histórico</button><button type="button" class="text-emerald-400 mr-3" onclick="nbRestoreExcludedLead('${escapeHtml(item.user_id)}')">Restaurar</button><button type="button" class="text-rose-400" onclick="nbPermanentlyDeleteLead('${escapeHtml(item.user_id)}')">Excluir permanentemente</button></td>
+          <td class="p-3 whitespace-nowrap"><button type="button" class="text-sky-300 mr-3" onclick="nbOpenLeadChatModalByRow(${rowIndex}, true)">Ver histórico</button><button type="button" class="text-emerald-400 mr-3" onclick="nbRestoreExcludedLeadByRow(${rowIndex})">Restaurar</button><button type="button" class="text-rose-400" onclick="nbPermanentlyDeleteLeadByRow(${rowIndex})">Excluir permanentemente</button></td>
         </tr>`).join('') : '<tr><td colspan="9" class="p-8 text-center text-zinc-500">Nenhum lead excluído.</td></tr>';
 
       const periodFilteredLeads = enrichedLeads.filter(item => nbMatchesDateFilter(item.date_iso, NB_LEADS_PERIOD));
@@ -9574,7 +9566,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <i class="fa-regular fa-comment-dots"></i>
                     <span>Abrir Chat</span>
                   </button>
-                  <button type="button" onclick="deleteLead('${escapeHtml(item.user_id)}')" class="ml-2 text-[11px] text-rose-400 hover:text-rose-300">Excluir</button>
+                  <button type="button" onclick="deleteLeadByRow(${rowIndex})" class="ml-2 text-[11px] text-rose-400 hover:text-rose-300">Excluir</button>
                 </td>
               </tr>
             `;
@@ -10258,6 +10250,26 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderDashboardView();
     }
 
+    // GET /api/metrics contract: {tx_records, memory:{leads}}.
+    // Older servers without this route fall back to the existing state API.
+    async function nbRefreshMetrics() {
+      try {
+        let res = await adminFetch('/api/metrics');
+        if (res.status === 404) res = await adminFetch('/api/state');
+        if (!res.ok) throw new Error('Falha ao atualizar métricas');
+        const data = await res.json();
+        const metrics = data.metrics || data;
+        if (!metrics.tx_records || !metrics.memory?.leads) throw new Error('Métricas incompletas');
+        STATE = { ...STATE, tx_records: metrics.tx_records,
+          memory: { ...STATE.memory, leads: metrics.memory.leads } };
+        nbUpdateHeaderRevenueWidget();
+      } catch (error) {
+        console.warn('Métricas não atualizadas:', error);
+        alert('Não foi possível atualizar as métricas. Exibindo os últimos dados disponíveis.');
+      }
+      nbRenderDashboardView();
+    }
+
     function nbRenderDashboardView() {
       const periods = ["Hoje", "Ontem", "Semana", "Mês", "Tudo"];
       if (!periods.includes(NB_DASH_PERIOD)) NB_DASH_PERIOD = "Mês";
@@ -10323,26 +10335,24 @@ quer que eu te mostre as opções de acesso?</textarea>
       const paidLeads = allLeads.filter(isPaidLead);
       const pixLeads = allLeads.filter(isPixLead);
 
-      const useBotAggregate = !NB_ANA_SELECTED_DATE && filterSrc === 'all' && filterType === 'all' && filterGw === 'all';
-      const botSalesSum = useBotAggregate ? filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0) : 0;
-      const botRevSum = useBotAggregate ? filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0) : 0;
-
       const startsCount = allLeads.length;
-      const visitsCount = Math.max(startsCount, Math.round(startsCount * 1.18));
-      const paidSalesCount = Math.max(botSalesSum, paidLeads.length);
-      const pixGenCount = Math.max(paidSalesCount, pixLeads.length);
+      const matchingTx = nbDistinctTransactions(STATE.tx_records).filter(tx => {
+        if (filterBot !== 'all' && tx.bot_id !== filterBot) return false;
+        if (filterFlow !== 'all' && !allowedBotIds.has(tx.bot_id)) return false;
+        if (filterGw !== 'all' && String(tx.gateway || '').toLowerCase() !== filterGw) return false;
+        const txDate = tx.paid_at || tx.created_at || '';
+        if (!txDate && (NB_ANA_SELECTED_DATE || NB_DASH_PERIOD !== 'Tudo')) return false;
+        return NB_ANA_SELECTED_DATE ? String(txDate).startsWith(NB_ANA_SELECTED_DATE) : nbMatchesDateFilter(txDate, NB_DASH_PERIOD);
+      });
+      const paidTx = matchingTx.filter(tx => tx.status === 'paid' || tx.delivered);
+      const pendingTx = matchingTx.filter(tx => tx.status === 'pending' && !tx.delivered);
+      const paidSalesCount = paidTx.length;
+      const pixGenCount = matchingTx.length;
+      const confirmedRev = paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const generatedRev = matchingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+      const avgTicket = paidSalesCount > 0 ? confirmedRev / paidSalesCount : 0;
 
-      const avgPlanPrice = (() => {
-        const allPrices = filteredBots.flatMap(b => (b.plans || []).map(p => Number(p.price || 0))).filter(v => v > 0);
-        return allPrices.length ? (allPrices.reduce((a, b) => a + b, 0) / allPrices.length) : 19.90;
-      })();
 
-      const getLeadPrice = l => Number(l.amount || l.flow_plan_price || l.plan_price || avgPlanPrice);
-      const confirmedRev = botRevSum > 0 ? botRevSum : paidLeads.reduce((acc, l) => acc + getLeadPrice(l), 0);
-      const generatedRev = Math.max(confirmedRev, pixLeads.reduce((acc, l) => acc + getLeadPrice(l), 0));
-      const avgTicket = paidSalesCount > 0 ? (confirmedRev / paidSalesCount) : (pixGenCount > 0 ? (generatedRev / pixGenCount) : 0);
-
-      const visitsToStartPct = visitsCount > 0 ? ((startsCount / visitsCount) * 100).toFixed(1) : "0.0";
       const startToSalesPct = startsCount > 0 ? ((paidSalesCount / startsCount) * 100).toFixed(1) : "0.0";
       const approvalPct = pixGenCount > 0 ? Math.round((paidSalesCount / pixGenCount) * 100) : 0;
 
@@ -10350,15 +10360,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
       // 0. Bloco Original Restaurado (Receita Hero, Vendas, Ticket Médio, Taxa de Conversão, Pendentes, Starts por Venda, Receita últimos dias, Status, Últimas atualizações)
-      const pendingOnlyLeads = pixLeads.filter(l => !isPaidLead(l));
-      const pendingVal = pendingOnlyLeads.reduce((acc, l) => acc + getLeadPrice(l), 0);
+      const pendingVal = pendingTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
       setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
       setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
       setTxt('nb-dash-kpi-conv', (paidSalesCount > 0 && startsCount > 0) ? `${Math.round((paidSalesCount / startsCount) * 100)}%` : (startsCount > 0 ? "0%" : "—"));
       setTxt('nb-dash-kpi-pending-val', fmtBRL(pendingVal));
-      setTxt('nb-dash-kpi-pending-cnt', `${pendingOnlyLeads.length} aguardando pagamento`);
+      setTxt('nb-dash-kpi-pending-cnt', `${pendingTx.length} Pix aguardando pagamento`);
       setTxt('nb-dash-kpi-starts', paidSalesCount > 0 ? String(Math.max(1, Math.round(startsCount / paidSalesCount))) : "—");
 
       const recRevEl = document.getElementById('nb-dash-recent-revenue');
@@ -10376,7 +10385,7 @@ quer que eu te mostre as opções de acesso?</textarea>
           stSumEl.innerHTML = `
             <div class="space-y-1.5 text-xs">
               <div class="flex items-center justify-between"><span class="text-emerald-400 font-semibold">✓ Pagas / Aprovadas</span><span class="text-white font-bold">${paidSalesCount} (${fmtBRL(confirmedRev)})</span></div>
-              <div class="flex items-center justify-between"><span class="text-amber-400 font-semibold">⏳ Pendentes (Aguardando PIX)</span><span class="text-zinc-300 font-bold">${pendingOnlyLeads.length} (${fmtBRL(pendingVal)})</span></div>
+              <div class="flex items-center justify-between"><span class="text-amber-400 font-semibold">⏳ Pix pendentes (registros)</span><span class="text-zinc-300 font-bold">${pendingTx.length} (${fmtBRL(pendingVal)})</span></div>
             </div>
           `;
         } else {
@@ -10408,8 +10417,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       // 1. Top 4 KPIs
-      setTxt('nb-ana-kpi-visits', String(visitsCount));
-      setTxt('nb-ana-kpi-visits-sub', `${visitsToStartPct}% VIRARAM STARTS`);
+
       setTxt('nb-ana-kpi-starts', String(startsCount));
       setTxt('nb-ana-kpi-starts-sub', `${startToSalesPct}% DE LEADS VIRAM VENDAS`);
       setTxt('nb-ana-kpi-rev-gen', fmtBRL(generatedRev));
@@ -10420,19 +10428,14 @@ quer que eu te mostre as opções de acesso?</textarea>
       // 2. Vendas por Hora (0h - 23h SVG)
       const hourlyGen = new Array(24).fill(0);
       const hourlyPaid = new Array(24).fill(0);
-      allLeads.forEach(l => {
-        let hr = 14;
-        const raw = String(l.created_at || l.last_interaction || '');
+      matchingTx.forEach(tx => {
+        const raw = String(tx.paid_at || tx.created_at || '');
         const m = raw.match(/(\d{1,2}):\d{2}/);
-        if (m) hr = Math.min(23, Math.max(0, parseInt(m[1], 10)));
-        if (isPixLead(l)) hourlyGen[hr] += 1;
-        if (isPaidLead(l)) hourlyPaid[hr] += 1;
+        if (!m) return;
+        const hr = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+        hourlyGen[hr] += 1;
+        if (tx.status === 'paid' || tx.delivered) hourlyPaid[hr] += 1;
       });
-      if (paidSalesCount > 0 && hourlyPaid.every(v => v === 0)) {
-        const curHr = new Date().getHours();
-        hourlyPaid[curHr] = paidSalesCount;
-        hourlyGen[curHr] = Math.max(pixGenCount, paidSalesCount);
-      }
       let bestHr = 0;
       let bestHrSales = 0;
       hourlyPaid.forEach((v, h) => { if (v > bestHrSales) { bestHrSales = v; bestHr = h; } });
@@ -10540,38 +10543,41 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // 5. Top 5 Bots, Fluxos, Planos, Dias
       const topBotsItems = filteredBots
-        .map(b => ({ label: b.username || b.display_name || '@bot', sales: Number(b.sales_today || 0), rev: Number(b.revenue_today || 0) }))
-        .filter(x => x.sales > 0 || filteredBots.length > 0)
+        .map(b => ({ label: b.username || b.display_name || '@bot', sales: paidTx.filter(tx => tx.bot_id === b.id).length, rev: paidTx.filter(tx => tx.bot_id === b.id).reduce((sum, tx) => sum + Number(tx.amount || 0), 0) }))
+        .filter(x => x.sales > 0)
         .sort((a, b) => b.rev - a.rev)
         .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
       renderRankList('nb-ana-top-bots', paidSalesCount > 0 ? topBotsItems : []);
 
       const topFlowsItems = filteredBots
-        .map(b => ({ label: `Fluxo Principal (${b.username || '@bot'})`, sales: Number(b.sales_today || 0), rev: Number(b.revenue_today || 0) }))
+        .map(b => ({ label: `Fluxo Principal (${b.username || '@bot'})`, sales: paidTx.filter(tx => tx.bot_id === b.id).length, rev: paidTx.filter(tx => tx.bot_id === b.id).reduce((sum, tx) => sum + Number(tx.amount || 0), 0) }))
         .filter(x => x.sales > 0)
         .map(x => ({ label: x.label, right: `${x.sales} vds · ${fmtBRL(x.rev)}` }));
       renderRankList('nb-ana-top-flows', topFlowsItems);
 
       const planAgg = [];
-      filteredBots.forEach(b => {
-        (b.plans || []).forEach(p => {
-          planAgg.push({ label: p.name || 'Plano VIP', price: Number(p.price || 0), right: fmtBRL(p.price || 0) });
-        });
-      });
+      paidTx.forEach(tx => { planAgg.push({label: tx.offer_name || 'Plano VIP', right: fmtBRL(tx.amount)}); });
       renderRankList('nb-ana-top-plans', paidSalesCount > 0 ? planAgg : []);
 
-      const todayStr = new Date().toLocaleDateString('pt-BR');
-      renderRankList('nb-ana-top-days', paidSalesCount > 0 ? [{ label: todayStr, right: `${paidSalesCount} vds · ${fmtBRL(confirmedRev)}` }] : []);
+      const salesByDay = new Map();
+      paidTx.forEach(tx => {
+        const day = String(tx.paid_at || tx.created_at || '').slice(0, 10);
+        if (!day) return;
+        const previous = salesByDay.get(day) || { count: 0, revenue: 0 };
+        salesByDay.set(day, { count: previous.count + 1, revenue: previous.revenue + Number(tx.amount || 0) });
+      });
+      renderRankList('nb-ana-top-days', [...salesByDay].sort((a, b) => b[1].revenue - a[1].revenue)
+        .map(([day, value]) => ({ label: day, right: `${value.count} vds · ${fmtBRL(value.revenue)}` })));
 
       // 6. Top 5 Tickets, Top Códigos, Funil de Conversão
       const ticketMap = {};
-      filteredBots.forEach(b => (b.plans || []).forEach(p => {
-        const k = fmtBRL(p.price || 0);
+      paidTx.forEach(tx => {
+        const k = fmtBRL(tx.amount);
         ticketMap[k] = (ticketMap[k] || 0) + 1;
-      }));
+      });
       const topTicketItems = Object.entries(ticketMap).map(([k, cnt]) => ({ label: k, right: `${cnt} plano(s)` }));
       renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
-      renderRankList('nb-ana-top-codes', paidSalesCount > 0 ? [{ label: 'PIX_DIRETO', right: fmtBRL(confirmedRev) }] : []);
+      renderRankList('nb-ana-top-codes', [], 'Sem dados de códigos');
 
       const fStartToPix = startsCount > 0 ? Math.min(100, Math.round((pixGenCount / startsCount) * 100)) : 0;
       const fPixToPaid = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : 0;
@@ -10593,12 +10599,12 @@ quer que eu te mostre as opções de acesso?</textarea>
         right: `${Number(c.sent_count || 0)} envios`
       }));
       renderRankList('nb-ana-top-campaigns', rmkCampaigns, "Sem dados de campanhas");
-      renderRankList('nb-ana-top-sources', startsCount > 0 ? [{ label: 'Telegram Direto (/start)', right: `${startsCount} leads` }] : [], "Sem dados de fontes");
-      renderRankList('nb-ana-top-placements', startsCount > 0 ? [{ label: 'Bot Telegram', right: `${startsCount} leads` }] : [], "Sem dados de posicionamentos");
+      renderRankList('nb-ana-top-sources', [], "Sem dados de fontes");
+      renderRankList('nb-ana-top-placements', [], "Sem dados de posicionamentos");
 
-      setTxt('nb-ana-time-sec', paidSalesCount > 0 ? '42' : '0');
-      setTxt('nb-ana-time-min', paidSalesCount > 0 ? '3' : '0');
-      setTxt('nb-ana-time-hr', '0');
+      setTxt('nb-ana-time-sec', '—');
+      setTxt('nb-ana-time-min', '—');
+      setTxt('nb-ana-time-hr', '—');
       setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
 
       // 8. 8 Cards de Taxas (Upsell, Downsell, OrderBump, Recuperação, Recorrência, Retenção, Upgrade, Abandono)
@@ -10655,6 +10661,30 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
     }
 
+    function deleteLeadByRow(rowIndex) {
+      const row = NB_VISIBLE_LEADS[rowIndex];
+      if (row) return deleteLead(row.user_id, null, nbLeadDeleteScope());
+    }
+    function nbRestoreExcludedLeadByRow(rowIndex) {
+      const row = NB_EXCLUDED_LEADS[rowIndex];
+      if (row) return nbRestoreExcludedLead(row.user_id, nbLeadDeleteScope());
+    }
+    function nbPermanentlyDeleteLeadByRow(rowIndex) {
+      const row = NB_EXCLUDED_LEADS[rowIndex];
+      if (row) return nbPermanentlyDeleteLead(row.user_id, nbLeadDeleteScope());
+    }
+
+    function nbDistinctTransactions(records) {
+      const unique = new Map();
+      Object.entries(records || {}).forEach(([id, rec]) => {
+        if (!rec) return;
+        const txId = String(rec.tx_id || id);
+        // Prefer the paid version if a transaction is represented twice.
+        if (!unique.has(txId) || (rec.status === 'paid' || rec.delivered)) unique.set(txId, { ...rec, tx_id: txId });
+      });
+      return [...unique.values()];
+    }
+
     function nbRenderFinanceView() {
       const periods = ["Hoje", "Ontem", "7 dias", "Mês", "Total"];
       const pillsEl = document.getElementById('nb-fin-period-pills');
@@ -10682,15 +10712,20 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       const selectedBotId = botSel ? botSel.value : "all";
-      const filteredBots = selectedBotId === "all" ? bots : bots.filter(b => b.id === selectedBotId);
-      const totalSales = filteredBots.reduce((acc, b) => acc + Number(b.sales_today || 0), 0);
-      const totalRev = filteredBots.reduce((acc, b) => acc + Number(b.revenue_today || 0), 0);
-
       const txMap = STATE.tx_records || {};
-      const allTxList = Object.entries(txMap).map(([tid, rec]) => ({ tx_id: tid, ...(rec || {}) })).reverse();
+      const allTxList = nbDistinctTransactions(txMap).reverse();
+      const scopedTx = allTxList.filter(tx =>
+        (selectedBotId === 'all' || tx.bot_id === selectedBotId) &&
+        (NB_FIN_PERIOD === 'Total' || Boolean(tx.paid_at || tx.created_at)) &&
+        nbMatchesDateFilter(tx.paid_at || tx.created_at || '', NB_FIN_PERIOD));
+      const paidTx = scopedTx.filter(tx => tx.status === 'paid' || tx.delivered);
+      const pendingTx = scopedTx.filter(tx => tx.status === 'pending' && !tx.delivered);
+      const totalSales = paidTx.length;
+      const totalRev = paidTx.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
       const filteredTx = allTxList.filter(tx => {
-        if (selectedBotId !== "all" && tx.bot_id && tx.bot_id !== selectedBotId) return false;
+        if (selectedBotId !== "all" && tx.bot_id !== selectedBotId) return false;
         const txDateIso = tx.paid_at || tx.created_at || "";
+        if (!txDateIso && NB_FIN_PERIOD !== 'Total') return false;
         if (!nbMatchesDateFilter(txDateIso, NB_FIN_PERIOD)) return false;
         const isPaid = tx.status === "paid" || Boolean(tx.delivered);
         if (NB_FIN_STATUS === "Pago" && !isPaid) return false;
@@ -10700,8 +10735,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         return true;
       });
 
-      const pendingTotal = allTxList
-        .filter(tx => (selectedBotId === "all" || !tx.bot_id || tx.bot_id === selectedBotId) && tx.status === "pending" && !tx.delivered && nbMatchesDateFilter(tx.created_at || "", NB_FIN_PERIOD))
+      const pendingTotal = pendingTx
         .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
 
       document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;
@@ -10751,12 +10785,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <span class="block text-[11px] text-zinc-500 font-mono mt-0.5">TX: ${escapeHtml(String(tx.tx_id || '').slice(0, 28))} ${dateStr ? '· ' + escapeHtml(dateStr) : ''}</span>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button type="button" onclick="nbDeleteTransaction('${escapeHtml(String(tx.tx_id || ''))}')" class="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/70 border border-rose-800/50 text-rose-300 text-[11px] font-semibold flex items-center gap-1.5 transition" title="Apaga este registro, desconta da receita/vendas do bot e reseta a conversa do lead">
-                    <i class="fa-regular fa-trash-can"></i>
-                    <span>Apagar registro</span>
-                  </button>
-                </div>
+
               </div>
             `;
           }).join('');
