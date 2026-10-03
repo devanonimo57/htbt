@@ -3282,7 +3282,11 @@ class ActiveBotManager:
                             ext_url = (plan_obj.get("delivery_external_url") or fb_deliv.get("external_url") or "").strip()
 
                     invite_url = ""
-                    if eff_type == "Link externo" and ext_url:
+                    if tx_record.get('primary_access_delivered'):
+                        # This retry sends only the purchased additional; the
+                        # primary message already carries its original invite.
+                        invite_url = str(tx_record.get('invite_url') or '')
+                    elif eff_type == "Link externo" and ext_url:
                         invite_url = ext_url
                     elif ch_target and (target_bot or self.bot):
                         try:
@@ -3341,15 +3345,22 @@ class ActiveBotManager:
                         plan_name=plan_label,
                         valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
                     )
-                    access_message = await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
+                    access_message = True if tx_record.get('primary_access_delivered') else await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
+                    if access_message is not None:
+                        tx_record['primary_access_delivered'] = True
+                        tx_record['invite_url'] = invite_url
+                        await self.state_saver(state, runtime_only=True)
 
                     bump_deliv = (tx_record.get("deliverable") or "").strip()
-                    if access_message is not None and bump_deliv:
+                    if access_message is not None and bump_deliv and not tx_record.get('additional_delivered'):
                         access_message = await self._safe_send_html(
                             user_id,
                             f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
                             bot_instance=target_bot
                         )
+                        if access_message is not None:
+                            tx_record['additional_delivered'] = True
+                            await self.state_saver(state, runtime_only=True)
                     # The HTML helper returns None after both transport attempts
                     # fail. A confirmed payment is not evidence of access delivery.
                     if access_message is None:

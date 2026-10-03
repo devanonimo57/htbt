@@ -975,7 +975,10 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                                 st_rec["delivered"] = True
                             if ex_rec.get("sales_counted"):
                                 st_rec["sales_counted"] = True
-                            for counter in ("delivery_attempts", "automatic_delivery_attempts"):
+                            for marker in ('primary_access_delivered', 'additional_delivered'):
+                                if ex_rec.get(marker):
+                                    st_rec[marker] = True
+                            for counter in ("delivery_attempts", "automatic_delivery_attempts", "manual_delivery_attempts"):
                                 if counter in ex_rec or counter in st_rec:
                                     st_rec[counter] = max(
                                         int(st_rec.get(counter) or 0), int(ex_rec.get(counter) or 0)
@@ -2779,7 +2782,7 @@ async def resend_vip_access(req: AccessResendRequest):
 
     sent_count = 0
     skipped_unpaid = 0
-    for tid in candidate_ids:
+    for tid in dict.fromkeys(candidate_ids):
         rec = tx_map.get(tid)
         if not isinstance(rec, dict):
             continue
@@ -2826,7 +2829,13 @@ async def resend_vip_access(req: AccessResendRequest):
                 continue  # identity mismatch: paid purchase requires manual correction, not a blind send
 
         temp_bot = None
+        lock = bot_manager._get_tx_lock(tid)
+        await lock.acquire()
         try:
+            state = await _read_state_from_db()
+            rec = state.get('tx_records', {}).get(tid)
+            if not isinstance(rec, dict) or rec.get('status') != 'paid' or rec.get('bot_token') != rec_token:
+                continue
             temp_bot = _create_bot_instance(tok)
             eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
             ch_target = (rec.get("delivery_channel_id") or "").strip()
@@ -2847,8 +2856,13 @@ async def resend_vip_access(req: AccessResendRequest):
                 except Exception:
                     invite_url = ""
 
-            if not invite_url or invite_url == "https://t.me/+link_exclusivo_vip":
+            resend_primary = not rec.get('primary_access_delivered') or bool(rec.get('delivered'))
+            if resend_primary and (not invite_url or invite_url == "https://t.me/+link_exclusivo_vip"):
                 continue
+
+            rec['manual_delivery_attempts'] = int(rec.get('manual_delivery_attempts') or 0) + 1
+            rec['last_manual_delivery_attempt_at'] = datetime.utcnow().isoformat()
+            await _write_state_to_db(state, runtime_only=True)
 
             btn_txt = ((fb.get("payments") or {}).get("access_button_text") if isinstance(fb, dict) else None) or "Acessar conteúdo"
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -2857,34 +2871,49 @@ async def resend_vip_access(req: AccessResendRequest):
             plan_label = rec.get("offer_name") or "Plano VIP"
             safe_plan = html.escape(str(plan_label))
             resend_text = f"🔑 <b>Seu acesso ao plano {safe_plan} foi reenviado!</b>\n\nClique no botão abaixo para acessar:"
-            try:
-                await temp_bot.send_message(
-                    chat_id=uid,
-                    text=resend_text,
-                    parse_mode="HTML",
-                    reply_markup=kb
-                )
-            except Exception:
-                await temp_bot.send_message(
-                    chat_id=uid,
-                    text=f"🔑 Seu acesso ao plano {plan_label} foi reenviado!\n\nClique no botão abaixo para acessar:",
-                    reply_markup=kb
-                )
-            rec["invite_url"] = invite_url
+            async def send_access(text, markup=None):
+                try:
+                    result = await _asyncio.wait_for(temp_bot.send_message(
+                        chat_id=uid, text=text, parse_mode='HTML', reply_markup=markup), 5)
+                except Exception as error:
+                    if "can't parse entities" not in str(error).lower():
+                        raise
+                    result = await _asyncio.wait_for(temp_bot.send_message(
+                        chat_id=uid, text=text, reply_markup=markup), 5)
+                if result is None:
+                    raise RuntimeError('Telegram não confirmou o envio.')
+
+            if resend_primary:
+                await send_access(resend_text, kb)
+                rec['primary_access_delivered'] = True
+                rec['invite_url'] = invite_url
+                await _write_state_to_db(state, runtime_only=True)
+            bump_deliv = str(rec.get('deliverable') or '').strip()
+            if bump_deliv and not rec.get('additional_delivered'):
+                await send_access(f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}")
+                rec['additional_delivered'] = True
+                await _write_state_to_db(state, runtime_only=True)
             rec["delivered"] = True
             rec["access_status"] = "Ativo"
+            rec.pop('delivery_error', None)
             sent_count += 1
-        except Exception:
-            pass
+        except Exception as error:
+            if isinstance(rec, dict):
+                rec['delivery_error'] = str(error)
+                if not rec.get('delivered'):
+                    rec['access_status'] = 'Pendente (Reenvio manual)'
         finally:
-            if temp_bot:
-                try:
-                    await temp_bot.session.close()
-                except Exception:
-                    pass
+            try:
+                await _write_state_to_db(state, runtime_only=True)
+            finally:
+                lock.release()
+                if temp_bot:
+                    try:
+                        await _asyncio.wait_for(temp_bot.session.close(), 1)
+                    except Exception:
+                        pass
 
-    if sent_count > 0:
-        state = await _write_state_to_db(state, preserve_runtime=False)
+    state = await _read_state_from_db()
     return {
         "status": "ok",
         "sent_count": sent_count,
