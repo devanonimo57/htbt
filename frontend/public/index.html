@@ -9833,17 +9833,21 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function nbSendLeadDirectMsg() {
       const inp = document.getElementById('nb-lead-chat-input');
       const btn = document.getElementById('nb-lead-chat-send-btn');
-      const text = (inp?.value || "").trim();
-      if (!text || !NB_ACTIVE_CHAT_USER_ID || !NB_ACTIVE_CHAT_BOT_ID) return;
+      const draft = inp?.value || "";
+      const text = draft.trim();
+      const userId = NB_ACTIVE_CHAT_USER_ID;
+      const botId = NB_ACTIVE_CHAT_BOT_ID;
+      const originBotId = NB_ACTIVE_CHAT_ORIGIN_BOT_ID;
+      if (!text || !userId || !botId) return;
       if (btn) btn.disabled = true;
       try {
         const res = await adminFetch("/api/flow-bots/leads/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: NB_ACTIVE_CHAT_USER_ID,
-            bot_id: NB_ACTIVE_CHAT_BOT_ID,
-            origin_bot_numeric_id: NB_ACTIVE_CHAT_ORIGIN_BOT_ID,
+            user_id: userId,
+            bot_id: botId,
+            origin_bot_numeric_id: originBotId,
             action: "send_message",
             message: text
           })
@@ -9858,8 +9862,12 @@ quer que eu te mostre as opções de acesso?</textarea>
           STATE = { ...data.state, saved_profiles: mergedProfiles };
           saveLocalBackup();
         }
-        if (inp) inp.value = "";
-        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID, NB_ACTIVE_CHAT_BOT_ID, NB_ACTIVE_CHAT_ORIGIN_BOT_ID);
+        const sameChat = NB_ACTIVE_CHAT_USER_ID === userId && NB_ACTIVE_CHAT_BOT_ID === botId
+          && NB_ACTIVE_CHAT_ORIGIN_BOT_ID === originBotId;
+        if (sameChat) {
+          if (inp && inp.value === draft) inp.value = "";
+          nbOpenLeadChatModal(userId, botId, originBotId);
+        }
         nbRenderClientsView();
       } catch (e) {} finally {
         if (btn) btn.disabled = false;
