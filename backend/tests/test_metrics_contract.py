@@ -38,6 +38,20 @@ class MetricsContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('data_json', page['items'][0])
         self.assertEqual((await main.list_panel_transactions(period='Total', bot_id='a', status='paid', page=1, page_size=2))['total'], 2)
 
+    async def test_transactions_sort_by_event_time_not_pix_id_across_pages(self):
+        state = await main._read_state_from_db()
+        state['tx_records']['p1'].update(
+            created_at='2026-09-20T08:00:00-03:00', paid_at='2026-09-21T02:30:00Z')
+        state['tx_records']['p2'].update(
+            created_at='2026-09-20T12:00:00-03:00', paid_at='2026-09-20T22:00:00-03:00')
+        state['tx_records']['p3'].update(created_at='2026-09-19T12:00:00-03:00')
+        await main._write_state_to_db(state)
+        pages = [await main.list_panel_transactions(period='Total', page=p, page_size=1)
+                 for p in (1, 2, 3)]
+        self.assertEqual([page['items'][0]['tx_id'] for page in pages], ['p1', 'p2', 'p3'])
+        pending = await main.list_panel_transactions(period='Total', status='pending')
+        self.assertEqual([item['tx_id'] for item in pending['items']], ['p3'])
+
     async def test_metrics_use_current_rows_after_payment_and_delete(self):
         state = await main._read_state_from_db()
         state['tx_records']['p3']['status'] = 'paid'

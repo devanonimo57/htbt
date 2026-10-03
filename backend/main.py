@@ -1203,9 +1203,14 @@ async def list_panel_transactions(period: str = 'Total', bot_id: str = 'all', st
         filters.append(PixRecord.status == status)
     async with async_session() as session:
         total = (await session.execute(select(func.count(PixRecord.tx_id)).where(*filters))).scalar_one()
+        event_ts = case(
+            (PixRecord.status == 'paid', func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)),
+            else_=PixRecord.created_at,
+        )
         rows = (await session.execute(select(PixRecord.tx_id, PixRecord.bot_id, PixRecord.telegram_id,
                     PixRecord.status, PixRecord.amount, PixRecord.is_test, PixRecord.paid_at,
-                    PixRecord.created_at).where(*filters).order_by(PixRecord.tx_id.desc())
+                    PixRecord.created_at).where(*filters)
+                    .order_by(func.julianday(event_ts).desc(), PixRecord.tx_id.desc())
                     .offset((page - 1) * page_size).limit(page_size))).all()
     return {'total': total, 'page': page, 'page_size': page_size, 'items': [
         dict(tx_id=r[0], bot_id=r[1], user_id=r[2], status=r[3], amount=r[4],
