@@ -858,7 +858,7 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -916,6 +916,27 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 if str(tid) not in dirty_pix and str(tid) not in (delete_tx_ids or []):
                     tx_map[tid] = copy.deepcopy(record)
 
+            if runtime_only:
+                # Runtime send completion must never restore the configuration
+                # captured before an await. Transfer runtime onto fresh config.
+                runtime_state = state
+                state = _merge_config_preserving_runtime(copy.deepcopy(existing_state), runtime_state)
+                # getMe metadata is runtime-owned, but only for the same token;
+                # never resurrect a removed/replaced bot or overwrite panel fields.
+                runtime_bots = {str(b.get('id')): b for b in runtime_state.get('flow_bots', []) if isinstance(b, dict)}
+                base_bots = {str(b.get('id')): b for b in baseline.get('flow_bots', []) if isinstance(b, dict)}
+                for bot in state.get('flow_bots', []):
+                    runtime_bot = runtime_bots.get(str(bot.get('id')), {})
+                    if bot.get('token') and bot.get('token') == runtime_bot.get('token'):
+                        for field in ('bot_id', 'username', 'first_name'):
+                            if field in runtime_bot and runtime_bot[field] != base_bots.get(str(bot.get('id')), {}).get(field):
+                                bot[field] = runtime_bot[field]
+                live_pub = state.get('publish', {})
+                runtime_pub = runtime_state.get('publish', {})
+                if live_pub.get('bot_token') and live_pub.get('bot_token') == runtime_pub.get('bot_token'):
+                    for field in ('bot_username', 'bot_first_name'):
+                        if field in runtime_pub and runtime_pub[field] != baseline.get('publish', {}).get(field):
+                            live_pub[field] = runtime_pub[field]
             if preserve_runtime:
                 state = _merge_config_preserving_runtime(state, existing_state)
             else:

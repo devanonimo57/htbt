@@ -344,7 +344,7 @@ class Stage1SecurityTests(unittest.IsolatedAsyncioTestCase):
         async def _getter():
             return self.mock_state
 
-        async def _saver(st):
+        async def _saver(st, **kwargs):
             self.mock_state = st
             return st
 

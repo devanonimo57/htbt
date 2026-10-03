@@ -69,7 +69,7 @@ class TestAuditBotIndependenceAndBlocks(unittest.IsolatedAsyncioTestCase):
         async def _getter():
             return self.state
 
-        async def _saver(new_st):
+        async def _saver(new_st, **kwargs):
             self.state = new_st
 
         self.mgr.state_getter = _getter

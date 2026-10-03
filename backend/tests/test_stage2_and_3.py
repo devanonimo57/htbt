@@ -133,7 +133,7 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         async def _getter():
             return self.server_state
 
-        async def _saver(st):
+        async def _saver(st, **kwargs):
             self.server_state = st
             return st
 

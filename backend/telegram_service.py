@@ -281,7 +281,7 @@ class ActiveBotManager:
 
         if state_changed and self.state_saver:
             try:
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
             except Exception:
                 pass
 
@@ -334,7 +334,7 @@ class ActiveBotManager:
                         fb["username"] = f"@{me.username}"
                     if me.first_name:
                         fb["first_name"] = me.first_name
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
         except Exception as e:
             if test_bot:
                 try:
@@ -878,7 +878,7 @@ class ActiveBotManager:
                     if bot_prefix:
                         break
                 if changed:
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
         except Exception as err:
             logger.warning(f"Aviso ao registrar bloqueio de lead {chat_id}: {err}")
 
@@ -1489,7 +1489,7 @@ class ActiveBotManager:
         if fid:
             if state and self.state_saver:
                 try:
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
                 except Exception:
                     pass
             eff_send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
@@ -1530,7 +1530,7 @@ class ActiveBotManager:
                 m["url"] = f"tg://file_id/{fid}"
             if state and self.state_saver:
                 try:
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
                 except Exception:
                     pass
             return str(fid)
@@ -1585,7 +1585,7 @@ class ActiveBotManager:
         )
         if warmed_cnt > 0 and state and self.state_saver:
             try:
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
             except Exception:
                 pass
 
@@ -1611,7 +1611,7 @@ class ActiveBotManager:
                                 updated = True
                     if updated and state and self.state_saver:
                         try:
-                            await self.state_saver(state)
+                            await self.state_saver(state, runtime_only=True)
                         except Exception:
                             pass
                 return False
@@ -1635,7 +1635,7 @@ class ActiveBotManager:
                                 m["album_cached"] = True
                         if state and self.state_saver:
                             try:
-                                await self.state_saver(state)
+                                await self.state_saver(state, runtime_only=True)
                             except Exception:
                                 pass
                     return False
@@ -1733,7 +1733,7 @@ class ActiveBotManager:
                     txt = self._render_flow_vars(msg_tmpl, user, fb)
                     await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -1836,7 +1836,7 @@ class ActiveBotManager:
                 await self._send_flow_medias(message.chat.id, seq_medias)
                 txt = self._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você:", message.from_user, fb)
                 await self._safe_send_html(message.chat.id, txt, reply_markup=kb)
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
             return True
 
         # Comando /aprovar <senha> ou /testepago <senha>
@@ -1917,7 +1917,7 @@ class ActiveBotManager:
         self.tx_records[target_tx_id] = tx_rec
         tx_map[target_tx_id] = tx_rec
         lead["last_tx_id"] = target_tx_id
-        await self.state_saver(state)
+        await self.state_saver(state, runtime_only=True)
         await self.deliver_purchase_and_upsell(message.from_user.id, tx_id=target_tx_id)
         return True
 
@@ -2009,7 +2009,7 @@ class ActiveBotManager:
                 lead["from_downsell"] = True
                 lead.setdefault("sent_downsell_steps", []).append(next_step.get("id"))
                 lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell] {msg_text}"})
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -2127,7 +2127,7 @@ class ActiveBotManager:
                         lead.setdefault("history", []).append({"role": "assistant", "content": main_msg})
 
                 self._advance_stage(lead, "Viu os planos")
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 self._schedule_flow_downsell(message.from_user, track="general", bot_token=msg_bot_tok)
                 return
 
@@ -2152,7 +2152,7 @@ class ActiveBotManager:
                 await message.answer(line)
                 lead.setdefault("history", []).append({"role": "assistant", "content": line})
 
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.message(F.text)
@@ -2216,7 +2216,7 @@ class ActiveBotManager:
                     reply = f"Vou te passar o contato do suporte oficial para resolver isso rapidinho: {support} 💜"
                     await message.answer(reply)
                     lead["history"].append({"role": "assistant", "content": reply})
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
                     return
 
                 delay = self._get_cadence_delay(state)
@@ -2278,7 +2278,7 @@ class ActiveBotManager:
                     logger.warning(f"Fallback envio de mensagem sem markup: {e}")
                     await message.answer(reply_text)
                 lead["history"].append({"role": "assistant", "content": reply_text})
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.message(F.voice | F.audio | F.photo | F.sticker | F.video)
@@ -2331,7 +2331,7 @@ class ActiveBotManager:
 
                 await message.answer(reply_text, reply_markup=markup)
                 lead["history"].append({"role": "assistant", "content": reply_text})
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
             self._schedule_downsell(message.from_user.id, message.from_user.first_name or "amor", bot_token=msg_bot_tok)
 
         @self.dp.callback_query(F.data.startswith("buy:"))
@@ -2420,7 +2420,7 @@ class ActiveBotManager:
 
             # Fail-closed: nunca gera transação sim_ nem PIX falso se o gateway falhar ou não estiver configurado
             if not pushin_token:
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 await (cb_bot or self.bot).send_message(
                     chat_id=target_chat_id,
                     text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
@@ -2439,7 +2439,7 @@ class ActiveBotManager:
                     raise ValueError("Gateway não retornou id ou qr_code válidos")
             except Exception as e:
                 logger.error(f"Erro Gateway PIX ({gw_provider}): {e}")
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 await (cb_bot or self.bot).send_message(
                     chat_id=target_chat_id,
                     text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
@@ -2482,7 +2482,7 @@ class ActiveBotManager:
                 "role": "assistant",
                 "content": f"[{label_prefix} — {chosen_offer_name} (R$ {price_fmt})] {pix_code}"
             })
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
 
             # IMPORTANTE: callback_data no Telegram tem limite rígido de 64 bytes!
             # checkpix:<uuid 36 chars> = 45 bytes (sempre < 64 bytes).
@@ -2563,7 +2563,7 @@ class ActiveBotManager:
 
             active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
             if active_bumps:
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 await self._present_flow_order_bump(callback, fb, plan_id, disc_pct, bump_index=0)
             else:
                 await self._generate_flow_checkout(callback, fb, state, plan_id, disc_pct, accepted_bumps=[])
@@ -2599,7 +2599,7 @@ class ActiveBotManager:
                 accepted_list.clear()
             if decision == "yes" and bump_idx not in accepted_list:
                 accepted_list.append(bump_idx)
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
 
             active_bumps = self._get_active_bumps_for_plan(fb, plan_id)
             next_idx = bump_idx + 1
@@ -2731,7 +2731,7 @@ class ActiveBotManager:
 
         # Fail-closed: nunca cria PIX sim_ caso o gateway falhe ou não esteja configurado
         if not pushin_token:
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
             await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
@@ -2750,7 +2750,7 @@ class ActiveBotManager:
                 raise ValueError("Gateway não retornou id ou qr_code válidos")
         except Exception as e:
             logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
             await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
@@ -2859,7 +2859,7 @@ class ActiveBotManager:
             "role": "assistant",
             "content": f"[PIX Flow — {full_plan_label} ({valor_str})] {pix_code}"
         })
-        await self.state_saver(state)
+        await self.state_saver(state, runtime_only=True)
 
         self._schedule_flow_downsell(callback.from_user, track="pix", bot_token=bot_tok_val)
         self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
@@ -3014,7 +3014,7 @@ class ActiveBotManager:
                 "role": "assistant",
                 "content": f"[Upsell] {upsell_msg}"
             })
-            await self.state_saver(state)
+            await self.state_saver(state, runtime_only=True)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -3087,7 +3087,7 @@ class ActiveBotManager:
                 tx_record["delivery_error"] = "Identidade do bot de origem indisponível ou divergente."
                 self.tx_records[tx_id] = tx_record
                 state["tx_records"][tx_id] = tx_record
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 return False
 
             if not is_flow_tx and not target_bot:
@@ -3100,7 +3100,7 @@ class ActiveBotManager:
                 tx_record["delivery_error"] = "Bot de origem não está em execução."
                 self.tx_records[tx_id] = tx_record
                 state["tx_records"][tx_id] = tx_record
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
                 return False
 
             # Matching purchase identity is now verified; keep the payment
@@ -3174,7 +3174,7 @@ class ActiveBotManager:
                     # Persiste estado da Fase 1 imediatamente
                     self.tx_records[tx_id] = tx_record
                     state["tx_records"][tx_id] = tx_record
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
 
                 if is_flow_tx and not target_bot:
                     tx_record["initial_delivery_pending"] = True
@@ -3182,7 +3182,7 @@ class ActiveBotManager:
                     tx_record["delivery_error"] = "Bot de origem não está em execução."
                     self.tx_records[tx_id] = tx_record
                     state["tx_records"][tx_id] = tx_record
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
                     return False
 
                 # The payment is counted independently of fulfillment. Only the
@@ -3194,7 +3194,7 @@ class ActiveBotManager:
                 if auto_attempts >= 2:
                     if tx_record.get("access_status") != "Pendente (Reenvio manual)":
                         tx_record["access_status"] = "Pendente (Reenvio manual)"
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                     return False
                 if auto_attempts and tx_record.get("last_delivery_attempt_at"):
                     try:
@@ -3214,7 +3214,7 @@ class ActiveBotManager:
                     tx_record["access_status"] = "Pendente (Reenvio manual)"
                 self.tx_records[tx_id] = tx_record
                 state["tx_records"][tx_id] = tx_record
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
 
                 # ========================================================
                 # FASE 2: DESPACHO E ENTREGA (AT-LEAST-ONCE DELIVERY)
@@ -3235,14 +3235,14 @@ class ActiveBotManager:
                         })
                         self.tx_records[tx_id] = tx_record
                         state["tx_records"][tx_id] = tx_record
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return True
                     except Exception as e:
                         logger.error(f"Erro no despacho de upsell para tx_id={tx_id}: {e}")
                         tx_record["delivery_error"] = str(e)
                         self.tx_records[tx_id] = tx_record
                         state["tx_records"][tx_id] = tx_record
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return False
 
                 if is_flow_tx:
@@ -3253,7 +3253,7 @@ class ActiveBotManager:
                         tx_record["delivery_error"] = "Bot de fluxo associado está inativo ou desativado."
                         self.tx_records[tx_id] = tx_record
                         state["tx_records"][tx_id] = tx_record
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return False
 
                     if tx_record.get("delivery_dest_type"):
@@ -3317,7 +3317,7 @@ class ActiveBotManager:
                             )
                         except Exception:
                             pass
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return False
 
                     pay_cfg = flow_bot.get("payments", {})
@@ -3360,7 +3360,7 @@ class ActiveBotManager:
                         tx_record["delivery_error"] = "Telegram não confirmou o envio do acesso."
                         self.tx_records[tx_id] = tx_record
                         state["tx_records"][tx_id] = tx_record
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return False
 
                     dur_str = str(tx_record.get("plan_duration") or "Vitalício")
@@ -3395,7 +3395,7 @@ class ActiveBotManager:
                         "role": "assistant",
                         "content": f"[Pagamento aprovado Flow ({plan_label}) — Entrega concluída]"
                     })
-                    await self.state_saver(state)
+                    await self.state_saver(state, runtime_only=True)
                     return True
 
                 # Caso IA (não-flow)
@@ -3433,7 +3433,7 @@ class ActiveBotManager:
                         tx_record["delivery_error"] = f"Não foi possível gerar link no canal {dest}."
                         self.tx_records[tx_id] = tx_record
                         state["tx_records"][tx_id] = tx_record
-                        await self.state_saver(state)
+                        await self.state_saver(state, runtime_only=True)
                         return False
 
                     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -3459,7 +3459,7 @@ class ActiveBotManager:
                     "role": "assistant",
                     "content": "[Pagamento aprovado — Entrega concluída]"
                 })
-                await self.state_saver(state)
+                await self.state_saver(state, runtime_only=True)
 
                 upsell = state.get("upsell", {})
                 if upsell.get("enabled", False):

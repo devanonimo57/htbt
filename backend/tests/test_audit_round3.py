@@ -92,7 +92,7 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
         async def _mock_read():
             return app_main._STATE_CACHE
 
-        async def _mock_write(st, preserve_runtime=True, delete_tx_ids=None):
+        async def _mock_write(st, preserve_runtime=True, delete_tx_ids=None, **kwargs):
             app_main._STATE_CACHE = copy.deepcopy(st)
             return app_main._STATE_CACHE
 

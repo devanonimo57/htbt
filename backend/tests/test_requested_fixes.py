@@ -30,7 +30,7 @@ class PaymentDeliveryRules(unittest.IsolatedAsyncioTestCase):
             "publish": {}, "learning": {},
         }
         mgr.state_getter = AsyncMock(return_value=state)
-        mgr.state_saver = AsyncMock(side_effect=lambda s: s)
+        mgr.state_saver = AsyncMock(side_effect=lambda s, **kw: s)
         return mgr, bot, state
 
     async def test_one_retry_per_pix_then_manual_pending_even_after_restart(self):
@@ -50,7 +50,7 @@ class PaymentDeliveryRules(unittest.IsolatedAsyncioTestCase):
         restarted.bot = bot
         restarted.current_token = "111:alpha"
         restarted.state_getter = AsyncMock(return_value=state)
-        restarted.state_saver = AsyncMock(side_effect=lambda s: s)
+        restarted.state_saver = AsyncMock(side_effect=lambda s, **kw: s)
         self.assertFalse(await restarted.deliver_purchase_and_upsell(42, "pix-1"))
         self.assertEqual(bot.create_chat_invite_link.await_count, 2)
     async def test_retry_worker_skips_invalid_and_exhausted_purchases(self):

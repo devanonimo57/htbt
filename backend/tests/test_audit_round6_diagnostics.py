@@ -94,7 +94,7 @@ class TestAuditRound6Diagnostics(unittest.IsolatedAsyncioTestCase):
         async def _mock_read():
             return copy.deepcopy(self.server_state)
 
-        async def _mock_write(st, preserve_runtime=False, delete_tx_ids=None):
+        async def _mock_write(st, preserve_runtime=False, delete_tx_ids=None, **kwargs):
             del_set = set(str(x) for x in (delete_tx_ids or []))
             ex_tx_map = self.server_state.get("tx_records") if isinstance(self.server_state.get("tx_records"), dict) else {}
             st_tx_map = st.setdefault("tx_records", {})
