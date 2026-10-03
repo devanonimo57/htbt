@@ -5783,6 +5783,10 @@ quer que eu te mostre as opções de acesso?</textarea>
       return s;
     }
 
+    function encodeResetBotId(botId) {
+      return encodeURIComponent(botId).replaceAll(String.fromCharCode(39), '%27');
+    }
+
     function renderMemoryLeads() {
       const allLeads = STATE.memory?.leads || [];
       const q = (document.getElementById('inp-lead-search')?.value || '').toLowerCase().trim();
@@ -5834,7 +5838,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-[10px] text-slate-500">${escapeHtml(l.last_interaction || '')}</span>
-              <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeURIComponent(l.bot_id || 'unassigned')}'))" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
+              <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeResetBotId(l.bot_id || 'unassigned')}'))" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
               <button type="button" onclick="deleteLead('${safeTid}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-[10px] text-purple-300 hover:text-white transition">
@@ -5883,7 +5887,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             <p class="text-[11px] text-zinc-400">Telegram ID: ${safeTid} • Etapa atual: <strong class="text-emerald-400">${escapeHtml(currStage)}</strong></p>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeURIComponent(lead.bot_id || 'unassigned')}'))" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
+            <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeResetBotId(lead.bot_id || 'unassigned')}'))" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
               <i class="fa-solid fa-rotate-left text-[11px]"></i> Reiniciar conversa
             </button>
             <button type="button" onclick="deleteLead('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-xs font-bold text-purple-300 flex items-center gap-1.5 transition">
@@ -6624,7 +6628,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (e) {}
       if (nameInp) nameInp.value = '';
       renderSavedProfilesDropdown(profileObj.id);
-      try { await saveFullState(); } finally { delete STATE.save_profile_id; }
+      if (await saveFullState()) delete STATE.save_profile_id;
     }
 
     async function applySelectedProfile() {
@@ -6650,7 +6654,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const btn = document.getElementById('btn-apply-profile');
       if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> <span>Aplicando...</span>`;
       syncStateToInputs();
-      try { await saveFullState(); } finally { delete STATE.restore_profile_id; }
+      if (await saveFullState()) delete STATE.restore_profile_id;
       renderSavedProfilesDropdown(profId);
       if (btn) {
         btn.innerHTML = `<i class="fa-solid fa-check text-[10px]"></i> <span>Aplicado!</span>`;

@@ -65,6 +65,34 @@ test('saved profiles sanitize legacy local cache and new snapshots', () => {
   assert.ok(!JSON.stringify(result).includes('111:fixture'));
   assert.ok(!storage.get('SHARKBOT_SAVED_PROFILES').includes('fixture-ai'));
 });
+test('failed profile save retains server-side credential restoration intent for retry', async () => {
+  const storage = new Map();
+  const fields = { 'sel-ai-provider': { value: 'sample' }, 'inp-ai-key': { value: '***configured***' },
+    'inp-new-profile-name': { value: 'My profile' } };
+  const ctx = context(['sanitizeSavedProfiles', 'saveCurrentToProfileList'], {
+    STATE: { persona: { name: 'Demo' }, business: {}, style: {}, medias: [], downsell: {}, upsell: {},
+      publish: { bot_token: '***configured***' }, account: {}, saved_profiles: [] },
+    document: { getElementById: id => fields[id] || null },
+    localStorage: { setItem: (key, value) => storage.set(key, value) },
+    onPersonaChange: () => {}, onBusinessChange: () => {}, onPublishChange: () => {},
+    getMergedSavedProfiles: () => [], renderSavedProfilesDropdown: () => {},
+    saveFullState: async () => false,
+  });
+  await ctx.saveCurrentToProfileList();
+  assert.equal(ctx.STATE.save_profile_id, ctx.STATE.saved_profiles[0].id);
+  assert.equal(ctx.STATE.saved_profiles[0].snapshot.publish.bot_token, '***configured***');
+});
+test('failed profile apply keeps restoration intent for retry', async () => {
+  const ctx = context(['applySelectedProfile'], {
+    STATE: { persona: {}, business: {}, style: {}, medias: [], downsell: {}, upsell: {}, publish: {}, account: {} },
+    document: { getElementById: id => id === 'sel-saved-profiles' ? { value: 'p' } : null },
+    getMergedSavedProfiles: () => [{ id: 'p', snapshot: { publish: { bot_token: '***configured***' } } }],
+    syncStateToInputs: () => {}, renderSavedProfilesDropdown: () => {},
+    saveFullState: async () => false,
+  });
+  await ctx.applySelectedProfile();
+  assert.equal(ctx.STATE.restore_profile_id, 'p');
+});
 test('reset requests selected bot scope rather than first matching Telegram ID', async () => {
   let url;
   const ctx = context(['resetLeadHistory', 'nbLeadDeleteScope'], {
@@ -81,6 +109,15 @@ test('reset requests selected bot scope rather than first matching Telegram ID',
   assert.equal(ctx.STATE.memory.leads[0].history[0], 'a');
   assert.equal(ctx.STATE.memory.leads[1].history.length, 0);
 });
+test('reset bot ID is safely embedded in single-quoted inline handler', () => {
+  const ctx = context(['encodeResetBotId'], { encodeURIComponent });
+  const encoded = ctx.encodeResetBotId("bot'one");
+  assert.equal(encoded, 'bot%27one');
+  assert.equal(vm.runInNewContext(`decodeURIComponent('${encoded}')`), "bot'one");
+  assert.equal((html.match(/encodeResetBotId\((?:l|lead)\.bot_id \|\| 'unassigned'\)/g) || []).length, 2);
+});
+
+
 test('starts count by creation day, while paid events use BRT payment day', () => {
   assert.match(html, /const leadDateStr = l\.created_at \|\| l\.last_interaction/);
   assert.match(html, /NB_ANA_SELECTED_DATE \? nbIsBrtDay\(txDate, NB_ANA_SELECTED_DATE\)/);

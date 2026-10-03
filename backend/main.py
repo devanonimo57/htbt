@@ -312,7 +312,13 @@ def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any
                 else:
                     restore_masks(item, old.get(key))
         elif isinstance(value, list) and isinstance(old, list):
-            for item, original in zip(value, old):
+            old_by_id = {str(item["id"]): item for item in old
+                         if isinstance(item, dict) and item.get("id") is not None}
+            for index, item in enumerate(value):
+                if isinstance(item, dict) and item.get("id") is not None:
+                    original = old_by_id.get(str(item["id"]))
+                else:
+                    original = old[index] if index < len(old) else None
                 restore_masks(item, original)
     for profile in incoming.get("saved_profiles", []):
         if isinstance(profile, dict) and isinstance(profile.get("snapshot"), dict):

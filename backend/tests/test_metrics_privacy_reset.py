@@ -37,6 +37,18 @@ class ProfilePrivacyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved['account']['ai_api_key'], 'ai-sample')
         self.assertEqual(saved['saved_profiles'][0]['snapshot']['publish']['bot_token'], '111:sample-secret')
 
+    async def test_reordering_nested_saved_media_keeps_secrets_with_their_ids(self):
+        old = {'publish': {}, 'account': {}, 'saved_profiles': [{'id': 'profile-one', 'snapshot': {
+            'medias': [{'id': 'a', 'api_key': 'secret-a'}, {'id': 'b', 'api_key': 'secret-b'}]
+        }}]}
+        incoming = {'publish': {}, 'account': {}, 'saved_profiles': [{'id': 'profile-one', 'snapshot': {
+            'medias': [{'id': 'b', 'api_key': main.REDACTED_SECRET_MASK},
+                       {'id': 'a', 'api_key': main.REDACTED_SECRET_MASK}]
+        }}]}
+        result = main._preserve_existing_secrets(incoming, old)
+        self.assertEqual([(m['id'], m['api_key']) for m in result['saved_profiles'][0]['snapshot']['medias']],
+                         [('b', 'secret-b'), ('a', 'secret-a')])
+
     async def test_new_profile_snapshot_preserves_live_credential_only_on_server(self):
         state = copy.deepcopy(await main._read_state_from_db())
         state['publish']['bot_token'] = '111:live-fixture'
