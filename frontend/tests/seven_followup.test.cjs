@@ -33,4 +33,15 @@ async function pendingEditsSurviveSave(){
  const fresh=setup();fresh.c.adminFetch=async(u,o)=>({ok:true,json:async()=>({state:JSON.parse(o.body)})});
  assert.equal(await fresh.c.saveFullState(),true);assert.equal(fresh.counts().saved,1);
 }
-(async()=>{await failedCampaignSave();await pendingEditsSurviveSave();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});
+function capturedUpload(){
+ for(const deleted of [false,true]){
+  const {c}=setup(),a={id:'a',token:'111:a',welcome:{medias:[]}},b={id:'b',token:'222:b',welcome:{medias:[]},payments:{approved_medias:[]}};let current=a,reader;const warmed=[];
+  c.STATE.flow_bots=[a,b];
+  Object.assign(c,{NB_MEDIA_TARGET:{section:'welcome',seqIdx:0},NB_DOWNSELL_TRACK:'general',NB_OB_TEMP_MEDIAS:[],FileReader:class{constructor(){reader=this;this.result='data:image/png;base64,AAAA'}readAsDataURL(){}},nbGetCurrentBot:()=>current,nbLoadBotIntoTabs(){},nbAutoWarmMediaItem:(bot,item,section)=>warmed.push({bot:bot.id,item:item.name,section})});
+  vm.runInContext(block('function nbHandleMediaUpload(', 'function nbRenderMediaChips('),c);
+  c.nbHandleMediaUpload({target:{files:[{name:'a.png',type:'image/png'}]}});current=b;c.NB_MEDIA_TARGET={section:'pay_app',seqIdx:9};if(deleted)c.STATE.flow_bots.splice(0,1);reader.onload();
+  assert.equal(b.welcome.medias.length,0,'must not attach A upload to currently selected B');
+  assert.equal(a.welcome.medias.length,deleted?0:1);assert.equal(warmed.length,deleted?0:1);if(!deleted)assert.equal(warmed[0].bot,'a');
+ }
+}
+(async()=>{await failedCampaignSave();await pendingEditsSurviveSave();capturedUpload();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});

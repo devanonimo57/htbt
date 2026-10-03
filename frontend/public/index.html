@@ -9145,10 +9145,13 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbAutoWarmMediaItem(b, item, section) {
       if (!b || !item || item.telegram_file_id) return;
+      const botId = b.id, botOrigin = b.bot_id, botToken = b.token;
+      const originExists = () => (STATE.flow_bots || []).some(bot => bot.id === botId && bot.bot_id === botOrigin && bot.token === botToken);
+      if (!originExists()) return;
       item._caching = true;
-      if (section === 'orderbump') {
+      if (section === 'orderbump' && nbGetCurrentBot()?.id === botId) {
         nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
-      } else {
+      } else if (nbGetCurrentBot()?.id === botId) {
         nbLoadBotIntoTabs(b);
       }
       const effCh = (
@@ -9170,6 +9173,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         });
         const data = await res.json();
         delete item._caching;
+        if (!originExists()) return;
         if (data && data.status === "ok" && data.telegram_file_id) {
           item.telegram_file_id = data.telegram_file_id;
           if (data.cached_channel_id) item.cached_channel_id = data.cached_channel_id;
@@ -9183,50 +9187,58 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (e) {
         delete item._caching;
       }
-      if (section === 'orderbump') {
+      if (section === 'orderbump' && nbGetCurrentBot()?.id === botId) {
         nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
-      } else {
-        nbLoadBotIntoTabs(b);
+      } else if (nbGetCurrentBot()?.id === botId) {
+        nbLoadBotIntoTabs((STATE.flow_bots || []).find(bot => bot.id === botId));
       }
     }
 
     function nbHandleMediaUpload(event) {
       const file = event.target.files?.[0];
-      if (!file || !NB_MEDIA_TARGET) return;
+      const original = nbGetCurrentBot();
+      if (!file || !NB_MEDIA_TARGET || !original) return;
+      const botId = original.id;
+      const botToken = original.token;
+      const botOrigin = original.bot_id;
+      const { section, seqIdx } = { ...NB_MEDIA_TARGET };
+      const track = NB_DOWNSELL_TRACK === 'pix' ? 'downsell_pix' : 'downsell_general';
+      const originalSeq = original[track]?.sequences?.[seqIdx];
+      const bumpMedias = NB_OB_TEMP_MEDIAS;
       const reader = new FileReader();
       reader.onload = () => {
-        const b = nbGetCurrentBot();
-        if (!b) return;
+        const b = (STATE.flow_bots || []).find(bot => bot.id === botId && bot.token === botToken && bot.bot_id === botOrigin);
+        if (!b) return; // Deleted/replaced origin: never attach to the current bot.
+        let medias;
+        if (section === 'welcome') {
+          const welcome = b.welcome || (b.welcome = {});
+          medias = welcome.medias || (welcome.medias = []);
+        } else if (section === 'downsell') {
+          const seq = (b[track]?.sequences || []).find(s => originalSeq?.id ? s.id === originalSeq.id : s === originalSeq);
+          if (!seq) return;
+          medias = seq.medias || (seq.medias = []);
+        } else if (section === 'orderbump') {
+          if (NB_OB_TEMP_MEDIAS !== bumpMedias || nbGetCurrentBot()?.id !== botId) return;
+          medias = bumpMedias;
+        } else if (section === 'pay_gen' || section === 'pay_app') {
+          const pay = b.payments || (b.payments = {});
+          const key = section === 'pay_gen' ? 'generated_medias' : 'approved_medias';
+          medias = pay[key] || (pay[key] = []);
+        }
+        if (!medias || medias.length >= 3) return;
         const item = {
           id: "nbm_" + Date.now(),
           name: file.name,
           type: file.type.startsWith("video") ? "Vídeos" : "Fotos",
           url: reader.result
         };
-        const { section, seqIdx } = NB_MEDIA_TARGET;
-        if (section === 'welcome') {
-          b.welcome.medias = b.welcome.medias || [];
-          if (b.welcome.medias.length < 3) b.welcome.medias.push(item);
-        } else if (section === 'downsell') {
-          const ds = nbGetActiveDownsellObj(b);
-          const seq = ds.sequences?.[seqIdx];
-          if (seq) {
-            seq.medias = seq.medias || [];
-            if (seq.medias.length < 3) seq.medias.push(item);
-          }
-        } else if (section === 'orderbump') {
-          if (NB_OB_TEMP_MEDIAS.length < 3) NB_OB_TEMP_MEDIAS.push(item);
-          nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
-          nbAutoWarmMediaItem(b, item, 'orderbump');
-          return;
-        } else if (section === 'pay_gen') {
-          b.payments.generated_medias = b.payments.generated_medias || [];
-          if (b.payments.generated_medias.length < 3) b.payments.generated_medias.push(item);
-        } else if (section === 'pay_app') {
-          b.payments.approved_medias = b.payments.approved_medias || [];
-          if (b.payments.approved_medias.length < 3) b.payments.approved_medias.push(item);
+        medias.push(item);
+        markUnsaved();
+        if (section === 'orderbump') {
+          nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', bumpMedias, 'orderbump');
+        } else if (nbGetCurrentBot()?.id === botId) {
+          nbLoadBotIntoTabs(b);
         }
-        nbLoadBotIntoTabs(b);
         nbAutoWarmMediaItem(b, item, section);
       };
       reader.readAsDataURL(file);
