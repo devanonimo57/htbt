@@ -2622,6 +2622,8 @@ async def resend_vip_access(req: AccessResendRequest):
     tx_map = state.get("tx_records") or {}
 
     single_tid = (req.tx_id or "").strip()
+    requested_bot_id = (req.bot_id or "").strip()
+    numeric_scope = requested_bot_id.isdecimal()
     if isinstance(req.tx_ids, list):
         candidate_ids = [str(x).strip() for x in req.tx_ids if str(x).strip()]
     elif single_tid and single_tid != "all":
@@ -2630,7 +2632,10 @@ async def resend_vip_access(req: AccessResendRequest):
         candidate_ids = [
             tid for tid, rec in tx_map.items()
             if isinstance(rec, dict)
-            and (not req.bot_id or req.bot_id == "all" or str(rec.get("bot_id") or "") == req.bot_id)
+            and (not req.bot_id or req.bot_id == "all"
+                 or (not numeric_scope and str(rec.get("bot_id") or "") == req.bot_id)
+                 or (numeric_scope and str(rec.get("bot_token") or "").startswith(requested_bot_id + ":")
+                     and str(rec.get("origin_bot_numeric_id") or req.bot_id) == req.bot_id))
             and (
                 not req.group_id
                 or req.group_id == "all"
@@ -2673,7 +2678,17 @@ async def resend_vip_access(req: AccessResendRequest):
             if matches:
                 fb = candidate
                 break
-        if not fb:
+        if numeric_scope and not (isinstance(req.tx_ids, list) or (single_tid and single_tid != "all")):
+            # Ignore mutable config ID for scoped numeric requests.
+            # A numeric API scope must resolve to exactly one configured origin.
+            # Legacy config IDs can be reused; only purchase token proves identity.
+            origin_configs = [candidate for candidate in (state.get("flow_bots") or [])
+                              if isinstance(candidate, dict)
+                              and str(candidate.get("token") or "").startswith(requested_bot_id + ":")]
+            if len(origin_configs) != 1:
+                continue
+            fb = origin_configs[0]
+        elif not fb:
             continue
         tok = str(fb.get("token") or "").strip()
         if not tok or tok == REDACTED_SECRET_MASK:
