@@ -10701,8 +10701,13 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     let NB_FIN_REQUEST_ID = 0;
+    let NB_FIN_LOAD_STATE = 'idle';
     async function nbRefreshFinance() {
       const requestId = ++NB_FIN_REQUEST_ID;
+      NB_FIN_METRICS = null;
+      NB_FIN_TRANSACTIONS = null;
+      NB_FIN_LOAD_STATE = 'loading';
+      nbRenderFinanceView();
       const bot = document.getElementById('nb-fin-bot-select')?.value || 'all';
       const base = `period=${encodeURIComponent(NB_FIN_PERIOD)}&bot_id=${encodeURIComponent(bot)}`;
       const status = {Pago:'paid',Pendente:'pending',Cancelado:'cancelled'}[NB_FIN_STATUS] || (NB_FIN_STATUS === 'Todos' ? 'all' : NB_FIN_STATUS.toLowerCase());
@@ -10716,9 +10721,14 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (requestId !== NB_FIN_REQUEST_ID) return;
         NB_FIN_METRICS = metrics;
         NB_FIN_TRANSACTIONS = transactions;
+        NB_FIN_LOAD_STATE = 'ready';
         nbRenderFinanceView();
       } catch (error) {
         if (requestId !== NB_FIN_REQUEST_ID) return;
+        NB_FIN_METRICS = null;
+        NB_FIN_TRANSACTIONS = null;
+        NB_FIN_LOAD_STATE = 'unavailable';
+        nbRenderFinanceView();
         console.warn('Financeiro não atualizado:', error);
         alert('Não foi possível atualizar o Financeiro.');
       }
@@ -10754,6 +10764,23 @@ quer que eu te mostre as opções de acesso?</textarea>
         }).join('');
       }
 
+      // Redacted panel state is not a Financeiro dataset. Never derive fake
+      // zero sales or reuse the previous filter's snapshot while unavailable.
+      if (!NB_FIN_METRICS || !NB_FIN_TRANSACTIONS) {
+        document.getElementById('nb-fin-rev-label').textContent = `RECEITA • ${NB_FIN_PERIOD.toUpperCase()}`;
+        for (const id of ['nb-fin-rev-value', 'nb-fin-paid-count', 'nb-fin-ticket-value', 'nb-fin-pending-value']) {
+          const field = document.getElementById(id);
+          if (field) field.textContent = '—';
+        }
+        const container = document.getElementById('nb-fin-tx-container');
+        if (container) {
+          container.className = 'py-16 text-center text-xs text-zinc-400';
+          container.innerHTML = NB_FIN_LOAD_STATE === 'loading'
+            ? '<p>Carregando o Financeiro...</p>'
+            : '<p>Financeiro indisponível. Tente atualizar novamente.</p>';
+        }
+        return;
+      }
       const selectedBotId = botSel ? botSel.value : "all";
       const txMap = STATE.tx_records || {};
       const allTxList = NB_FIN_TRANSACTIONS ? NB_FIN_TRANSACTIONS.items : nbDistinctTransactions(txMap).reverse();

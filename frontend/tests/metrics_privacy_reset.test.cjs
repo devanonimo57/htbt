@@ -50,7 +50,7 @@ test('only latest Finance request commits both metrics and transactions', async 
   await first;
   assert.equal(ctx.NB_FIN_METRICS.tag, 'new');
   assert.equal(ctx.NB_FIN_TRANSACTIONS.tag, 'new');
-  assert.equal(rendered, 1);
+  assert.equal(rendered, 3); // Two loading invalidations, one latest successful snapshot.
   assert.equal(alerts, 0);
 });
 test('saved profiles sanitize legacy local cache and new snapshots', () => {
