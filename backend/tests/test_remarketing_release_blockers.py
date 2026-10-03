@@ -16,6 +16,61 @@ class RemarketingReleaseBlockers(unittest.IsolatedAsyncioTestCase):
     _close = fixtures.RemarketingInterruption._close
     persisted = fixtures.RemarketingInterruption.persisted
 
+    async def test_explicit_new_run_retry_is_idempotent_and_later_run_sends_again(self):
+        self.release_second.set()
+        for run in ('run-one', 'run-two'):
+            payload = {'campaign_id':'camp', 'run_id':run, 'start_new_run':True}
+            first = await self.client.post('/api/flow-bots/remarketing/send', json=payload)
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertEqual(first.json()['sent_count'], 3)
+            main._STATE_CACHE = None
+            retry = await self.client.post('/api/flow-bots/remarketing/send', json=payload)
+            self.assertEqual(retry.json()['sent_count'], 0)
+        self.assertEqual(self.sent, [41,42,43,41,42,43])
+        stale = await self.client.post('/api/flow-bots/remarketing/send', json={
+            'campaign_id':'camp', 'run_id':'run-one'})
+        self.assertEqual(stale.status_code, 409)
+        stale_new = await self.client.post('/api/flow-bots/remarketing/send', json={
+            'campaign_id':'camp', 'run_id':'run-one', 'start_new_run':True})
+        self.assertEqual(stale_new.status_code, 409)
+
+    async def test_stale_panel_cannot_replace_active_run_identity(self):
+        stale = copy.deepcopy(await main._read_state_from_db())
+        self.release_second.set()
+        await self.client.post('/api/flow-bots/remarketing/send', json={
+            'campaign_id':'camp', 'run_id':'run-one', 'start_new_run':True})
+        stale['remarketing_campaigns'][0]['message'] = 'Edited configuration only'
+        await main._write_state_to_db(stale, preserve_runtime=True)
+        saved = await self.persisted()
+        self.assertEqual(saved['remarketing_campaigns'][0].get('run_id'), 'run-one')
+        self.assertEqual(saved['remarketing_campaigns'][0]['sent_count'], 3)
+
+    async def test_hanging_send_persists_uncertainty_and_never_retries_recipient(self):
+        async def hang(**kwargs):
+            await asyncio.Event().wait()
+        self.bot.send_message = hang
+        with patch.object(main, 'REMARKETING_SEND_TIMEOUT_SECONDS', 0.01):
+            result = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id':'camp'})
+        self.assertFalse(result.json()['has_more'])
+        saved = await self.persisted()
+        self.assertEqual(saved['remarketing_campaigns'][0]['deliveries']['111:41'], 'uncertain')
+        self.release_second.set()
+        self.bot.send_message = lambda **kwargs: self._record_send(**kwargs)
+        await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id':'camp'})
+        self.assertEqual(self.sent, [42,43])
+
+    async def _record_send(self, *, chat_id, **kwargs):
+        self.sent.append(chat_id)
+
+    async def test_failed_new_run_commit_does_not_publish_cache_or_send(self):
+        before = copy.deepcopy(await main._read_state_from_db())
+        with patch.object(main, '_write_state_to_db', side_effect=RuntimeError('commit failed')):
+            with self.assertRaises(RuntimeError):
+                await self.client.post('/api/flow-bots/remarketing/send', json={
+                    'campaign_id':'camp','run_id':'failed-run','start_new_run':True})
+        self.assertEqual(self.sent, [])
+        self.assertEqual((await main._read_state_from_db())['remarketing_campaigns'], before['remarketing_campaigns'])
+
     async def test_rate_limit_stops_continuation_with_more_than_one_batch(self):
         state = await main._read_state_from_db()
         state['memory']['leads'].extend(

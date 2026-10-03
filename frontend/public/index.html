@@ -10092,11 +10092,12 @@ quer que eu te mostre as opções de acesso?</textarea>
             <div class="flex items-center gap-2">
               <button type="button" onclick="nbSendRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3.5 py-2 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-purple-950/40 transition">
                 <i class="fa-regular fa-paper-plane"></i>
-                <span>Disparar Agora</span>
+                <span>Continuar execução</span>
               </button>
               <button type="button" onclick="nbOpenRemarketingModal('${escapeHtml(c.id)}')" class="px-3 py-2 rounded-xl bg-[#191214] hover:bg-[#261b1e] border border-[#2f1f23] text-xs font-semibold text-zinc-300 hover:text-white transition">
                 Editar
               </button>
+              <button type="button" onclick="nbSendRemarketingCampaign('${escapeHtml(c.id)}', true)" class="px-3 py-2 rounded-xl border border-purple-700 text-xs text-purple-200">Nova execução</button>
               <button type="button" onclick="nbDeleteRemarketingCampaign('${escapeHtml(c.id)}')" class="px-3 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-xs text-rose-300 transition">
                 <i class="fa-regular fa-trash-can"></i>
               </button>
@@ -10175,13 +10176,18 @@ quer que eu te mostre as opções de acesso?</textarea>
       nbRenderRemarketingView();
 
       if (sendImmediately && targetId) {
-        await nbSendRemarketingCampaign(targetId);
+        await nbSendRemarketingCampaign(targetId, true);
       }
     }
 
-    async function nbSendRemarketingCampaign(campaignId) {
+    async function nbSendRemarketingCampaign(campaignId, startNewRun = false) {
       const c = (STATE.remarketing_campaigns || []).find(x => x.id === campaignId);
       if (!c) return;
+      if (startNewRun && !confirm('Iniciar outra execução? Os destinatários poderão receber esta campanha novamente.')) return;
+      // Keep the ID locally before HTTP so an uncertain response resumes this run.
+      const runId = startNewRun ? crypto.randomUUID() : c.run_id;
+      if (startNewRun) { c.run_id = runId; c.pending_new_run = true; saveLocalBackup(); }
+      const newRun = startNewRun || c.pending_new_run === true;
       const banner = document.getElementById('nb-rmk-feedback-banner');
       if (banner) {
         banner.classList.remove('hidden');
@@ -10191,12 +10197,15 @@ quer que eu te mostre as opções de acesso?</textarea>
         let more = true;
         let totalSent = 0;
         let totalTargets = 0;
+        let retryAfter = 0;
         while (more) {
         const res = await adminFetch("/api/flow-bots/remarketing/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             campaign_id: c.id,
+            run_id: runId,
+            start_new_run: newRun,
             bot_id: c.bot_id || "all",
             segment: c.segment || "Pendentes",
             message: c.message || "",
@@ -10208,7 +10217,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         const data = await res.json();
         totalSent += Number(data.sent_count || 0);
         totalTargets = Number(data.total_targets || 0);
-        more = data.has_more === true;
+        retryAfter = Number(data.retry_after || 0);
+        more = data.has_more === true && retryAfter <= 0;
         if (data && data.state) {
           const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
           STATE = { ...data.state, saved_profiles: mergedProfiles };
@@ -10217,9 +10227,11 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (banner) banner.textContent = `Campanha em andamento: ${totalSent} enviadas (${totalTargets} leads).`;
         nbRenderRemarketingView();
         }
-        if (banner) banner.textContent = `✓ Campanha processada: ${totalSent} mensagens nesta sessão (${totalTargets} leads no segmento). Verifique destinatários em revisão.`;
+        if (banner) banner.textContent = retryAfter > 0
+          ? `Telegram limitou o envio. Aguarde ${Math.ceil(retryAfter)} segundos e clique Continuar execução. O progresso foi salvo.`
+          : `✓ Campanha processada: ${totalSent} mensagens nesta sessão (${totalTargets} leads no segmento). Verifique destinatários em revisão.`;
       } catch (e) {
-        if (banner) banner.textContent = "Disparo interrompido. O progresso foi salvo; clique Disparar Agora para continuar sem reenviar destinatários já processados.";
+        if (banner) banner.textContent = "Disparo interrompido. O progresso foi salvo; clique Continuar execução para retomar a mesma execução sem reenviar destinatários já processados.";
       }
     }
 
@@ -10229,7 +10241,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       try {
         const res = await adminFetch('/api/flow-bots/remarketing/reconcile', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({campaign_id:campaignId, recipient, resolution})
+          body: JSON.stringify({campaign_id:campaignId, run_id:(STATE.remarketing_campaigns || []).find(c => c.id === campaignId)?.run_id, recipient, resolution})
         });
         if (!res.ok) throw new Error('Reconciliation failed');
         const data = await res.json();

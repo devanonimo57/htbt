@@ -50,7 +50,7 @@ class PixRecord(Base):
     __table_args__ = (Index("ix_pix_bot_user", "origin_bot_id", "telegram_id"),)
 
 class RemarketingDelivery(Base):
-    """A unique durable claim per campaign and immutable bot/user pair."""
+    """A unique durable claim per campaign run and immutable bot/user pair."""
     __tablename__ = "remarketing_deliveries"
     campaign_id = Column(String, primary_key=True)
     recipient = Column(String, primary_key=True)

@@ -10,6 +10,7 @@ from unittest.mock import patch
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import main
 import telegram_service
@@ -19,7 +20,7 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.original_engine, self.original_session = main.engine, main.async_session
-        self.engine = create_async_engine('sqlite+aiosqlite:///' + (Path(self.tmp.name) / 'remarketing.db').as_posix())
+        self.engine = create_async_engine('sqlite+aiosqlite:///' + (Path(self.tmp.name) / 'remarketing.db').as_posix(), poolclass=StaticPool)
         main.engine = self.engine
         main.async_session = sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
         main._STATE_CACHE = None
@@ -92,6 +93,12 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
         interim = await self.persisted()
         self.assertEqual(interim['remarketing_campaigns'][0]['sent_count'], 2)
         self.assertEqual(interim['remarketing_campaigns'][0]['status'], 'Parcial')
+        deferred = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertGreater(deferred.json()['retry_after'], 0)
+        self.assertEqual(attempts, [41, 42, 43])
+        # Advance the persisted cooldown without waiting on wall-clock time.
+        interim['remarketing_campaigns'][0]['retry_not_before'] = 0
+        await main._write_state_to_db(interim)
         second = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
         self.assertEqual(second.json()['sent_count'], 1)
         self.assertEqual(attempts, [41, 42, 43, 42])
