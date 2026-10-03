@@ -91,17 +91,17 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
         first = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
         self.assertEqual(first.status_code, 200, first.text)
         interim = await self.persisted()
-        self.assertEqual(interim['remarketing_campaigns'][0]['sent_count'], 2)
+        self.assertEqual(interim['remarketing_campaigns'][0]['sent_count'], 1)
         self.assertEqual(interim['remarketing_campaigns'][0]['status'], 'Parcial')
         deferred = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
         self.assertGreater(deferred.json()['retry_after'], 0)
-        self.assertEqual(attempts, [41, 42, 43])
+        self.assertEqual(attempts, [41, 42])
         # Advance the persisted cooldown without waiting on wall-clock time.
         interim['remarketing_campaigns'][0]['retry_not_before'] = 0
         await main._write_state_to_db(interim)
         second = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
-        self.assertEqual(second.json()['sent_count'], 1)
-        self.assertEqual(attempts, [41, 42, 43, 42])
+        self.assertEqual(second.json()['sent_count'], 2)
+        self.assertEqual(attempts, [41, 42, 42, 43])
         self.assertEqual((await self.persisted())['remarketing_campaigns'][0]['sent_count'], 3)
 
     async def test_stale_panel_save_cannot_erase_delivery_claims(self):

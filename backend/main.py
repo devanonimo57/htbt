@@ -3212,6 +3212,7 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
         return next(c for c in state["remarketing_campaigns"] if str(c.get("id")) == str(req.campaign_id))
 
     attempted = 0
+    batch_rate_limited = False
     attempted_recipients = set()
     try:
         for origin, uid_str in targets:
@@ -3276,6 +3277,7 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
             except Exception as e:
                 camp = current_campaign()
                 err_s = str(e).lower()
+                rate_limited = False
                 if any(x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
                     camp["deliveries"][recipient] = "blocked"
                     l["blocked"] = True
@@ -3283,6 +3285,7 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
                     if authorized_here and not await _discount_needed_elsewhere(state, req.campaign_id, recipient, disc_pct):
                         l['authorized_flow_discounts'].remove(disc_pct)
                 elif "retry after" in err_s or "too many requests" in err_s or "flood" in err_s:
+                    rate_limited = batch_rate_limited = True
                     import re
                     delay = getattr(e, 'retry_after', None)
                     match = re.search(r'retry after\s+(\d+)', err_s)
@@ -3306,6 +3309,8 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
                             'target_count':target_count, 'has_more':False, 'retry_after':0,
                             'run_id':camp.get('run_id'), 'state':_panel_state(state)}
                 state = await _write_state_to_db(state, preserve_runtime=False)
+                if rate_limited:
+                    break  # Telegram rejected the batch: no later recipient may be attempted.
                 continue
             camp = current_campaign()
             camp["deliveries"][recipient] = "sent"
@@ -3333,7 +3338,7 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
     async with async_session() as claim_session:
         await _project_remarketing_deliveries(claim_session, state)
     deliveries = camp.get("deliveries", {})
-    has_more = not retry_after and any(uid.lstrip("-").isdigit() and f"{origin}:{uid}" not in deliveries
+    has_more = not batch_rate_limited and not retry_after and any(uid.lstrip("-").isdigit() and f"{origin}:{uid}" not in deliveries
                    and f"{origin}:{uid}" not in attempted_recipients
                    for origin, uid in targets)
     camp["status"] = ("Revisão necessária" if any(v in ("sending", "uncertain")
@@ -3342,6 +3347,8 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
                                        for origin, uid in targets) else "Finalizada")
     camp["last_sent_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
     state = await _write_state_to_db(state, preserve_runtime=False)
+    camp = current_campaign()
+    retry_after = max(0, float(camp.get('retry_not_before') or 0) - datetime.now().timestamp())
     return {
         "status": "ok",
         "sent_count": sent_ok,

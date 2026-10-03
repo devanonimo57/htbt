@@ -139,3 +139,24 @@ class SevenFollowup(fixture.CheckoutWebhookIntegration):
         finally:
             for task in tasks.values(): task.cancel()
             await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+    async def test_rate_limit_stops_batch_and_survives_cold_resume(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        state['remarketing_campaigns'] = [{'id':'camp','bot_id':'flow-a','segment':'all','message':'Offer','include_plans':False}]
+        state['memory']['leads'] = [{'telegram_id':str(uid),'bot_id':'flow-a','origin_bot_numeric_id':'111','history':[]} for uid in range(41,56)]
+        await main._write_state_to_db(state)
+        class RateLimit(RuntimeError):
+            retry_after = 3.25
+        bot = SimpleNamespace(send_message=AsyncMock(side_effect=RateLimit('Too many requests')),session=SimpleNamespace(close=AsyncMock()))
+        with patch.object(telegram_service, '_create_bot_instance', return_value=bot):
+            result = await main.send_remarketing_campaign(main.RemarketingSendRequest(campaign_id='camp'))
+            self.assertEqual(bot.send_message.await_count, 1)
+            self.assertFalse(result['has_more'])
+            self.assertGreater(result['retry_after'], 0)
+            self.assertLessEqual(result['retry_after'], 3.25)
+            main._STATE_CACHE = None
+            saved = await main._read_state_from_db()
+            self.assertNotIn('111:41', saved['remarketing_campaigns'][0].get('deliveries',{}))
+            deferred = await main.send_remarketing_campaign(main.RemarketingSendRequest(campaign_id='camp'))
+            self.assertEqual(deferred['status'], 'deferred')
+            self.assertEqual(bot.send_message.await_count, 1)
