@@ -6946,22 +6946,53 @@ quer que eu te mostre as opções de acesso?</textarea>
       saveLocalBackup();
 
       let savedOk = false;
+      let newerEdits = false;
+      const submitted = JSON.parse(JSON.stringify(STATE));
+      const sequence = saveFullState.sequence = (saveFullState.sequence || 0) + 1;
+      // Three-way merge: keep edits made after POST, accept fresh server runtime.
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const mergeResponse = (server, before, current) => {
+        if (same(before, current)) return server;
+        if (Array.isArray(current) && Array.isArray(before) && Array.isArray(server)) {
+          if ([...current, ...before, ...server].every(x => x && typeof x === 'object' && x.id)) {
+            const oldById = new Map(before.map(x => [x.id, x]));
+            const serverById = new Map(server.map(x => [x.id, x]));
+            return current.map(x => mergeResponse(serverById.get(x.id), oldById.get(x.id), x));
+          }
+          return current;
+        }
+        if (current && before && server && !Array.isArray(current) &&
+            typeof current === 'object' && typeof before === 'object' && typeof server === 'object') {
+          const result = {};
+          for (const key of new Set([...Object.keys(server), ...Object.keys(before), ...Object.keys(current)])) {
+            const value = mergeResponse(server[key], before[key], current[key]);
+            if (value !== undefined) result[key] = value;
+          }
+          return result;
+        }
+        return current;
+      };
       try {
         const res = await adminFetch("/api/state", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(STATE)
+          body: JSON.stringify(submitted)
         });
         if (res.ok) {
           BACKEND_ONLINE = true;
-          savedOk = true;
           const data = await res.json();
-          if (data.state) {
-            const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-            STATE = { ...data.state, saved_profiles: mergedProfiles };
-            saveLocalBackup();
+          savedOk = true;
+          if (sequence >= (saveFullState.appliedSequence || 0)) {
+            newerEdits = !same(submitted, STATE);
+            if (data.state) {
+              STATE = mergeResponse(data.state, submitted, STATE);
+              STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
+              saveLocalBackup();
+            }
+            saveFullState.appliedSequence = sequence;
+            if (newerEdits) markUnsaved();
+            else markSaved();
           }
-          markSaved();
         }
       } catch (e) {
         BACKEND_ONLINE = false;
@@ -6979,7 +7010,11 @@ quer que eu te mostre as opções de acesso?</textarea>
         const status = document.getElementById('nb-save-status');
         if (status) { status.textContent = 'Não foi possível salvar no servidor. As alterações permanecem nesta página; tente novamente.'; status.className = 'text-xs text-rose-400'; }
       }
-      return savedOk;
+      if (newerEdits) {
+        const status = document.getElementById('nb-save-status');
+        if (status) { status.textContent = 'A versão enviada foi salva; há novas alterações não salvas.'; status.className = 'text-xs text-amber-400'; }
+      }
+      return savedOk && !newerEdits;
     }
 
     async function loadInitialState() {
@@ -8205,6 +8240,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nb-welcome-counter').textContent = `${w.message.length}/4000 caracteres`;
       document.getElementById('nb-welcome-sec-counter').textContent = `${w.secondary_message.length}/4000 caracteres`;
       nbUpdateWelcomeValidation();
+      markUnsaved();
     }
 
     function nbUpdateWelcomeValidation() {

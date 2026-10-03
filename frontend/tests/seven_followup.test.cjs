@@ -19,4 +19,18 @@ async function failedCampaignSave(){
   assert.equal(c.STATE.remarketing_campaigns[0].message,'NEW');assert.equal(counts().closed,0);
  }
 }
-(async()=>{await failedCampaignSave();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});
+async function pendingEditsSurviveSave(){
+ const {c,el,counts}=setup();let release;const waiting=new Promise(r=>release=r);
+ c.STATE.flow_bots=[{id:'a',token:'111:old',welcome:{message:'before',medias:[{id:'m',url:'old'}]}},{id:'b',welcome:{message:'delete me'}}];
+ c.adminFetch=async(url,opt)=>{const posted=JSON.parse(opt.body);await waiting;posted.flow_bots[0].token='***configured***';posted.flow_bots[0].welcome.medias[0].telegram_file_id='cached';posted.memory={leads:[]};return {ok:true,json:async()=>({state:posted})}};
+ c.nbGetCurrentBot=()=>c.STATE.flow_bots.find(b=>b.id==='a');c.nbUpdateWelcomeValidation=()=>{};
+ vm.runInContext(block('function nbOnWelcomeInput()', 'function nbUpdateWelcomeValidation()'),c);
+ const pending=c.saveFullState();el('nb-welcome-msg').value='new edit';c.nbOnWelcomeInput();c.STATE.flow_bots[0].token='111:new-secret';c.STATE.flow_bots.splice(1,1);release();await pending;
+ assert.equal(c.STATE.flow_bots[0].welcome.message,'new edit','late save response must preserve unsaved input');
+ assert.equal(c.STATE.flow_bots[0].token,'111:new-secret');assert.equal(c.STATE.flow_bots.length,1);
+ assert.equal(c.STATE.flow_bots[0].welcome.medias[0].telegram_file_id,'cached');
+ assert.equal(counts().saved,0);assert.ok(counts().dirty>0);
+ const fresh=setup();fresh.c.adminFetch=async(u,o)=>({ok:true,json:async()=>({state:JSON.parse(o.body)})});
+ assert.equal(await fresh.c.saveFullState(),true);assert.equal(fresh.counts().saved,1);
+}
+(async()=>{await failedCampaignSave();await pendingEditsSurviveSave();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});
