@@ -10184,10 +10184,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       const c = (STATE.remarketing_campaigns || []).find(x => x.id === campaignId);
       if (!c) return;
       if (startNewRun && !confirm('Iniciar outra execução? Os destinatários poderão receber esta campanha novamente.')) return;
-      // Keep the ID locally before HTTP so an uncertain response resumes this run.
-      const runId = startNewRun ? crypto.randomUUID() : c.run_id;
-      if (startNewRun) { c.run_id = runId; c.pending_new_run = true; saveLocalBackup(); }
-      const newRun = startNewRun || c.pending_new_run === true;
+      // A proposal is durable for lost-response retries, but is not the
+      // confirmed run used by reconciliation until the server accepts it.
+      const runId = c.pending_run_id || (startNewRun ? crypto.randomUUID() : c.run_id);
+      if (startNewRun && !c.pending_run_id) { c.pending_run_id = runId; saveLocalBackup(); }
+      let newRun = Boolean(c.pending_run_id) || c.pending_new_run === true;
       const banner = document.getElementById('nb-rmk-feedback-banner');
       if (banner) {
         banner.classList.remove('hidden');
@@ -10213,8 +10214,22 @@ quer que eu te mostre as opções de acesso?</textarea>
             discount_pct: Number(c.discount_pct || 0)
           })
         });
-        if (!res.ok) throw new Error('Falha no lote de remarketing');
+        if (!res.ok) {
+          // These responses reject the proposal before committing a new run.
+          // Transport failures and 5xx can hide an accepted run: keep its ID.
+          if (newRun && [400, 401, 403, 404, 409, 422].includes(res.status)) {
+            delete c.pending_run_id;
+            delete c.pending_new_run;
+            saveLocalBackup();
+          }
+          throw new Error('Falha no lote de remarketing');
+        }
         const data = await res.json();
+        c.run_id = data.state?.remarketing_campaigns?.find(x => x.id === campaignId)?.run_id || runId;
+        delete c.pending_run_id;
+        delete c.pending_new_run;
+        newRun = false;
+        saveLocalBackup();
         totalSent += Number(data.sent_count || 0);
         totalTargets = Number(data.total_targets || 0);
         retryAfter = Number(data.retry_after || 0);
