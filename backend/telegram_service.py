@@ -3341,15 +3341,27 @@ class ActiveBotManager:
                         plan_name=plan_label,
                         valor_str=f"R$ {paid_val:.2f}".replace(".", ",")
                     )
-                    await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
+                    access_message = await self._safe_send_html(user_id, rendered_app, reply_markup=kb, bot_instance=target_bot)
 
                     bump_deliv = (tx_record.get("deliverable") or "").strip()
-                    if bump_deliv:
-                        await self._safe_send_html(
+                    if access_message is not None and bump_deliv:
+                        access_message = await self._safe_send_html(
                             user_id,
                             f"🎁 <b>Seu adicional adquirido:</b>\n\n{bump_deliv}",
                             bot_instance=target_bot
                         )
+                    # The HTML helper returns None after both transport attempts
+                    # fail. A confirmed payment is not evidence of access delivery.
+                    if access_message is None:
+                        tx_record["delivered"] = False
+                        tx_record["access_status"] = (
+                            "Pendente (Reenvio manual)" if auto_attempts + 1 >= 2 else "Pendente"
+                        )
+                        tx_record["delivery_error"] = "Telegram não confirmou o envio do acesso."
+                        self.tx_records[tx_id] = tx_record
+                        state["tx_records"][tx_id] = tx_record
+                        await self.state_saver(state)
+                        return False
 
                     dur_str = str(tx_record.get("plan_duration") or "Vitalício")
                     exp_days = 0
