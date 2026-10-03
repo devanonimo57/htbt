@@ -117,3 +117,25 @@ class SevenFollowup(fixture.CheckoutWebhookIntegration):
         self.assertIn(bump['deliverable'], self.bot.send_message.await_args.kwargs['text'])
 
 
+    async def test_scoped_soft_delete_keeps_other_origins_tasks(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        state['flow_bots'].append({'id':'flow-b','bot_id':'222','token':'222:test-only'})
+        state['memory'] = {'leads':[
+            {'telegram_id':'7','bot_id':'flow-a','origin_bot_numeric_id':'111'},
+            {'telegram_id':'7','bot_id':'flow-b','origin_bot_numeric_id':'222'}], 'deleted_leads':[]}
+        await main._write_state_to_db(state)
+        tasks = {key:asyncio.create_task(asyncio.Event().wait()) for key in ('111:7','222:7','111:8')}
+        self.manager.downsell_tasks = dict(tasks)
+        try:
+            await main.delete_lead('7', bot_id='flow-a')
+            await asyncio.sleep(0)
+            self.assertTrue(tasks['111:7'].cancelled())
+            self.assertFalse(tasks['222:7'].cancelled())
+            self.assertFalse(tasks['111:8'].cancelled())
+            await main.delete_lead('7', bot_id='all')
+            await asyncio.sleep(0)
+            self.assertTrue(tasks['222:7'].cancelled())
+            self.assertFalse(tasks['111:8'].cancelled())
+        finally:
+            for task in tasks.values(): task.cancel()
+            await asyncio.gather(*tasks.values(), return_exceptions=True)

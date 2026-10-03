@@ -1472,7 +1472,12 @@ async def delete_lead(telegram_id: str, bot_id: str = ""):
             saved_state = await _write_state_to_db(staged, delete_client_keys=removed_keys)
 
             # 2. Apenas após confirmação no banco, limpa runtime em memória
-            bot_manager.cancel_lead_tasks(clean_uid)
+            if not bot_id or bot_id == 'all':
+                bot_manager.cancel_lead_tasks(clean_uid)
+            else:
+                bot_manager.cancel_lead_tasks(clean_uid, origin_bot_ids={
+                    _crm_verified_bot_origin(lead) for lead in matched
+                })
             for tx_id in cancelled_tx_ids:
                 bot_manager.active_tx_map.pop(tx_id, None)
                 poll = bot_manager.pix_poll_tasks.pop(tx_id, None)

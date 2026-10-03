@@ -2031,12 +2031,21 @@ class ActiveBotManager:
             if task and not task.done():
                 task.cancel()
 
-    def cancel_lead_tasks(self, user_id: str):
+    def cancel_lead_tasks(self, user_id: str, *, origin_bot_ids=None):
         uid = str(user_id)
-        self._cancel_downsell(uid)
-        self._cancel_upsell(uid)
+        origins = None if origin_bot_ids is None else {str(x) for x in origin_bot_ids if str(x).isdecimal()}
+        if origins is None:
+            self._cancel_downsell(uid)
+            self._cancel_upsell(uid)
+        else:
+            for origin in origins:
+                self._cancel_downsell(uid, bot_id=origin)
+                self._cancel_upsell(uid, bot_id=origin)
         for tx_id, owner_id in list(self.active_tx_map.items()):
-            if str(owner_id) == uid:
+            rec = self.tx_records.get(tx_id) or {}
+            token = str(rec.get('bot_token') or '')
+            origin = token.split(':', 1)[0] if ':' in token else ''
+            if str(owner_id) == uid and (origins is None or origin in origins):
                 pt = self.pix_poll_tasks.pop(tx_id, None)
                 if pt and not pt.done():
                     pt.cancel()
