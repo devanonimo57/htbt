@@ -742,7 +742,21 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             old_clients = _client_map(baseline)
             dirty_clients = {key for key, lead in _client_map(state).items() if lead != old_clients.get(key)}
             old_pix = baseline.get('tx_records', {})
+            live_pix = existing_state.get('tx_records', {})
+            # A Pix seen by this snapshot but explicitly deleted meanwhile is
+            # not a newly generated payment; never recreate its row.
+            discarded_pix = set(old_pix) - set(live_pix)
+            for tid in discarded_pix:
+                state.get('tx_records', {}).pop(tid, None)
             dirty_pix = {str(tid) for tid, rec in state.get('tx_records', {}).items() if rec != old_pix.get(tid)}
+            # Count only paid transitions that are not already committed. Two
+            # independent stale webhooks must both contribute; a replay must not.
+            newly_counted = [rec for tid, rec in state.get('tx_records', {}).items()
+                             if str(tid) in dirty_pix and str(tid) not in (delete_tx_ids or [])
+                             and isinstance(rec, dict) and rec.get('status') == 'paid'
+                             and rec.get('sales_counted') is True
+                             and not (isinstance(live_pix.get(tid), dict)
+                                      and live_pix[tid].get('sales_counted') is True)]
 
             # Do not turn a stale copy's untouched rows into writes (or into
             # stale values in the returned cache). Only explicit deletion drops rows.
@@ -794,21 +808,52 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                                 st_rec["delivered"] = True
                             if ex_rec.get("sales_counted"):
                                 st_rec["sales_counted"] = True
-                            st_rec["delivery_attempts"] = max(
-                                int(st_rec.get("delivery_attempts") or 0),
-                                int(ex_rec.get("delivery_attempts") or 0),
-                            )
-                            for field in ("access_status", "invite_url", "delivered_at"):
-                                if ex_rec.get(field) and not st_rec.get(field):
+                            for counter in ("delivery_attempts", "automatic_delivery_attempts"):
+                                if counter in ex_rec or counter in st_rec:
+                                    st_rec[counter] = max(
+                                        int(st_rec.get(counter) or 0), int(ex_rec.get(counter) or 0)
+                                    )
+                            for field in ("access_status", "invite_url", "delivered_at", "expires_at"):
+                                if ex_rec.get(field) and (not st_rec.get(field) or
+                                        st_rec.get(field) == old_pix.get(ex_id, {}).get(field)):
                                     st_rec[field] = ex_rec[field]
+                            # The reservation timestamp belongs to the latest
+                            # attempt, never to an older paid snapshot.
+                            if ex_rec.get("last_delivery_attempt_at") and (
+                                    not st_rec.get("last_delivery_attempt_at") or
+                                    str(ex_rec["last_delivery_attempt_at"]) > str(st_rec["last_delivery_attempt_at"])):
+                                st_rec["last_delivery_attempt_at"] = ex_rec["last_delivery_attempt_at"]
 
                 ex_learning = existing_state.get("learning") if isinstance(existing_state.get("learning"), dict) else {}
                 st_learning = state.setdefault("learning", {})
-                if not delete_tx_ids and isinstance(ex_learning, dict):
-                    ex_confirmed = int(ex_learning.get("confirmed_purchases") or 0)
-                    st_confirmed = int(st_learning.get("confirmed_purchases") or 0)
-                    if ex_confirmed > st_confirmed:
-                        st_learning["confirmed_purchases"] = ex_confirmed
+                if not delete_tx_ids:
+                    # Config totals are aggregates, not monotonic max values:
+                    # deletions/reset may legitimately decrease them. Replay
+                    # only genuinely new settlements against the live totals.
+                    for bot in state.get("flow_bots", []):
+                        if not isinstance(bot, dict):
+                            continue
+                        bid = str(bot.get("id") or "")
+                        live_bot = next((b for b in existing_state.get("flow_bots", [])
+                                         if isinstance(b, dict) and str(b.get("id") or "") == bid), {})
+                        base_bot = next((b for b in baseline.get("flow_bots", [])
+                                         if isinstance(b, dict) and str(b.get("id") or "") == bid), {})
+                        payments = [r for r in newly_counted if r.get("mode") == "flow"
+                                    and not r.get("is_upsell") and str(r.get("bot_id") or "") == bid]
+                        if live_bot:
+                            for key, increment in (("sales_today", len(payments)),
+                                                   ("revenue_today", sum(float(r.get("amount") or 0) for r in payments))):
+                                if payments or discarded_pix or bot.get(key) == base_bot.get(key):
+                                    value = float(live_bot.get(key) or 0) + increment
+                                    bot[key] = round(value, 2) if key == "revenue_today" else int(value)
+                    baseline_learning = baseline.get("learning")
+                    baseline_confirmed = (baseline_learning.get("confirmed_purchases")
+                                          if isinstance(baseline_learning, dict) else None)
+                    if (discarded_pix or newly_counted or
+                            st_learning.get("confirmed_purchases") == baseline_confirmed):
+                        st_learning["confirmed_purchases"] = (
+                            int(ex_learning.get("confirmed_purchases") or 0) + len(newly_counted)
+                        )
 
             # Missing rows in a stale snapshot do not imply deletion. The
             # selected client's rows are removed only by explicit keys.
