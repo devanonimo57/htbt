@@ -10179,8 +10179,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         });
       }
 
+      const saved = await saveFullState();
+      if (!saved) return false; // Never dispatch an older persisted campaign.
       nbCloseRemarketingModal();
-      await saveFullState();
       nbRenderRemarketingView();
 
       if (sendImmediately && targetId) {
