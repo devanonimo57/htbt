@@ -19,9 +19,9 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, update, delete
 
-from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order, ClientRecord, PixRecord
+from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order, ClientRecord, PixRecord, RemarketingDelivery
 from pushin_pay import PushinPayClient
 from ai_engine import generate_ai_reply
 from telegram_service import bot_manager
@@ -411,6 +411,23 @@ def _preserve_media_file_ids(inc_medias: Any, ex_medias: Any) -> None:
                     m["url"] = matched["url"]
 
 
+def _preserve_campaign_progress(incoming: Dict[str, Any], existing: Dict[str, Any]) -> None:
+    """Never replace live delivery metadata with an older config snapshot."""
+    live_campaigns = {str(c.get('id')): c for c in existing.get('remarketing_campaigns', [])
+                      if isinstance(c, dict) and c.get('id')}
+    for campaign in incoming.get('remarketing_campaigns', []):
+        if not isinstance(campaign, dict):
+            continue
+        live = live_campaigns.get(str(campaign.get('id')))
+        if live and (live.get('deliveries') or live.get('run_id')):
+            if campaign.get('run_id') != live.get('run_id'):
+                campaign['deliveries'] = {}
+            campaign['deliveries'] = {**campaign.get('deliveries', {}), **copy.deepcopy(live.get('deliveries', {}))}
+            for field in ('sent_count', 'total_targets', 'status', 'last_sent_at', 'run_id', 'run_ids', 'run_message', 'retry_not_before'):
+                if field in live:
+                    campaign[field] = copy.deepcopy(live[field])
+
+
 def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
     """
     Mescla alterações de configuração vindas do painel preservando integralmente o estado
@@ -430,6 +447,8 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
 
     if isinstance(existing.get("learning"), dict):
         incoming["learning"] = json.loads(json.dumps(existing["learning"]))
+
+    _preserve_campaign_progress(incoming, existing)
 
     _preserve_media_file_ids(incoming.get("medias"), existing.get("medias"))
     if isinstance(incoming.get("upsell"), dict) and isinstance(existing.get("upsell"), dict):
@@ -688,6 +707,7 @@ def _client_map(state):
 
 
 async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None, *, dirty_clients=None, dirty_pix=None) -> None:
+    client_baseline = _client_map(getattr(state, '_row_base', None) or _STATE_COMMITTED or {})
     for archived, key in ((False, "leads"), (True, "deleted_leads")):
         for lead in state.get("memory", {}).get(key, []):
             uid = str(lead.get("telegram_id") or "").strip()
@@ -697,6 +717,15 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             if dirty_clients is not None and (origin, uid, archived) not in dirty_clients:
                 continue
             row = await session.get(ClientRecord, (origin, uid, archived))
+            if row is not None:
+                # Merge offer authorization against the durable row, not a worker cache.
+                persisted = json.loads(row.data_json)
+                previous = client_baseline.get((origin, uid, archived), {})
+                removed = set(previous.get('authorized_flow_discounts', [])) - set(lead.get('authorized_flow_discounts', []))
+                discounts = [d for d in persisted.get('authorized_flow_discounts', []) if d not in removed]
+                if discounts:
+                    lead['authorized_flow_discounts'] = list(dict.fromkeys(
+                        lead.get('authorized_flow_discounts', []) + discounts))
             data = json.dumps(lead, ensure_ascii=False)
             if row is None:
                 session.add(ClientRecord(origin_bot_id=origin, telegram_id=uid, archived=archived, data_json=data))
@@ -734,6 +763,71 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             row.created_at = str(rec.get("created_at") or "")
 
 
+def _remarketing_claim_key(camp):
+    return str(camp.get('id')) + ('::' + str(camp['run_id']) if camp.get('run_id') else '')
+
+
+async def _project_remarketing_deliveries(session, state):
+    rows = (await session.execute(select(RemarketingDelivery))).scalars().all()
+    grouped = {}
+    for row in rows:
+        grouped.setdefault(row.campaign_id, {})[row.recipient] = row.status
+    for camp in state.get('remarketing_campaigns', []):
+        if not isinstance(camp, dict):
+            continue
+        claims = grouped.get(_remarketing_claim_key(camp), {})
+        if claims:
+            camp['deliveries'] = {**camp.get('deliveries', {}), **claims}
+            camp['sent_count'] = sum(status == 'sent' for status in camp['deliveries'].values())
+            if any(status in ('sending', 'uncertain') for status in camp['deliveries'].values()):
+                if camp.get('status') != 'Interrompida':
+                    camp['status'] = 'Revisão necessária'
+            elif camp.get('status') == 'Revisão necessária':
+                camp['status'] = 'Parcial' if len(camp['deliveries']) < int(camp.get('total_targets') or 0) else 'Finalizada'
+
+
+async def _claim_remarketing_recipient(campaign_id, recipient):
+    """Unique DB insert arbitrates claims even across application processes."""
+    async with async_session() as session:
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        dialect = session.bind.dialect.name
+        insert = sqlite_insert if dialect == 'sqlite' else pg_insert
+        result = await session.execute(insert(RemarketingDelivery).values(
+            campaign_id=str(campaign_id), recipient=recipient, status='sending'
+        ).on_conflict_do_nothing(index_elements=['campaign_id', 'recipient']))
+        await session.commit()
+        return result.rowcount == 1
+
+
+async def _mark_remarketing_recipient(campaign_id, recipient, status):
+    async with async_session() as session:
+        condition = (RemarketingDelivery.campaign_id == str(campaign_id),
+                     RemarketingDelivery.recipient == recipient)
+        statement = delete(RemarketingDelivery).where(*condition) if status == 'retryable' else update(RemarketingDelivery).where(
+            *condition).values(status=status)
+        await session.execute(statement)
+        await session.commit()
+
+
+async def _discount_needed_elsewhere(state, campaign_id, recipient, discount):
+    async with async_session() as session:
+        rows = (await session.execute(select(RemarketingDelivery).where(
+            RemarketingDelivery.recipient == recipient))).scalars().all()
+    by_campaign = {row.campaign_id: row.status for row in rows}
+    for other in state.get('remarketing_campaigns', []):
+        if not isinstance(other, dict) or str(other.get('id')) == str(campaign_id):
+            continue
+        other_discount = bot_manager._parse_discount_pct(
+            f"{other.get('discount_pct')}%" if other.get('discount_pct') else str(other.get('discount') or ''))
+        if other_discount != discount:
+            continue
+        status = by_campaign.get(str(other.get('id')), other.get('deliveries', {}).get(recipient))
+        if status in ('sent', 'sending', 'uncertain'):
+            return True
+    return False
+
+
 async def _read_state_from_db() -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     if _STATE_CACHE is not None:
@@ -750,7 +844,9 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 saved = json.loads(config.full_state_json)
             try:
                 merged = {**DEFAULT_SHARKBOT_STATE, **saved}
-                _STATE_CACHE = _StateSnapshot(_normalize_providers(await _hydrate_records(session, merged)))
+                hydrated = await _hydrate_records(session, merged)
+                await _project_remarketing_deliveries(session, hydrated)
+                _STATE_CACHE = _StateSnapshot(_normalize_providers(hydrated))
                 _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
                 _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
@@ -762,7 +858,7 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -774,6 +870,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             elif config and config.full_state_json:
                 try:
                     existing_state = await _hydrate_records(session, json.loads(config.full_state_json))
+                    await _project_remarketing_deliveries(session, existing_state)
                 except Exception:
                     existing_state = {}
 
@@ -807,6 +904,13 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     identity = (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived)
                     if identity not in dirty_clients and identity in live_clients:
                         incoming[idx] = copy.deepcopy(live_clients[identity])
+                    elif identity in live_clients and state is not _STATE_CACHE:
+                        # Detached snapshots may edit history but cannot revoke
+                        # an already exposed offer; revocation uses the live state.
+                        live_discounts = live_clients[identity].get('authorized_flow_discounts', [])
+                        if live_discounts:
+                            lead['authorized_flow_discounts'] = list(dict.fromkeys(
+                                lead.get('authorized_flow_discounts', []) + live_discounts))
             tx_map = state.setdefault('tx_records', {})
             for tid, record in existing_state.get('tx_records', {}).items():
                 if str(tid) not in dirty_pix and str(tid) not in (delete_tx_ids or []):
@@ -816,6 +920,8 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 state = _merge_config_preserving_runtime(state, existing_state)
             else:
                 state = _preserve_existing_secrets(state, existing_state)
+                if state is not _STATE_CACHE and not remarketing_new_run:
+                    _preserve_campaign_progress(state, existing_state)
                 # Reconciliação monotônica de transações financeiras (Item 2)
                 del_set = set(str(x) for x in (delete_tx_ids or []))
                 ex_tx_map = existing_state.get("tx_records") if isinstance(existing_state.get("tx_records"), dict) else {}
@@ -905,6 +1011,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     identity = (_origin_for_lead(old, existing_state), str(old.get("telegram_id")), archived)
                     if identity not in known and identity not in deleted_keys:
                         incoming.append(copy.deepcopy(old))
+            await _project_remarketing_deliveries(session, state)
             state = _normalize_providers(state)
 
             if not config:
@@ -2905,6 +3012,8 @@ async def handle_lead_action(req: LeadActionRequest):
 
 class RemarketingSendRequest(BaseModel):
     campaign_id: str
+    run_id: Optional[str] = None
+    start_new_run: bool = False
     bot_id: Optional[str] = "all"
     segment: Optional[str] = "Pendentes"
     message: Optional[str] = ""
@@ -2912,8 +3021,44 @@ class RemarketingSendRequest(BaseModel):
     discount_pct: Optional[int] = 0
 
 
+class RemarketingReconcileRequest(BaseModel):
+    campaign_id: str
+    run_id: Optional[str] = None
+    recipient: str
+    resolution: str
+
+
+@app.post('/api/flow-bots/remarketing/reconcile', dependencies=[Depends(verify_admin_auth)])
+async def reconcile_remarketing(req: RemarketingReconcileRequest):
+    if req.resolution not in ('sent', 'not_delivered'):
+        raise HTTPException(400, 'Resolução inválida')
+    async with async_session() as session:
+        state = await _read_state_from_db()
+        camp = next((c for c in state.get('remarketing_campaigns', []) if str(c.get('id')) == req.campaign_id), None)
+        if not camp or req.run_id != camp.get('run_id'):
+            raise HTTPException(409, 'Execução mudou; atualize os dados')
+        claim = await session.get(RemarketingDelivery, (_remarketing_claim_key(camp), req.recipient))
+        if claim is None or claim.status not in ('sending', 'uncertain'):
+            raise HTTPException(409, 'Destinatário sem entrega ambígua')
+        claim.status = req.resolution
+        await session.commit()
+    global _STATE_CACHE
+    _STATE_CACHE = None
+    state = await _read_state_from_db()
+    return {'status': 'ok', 'state': _panel_state(state)}
+
+
+# Serializes overlapping sends in one worker; persisted recipient claims survive retries.
+_REMARKETING_SEND_LOCK = _asyncio.Lock()
+REMARKETING_SEND_TIMEOUT_SECONDS = 5.0
+REMARKETING_BATCH_TIMEOUT_SECONDS = 15.0
+
 @app.post("/api/flow-bots/remarketing/send", dependencies=[Depends(verify_admin_auth)])
 async def send_remarketing_campaign(req: RemarketingSendRequest):
+    async with _REMARKETING_SEND_LOCK:
+        return await _send_remarketing_campaign_locked(req)
+
+async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
     from aiogram import types
     from telegram_service import _create_bot_instance
 
@@ -2922,6 +3067,38 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     camp = next((c for c in campaigns if isinstance(c, dict) and str(c.get("id")) == str(req.campaign_id)), None)
     if not camp:
         raise HTTPException(status_code=404, detail="Campanha não encontrada.")
+
+    # Explicit new runs get distinct durable claims; retries keep the same ID.
+    changed_completed = (not req.run_id and camp.get('status') == 'Finalizada'
+                         and camp.get('run_message') != camp.get('message'))
+    if req.start_new_run and not req.run_id:
+        raise HTTPException(400, 'Uma nova execução requer run_id para permitir retomada segura')
+    new_run = (req.start_new_run and req.run_id != camp.get('run_id')) or changed_completed
+    if new_run:
+        import uuid
+        if req.run_id in camp.get('run_ids', []):
+            raise HTTPException(409, 'Esta execução já foi encerrada; atualize os dados')
+        if any(v in ('sending', 'uncertain') for v in camp.get('deliveries', {}).values()):
+            raise HTTPException(409, 'Reconcilie as entregas ambíguas antes de iniciar outra execução')
+        # Publish the new identity only after its durable commit succeeds.
+        state = copy.deepcopy(state)
+        camp = next(c for c in state['remarketing_campaigns'] if str(c.get('id')) == req.campaign_id)
+        camp.update(run_id=req.run_id or uuid.uuid4().hex, deliveries={}, sent_count=0,
+                    status='Em andamento', retry_not_before=0)
+        camp.setdefault('run_ids', []).append(camp['run_id'])
+    elif req.run_id and req.run_id != camp.get('run_id'):
+        raise HTTPException(409, 'Execução não encontrada; atualize os dados')
+    camp.setdefault('run_message', camp.get('message'))
+    if new_run:
+        camp['run_message'] = camp.get('message')
+        state = await _write_state_to_db(state, preserve_runtime=False, remarketing_new_run=True)
+        camp = next(c for c in state['remarketing_campaigns'] if str(c.get('id')) == req.campaign_id)
+    claim_key = _remarketing_claim_key(camp)
+    retry_after = max(0, float(camp.get('retry_not_before') or 0) - datetime.now().timestamp())
+    if retry_after:
+        return {'status':'deferred', 'sent_count':0, 'total_targets':int(camp.get('total_targets') or 0),
+                'has_more':False, 'retry_after':retry_after, 'run_id':camp.get('run_id'), 'state':_panel_state(state)}
+    deadline = _asyncio.get_running_loop().time() + REMARKETING_BATCH_TIMEOUT_SECONDS
 
     target_bot_id = str(camp.get("bot_id") or req.bot_id or "all").strip()
     segment = str(camp.get("segment") or req.segment or "all").strip().lower()
@@ -2970,82 +3147,154 @@ async def send_remarketing_campaign(req: RemarketingSendRequest):
     temp_bots: Dict[str, Any] = {}
     sent_ok = 0
     disc_pct = bot_manager._parse_discount_pct(discount_str)
+    target_count = len(matched_leads)
+    # Campaign-scoped identities prevent a retry from re-sending confirmed or
+    # ambiguous deliveries. A Telegram acceptance and our DB commit cannot be atomic.
+    targets = [(str(verified_lead_bot(l).get("token")).split(":", 1)[0],
+                str(l.get("telegram_id") or l.get("user_id") or "").strip())
+               for l in matched_leads]
+    def current_campaign():
+        return next(c for c in state["remarketing_campaigns"] if str(c.get("id")) == str(req.campaign_id))
+
+    attempted = 0
+    attempted_recipients = set()
     try:
-        for l in matched_leads:
-            uid_str = str(l.get("telegram_id") or l.get("user_id") or "").strip()
+        for origin, uid_str in targets:
             if not uid_str.lstrip("-").isdigit():
                 continue
             uid = int(uid_str)
-
+            camp = current_campaign()
+            recipient = f"{origin}:{uid_str}"
+            deliveries = camp.setdefault("deliveries", {})
+            if recipient in deliveries:
+                continue  # 'sending' is ambiguous after a crash; never auto-resend it.
+            l = next((lead for lead in state.get("memory", {}).get("leads", [])
+                      if str(lead.get("telegram_id") or lead.get("user_id") or "") == uid_str
+                      and _crm_verified_bot_origin(lead) == origin), None)
+            if l is None:
+                continue
             lead_fb = verified_lead_bot(l)
             if not lead_fb:
                 continue
             lead_tok = str(lead_fb.get("token") or "").strip()
             if not lead_tok or lead_tok == REDACTED_SECRET_MASK:
                 continue
-
+            if attempted >= 10 or _asyncio.get_running_loop().time() >= deadline:
+                break
+            if not await _claim_remarketing_recipient(claim_key, recipient):
+                continue
+            attempted += 1
+            attempted_recipients.add(recipient)
             bot_inst = temp_bots.get(lead_tok)
             if not bot_inst:
                 bot_inst = _create_bot_instance(lead_tok)
                 temp_bots[lead_tok] = bot_inst
-
-            kb = bot_manager._build_flow_plans_kb(lead_fb, discount_str=discount_str) if (include_buttons and isinstance(lead_fb, dict)) else None
+            kb = bot_manager._build_flow_plans_kb(lead_fb, discount_str=discount_str) if include_buttons else None
+            fake_user = types.User(id=uid, is_bot=False, first_name=l.get("first_name") or "Cliente")
+            rendered = bot_manager._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você!", fake_user, lead_fb)
+            # Persist the claim BEFORE calling the external API. An interrupted
+            # send remains 'sending' for manual reconciliation, not blind retry.
+            deliveries[recipient] = "sending"
+            camp["status"] = "Em andamento"
+            camp["total_targets"] = target_count
+            # The unique claim is already durable; avoid a redundant full-state write.
+            # The state writer may replace untouched lead objects while merging rows.
+            l = next(lead for lead in state["memory"]["leads"]
+                     if str(lead.get("telegram_id") or lead.get("user_id") or "") == uid_str
+                     and _crm_verified_bot_origin(lead) == origin)
+            authorized_here = False
+            if disc_pct > 0:
+                auth_d = l.setdefault("authorized_flow_discounts", [])
+                if disc_pct not in auth_d:
+                    auth_d.append(disc_pct)
+                    authorized_here = True
+                state = await _write_state_to_db(state, preserve_runtime=False)
             try:
-                if disc_pct > 0:
-                    auth_d = l.setdefault("authorized_flow_discounts", [])
-                    if disc_pct not in auth_d:
-                        auth_d.append(disc_pct)
-                fake_user = types.User(id=uid, is_bot=False, first_name=l.get("first_name") or "Cliente")
-                rendered = bot_manager._render_flow_vars(msg_tmpl or "🔥 Oferta especial liberada para você!", fake_user, lead_fb or {})
                 try:
-                    await bot_inst.send_message(chat_id=uid, text=rendered, parse_mode="HTML", reply_markup=kb)
-                except Exception:
-                    await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
-                l["from_remarketing"] = True
-                l.setdefault("history", []).append({"role": "assistant", "content": f"[Remarketing: {camp.get('name', 'Campanha')}] {rendered}"})
-                sent_ok += 1
-                await _asyncio.sleep(0.05)
+                    await _asyncio.wait_for(bot_inst.send_message(chat_id=uid, text=rendered, parse_mode="HTML", reply_markup=kb),
+                        timeout=min(REMARKETING_SEND_TIMEOUT_SECONDS, max(0.001, deadline - _asyncio.get_running_loop().time())))
+                except Exception as e:
+                    if "can't parse entities" not in str(e).lower():
+                        raise
+                    await _asyncio.wait_for(bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb),
+                        timeout=min(REMARKETING_SEND_TIMEOUT_SECONDS, max(0.001, deadline - _asyncio.get_running_loop().time())))
             except Exception as e:
+                camp = current_campaign()
                 err_s = str(e).lower()
                 if any(x in err_s for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
+                    camp["deliveries"][recipient] = "blocked"
                     l["blocked"] = True
                     l["stage"] = "Bloqueou o bot"
+                    if authorized_here and not await _discount_needed_elsewhere(state, req.campaign_id, recipient, disc_pct):
+                        l['authorized_flow_discounts'].remove(disc_pct)
                 elif "retry after" in err_s or "too many requests" in err_s or "flood" in err_s:
-                    raw_wait = getattr(e, "retry_after", None)
-                    if isinstance(raw_wait, (int, float)):
-                        retry_wait = float(raw_wait)
-                    else:
-                        m = re.search(r"retry\s+(?:after|in)?\s*(\d+)", err_s)
-                        retry_wait = float(m.group(1)) if m else 3.0
-                    retry_wait = min(max(1.0, retry_wait), 15.0)
-                    await _asyncio.sleep(retry_wait)
-                    try:
-                        await bot_inst.send_message(chat_id=uid, text=rendered, reply_markup=kb)
-                        sent_ok += 1
-                    except Exception as e_after:
-                        err_sa = str(e_after).lower()
-                        if any(x in err_sa for x in ("blocked by the user", "user is deactivated", "forbidden", "chat not found")):
-                            l["blocked"] = True
-                            l["stage"] = "Bloqueou o bot"
+                    import re
+                    delay = getattr(e, 'retry_after', None)
+                    match = re.search(r'retry after\s+(\d+)', err_s)
+                    retry_after = max(float(delay or (match.group(1) if match else 60)), 1)
+                    camp['retry_not_before'] = datetime.now().timestamp() + retry_after
+                    # Telegram rejected the request; this recipient is safe to retry.
+                    camp["deliveries"].pop(recipient, None)
+                    if authorized_here and not await _discount_needed_elsewhere(state, req.campaign_id, recipient, disc_pct):
+                        l['authorized_flow_discounts'].remove(disc_pct)
                 else:
-                    pass
+                    # A transport error may arrive after Telegram accepted the send.
+                    camp["deliveries"][recipient] = "uncertain"
+                await _mark_remarketing_recipient(claim_key, recipient,
+                                                  camp['deliveries'].get(recipient, 'retryable'))
+                if isinstance(e, _asyncio.TimeoutError):
+                    # The durable claim holds uncertainty; no redundant full-state
+                    # commit may consume the remaining HTTP budget. Cold reads
+                    # project this claim back into campaign progress.
+                    camp['status'] = 'Revisão necessária'
+                    return {'status':'ok', 'sent_count':sent_ok, 'total_targets':target_count,
+                            'target_count':target_count, 'has_more':False, 'retry_after':0,
+                            'run_id':camp.get('run_id'), 'state':_panel_state(state)}
+                state = await _write_state_to_db(state, preserve_runtime=False)
+                continue
+            camp = current_campaign()
+            camp["deliveries"][recipient] = "sent"
+            await _mark_remarketing_recipient(claim_key, recipient, 'sent')
+            camp["sent_count"] = int(camp.get("sent_count") or 0) + 1
+            l["from_remarketing"] = True
+            l.setdefault("history", []).append({"role": "assistant", "content": f"[Remarketing: {camp.get('name', 'Campanha')}] {rendered}"})
+            sent_ok += 1
+            state = await _write_state_to_db(state, preserve_runtime=False)
+            await _asyncio.sleep(min(0.05, max(0, deadline - _asyncio.get_running_loop().time())))
+    except _asyncio.CancelledError:
+        current_campaign()["status"] = "Interrompida"
+        await _write_state_to_db(state, preserve_runtime=False)
+        raise
     finally:
         for b_inst in temp_bots.values():
             try:
-                await b_inst.session.close()
+                await _asyncio.wait_for(b_inst.session.close(), timeout=1)
             except Exception:
                 pass
 
-    camp["sent_count"] = int(camp.get("sent_count") or 0) + sent_ok
-    camp["total_targets"] = len(matched_leads)
-    camp["status"] = "Finalizada"
+    camp = current_campaign()
+    # Other workers may have claimed/sent recipients while this snapshot was
+    # running. Always project DB claims before deciding whether to continue.
+    async with async_session() as claim_session:
+        await _project_remarketing_deliveries(claim_session, state)
+    deliveries = camp.get("deliveries", {})
+    has_more = not retry_after and any(uid.lstrip("-").isdigit() and f"{origin}:{uid}" not in deliveries
+                   and f"{origin}:{uid}" not in attempted_recipients
+                   for origin, uid in targets)
+    camp["status"] = ("Revisão necessária" if any(v in ("sending", "uncertain")
+                       for v in deliveries.values()) else
+                      "Parcial" if any(uid.lstrip("-").isdigit() and f"{origin}:{uid}" not in deliveries
+                                       for origin, uid in targets) else "Finalizada")
     camp["last_sent_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
     state = await _write_state_to_db(state, preserve_runtime=False)
     return {
         "status": "ok",
         "sent_count": sent_ok,
-        "total_targets": len(matched_leads),
-        "target_count": len(matched_leads),
+        "total_targets": target_count,
+        "target_count": target_count,
+        "has_more": has_more,
+        "retry_after": retry_after,
+        "run_id": camp.get('run_id'),
         "state": _panel_state(state)
     }
 
