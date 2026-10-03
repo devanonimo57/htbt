@@ -190,6 +190,9 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
         bot.session.close = AsyncMock()
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
              patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)), \
+             patch.object(app_main, "_claim_remarketing_recipient", new=AsyncMock(return_value=True)), \
+             patch.object(app_main, "_mark_remarketing_recipient", new=AsyncMock()), \
+             patch.object(app_main, "_project_remarketing_deliveries", new=AsyncMock()), \
              patch.object(tg_srv, "_create_bot_instance", return_value=bot) as make_bot:
             result = await app_main.send_remarketing_campaign(
                 app_main.RemarketingSendRequest(campaign_id="camp")

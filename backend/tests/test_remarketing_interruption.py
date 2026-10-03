@@ -52,6 +52,10 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
                                     if getattr(route, 'path', None) == '/api/flow-bots/remarketing/send'
                                     for d in route.dependant.dependencies)
         main.app.dependency_overrides[self.auth_dependency] = lambda: True
+        self.reconcile_auth = next(d.call for route in main.app.routes
+                                   if getattr(route, 'path', None) == '/api/flow-bots/remarketing/reconcile'
+                                   for d in route.dependant.dependencies)
+        main.app.dependency_overrides[self.reconcile_auth] = lambda: True
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='http://test')
 
     async def _close(self):
@@ -61,6 +65,7 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
         self.release_second.set()
         await self.client.aclose()
         main.app.dependency_overrides.pop(self.auth_dependency, None)
+        main.app.dependency_overrides.pop(self.reconcile_auth, None)
         self.auth_patch.stop()
         self.bot_patch.stop()
         main.engine, main.async_session = self.original_engine, self.original_session
@@ -104,6 +109,108 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved['remarketing_campaigns'][0]['deliveries'], {'111:41': 'sent'})
         self.assertEqual(saved['remarketing_campaigns'][0]['sent_count'], 1)
         self.assertEqual(saved['remarketing_campaigns'][0]['message'], 'Nova oferta')
+
+    async def test_stale_nonpanel_write_cannot_erase_delivery_claims(self):
+        stale = copy.deepcopy(await main._read_state_from_db())
+        live = copy.deepcopy(stale)
+        live['remarketing_campaigns'][0]['deliveries'] = {'111:41': 'sent'}
+        live['remarketing_campaigns'][0]['sent_count'] = 1
+        await main._write_state_to_db(live)
+        stale['learning']['confirmed_purchases'] = 2
+        await main._write_state_to_db(stale, preserve_runtime=False)
+        saved = await self.persisted()
+        self.assertEqual(saved['remarketing_campaigns'][0]['deliveries'], {'111:41': 'sent'})
+        self.assertEqual(saved['remarketing_campaigns'][0]['sent_count'], 1)
+
+    async def test_stale_lead_write_cannot_erase_exposed_discount(self):
+        stale = copy.deepcopy(await main._read_state_from_db())
+        live = copy.deepcopy(stale)
+        live['memory']['leads'][0]['authorized_flow_discounts'] = [20]
+        await main._write_state_to_db(live)
+        stale['memory']['leads'][0]['history'].append({'role':'user','content':'oi'})
+        await main._write_state_to_db(stale)
+        saved = await self.persisted()
+        self.assertIn(20, saved['memory']['leads'][0].get('authorized_flow_discounts', []))
+
+    async def test_send_is_bounded_and_resumes_without_duplicate(self):
+        state = await main._read_state_from_db()
+        state['memory']['leads'].extend(
+            {'telegram_id': str(uid), 'bot_id': 'flow', 'origin_bot_numeric_id': '111', 'history': []}
+            for uid in range(100, 112))
+        await main._write_state_to_db(state)
+        self.release_second.set()
+        first = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertLessEqual(len(self.sent), 10)
+        self.assertTrue(first.json()['has_more'])
+        second = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertFalse(second.json()['has_more'])
+        self.assertEqual(len(set(self.sent)), 15)
+
+    async def test_discount_is_authorized_when_message_is_exposed(self):
+        state = await main._read_state_from_db()
+        state['remarketing_campaigns'][0]['discount_pct'] = 20
+        await main._write_state_to_db(state)
+        self.release_second.set()
+        async def inspect(*, chat_id, **kwargs):
+            live = await self.persisted()
+            lead = next(l for l in live['memory']['leads'] if l['telegram_id'] == str(chat_id))
+            self.assertIn(20, lead.get('authorized_flow_discounts', []))
+        self.bot.send_message = inspect
+        response = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['sent_count'], 3)
+
+    async def test_separate_workers_cannot_claim_same_recipient(self):
+        self.release_second.set()
+        results = await asyncio.gather(
+            main._claim_remarketing_recipient('camp', '111:41'),
+            main._claim_remarketing_recipient('camp', '111:41'))
+        self.assertEqual(sorted(results), [False, True])
+        main._STATE_CACHE = None
+        self.assertEqual((await main._read_state_from_db())['remarketing_campaigns'][0]['deliveries']['111:41'], 'sending')
+
+    async def test_operator_reconciles_ambiguous_without_resend(self):
+        await main._claim_remarketing_recipient('camp', '111:41')
+        response = await self.client.post('/api/flow-bots/remarketing/reconcile', json={
+            'campaign_id': 'camp', 'recipient': '111:41', 'resolution': 'not_delivered'})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.release_second.set()
+        await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertEqual(self.sent, [42, 43])
+        self.assertEqual((await self.persisted())['remarketing_campaigns'][0]['deliveries']['111:41'], 'not_delivered')
+
+    async def test_all_rate_limited_does_not_request_immediate_continuation(self):
+        async def reject(**kwargs):
+            raise RuntimeError('Retry after 3')
+        self.bot.send_message = reject
+        result = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertFalse(result.json()['has_more'])
+
+    async def test_definite_rejection_revokes_new_discount(self):
+        state = await main._read_state_from_db()
+        state['remarketing_campaigns'][0]['discount_pct'] = 20
+        await main._write_state_to_db(state)
+        async def reject(**kwargs):
+            raise RuntimeError('Forbidden: bot was blocked by the user')
+        self.bot.send_message = reject
+        result = await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'})
+        self.assertEqual(result.status_code, 200, result.text)
+        saved = await self.persisted()
+        self.assertNotIn(20, saved['memory']['leads'][0].get('authorized_flow_discounts', []))
+
+    async def test_rejection_keeps_discount_used_by_other_campaign(self):
+        state = await main._read_state_from_db()
+        state['remarketing_campaigns'][0]['discount_pct'] = 20
+        state['remarketing_campaigns'].append({'id':'other','discount_pct':20,'deliveries':{'111:41':'sent'}})
+        await main._write_state_to_db(state)
+        async def reject(**kwargs):
+            raise RuntimeError('Forbidden: bot was blocked by the user')
+        self.bot.send_message = reject
+        await self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id':'camp'})
+        saved = await self.persisted()
+        self.assertIn(20, saved['memory']['leads'][0].get('authorized_flow_discounts', []))
 
     async def test_proxy_timeout_does_not_cancel_live_request_and_retry_is_serialized(self):
         request = asyncio.create_task(self.client.post('/api/flow-bots/remarketing/send', json={'campaign_id': 'camp'}))

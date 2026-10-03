@@ -49,6 +49,13 @@ class PixRecord(Base):
     data_json = Column(Text, nullable=False)
     __table_args__ = (Index("ix_pix_bot_user", "origin_bot_id", "telegram_id"),)
 
+class RemarketingDelivery(Base):
+    """A unique durable claim per campaign and immutable bot/user pair."""
+    __tablename__ = "remarketing_deliveries"
+    campaign_id = Column(String, primary_key=True)
+    recipient = Column(String, primary_key=True)
+    status = Column(String, nullable=False, default="sending")
+
 
 class Offer(Base):
     """Ofertas e Planos de Assinatura"""
