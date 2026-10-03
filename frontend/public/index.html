@@ -5822,7 +5822,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
       box.className = "flex-1 overflow-y-auto space-y-2 text-left pt-3";
       box.innerHTML = leads.map((l) => {
-        const realIdx = allLeads.findIndex(item => String(item.telegram_id) === String(l.telegram_id));
+        const realIdx = allLeads.findIndex(item => String(item.telegram_id) === String(l.telegram_id) &&
+          String(item.origin_bot_numeric_id || item.bot_id || '') === String(l.origin_bot_numeric_id || l.bot_id || ''));
         const normStage = normalizeLeadStage(l.stage);
         const safeTid = escapeHtml(l.telegram_id);
         return `
@@ -5833,7 +5834,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               <span class="text-[10px] text-slate-500">${escapeHtml(l.last_interaction || '')}</span>
-              <button type="button" onclick="resetLeadHistory('${safeTid}', event)" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
+              <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeURIComponent(l.bot_id || 'unassigned')}'))" title="Reiniciar histórico desta conversa" class="px-2 py-1 rounded-lg bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-[10px] text-slate-300 hover:text-white transition">
                 <i class="fa-solid fa-rotate-left"></i>
               </button>
               <button type="button" onclick="deleteLead('${safeTid}', event)" title="Excluir conversa/lead" class="px-2 py-1 rounded-lg bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-[10px] text-purple-300 hover:text-white transition">
@@ -5843,7 +5844,8 @@ quer que eu te mostre as opções de acesso?</textarea>
           </div>
         `;
       }).join('');
-      const firstRealIdx = allLeads.findIndex(item => String(item.telegram_id) === String(leads[0].telegram_id));
+      const firstRealIdx = allLeads.findIndex(item => String(item.telegram_id) === String(leads[0].telegram_id) &&
+        String(item.origin_bot_numeric_id || item.bot_id || '') === String(leads[0].origin_bot_numeric_id || leads[0].bot_id || ''));
       showLeadDetail(firstRealIdx >= 0 ? firstRealIdx : 0);
     }
 
@@ -5881,7 +5883,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             <p class="text-[11px] text-zinc-400">Telegram ID: ${safeTid} • Etapa atual: <strong class="text-emerald-400">${escapeHtml(currStage)}</strong></p>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="resetLeadHistory('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
+            <button type="button" onclick="resetLeadHistory('${safeTid}', event, decodeURIComponent('${encodeURIComponent(lead.bot_id || 'unassigned')}'))" class="px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2638] border border-[#232a3d] text-xs font-bold text-slate-200 flex items-center gap-1.5 transition">
               <i class="fa-solid fa-rotate-left text-[11px]"></i> Reiniciar conversa
             </button>
             <button type="button" onclick="deleteLead('${safeTid}', event)" class="px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-red-900/60 border border-purple-800/40 text-xs font-bold text-purple-300 flex items-center gap-1.5 transition">
@@ -5911,22 +5913,27 @@ quer que eu te mostre as opções de acesso?</textarea>
       `;
     }
 
-    async function resetLeadHistory(telegramId, e) {
+    async function resetLeadHistory(telegramId, e, botId) {
       if (e) e.stopPropagation();
+      const scope = nbLeadDeleteScope(botId);
       const leads = STATE.memory?.leads || [];
-      const lead = leads.find(l => String(l.telegram_id) === String(telegramId));
-      if (lead) {
+      const selectedBot = (STATE.flow_bots || []).find(b => b.id === scope);
+      const matches = lead => String(lead.telegram_id) === String(telegramId) &&
+        (scope === 'all' || (selectedBot && (lead.origin_bot_numeric_id
+          ? String(lead.origin_bot_numeric_id) === String(selectedBot.bot_id || '')
+          : lead.bot_id === scope)));
+      leads.filter(matches).forEach(lead => {
         lead.history = [];
         lead.stage = 'Conversando';
         lead.stage_history = ['Conversando'];
         lead.sent_downsell_steps = [];
         lead.preferences = 'Iniciou conversa no bot';
         lead.objections = 'Nenhuma identificada';
-      }
+      });
       saveLocalBackup();
       renderMemoryLeads();
       try {
-        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}/reset`, { method: 'POST' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}/reset?bot_id=${encodeURIComponent(scope)}`, { method: 'POST' });
         if (res.ok) {
           const data = await res.json();
           if (data.state) STATE = data.state;
@@ -6511,6 +6518,18 @@ quer que eu te mostre as opções de acesso?</textarea>
     let BROWSER_POLL_OFFSET = 0;
     let BROWSER_POLL_ACTIVE_TOKEN = "";
 
+    function sanitizeSavedProfiles(profiles) {
+      const sensitive = new Set(['token', 'bot_token', 'pushin_pay_token', 'gateway_secret', 'secret', 'password', 'api_key', 'ai_api_key']);
+      const mask = value => {
+        if (Array.isArray(value)) return value.map(mask);
+        if (value && typeof value === 'object') return Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, sensitive.has(key.toLowerCase()) ? (item ? '***configured***' : '') : mask(item)])
+        );
+        return value;
+      };
+      return (Array.isArray(profiles) ? profiles : []).map(profile => ({ ...profile, snapshot: mask(profile.snapshot || {}) }));
+    }
+
     function getMergedSavedProfiles(serverProfiles) {
       let localList = [];
       try {
@@ -6519,7 +6538,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       } catch (e) {}
       const srvList = Array.isArray(serverProfiles) ? serverProfiles : (Array.isArray(STATE.saved_profiles) ? STATE.saved_profiles : []);
       const map = new Map();
-      [...srvList, ...localList].forEach(item => {
+      [...sanitizeSavedProfiles(srvList), ...sanitizeSavedProfiles(localList)].forEach(item => {
         if (item && item.id) {
           const existing = map.get(item.id);
           if (!existing || (item.saved_at_ms || 0) >= (existing.saved_at_ms || 0)) {
@@ -6589,7 +6608,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         gender: STATE.persona?.gender || 'Feminina',
         flirt: STATE.style?.flirt || 'Leve',
         saved_at_ms: Date.now(),
-        snapshot
+        snapshot: sanitizeSavedProfiles([{ snapshot }])[0].snapshot
       };
 
       if (existingIdx >= 0) {
@@ -6599,12 +6618,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       }
 
       STATE.saved_profiles = profiles;
+      STATE.save_profile_id = profileObj.id;
       try {
         localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(profiles));
       } catch (e) {}
       if (nameInp) nameInp.value = '';
       renderSavedProfilesDropdown(profileObj.id);
-      await saveFullState();
+      try { await saveFullState(); } finally { delete STATE.save_profile_id; }
     }
 
     async function applySelectedProfile() {
@@ -6624,12 +6644,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (snap.publish) STATE.publish = snap.publish;
       if (snap.account) STATE.account = snap.account;
       STATE.saved_profiles = profiles;
+      STATE.restore_profile_id = profId;
       STATE.updated_at_ms = Date.now();
 
       const btn = document.getElementById('btn-apply-profile');
       if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-[10px]"></i> <span>Aplicando...</span>`;
       syncStateToInputs();
-      await saveFullState();
+      try { await saveFullState(); } finally { delete STATE.restore_profile_id; }
       renderSavedProfilesDropdown(profId);
       if (btn) {
         btn.innerHTML = `<i class="fa-solid fa-check text-[10px]"></i> <span>Aplicado!</span>`;
@@ -6655,9 +6676,10 @@ quer que eu te mostre as opções de acesso?</textarea>
     function saveLocalBackup() {
       try {
         if (Array.isArray(STATE.saved_profiles) && STATE.saved_profiles.length) {
-          localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(STATE.saved_profiles));
+          localStorage.setItem('SHARKBOT_SAVED_PROFILES', JSON.stringify(sanitizeSavedProfiles(STATE.saved_profiles)));
         }
-        localStorage.setItem('SHARKBOT_STATE_BACKUP', JSON.stringify(STATE));
+        const { save_profile_id, restore_profile_id, ...backupState } = STATE;
+        localStorage.setItem('SHARKBOT_STATE_BACKUP', JSON.stringify({ ...backupState, saved_profiles: sanitizeSavedProfiles(STATE.saved_profiles) }));
       } catch (e) {}
     }
 
@@ -6960,7 +6982,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       let localBackup = null;
       try {
         const raw = localStorage.getItem('SHARKBOT_STATE_BACKUP');
-        if (raw) localBackup = JSON.parse(raw);
+        if (raw) {
+          localBackup = JSON.parse(raw);
+          localBackup.saved_profiles = sanitizeSavedProfiles(localBackup.saved_profiles);
+          localStorage.setItem('SHARKBOT_STATE_BACKUP', JSON.stringify(localBackup));
+        }
       } catch (e) {}
 
       try {
@@ -9372,28 +9398,35 @@ quer que eu te mostre as opções de acesso?</textarea>
       return "Novo";
     }
 
+    function nbParseEventDate(isoStr) {
+      const raw = String(isoStr || '');
+      return new Date(/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d+)?)?$/.test(raw) ? `${raw}Z` : raw);
+    }
+
+    function nbIsBrtDay(isoStr, day) {
+      const dt = nbParseEventDate(isoStr);
+      return !isNaN(dt.getTime()) && new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(dt) === day;
+    }
+
     function nbMatchesDateFilter(isoStr, periodKey) {
       if (!periodKey || periodKey === "Tudo" || periodKey === "Total" || periodKey === "all") return true;
       if (!isoStr) return true;
-      const dt = new Date(isoStr);
-      if (isNaN(dt.getTime())) return true;
-      const now = new Date();
-      const diffMs = now - dt;
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-      if (periodKey === "Hoje" || periodKey === "today") {
-        return dt.toDateString() === now.toDateString();
-      }
-      if (periodKey === "Ontem") {
-        const yest = new Date(now);
-        yest.setDate(now.getDate() - 1);
-        return dt.toDateString() === yest.toDateString();
-      }
-      if (periodKey === "Semana" || periodKey === "7 dias" || periodKey === "7d") {
-        return diffDays <= 7;
-      }
-      if (periodKey === "Mês" || periodKey === "30d") {
-        return diffDays <= 30;
-      }
+      const dt = nbParseEventDate(isoStr);
+      if (isNaN(dt.getTime())) return false;
+      const brtDay = date => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+      const day = brtDay(dt);
+      const today = brtDay(new Date());
+      const offsetDay = days => {
+        const midnight = new Date(`${today}T12:00:00Z`);
+        midnight.setUTCDate(midnight.getUTCDate() - days);
+        return midnight.toISOString().slice(0, 10);
+      };
+      if (periodKey === "Hoje" || periodKey === "today") return day === today;
+      if (periodKey === "Ontem") return day === offsetDay(1);
+      if (periodKey === "Semana" || periodKey === "7 dias" || periodKey === "7d") return day >= offsetDay(6) && day <= today;
+      if (periodKey === "Mês" || periodKey === "30d") return day >= offsetDay(29) && day <= today;
       return true;
     }
 
@@ -10316,9 +10349,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (filterBot !== 'all' && l.bot_id !== filterBot && l.bot_username !== (bots.find(x => x.id === filterBot)?.username)) return false;
         if (filterFlow !== 'all' && l.bot_id && !allowedBotIds.has(l.bot_id) && !allowedBotNames.has(l.bot_username)) return false;
 
-        const leadDateStr = l.paid_at || l.created_at || l.last_interaction || '';
+        const leadDateStr = l.created_at || l.last_interaction || '';
         if (NB_ANA_SELECTED_DATE) {
-          if (leadDateStr && !String(leadDateStr).startsWith(NB_ANA_SELECTED_DATE)) return false;
+          if (!leadDateStr || !nbIsBrtDay(leadDateStr, NB_ANA_SELECTED_DATE)) return false;
         } else if (!nbMatchesDateFilter(leadDateStr, NB_DASH_PERIOD)) {
           return false;
         }
@@ -10332,7 +10365,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (filterGw !== 'all' && String(tx.gateway || '').toLowerCase() !== filterGw) return false;
         const txDate = tx.paid_at || tx.created_at || '';
         if (!txDate && (NB_ANA_SELECTED_DATE || NB_DASH_PERIOD !== 'Tudo')) return false;
-        return NB_ANA_SELECTED_DATE ? String(txDate).startsWith(NB_ANA_SELECTED_DATE) : nbMatchesDateFilter(txDate, NB_DASH_PERIOD);
+        return NB_ANA_SELECTED_DATE ? nbIsBrtDay(txDate, NB_ANA_SELECTED_DATE) : nbMatchesDateFilter(txDate, NB_DASH_PERIOD);
       });
       const paidTx = matchingTx.filter(tx => tx.status === 'paid' || tx.delivered);
       const pendingTx = matchingTx.filter(tx => tx.status === 'pending' && !tx.delivered);
@@ -10609,7 +10642,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       return [...unique.values()];
     }
 
+    let NB_FIN_REQUEST_ID = 0;
     async function nbRefreshFinance() {
+      const requestId = ++NB_FIN_REQUEST_ID;
       const bot = document.getElementById('nb-fin-bot-select')?.value || 'all';
       const base = `period=${encodeURIComponent(NB_FIN_PERIOD)}&bot_id=${encodeURIComponent(bot)}`;
       const status = {Pago:'paid',Pendente:'pending',Cancelado:'cancelled'}[NB_FIN_STATUS] || (NB_FIN_STATUS === 'Todos' ? 'all' : NB_FIN_STATUS.toLowerCase());
@@ -10619,10 +10654,13 @@ quer que eu te mostre as opções de acesso?</textarea>
           adminFetch(`/api/transactions?${base}&status=${encodeURIComponent(status)}&page=${NB_FIN_PAGE}&page_size=25`)
         ]);
         if (!metricsRes.ok || !txRes.ok) throw new Error('Não foi possível carregar o Financeiro');
-        NB_FIN_METRICS = await metricsRes.json();
-        NB_FIN_TRANSACTIONS = await txRes.json();
+        const [metrics, transactions] = await Promise.all([metricsRes.json(), txRes.json()]);
+        if (requestId !== NB_FIN_REQUEST_ID) return;
+        NB_FIN_METRICS = metrics;
+        NB_FIN_TRANSACTIONS = transactions;
         nbRenderFinanceView();
       } catch (error) {
+        if (requestId !== NB_FIN_REQUEST_ID) return;
         console.warn('Financeiro não atualizado:', error);
         alert('Não foi possível atualizar o Financeiro.');
       }

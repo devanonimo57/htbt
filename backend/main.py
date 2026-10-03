@@ -274,24 +274,58 @@ def _redact_state_secrets(state: Dict[str, Any]) -> Dict[str, Any]:
                 _mask_archived_secrets(item)
 
     _mask_archived_secrets(copy_state.get("memory", {}).get("deleted_leads", []))
+    _mask_archived_secrets(copy_state.get("saved_profiles", []))
     return copy_state
 
 
 def _preserve_existing_secrets(incoming: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
     """Preserva segredos já salvos no banco quando o frontend envia a máscara REDACTED_SECRET_MASK."""
+    profile_id = str(incoming.pop("restore_profile_id", "") or "")
+    save_profile_id = str(incoming.pop("save_profile_id", "") or "")
     if not existing:
         return incoming
     inc_pub = incoming.setdefault("publish", {})
     ex_pub = existing.get("publish", {})
+    selected_profile = next((p.get("snapshot") for p in existing.get("saved_profiles", [])
+                             if isinstance(p, dict) and str(p.get("id")) == profile_id), None)
+    profile_pub = selected_profile.get("publish", {}) if isinstance(selected_profile, dict) else {}
+    profile_acc = selected_profile.get("account", {}) if isinstance(selected_profile, dict) else {}
     for key in ("bot_token", "pushin_pay_token", "gateway_secret"):
         val = (inc_pub.get(key) or "").strip()
         if val == REDACTED_SECRET_MASK:
-            inc_pub[key] = ex_pub.get(key, "")
+            inc_pub[key] = profile_pub.get(key) or ex_pub.get(key, "")
 
     inc_acc = incoming.setdefault("account", {})
     ex_acc = existing.get("account", {})
     if (inc_acc.get("ai_api_key") or "").strip() == REDACTED_SECRET_MASK:
-        inc_acc["ai_api_key"] = ex_acc.get("ai_api_key", "")
+        inc_acc["ai_api_key"] = profile_acc.get("ai_api_key") or ex_acc.get("ai_api_key", "")
+
+    # Profile snapshots returned to browsers contain masks. Match only stable
+    # profile IDs, so a renamed/overwritten snapshot does not lose credentials.
+    old_profiles = {str(p.get("id")): p.get("snapshot") for p in existing.get("saved_profiles", [])
+                    if isinstance(p, dict) and p.get("id") and isinstance(p.get("snapshot"), dict)}
+    def restore_masks(value, old):
+        if isinstance(value, dict) and isinstance(old, dict):
+            for key, item in value.items():
+                if item == REDACTED_SECRET_MASK and key in old:
+                    value[key] = old[key]
+                else:
+                    restore_masks(item, old.get(key))
+        elif isinstance(value, list) and isinstance(old, list):
+            for item, original in zip(value, old):
+                restore_masks(item, original)
+    for profile in incoming.get("saved_profiles", []):
+        if isinstance(profile, dict) and isinstance(profile.get("snapshot"), dict):
+            restore_masks(profile["snapshot"], old_profiles.get(str(profile.get("id"))))
+            if str(profile.get("id")) == save_profile_id:
+                snapshot = profile["snapshot"]
+                for section, keys, live in (("publish", ("bot_token", "pushin_pay_token", "gateway_secret"), inc_pub),
+                                             ("account", ("ai_api_key",), inc_acc)):
+                    fields = snapshot.get(section)
+                    if isinstance(fields, dict):
+                        for key in keys:
+                            if key in fields:
+                                fields[key] = live.get(key, "")
 
     ex_bots_by_id = {
         str(b.get("id")): b
@@ -1053,13 +1087,14 @@ async def _pix_filters(period: str, bot_id: str, date: str = ''):
             local_day = func.date(func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at), '-3 hours')
             filters.append(local_day < today.isoformat())
         elif period in ('Semana', '7 dias'):
-            start = (today - timedelta(days=7)).isoformat()
+            start = (today - timedelta(days=6)).isoformat()
         elif period in ('Mês', '30d'):
-            start = (today - timedelta(days=30)).isoformat()
+            start = (today - timedelta(days=29)).isoformat()
         else:
             raise HTTPException(status_code=422, detail='Período inválido')
         effective = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
-        filters.append(func.date(effective, '-3 hours') >= start)
+        local_day = func.date(effective, '-3 hours')
+        filters.extend((local_day >= start, local_day < (today + timedelta(days=1)).isoformat()))
     return filters
 
 
@@ -1077,13 +1112,13 @@ def _metrics_date_filters(period, date, timestamp):
     if period in ('Total', 'Tudo'):
         return []
     today = datetime.now(timezone(timedelta(hours=-3))).date()
-    spans = {'Hoje': 0, 'Ontem': 1, 'Semana': 7, '7 dias': 7, 'Mês': 30, '30d': 30}
+    spans = {'Hoje': 0, 'Ontem': 1, 'Semana': 6, '7 dias': 6, 'Mês': 29, '30d': 29}
     if period not in spans:
         raise HTTPException(status_code=422, detail='Período inválido')
     filters = [local_day >= (today - timedelta(days=spans[period])).isoformat()]
     if period == 'Ontem':
         filters.append(local_day < today.isoformat())
-    elif period == 'Hoje':
+    else:
         filters.append(local_day < (today + timedelta(days=1)).isoformat())
     return filters
 
@@ -1417,7 +1452,7 @@ async def permanently_delete_lead(telegram_id: str, bot_id: str = ""):
 
 
 @app.post("/api/leads/{telegram_id}/reset", dependencies=[Depends(verify_admin_auth)])
-async def reset_lead_conversation(telegram_id: str):
+async def reset_lead_conversation(telegram_id: str, bot_id: str = "all"):
     clean_uid = str(telegram_id or "").strip()
     if not clean_uid:
         raise HTTPException(status_code=400, detail="ID de lead inválido.")
@@ -1427,7 +1462,7 @@ async def reset_lead_conversation(telegram_id: str):
         staged = copy.deepcopy(current)
         memory = staged.setdefault("memory", {"leads": []})
         for lead in memory.get("leads", []):
-            if str(lead.get("telegram_id")) == clean_uid:
+            if _matches_lead_scope(lead, clean_uid, bot_id, staged):
                 lead["history"] = []
                 lead["stage"] = "Conversando"
                 lead["stage_history"] = ["Conversando"]
@@ -1439,9 +1474,16 @@ async def reset_lead_conversation(telegram_id: str):
                 lead.pop("chosen_plan", None)
                 lead.pop("chosen_upsell", None)
                 lead.pop("last_tx_is_upsell", None)
-                break
+                if bot_id != "all":
+                    break
         saved = await _write_state_to_db(staged)
-        bot_manager.cancel_lead_tasks(clean_uid)
+        if bot_id == "all":
+            bot_manager.cancel_lead_tasks(clean_uid)
+        else:
+            bot = next((b for b in staged.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
+            if bot:
+                bot_manager._cancel_downsell(clean_uid, str(bot.get("bot_id")))
+                bot_manager._cancel_upsell(clean_uid, str(bot.get("bot_id")))
         return {"status": "success", "state": _panel_state(saved)}
 
 async def clear_all_leads():
