@@ -44,4 +44,18 @@ function capturedUpload(){
   assert.equal(a.welcome.medias.length,deleted?0:1);assert.equal(warmed.length,deleted?0:1);if(!deleted)assert.equal(warmed[0].bot,'a');
  }
 }
-(async()=>{await failedCampaignSave();await pendingEditsSurviveSave();capturedUpload();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});
+async function rateLimitDoesNotLoop(){
+ const {c}=setup();let sends=0;
+ c.STATE.remarketing_campaigns=[{id:'camp',message:'Offer',run_id:'run'}];
+ c.adminFetch=async()=>{sends++;return {ok:true,json:async()=>({sent_count:0,total_targets:15,has_more:true,retry_after:3.2,state:c.STATE})}};
+ vm.runInContext(block('async function nbSendRemarketingCampaign(', 'async function nbDeleteRemarketingCampaign('),c);
+ await c.nbSendRemarketingCampaign('camp');assert.equal(sends,1);
+}
+async function uploadCacheUsesCapturedBot(){
+ const {c}=setup(),a={id:'a',bot_id:'111',token:'111:a',cache_channel_id:'-1001',welcome:{medias:[]}},b={id:'b',bot_id:'222',token:'222:b'};let current=a,reader;const requests=[],loads=[];
+ c.STATE.flow_bots=[a,b];Object.assign(c,{NB_MEDIA_TARGET:{section:'welcome',seqIdx:0},NB_DOWNSELL_TRACK:'general',NB_OB_TEMP_MEDIAS:[],FileReader:class{constructor(){reader=this;this.result='data:image/png;base64,AAAA'}readAsDataURL(){}},nbGetCurrentBot:()=>current,nbLoadBotIntoTabs:bot=>loads.push(bot.id),saveFullState:async()=>true,adminFetch:async(u,o)=>{requests.push(JSON.parse(o.body));return {json:async()=>({status:'ok',telegram_file_id:'cached-a'})}}});
+ vm.runInContext(block('async function nbAutoWarmMediaItem(', 'function nbRenderMediaChips('),c);
+ c.nbHandleMediaUpload({target:{files:[{name:'a.png',type:'image/png'}]}});current=b;reader.onload();await new Promise(r=>setImmediate(r));
+ assert.equal(requests[0].bot_id,'a');assert.equal(requests[0].channel_id,'-1001');assert.deepEqual(loads,[]);assert.equal(a.welcome.medias[0].telegram_file_id,'cached-a');
+}
+(async()=>{await failedCampaignSave();await pendingEditsSurviveSave();capturedUpload();await uploadCacheUsesCapturedBot();await rateLimitDoesNotLoop();console.log('seven followup frontend checks passed')})().catch(e=>{console.error(e);process.exitCode=1});

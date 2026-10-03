@@ -36,11 +36,17 @@ const context = {STATE:{flow_bots:[{id:'a',username:'@a',sales_today:999,revenue
 vm.createContext(context);
 vm.runInContext(extract('function nbDistinctTransactions(', 'async function nbClearBotTestSales('),context);
 context.nbRenderFinanceView();
+assert.equal(el('nb-fin-rev-value').textContent,'—', 'SQL metrics unavailable must not fall back to state-derived totals');
+assert.equal(el('nb-fin-paid-count').textContent,'—');
+assert.equal(el('nb-fin-pending-value').textContent,'—');
+context.NB_FIN_METRICS={paid_amount:10,paid_count:1,pending_amount:20};
+context.NB_FIN_TRANSACTIONS={items:[],total:0,page:1,page_size:25};
+context.nbRenderFinanceView();
 assert.equal(el('nb-fin-rev-value').textContent,'R$ 10,00');
 assert.equal(el('nb-fin-paid-count').textContent,'1');
 assert.equal(el('nb-fin-pending-value').textContent,'R$ 20,00');
 el('nb-fin-bot-select').value='b';
-context.NB_FIN_PERIOD='Total'; context.nbRenderFinanceView();
+context.NB_FIN_PERIOD='Total'; context.NB_FIN_METRICS={paid_amount:30,paid_count:1,pending_amount:40}; context.nbRenderFinanceView();
 assert.equal(el('nb-fin-rev-value').textContent,'R$ 30,00');
 assert.equal(el('nb-fin-paid-count').textContent,'1');
 assert.equal(el('nb-fin-pending-value').textContent,'R$ 40,00');
