@@ -990,23 +990,35 @@ def _merge_late_cache_delta(committed, before, live, path=()):
             elif before[key] != value:
                 merged[key] = _merge_late_cache_delta(merged.get(key), before[key], value, path + (key,))
         if path == ('memory',):
-            # Archival changes placement, not immutable customer identity.
-            # Move the event-owned history with its customer, never to a new
-            # origin that happens to reuse the same configured ID/user ID.
-            old = {(o, u): lead for (o, u, _), lead in _client_map({'memory': before}).items()}
-            saved = {(o, u): lead for (o, u, _), lead in _client_map({'memory': committed}).items()}
-            for key in ('leads', 'deleted_leads'):
+            # Coexisting active/archived rows are independent customers.
+            old = _client_map({'memory': before})
+            saved = _client_map({'memory': committed})
+            current = _client_map({'memory': live})
+            for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
                 rows = []
                 for lead in live.get(key, []):
-                    identity = (_origin_for_lead(lead, {}), str(lead.get('telegram_id')))
-                    rows.append(_merge_late_cache_delta(saved[identity], old[identity], lead)
-                                if identity in old and identity in saved else copy.deepcopy(lead))
+                    identity = (_origin_for_lead(lead, {}), str(lead.get('telegram_id')), archived)
+                    source = identity
+                    if identity not in old or lead.get('created_at') != old[identity].get('created_at'):
+                        # Only a captured incarnation that vacated the opposite
+                        # position may carry its checkout across archive/restore.
+                        # A fresh reentry at the same SQL key is not that move.
+                        opposite = (identity[0], identity[1], not archived)
+                        created = lead.get('created_at')
+                        source = (opposite if created
+                                  and old.get(opposite, {}).get('created_at') == created
+                                  and saved.get(opposite, {}).get('created_at') == created
+                                  and current.get(opposite, {}).get('created_at') != created else None)
+                    rows.append(_merge_late_cache_delta(saved[source], old[source], lead)
+                                if source in old and source in saved
+                                and saved[source].get('created_at') == old[source].get('created_at')
+                                else copy.deepcopy(lead))
                 # Retain admission-owned new customers unless live explicitly
                 # supplied another row with their same immutable identity.
                 known = {(_origin_for_lead(l, {}), str(l.get('telegram_id')))
                          for k in ('leads', 'deleted_leads') for l in live.get(k, [])}
                 rows.extend(copy.deepcopy(l) for l in committed.get(key, [])
-                            if (_origin_for_lead(l, {}), str(l.get('telegram_id'))) not in old
+                            if (_origin_for_lead(l, {}), str(l.get('telegram_id')), archived) not in old
                             and (_origin_for_lead(l, {}), str(l.get('telegram_id'))) not in known)
                 merged[key] = rows
         return merged
