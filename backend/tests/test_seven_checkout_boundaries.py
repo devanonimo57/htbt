@@ -173,6 +173,44 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
         main._STATE_CACHE = None
         self.assertFalse((await main._read_state_from_db())['tx_records'])
 
+    async def test_checkout_reentry_preserves_current_profile_insights_and_both_histories(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        await self.manager._get_or_create_lead(state, self.user, bot_token=self.bot.token)
+        await main._write_state_to_db(state)
+        state = copy.deepcopy(await main._read_state_from_db())
+        gate, reached, finish = self.gate_gateway(1)
+        with gate:
+            task = asyncio.create_task(self.manager._generate_flow_checkout(
+                self.callback, state['flow_bots'][0], state, 'plan-a', 0, []))
+            try:
+                await asyncio.wait_for(reached.wait(), 5)
+                await main.delete_lead('7', bot_id='flow-a')
+                fresh = copy.deepcopy(await main._read_state_from_db())
+                lead = await self.manager._get_or_create_lead(fresh, self.user, bot_token=self.bot.token)
+                lead.update(first_name='Reentered profile', preferences='New custom insight', prefs_list=['New preference'],
+                            objections='New custom objection', objs_list=['New objection'], stage='Entrega concluída')
+                lead['history'] = [{'role':'user','content':'NEW REENTRY MESSAGE'}]
+                fresh['memory']['deleted_leads'][0]['history'].append({'role':'user','content':'ARCHIVED HISTORY'})
+                await main._write_state_to_db(fresh)
+                finish.set()
+                await asyncio.wait_for(task, 5)
+            finally:
+                finish.set()
+                await asyncio.gather(task, return_exceptions=True)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        lead = saved['memory']['leads'][0]
+        self.assertEqual(lead['first_name'],'Reentered profile')
+        self.assertEqual(lead['preferences'],'New custom insight')
+        self.assertEqual(lead['objections'],'New custom objection')
+        self.assertEqual(lead['prefs_list'],['New preference'])
+        self.assertEqual(lead['objs_list'],['New objection'])
+        self.assertEqual(lead['stage'],'Entrega concluída')
+        self.assertEqual(lead['history'][0]['content'],'NEW REENTRY MESSAGE')
+        self.assertEqual(lead['history'][-1]['tx_id'],self.created[0][0])
+        self.assertEqual(saved['memory']['deleted_leads'][0]['history'][-1]['content'],'ARCHIVED HISTORY')
+        self.assertEqual(len(saved['tx_records']),1)
+
     async def ordered_checkouts(self, reverse):
         state = copy.deepcopy(await main._read_state_from_db())
         lead = await self.manager._get_or_create_lead(state, self.user, bot_token=self.bot.token)

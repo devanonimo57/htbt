@@ -27,7 +27,7 @@ function setup(initial=fixture()){
  return {c,el};
 }
 async function crm(contract){
- const {c,el}=setup(contract?.initial);const gate=deferred();let request,post;
+ const {c,el}=setup(contract?.initial);const gate=deferred();let request,post,dirty=0;c.markUnsaved=()=>dirty++;
  el('nb-lead-chat-input').value='AUDIT CRM MESSAGE';
  c.adminFetch=async(url,opt)=>{if(url.includes('/leads/action')){request=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>contract?.action||{status:'ok',state:fixture()}}}post=JSON.parse(opt.body);return{ok:true,json:async()=>({state:post})}};
  const pending=c.nbSendLeadDirectMsg();
@@ -36,8 +36,9 @@ async function crm(contract){
  // The shipped welcome input handler creates the newer edit while CRM awaits.
  el('nb-welcome-msg').value='NEW UNSAVED WELCOME';c.nbOnWelcomeInput();
  assert.equal(c.STATE.flow_bots[0].welcome.message,'NEW UNSAVED WELCOME');
+ c.STATE.publish.gateway_secret='new-crm-secret';c.STATE.flow_bots[0].welcome.medias=[];c.STATE.flow_bots[1].plans=[];
  gate.resolve();await pending;
- assert.equal(c.STATE.flow_bots[0].welcome.message,'NEW UNSAVED WELCOME');
+ assert.equal(c.STATE.flow_bots[0].welcome.message,'NEW UNSAVED WELCOME');assert.equal(c.STATE.publish.gateway_secret,'new-crm-secret');assert.equal(c.STATE.flow_bots[0].welcome.medias.length,0);assert.equal(c.STATE.flow_bots[1].plans.length,0);assert(dirty>0);
  await c.saveFullState();
  return {request,post,lost_edit:'NEW UNSAVED WELCOME',after:c.STATE.flow_bots[0].welcome.message};
 }
@@ -68,11 +69,11 @@ async function downsellFailure(all=false,kind='http'){
  assert.equal(requests.length,0);assert.doesNotMatch(el('nb-ds-test-banner').innerHTML,/Sucesso/);assert.match(el('nb-ds-test-banner').innerHTML,/salvar/i);
  return{requests,post,save_http_status:500,banner:el('nb-ds-test-banner').innerHTML};
 }
-async function downsellTrack(){
- const {c}=setup(),gate=deferred();let request;
- c.adminFetch=async(url,opt)=>{if(url==='/api/state'){const posted=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>({state:posted})}}request=JSON.parse(opt.body);return{ok:true,json:async()=>({status:'success',channel_id:'-1001',bot_username:'@fixture'})}};
+async function downsellTrack(all=false){
+ const {c,el}=setup(),gate=deferred();let request,post;
+ c.adminFetch=async(url,opt)=>{if(url==='/api/state'){if(!opt)return{ok:true,json:async()=>clone(post)};post=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>({state:post})}}request=JSON.parse(opt.body);return{ok:true,json:async()=>({status:'success',channel_id:'-1001',bot_username:'@fixture'})}};
  vm.runInContext(block('function nbSwitchDownsellTrack(','function nbRenderDownsellTab('),c);
- const pending=c.nbTestDownsellSequence(0);c.nbSwitchDownsellTrack('pix');gate.resolve();await pending;
+ const pending=all?c.nbTestAllDownsellSequences():c.nbTestDownsellSequence(0);c.nbSwitchDownsellTrack('pix');el('nb-ds-test-banner').innerHTML='PIX UI';gate.resolve();await pending;assert.equal(el('nb-ds-test-banner').innerHTML,'PIX UI');
  assert.equal(request.track,'general');return{request,track_at_click:'general'};
 }
 async function cacheContract(contract){
@@ -120,6 +121,9 @@ async function cacheControls(){
 }
 async function previewControls(){
  const outputs=[];
+ {const {c}=setup();let sent=0;c.STATE.flow_bots[0].token='111:test-only';
+ c.adminFetch=async(url,opt)=>{if(url==='/api/state'){if(!opt)return{ok:true,json:async()=>clone(c.STATE)};const state=JSON.parse(opt.body);state.flow_bots[0].token='***configured***';return{ok:true,json:async()=>({state})}}sent++;return{ok:true,json:async()=>({status:'success'})}};
+ await c.nbTestDownsellSequence(0);assert.equal(sent,1,'successful masked save must still preview the same bot');}
  for(const all of [false,true]){
   for(const mutation of ['remove','reorder','replace','edit','token','bot','bot-roundtrip']){
    const {c}=setup(),gate=deferred(),requests=[];
@@ -140,9 +144,10 @@ async function previewControls(){
   let dirty=0;c.markUnsaved=()=>dirty++;
   c.STATE.flow_bots[0].plans=[{id:'remove-plan',name:'Delete later'}];
   c.STATE.flow_bots[0].downsell_general.sequences[0].message='NEW SAVED DOWNSELL';
+  c.STATE.flow_bots[0].downsell_general.sequences[0].medias=[{id:'warm-media',type:'photo',url:'https://example.invalid/source'}];
   c.adminFetch=async(url,opt)=>{
    if(url==='/api/state'&&opt){post=JSON.parse(opt.body);return{ok:true,json:async()=>({state:post})}}
-   if(url==='/api/state'){getReached=true;await refreshGate.promise;return{ok:true,json:async()=>clone(post)}}
+   if(url==='/api/state'){getReached=true;await refreshGate.promise;const fresh=clone(post);fresh.flow_bots[0].downsell_general.sequences[0].medias[0].telegram_file_id='warmed-file';return{ok:true,json:async()=>fresh}}
    request=JSON.parse(opt.body);sendReached=true;await sendGate.promise;return{ok:true,json:async()=>({status:'success',sent_count:all?1:1,channel_id:'-1001'})};
   };
   const pending=all?c.nbTestAllDownsellSequences():c.nbTestDownsellSequence(0);
@@ -158,7 +163,7 @@ async function previewControls(){
  return outputs;
 }
 (async()=>{
- const mode=process.argv[2]||'crm';
+ const mode=process.argv[2]||'all';
  if(mode==='crm-request'){
   const {c,el}=setup(JSON.parse(fs.readFileSync(process.argv[3],'utf8')));let request;
   el('nb-lead-chat-input').value='AUDIT CRM MESSAGE';
@@ -175,7 +180,8 @@ async function previewControls(){
  if(mode==='cache-switch'){const output=await cacheSwitch();fs.writeFileSync(path.join(report,'cache-switch-result.json'),JSON.stringify(output));console.log('Cache switch passed');return;}
  if(mode==='cache-controls'){await cacheControls();console.log('Cache guards passed');return;}
  if(mode==='cache-contract'){const contract=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));fs.writeFileSync(path.join(report,'cache-contract-result.json'),JSON.stringify(await cacheContract(contract)));console.log('Cache contract passed');return;}
- assert.equal(mode,'crm');await crm();
+ assert(['all','crm'].includes(mode));await crm();
+ if(mode==='all'){await cacheSwitch();await cacheControls();await previewControls();for(const all of [false,true]){await downsellTrack(all);for(const kind of ['http','offline','false'])await downsellFailure(all,kind);}}
  let scripts=0;for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++}}
  console.log(JSON.stringify({passed:mode,parsed_inline_scripts:scripts}));
 })().catch(e=>{console.error(e);process.exitCode=1});

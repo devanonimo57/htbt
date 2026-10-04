@@ -8862,15 +8862,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       const detailRevision = nbOpenBotDetail.contextRevision || 0;
       const viewRevision = nbSwitchMainView.contextRevision || 0;
       const request = nbRunDownsellPreview.sequence = (nbRunDownsellPreview.sequence || 0) + 1;
-      const valid = () => {
+      const contextCurrent = () => {
         const live = nbGetCurrentBot();
+        const sameToken = live?.token === token || (token !== '***configured***'
+          && live?.token === '***configured***' && publicOrigin === origin);
         return request === nbRunDownsellPreview.sequence && NB_CURRENT_BOT_ID === botId
           && detailRevision === (nbOpenBotDetail.contextRevision || 0)
           && viewRevision === (nbSwitchMainView.contextRevision || 0)
-          && live?.id === botId && live.token === token && String(live.bot_id || '') === publicOrigin
-          && JSON.stringify(live[key]?.sequences || []) === signature;
+          && live?.id === botId && sameToken && String(live.bot_id || '') === publicOrigin;
       };
-      const feedbackCurrent = () => valid() && NB_DOWNSELL_TRACK === track;
+      const valid = () => contextCurrent() && JSON.stringify(nbGetCurrentBot()?.[key]?.sequences || []) === signature;
+      const feedbackCurrent = () => contextCurrent() && NB_DOWNSELL_TRACK === track;
       const btn = document.getElementById(sIdx < 0 ? 'nb-ds-test-all-btn' : `nb-ds-test-btn-${sIdx}`);
       const banner = document.getElementById('nb-ds-test-banner');
       const originalText = btn?.innerHTML || '';

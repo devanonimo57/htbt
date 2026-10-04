@@ -71,7 +71,8 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         for output in outputs:
             response=await self.client.post('/api/state',json=output['post'])
             self.assertEqual(response.status_code,200,response.text)
-            response=await self.client.post('/api/flow-bots/downsell/test-send',json=output['request'])
+            with patch.object(self.manager,'warm_media_item_in_channel',new=AsyncMock(return_value=None)), patch.object(self.manager,'_send_flow_medias',new=AsyncMock(return_value=False)):
+                response=await self.client.post('/api/flow-bots/downsell/test-send',json=output['request'])
             self.assertEqual(response.status_code,200,response.text)
         texts=[c.kwargs['text'] for c in self.bot.send_message.await_args_list]
         self.assertEqual(texts.count('NEW SAVED DOWNSELL'),2)
@@ -182,6 +183,64 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code,200,response.text)
         saved=await self.cold()
         self.assertNotIn('telegram_file_id',saved['flow_bots'][0]['welcome']['medias'][0])
+
+    async def test_downsell_stable_identity_request_rejects_replaced_sequence_or_bot(self):
+        response=await self.client.post('/api/flow-bots/downsell/test-send',json={
+            'bot_id':'flow-a','track':'general','seq_idx':0,'seq_id':'removed-sequence',
+            'seq_ids':['removed-sequence'],'origin_bot_numeric_id':'111'})
+        self.assertEqual(response.status_code,409,response.text)
+        response=await self.client.post('/api/flow-bots/downsell/test-send',json={
+            'bot_id':'flow-a','track':'general','seq_idx':0,'seq_id':'general-1',
+            'seq_ids':['general-1'],'origin_bot_numeric_id':'222'})
+        self.assertEqual(response.status_code,409,response.text)
+        self.bot.send_message.assert_not_awaited()
+
+    async def test_downsell_held_send_preserves_current_configuration(self):
+        reached,finish=asyncio.Event(),asyncio.Event()
+        async def send(**kwargs):
+            reached.set()
+            await finish.wait()
+        self.bot.send_message=AsyncMock(side_effect=send)
+        task=asyncio.create_task(self.client.post('/api/flow-bots/downsell/test-send',json={
+            'bot_id':'flow-a','origin_bot_numeric_id':'111','track':'general','seq_idx':0,
+            'seq_id':'general-1','seq_ids':['general-1']}))
+        try:
+            await asyncio.wait_for(reached.wait(),5)
+            fresh=copy.deepcopy(await main._read_state_from_db())
+            fresh['flow_bots'][0]['welcome']['message']='NEW SERVER WELCOME'
+            fresh['flow_bots'][0]['downsell_general']['sequences'][0]['message']='NEW SERVER DOWNSELL'
+            await main._write_state_to_db(fresh)
+            finish.set()
+            response=await asyncio.wait_for(task,5)
+            self.assertEqual(response.status_code,200,response.text)
+        finally:
+            finish.set()
+            await asyncio.gather(task,return_exceptions=True)
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][0]['welcome']['message'],'NEW SERVER WELCOME')
+        self.assertEqual(saved['flow_bots'][0]['downsell_general']['sequences'][0]['message'],'NEW SERVER DOWNSELL')
+
+    async def test_all_downsell_preview_warmed_media_keeps_immutable_sequence_baseline(self):
+        state=copy.deepcopy(await main._read_state_from_db())
+        seqs=state['flow_bots'][0]['downsell_general']['sequences']
+        seqs[0]['medias']=[{'id':'media-1','type':'photo','url':'https://example.invalid/one'}]
+        seqs.append({'id':'general-2','message':'SECOND GENERAL','medias':[{'id':'media-2','type':'photo','url':'https://example.invalid/two'}]})
+        await main._write_state_to_db(state)
+        async def warm(media,*args,**kwargs):
+            media['telegram_file_id']='cached-'+media['id']
+            return media['telegram_file_id']
+        with patch.object(self.manager,'warm_media_item_in_channel',new=warm), patch.object(self.manager,'_send_flow_medias',new=AsyncMock(return_value=False)) as send:
+            response=await self.client.post('/api/flow-bots/downsell/test-send',json={
+                'bot_id':'flow-a','origin_bot_numeric_id':'111','track':'general','seq_idx':-1,
+                'seq_ids':['general-1','general-2']})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['sent_count'],2)
+        self.assertEqual(send.await_count,2)
+        self.assertTrue(all(call.kwargs['persist_cache'] is False for call in send.await_args_list))
+        saved=await self.cold()
+        seqs=saved['flow_bots'][0]['downsell_general']['sequences']
+        self.assertEqual(seqs[0]['medias'][0]['telegram_file_id'],'cached-media-1')
+        self.assertEqual(seqs[1]['medias'][0]['telegram_file_id'],'cached-media-2')
 
     def node(self, mode, contract=None):
         args=['node',str(SCRIPT),mode]+([str(contract)] if contract else [])

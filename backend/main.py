@@ -952,7 +952,10 @@ def _apply_checkout_event(existing_state, event):
     if not any(str(h.get('tx_id') or '') == tx_id for h in history):
         history.append(copy.deepcopy(event['history']))
     if not archived:
-        bot_manager._update_lead_insights(state, lead)
+        # Merge only this checkout's insight delta; leave newer custom insights intact.
+        for field in ('prefs_list', 'objs_list', 'preferences', 'objections'):
+            if lead.get(field) == before.get(field) and field in after:
+                lead[field] = copy.deepcopy(after[field])
     return state
 
 
@@ -2170,8 +2173,11 @@ async def cache_flow_media(req: CacheMediaRequest):
 
 class DownsellTestSendRequest(BaseModel):
     bot_id: Optional[str] = ""
+    origin_bot_numeric_id: Optional[str] = ""
     track: str = "general"
     seq_idx: int = -1
+    seq_id: Optional[str] = ""
+    seq_ids: Optional[List[str]] = None
     channel_id: Optional[str] = ""
 
 
@@ -2180,11 +2186,13 @@ async def test_send_downsell(req: DownsellTestSendRequest):
     from aiogram import types
     from telegram_service import _create_bot_instance
 
-    state = await _read_state_from_db()
+    state = copy.deepcopy(await _read_state_from_db())
     flow_bots = [b for b in (state.get("flow_bots") or []) if isinstance(b, dict)]
     target_fb = None
     if req.bot_id:
         target_fb = next((b for b in flow_bots if str(b.get("id")) == str(req.bot_id)), None)
+    if req.bot_id and not target_fb:
+        raise HTTPException(status_code=404, detail="Bot solicitado não encontrado.")
     if not target_fb:
         target_fb = bot_manager._get_active_flow_bot(state) or (flow_bots[0] if flow_bots else None)
 
@@ -2199,6 +2207,21 @@ async def test_send_downsell(req: DownsellTestSendRequest):
     )
     if not tok or tok == REDACTED_SECRET_MASK or ":" not in tok:
         raise HTTPException(status_code=400, detail="Token do bot não está configurado.")
+    origin = tok.split(":", 1)[0]
+    if req.origin_bot_numeric_id and (not req.origin_bot_numeric_id.isdecimal() or req.origin_bot_numeric_id != origin):
+        raise HTTPException(status_code=409, detail="Identidade do bot de origem não confere.")
+    if req.track not in ("general", "pix"):
+        raise HTTPException(status_code=400, detail="Trilha de downsell inválida.")
+    track_key = "downsell_general" if req.track == "general" else "downsell_pix"
+    initial_seqs = copy.deepcopy(target_fb.get(track_key, {}).get("sequences") or [])
+    if req.seq_ids is not None and req.seq_ids != [str(s.get("id") or "") for s in initial_seqs]:
+        raise HTTPException(status_code=409, detail="As sequências foram alteradas. Salve e teste novamente.")
+    if req.seq_id and (req.seq_idx < 0 or req.seq_idx >= len(initial_seqs) or str(initial_seqs[req.seq_idx].get("id")) != req.seq_id):
+        raise HTTPException(status_code=409, detail="A sequência selecionada foi alterada.")
+    before_bot = copy.deepcopy(target_fb)
+    def same_preview(live_state):
+        live = next((b for b in live_state.get("flow_bots", []) if str(b.get("id")) == str(target_fb["id"])), None)
+        return live and live.get("token") == tok and live.get("cache_channel_id") == before_bot.get("cache_channel_id") and live.get(track_key, {}).get("sequences", []) == initial_seqs
 
     cache_channels = []
     if req.channel_id and str(req.channel_id).strip():
@@ -2246,6 +2269,8 @@ async def test_send_downsell(req: DownsellTestSendRequest):
         warmed_medias = 0
 
         for idx, seq in to_test:
+            if not same_preview(await _read_state_from_db()):
+                raise HTTPException(status_code=409, detail="A configuração foi alterada durante o teste.")
             msg_raw = str(seq.get("message") or "").strip()
             medias = [m for m in (seq.get("medias") or []) if isinstance(m, dict)]
             delay_min = int(seq.get("delay_minutes") or 10)
@@ -2271,7 +2296,8 @@ async def test_send_downsell(req: DownsellTestSendRequest):
                     chat_id=parsed_channel,
                     medias=medias,
                     reply_markup=kb,
-                    bot_instance=bot_inst
+                    bot_instance=bot_inst,
+                    persist_cache=False
                 )
                 if not attached_kb and kb:
                     try:
@@ -2294,7 +2320,8 @@ async def test_send_downsell(req: DownsellTestSendRequest):
                     await bot_manager._send_flow_medias(
                         chat_id=parsed_channel,
                         medias=medias,
-                        bot_instance=bot_inst
+                        bot_instance=bot_inst,
+                        persist_cache=False
                     )
                 try:
                     await bot_inst.send_message(
@@ -2313,8 +2340,8 @@ async def test_send_downsell(req: DownsellTestSendRequest):
                     )
             sent_count += 1
 
-        # Salva o estado atualizado com os novos file_ids no banco
-        await _write_state_to_db(state)
+        # Cache-only, source-checked transfer; never restore this send's configuration snapshot.
+        await _write_state_to_db(state, flow_cache_event=_flow_cache_event(before_bot, target_fb, state))
 
         return {
             "status": "success",
