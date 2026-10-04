@@ -46,6 +46,7 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
         bot.session.close = AsyncMock()
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
              patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)), \
+             patch.object(app_main, "_record_crm_message", new=AsyncMock(return_value=True)) as record_message, \
              patch.object(tg_srv, "_create_bot_instance", return_value=bot) as make_bot:
             result = await app_main.handle_lead_action(
                 app_main.LeadActionRequest(user_id="42", bot_id="beta",
@@ -55,7 +56,8 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
         make_bot.assert_called_once_with("222:beta")
         bot.send_message.assert_awaited_once()
         self.assertEqual(alpha["history"], [])
-        self.assertEqual(len(beta["history"]), 1)
+        record_message.assert_awaited_once_with("222", "42", "beta", "", "Mensagem de suporte")
+        self.assertEqual(beta["history"], [])
 
     async def test_replaced_config_token_does_not_send_via_new_bot(self):
         state, _, beta = self.make_state()
@@ -117,6 +119,7 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
         bot.session.close = AsyncMock()
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
              patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)), \
+             patch.object(app_main, "_record_crm_message", new=AsyncMock(return_value=True)) as record_message, \
              patch.object(tg_srv, "_create_bot_instance", return_value=bot) as make_bot:
             result = await app_main.handle_lead_action(app_main.LeadActionRequest(
                 user_id="42", bot_id="beta", origin_bot_numeric_id="222",
