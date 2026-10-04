@@ -280,4 +280,3 @@ class CheckoutCommittedBaseline(fixture.CheckoutWebhookIntegration):
         finally:
             if main._DB_LOCK.locked():main._DB_LOCK.release()
             await asyncio.gather(task,return_exceptions=True)
-
