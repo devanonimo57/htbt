@@ -2566,7 +2566,9 @@ class ActiveBotManager:
             plan_id = parts[1] if len(parts) > 1 else ""
             disc_pct = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
 
-            state = await self.state_getter()
+            # Plan admission is staged: a failed SQL commit must not expose a lead.
+            import copy
+            state = copy.deepcopy(await self.state_getter())
             cb_bot_tok = getattr(getattr(callback, "bot", None), "token", "") or ""
             if cb_bot_tok:
                 _CURRENT_BOT_TOKEN_CTX.set(cb_bot_tok)
@@ -2707,13 +2709,17 @@ class ActiveBotManager:
         checkout_origin = checkout_token.split(":", 1)[0] if ":" in checkout_token else ""
         if not checkout_origin.isdecimal() or checkout_token != str(fb.get("token") or "").strip():
             return
-        had_lead = any(str(l.get("telegram_id")) == str(callback.from_user.id)
-                       and str(l.get("origin_bot_numeric_id")) == checkout_origin
-                       for l in state.get("memory", {}).get("leads", []))
+        admission_base = getattr(state, '_row_base', None)
+        if admission_base is None:
+            admission_base = state
+        admission_before = next((l for l in admission_base.get("memory", {}).get("leads", [])
+                                 if str(l.get("telegram_id")) == str(callback.from_user.id)
+                                 and str(l.get("origin_bot_numeric_id")) == checkout_origin), None)
         lead = await self._get_or_create_lead(state, callback.from_user, bot_token=checkout_token)
         # Admit a new lead before network I/O; completion never recreates a deleted one.
         state = copy.deepcopy(await self.state_saver(state, runtime_only=True, checkout_start={
-            "lead": lead, "allow_create": not had_lead,
+            "lead": lead, "allow_create": admission_before is None,
+            "before": admission_before,
         }))
         lead = next((l for l in state.get("memory", {}).get("leads", [])
                      if str(l.get("telegram_id")) == str(callback.from_user.id)

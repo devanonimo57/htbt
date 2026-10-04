@@ -710,7 +710,8 @@ def _client_map(state):
     }
 
 
-async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None, *, dirty_clients=None, dirty_pix=None) -> None:
+async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_tx_ids: Optional[List[str]], delete_client_keys=None, *, dirty_clients=None, dirty_pix=None):
+    persisted_clients, persisted_pix = {}, {}
     client_baseline = _client_map(getattr(state, '_row_base', None) or _STATE_COMMITTED or {})
     for archived, key in ((False, "leads"), (True, "deleted_leads")):
         for lead in state.get("memory", {}).get(key, []):
@@ -731,6 +732,7 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
                     lead['authorized_flow_discounts'] = list(dict.fromkeys(
                         lead.get('authorized_flow_discounts', []) + discounts))
             data = json.dumps(lead, ensure_ascii=False)
+            persisted_clients[(origin, uid, archived)] = json.loads(data)
             if row is None:
                 session.add(ClientRecord(origin_bot_id=origin, telegram_id=uid, archived=archived, data_json=data))
             elif row.data_json != data:
@@ -750,6 +752,7 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             continue
         row = await session.get(PixRecord, str(tid))
         data = json.dumps(rec, ensure_ascii=False)
+        persisted_pix[str(tid)] = json.loads(data)
         if row is None:
             row = PixRecord(tx_id=str(tid), origin_bot_id=_origin_for_tx(rec))
             session.add(row)
@@ -765,6 +768,7 @@ async def _persist_records(session: AsyncSession, state: Dict[str, Any], delete_
             row.is_upsell = bool(rec.get("is_upsell"))
             row.paid_at = str(rec.get("paid_at") or "")
             row.created_at = str(rec.get("created_at") or "")
+    return persisted_clients, persisted_pix
 
 
 def _remarketing_claim_key(camp):
@@ -850,8 +854,9 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 merged = {**DEFAULT_SHARKBOT_STATE, **saved}
                 hydrated = await _hydrate_records(session, merged)
                 await _project_remarketing_deliveries(session, hydrated)
+                confirmed = copy.deepcopy(hydrated)
                 _STATE_CACHE = _StateSnapshot(_normalize_providers(hydrated))
-                _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+                _STATE_COMMITTED = confirmed
                 _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
@@ -890,8 +895,8 @@ def _flow_cache_event(before, after, state, channel_id=None):
 
 
 def _apply_flow_cache_event(existing_state, event):
-    state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
-    state._row_base = copy.deepcopy(dict(existing_state))
+    # Keep immutable SQL ancestry, including when current cache rows are dirty.
+    state = copy.deepcopy(existing_state)
     bot = next((b for b in state.get('flow_bots', []) if str(b.get('id')) == event['bot_id']), None)
     if not bot or bot.get('token') != event['token'] or bot.get('cache_channel_id') != event['previous_channel']:
         raise HTTPException(status_code=409, detail='O bot ou o canal foi alterado durante a verificação.')
@@ -918,8 +923,7 @@ def _apply_flow_cache_event(existing_state, event):
 
 def _apply_checkout_event(existing_state, event):
     """Reconcile one generated Pix onto current rows inside the writer lock."""
-    state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
-    state._row_base = copy.deepcopy(dict(existing_state))
+    state = copy.deepcopy(existing_state)
     record, before, after = event['record'], event['before'], event['lead']
     tx_id = str(record['tx_id'])
     is_new = tx_id not in state.get('tx_records', {})
@@ -978,14 +982,22 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             if flow_cache_event:
                 state = _apply_flow_cache_event(existing_state, flow_cache_event)
             if checkout_start:
-                state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
-                state._row_base = copy.deepcopy(dict(existing_state))
+                state = copy.deepcopy(existing_state)
                 candidate = checkout_start['lead']
                 identity = (_origin_for_lead(candidate, state), str(candidate['telegram_id']))
                 clients = _client_map(state)
                 if (identity[0], identity[1], False) not in clients:
                     if checkout_start['allow_create'] and (identity[0], identity[1], True) not in clients:
                         state.setdefault('memory', {}).setdefault('leads', []).append(copy.deepcopy(candidate))
+                elif checkout_start.get('before') is not None:
+                    lead = clients[(identity[0], identity[1], False)]
+                    before = checkout_start['before']
+                    # Only admission-owned deltas, never an old full lead snapshot.
+                    if candidate.get('stage') != before.get('stage') and lead.get('stage') == before.get('stage'):
+                        bot_manager._advance_stage(lead, candidate['stage'])
+                    if lead.get('accepted_bump_indices') == before.get('accepted_bump_indices'):
+                        if 'accepted_bump_indices' in candidate:
+                            lead['accepted_bump_indices'] = copy.deepcopy(candidate['accepted_bump_indices'])
             if checkout_event:
                 state = _apply_checkout_event(existing_state, checkout_event)
 
@@ -1192,8 +1204,9 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 config = BotConfig()
                 session.add(config)
 
-            await _persist_records(session, state, delete_tx_ids, delete_client_keys,
-                                   dirty_clients=dirty_clients, dirty_pix=dirty_pix)
+            persisted_clients, persisted_pix = await _persist_records(
+                session, state, delete_tx_ids, delete_client_keys,
+                dirty_clients=dirty_clients, dirty_pix=dirty_pix)
             config_state = copy.deepcopy(state)
             config_state.pop("tx_records", None)
             config_state.setdefault("memory", {}).pop("leads", None)
@@ -1241,7 +1254,21 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     await session.delete(order)
             await session.commit()
             _STATE_CACHE = _StateSnapshot(state)
-            _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
+            # Cache rows copied during reconciliation are not necessarily writes.
+            # Advance ancestry only with the exact JSON payloads committed to SQL.
+            _STATE_COMMITTED = copy.deepcopy(dict(config_state))
+            confirmed = getattr(existing_state, '_row_base', None)
+            if confirmed is None:
+                confirmed = existing_state
+            confirmed_clients = {**_client_map(confirmed), **persisted_clients}
+            for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
+                _STATE_COMMITTED['memory'][key] = [copy.deepcopy(lead)
+                    for identity, lead in confirmed_clients.items()
+                    if identity[2] == archived and identity not in deleted_keys]
+            _STATE_COMMITTED['tx_records'] = {
+                tid: copy.deepcopy(rec) for tid, rec in
+                {**confirmed.get('tx_records', {}), **persisted_pix}.items()
+                if str(tid) not in (delete_tx_ids or [])}
             _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
             _STATE_COMMITTED_OWNER = _STATE_CACHE
         return _STATE_CACHE
