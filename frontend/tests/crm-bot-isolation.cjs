@@ -63,6 +63,16 @@ ctx.nbOpenLeadChatModalByRow(1, false);
 assert(elements['nb-lead-chat-title'].textContent.includes('Bia'), 'chat must open beta lead');
 assert.equal(ctx.NB_ACTIVE_CHAT_BOT_ID, 'beta');
 assert.equal(ctx.NB_ACTIVE_CHAT_ORIGIN_BOT_ID, '222');
-assert.match(html, /origin_bot_numeric_id:\s*NB_ACTIVE_CHAT_ORIGIN_BOT_ID/, 'admin action must send immutable origin');
-assert.match(html, /bot_id:\s*NB_ACTIVE_CHAT_BOT_ID/, 'admin action must send bot identity');
-console.log('CRM bot isolation frontend checks passed');
+// Verify the emitted request, not whether it spells mutable globals inline.
+// The action now captures those globals before awaiting the response.
+vm.runInContext(extract('async function nbToggleLeadBlock()', 'async function nbResendAccess('), ctx);
+(async () => {
+  let request;
+  ctx.adminFetch = async (url, options) => {
+    request = JSON.parse(options.body);
+    return {ok:true, json:async()=>({status:'ok'})};
+  };
+  await ctx.nbToggleLeadBlock();
+  assert.deepEqual(request, {user_id:'42', bot_id:'beta', origin_bot_numeric_id:'222', action:'toggle_block'});
+  console.log('CRM bot isolation frontend checks passed');
+})().catch(error => {console.error(error);process.exitCode=1;});
