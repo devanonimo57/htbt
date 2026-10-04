@@ -858,7 +858,40 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _apply_checkout_event(existing_state, event):
+    """Reconcile one generated Pix onto current rows inside the writer lock."""
+    state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
+    state._row_base = copy.deepcopy(dict(existing_state))
+    record, before, after = event['record'], event['before'], event['lead']
+    tx_id = str(record['tx_id'])
+    is_new = tx_id not in state.get('tx_records', {})
+    if is_new:
+        state.setdefault('tx_records', {})[tx_id] = copy.deepcopy(record)
+        learning = state.setdefault('learning', {})
+        learning['unpaid_checkouts'] = int(learning.get('unpaid_checkouts') or 0) + 1
+    identity = (_origin_for_lead(after, state), str(after['telegram_id']))
+    leads = state.setdefault('memory', {}).setdefault('leads', [])
+    lead = next((l for l in leads if (_origin_for_lead(l, state), str(l.get('telegram_id'))) == identity), None)
+    if lead is None:
+        lead = copy.deepcopy(before)
+        leads.append(lead)
+    # Checkout-owned fields only; never copy an old profile or insight snapshot.
+    for field in ('accepted_bump_deliverable', 'has_order_bump', 'flow_plan_id',
+                  'flow_plan_price', 'chosen_plan', 'last_tx_id', 'last_tx_is_upsell'):
+        if lead.get(field) == before.get(field):
+            if field in after:
+                lead[field] = copy.deepcopy(after[field])
+            else:
+                lead.pop(field, None)
+    bot_manager._advance_stage(lead, 'Gerou checkout')
+    history = lead.setdefault('history', [])
+    if not any(str(h.get('tx_id') or '') == tx_id for h in history):
+        history.append(copy.deepcopy(event['history']))
+    bot_manager._update_lead_insights(state, lead)
+    return state
+
+
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -873,6 +906,9 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     await _project_remarketing_deliveries(session, existing_state)
                 except Exception:
                     existing_state = {}
+
+            if checkout_event:
+                state = _apply_checkout_event(existing_state, checkout_event)
 
             baseline = (getattr(state, '_row_base', None) or
                         (_STATE_COMMITTED if _STATE_COMMITTED_OWNER is _STATE_CACHE else existing_state))

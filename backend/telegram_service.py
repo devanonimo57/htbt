@@ -2705,6 +2705,8 @@ class ActiveBotManager:
         if checkout_origin.isdecimal():
             self._cancel_downsell(str(callback.from_user.id), bot_id=checkout_origin)
 
+        checkout_lead_before = copy.deepcopy(lead)
+
         # Valida desconto contra descontos efetivamente autorizados pelo downsell no servidor
         auth_discounts = lead.get("authorized_flow_discounts") or []
         if disc_pct not in auth_discounts:
@@ -2830,11 +2832,15 @@ class ActiveBotManager:
         lead["last_tx_id"] = tx_id
         lead["last_tx_is_upsell"] = False
         valor_str = f"R$ {total_price:.2f}".replace(".", ",")
-        lead.setdefault("history", []).append({
-            "role": "assistant",
+        checkout_history = {
+            "role": "assistant", "tx_id": tx_id,
             "content": f"[PIX Flow — {full_plan_label} ({valor_str})] {pix_code}"
+        }
+        lead.setdefault("history", []).append(checkout_history)
+        await self.state_saver(state, runtime_only=True, checkout_event={
+            "record": tx_record, "before": checkout_lead_before,
+            "lead": lead, "history": checkout_history,
         })
-        await self.state_saver(state, runtime_only=True)
         self.tx_records[tx_id] = tx_record
         self.active_tx_map[tx_id] = callback.from_user.id
 
