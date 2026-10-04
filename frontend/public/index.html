@@ -2344,7 +2344,7 @@
         <div class="space-y-4">
           <div>
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">TOKEN DO BOT (@BotFather) *</label>
-            <input type="text" id="nb-inp-bot-token" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
+            <input type="text" id="nb-inp-bot-token" oninput="nbInvalidateBotModal()" placeholder="Ex: 8686296179:AAH..." class="nb-input font-mono">
           </div>
           <div>
             <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">CANAL DE CACHE DE MÍDIAS (ID DO CANAL/GRUPO)</label>
@@ -7867,6 +7867,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbOpenAddBotModal() {
+      nbInvalidateBotModal();
       NB_EDITING_BOT_ID = null;
       document.getElementById('nb-modal-bot-title').textContent = "Conectar Novo Bot";
       document.getElementById('nb-inp-bot-token').value = "";
@@ -7880,6 +7881,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbOpenEditBotModal(botId) {
       const b = (STATE.flow_bots || []).find(x => x.id === botId);
       if (!b) return;
+      nbInvalidateBotModal();
       NB_EDITING_BOT_ID = botId;
       document.getElementById('nb-modal-bot-title').textContent = `Configurar ${b.username || 'Bot'}`;
       document.getElementById('nb-inp-bot-token').value = b.token || "";
@@ -7895,7 +7897,13 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbCloseBotModal() {
+      nbInvalidateBotModal();
       document.getElementById('nb-modal-bot').classList.add('hidden');
+    }
+
+    function nbInvalidateBotModal() {
+      nbSubmitBotModal.contextRevision = (nbSubmitBotModal.contextRevision || 0) + 1;
+      document.getElementById('nb-btn-save-bot-modal').textContent = 'Salvar';
     }
 
     async function nbSubmitBotModal() {
@@ -7903,6 +7911,15 @@ quer que eu te mostre as opções de acesso?</textarea>
       const cacheCh = (document.getElementById('nb-inp-bot-cache-channel')?.value || '').trim();
       const mode = (document.getElementById('nb-inp-bot-mode')?.value === 'ai') ? 'ai' : 'flow';
       const btn = document.getElementById('nb-btn-save-bot-modal');
+      const editingId = NB_EDITING_BOT_ID;
+      const original = (STATE.flow_bots || []).find(b => b.id === editingId);
+      const originalToken = original?.token, originalOrigin = original?.bot_id;
+      const revision = nbSubmitBotModal.contextRevision = (nbSubmitBotModal.contextRevision || 0) + 1;
+      const stillCurrent = () => revision === nbSubmitBotModal.contextRevision
+        && NB_EDITING_BOT_ID === editingId
+        && document.getElementById('nb-inp-bot-token').value.trim() === tok
+        && (!editingId || (STATE.flow_bots || []).some(b => b.id === editingId
+          && b.token === originalToken && b.bot_id === originalOrigin));
       btn.textContent = "Salvando...";
 
       const isRealToken = Boolean(tok && tok !== "***configured***");
@@ -7920,6 +7937,7 @@ quer que eu te mostre as opções de acesso?</textarea>
             body: JSON.stringify({ token: tok })
           });
           const data = await r.json();
+          if (!stillCurrent()) return;
           if (data.status === "ok") {
             botInfo = data;
           } else {
@@ -7935,9 +7953,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         } catch (e) {}
       }
 
-      let targetBotId = NB_EDITING_BOT_ID;
-      if (NB_EDITING_BOT_ID) {
-        const b = (STATE.flow_bots || []).find(x => x.id === NB_EDITING_BOT_ID);
+      if (!stillCurrent()) return;
+      let targetBotId = editingId;
+      if (editingId) {
+        const b = (STATE.flow_bots || []).find(x => x.id === editingId);
         if (b) {
           if (tok) b.token = tok;
           b.mode = mode;
