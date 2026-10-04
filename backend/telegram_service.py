@@ -1439,7 +1439,9 @@ class ActiveBotManager:
         caption: Optional[str] = None,
         has_spoiler: bool = False,
         reply_markup: Optional[InlineKeyboardMarkup] = None,
-        bot_instance: Optional[Bot] = None
+        bot_instance: Optional[Bot] = None,
+        *,
+        persist_cache: bool = True
     ) -> Optional[str]:
         if not isinstance(m, dict):
             return None
@@ -1487,7 +1489,7 @@ class ActiveBotManager:
             exclude_chat_id=chat_id
         )
         if fid:
-            if state and self.state_saver:
+            if persist_cache and state and self.state_saver:
                 try:
                     await self.state_saver(state, runtime_only=True)
                 except Exception:
@@ -1528,7 +1530,7 @@ class ActiveBotManager:
             m["telegram_send_as"] = detected_kind
             if str(url).startswith("data:video") or len(str(url)) > 350000:
                 m["url"] = f"tg://file_id/{fid}"
-            if state and self.state_saver:
+            if persist_cache and state and self.state_saver:
                 try:
                     await self.state_saver(state, runtime_only=True)
                 except Exception:
@@ -1541,8 +1543,12 @@ class ActiveBotManager:
         chat_id: int,
         medias: List[Dict[str, Any]],
         reply_markup: Optional[InlineKeyboardMarkup] = None,
-        bot_instance: Optional[Bot] = None
+        bot_instance: Optional[Bot] = None,
+        *,
+        persist_cache: bool = True
     ) -> bool:
+        # Detached checkout media use one source-checked writer after sending;
+        # every single/album fallback must avoid generic stale-state saves.
         target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         valid_items = [
             m for m in (medias or [])[:3]
@@ -1557,7 +1563,7 @@ class ActiveBotManager:
             for idx, m in enumerate(valid_items):
                 try:
                     rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                    await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot)
+                    await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache)
                     if rm is not None:
                         attached = True
                 except Exception as e:
@@ -1583,7 +1589,7 @@ class ActiveBotManager:
             bot_instance=target_bot,
             exclude_chat_id=chat_id
         )
-        if warmed_cnt > 0 and state and self.state_saver:
+        if persist_cache and warmed_cnt > 0 and state and self.state_saver:
             try:
                 await self.state_saver(state, runtime_only=True)
             except Exception:
@@ -1609,7 +1615,7 @@ class ActiveBotManager:
                                 m["telegram_send_as"] = detected_kind
                                 m["album_cached"] = True
                                 updated = True
-                    if updated and state and self.state_saver:
+                    if persist_cache and updated and state and self.state_saver:
                         try:
                             await self.state_saver(state, runtime_only=True)
                         except Exception:
@@ -1633,7 +1639,7 @@ class ActiveBotManager:
                                 m["telegram_file_id"] = str(fid)
                                 m["telegram_send_as"] = detected_kind
                                 m["album_cached"] = True
-                        if state and self.state_saver:
+                        if persist_cache and state and self.state_saver:
                             try:
                                 await self.state_saver(state, runtime_only=True)
                             except Exception:
@@ -1646,7 +1652,7 @@ class ActiveBotManager:
         for idx, m in enumerate(valid_items):
             try:
                 rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot)
+                await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache)
                 if rm is not None:
                     attached = True
             except Exception as e:
@@ -2855,7 +2861,7 @@ class ActiveBotManager:
         # Sending mutates file IDs; keep those mutations off the stale flow bot.
         generated_before = copy.deepcopy(pay_cfg.get("generated_medias", []))
         generated_medias = copy.deepcopy(generated_before)
-        await self._send_flow_medias(chat_id, generated_medias, bot_instance=target_bot)
+        await self._send_flow_medias(chat_id, generated_medias, bot_instance=target_bot, persist_cache=False)
         cache_updates = [(before, after) for before, after in zip(generated_before, generated_medias)
                          if isinstance(after, dict) and after.get("telegram_file_id")
                          and after != before]

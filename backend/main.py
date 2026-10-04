@@ -1043,12 +1043,20 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                         matches = [media for media in cached_bot.get("payments", {}).get("generated_medias", [])
                                    if isinstance(media, dict) and all(media.get(key) == before.get(key)
                                        for key in ("id", "url", "type", "name"))]
-                        if len(matches) != 1 or matches[0].get("telegram_file_id"):
+                        if len(matches) != 1:
                             continue
                         media = matches[0]
-                        for field in ("telegram_file_id", "telegram_send_as", "cached_channel_id", "album_cached"):
+                        cache_fields = ("telegram_file_id", "telegram_send_as", "cached_channel_id", "album_cached")
+                        # Accept our repair/conversion only if nobody changed the
+                        # original cache meanwhile, including its format/channel.
+                        if ({key: media[key] for key in cache_fields if key in media}
+                                != {key: before[key] for key in cache_fields if key in before}):
+                            continue
+                        for field in cache_fields:
                             if field in after:
                                 media[field] = after[field]
+                            else:
+                                media.pop(field, None)
                         if str(after.get("url") or "").startswith("tg://file_id/"):
                             media["url"] = after["url"]
 

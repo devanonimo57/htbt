@@ -1,6 +1,7 @@
 """Deterministic held-transport regressions with real temporary SQLite."""
 import asyncio
 import copy
+from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 import httpx
@@ -327,6 +328,295 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         await self.manager._generate_flow_checkout(self.callback, saved['flow_bots'][0], saved, 'plan-a', 0, [])
         self.assertEqual(self.bot.send_media_group.await_count, 3)
         self.assertEqual([media.media for media in self.bot.send_media_group.call_args.kwargs['media']], ['album-a', 'album-b'])
+
+    async def test_checkout_repaired_existing_cache_survives_cold_read(self):
+        state = await self.checkout_media_state([{
+            'id': 'checkout-photo', 'type': 'photo', 'name': 'photo.jpg',
+            'url': 'data:image/png;base64,AAAA', 'telegram_file_id': 'broken-old',
+            'telegram_send_as': 'photo', 'cached_channel_id': '-1001', 'album_cached': False}])
+        async def photo(**kw):
+            if kw['photo'] == 'broken-old':
+                raise RuntimeError('fake rejected file ID')
+            return SimpleNamespace(photo=[SimpleNamespace(file_id='repaired-new')])
+        self.bot.send_photo.side_effect = photo
+        self.bot.send_document = AsyncMock(side_effect=RuntimeError('fake rejected file ID'))
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        media = saved['flow_bots'][0]['payments']['generated_medias'][0]
+        self.assertEqual(media['telegram_file_id'], 'repaired-new')
+        self.assertEqual(media['telegram_send_as'], 'photo')
+        self.assertEqual(media['cached_channel_id'], '-1002')
+        self.assertFalse(media['album_cached'])
+        uploads = sum(not isinstance(c.kwargs['photo'], str) for c in self.bot.send_photo.call_args_list)
+        await self.manager._generate_flow_checkout(self.callback, saved['flow_bots'][0], saved, 'plan-a', 0, [])
+        self.assertEqual(sum(not isinstance(c.kwargs['photo'], str) for c in self.bot.send_photo.call_args_list), uploads)
+        self.assertEqual(self.bot.send_photo.call_args.kwargs['photo'], 'repaired-new')
+
+    async def test_checkout_existing_document_cache_converts_to_native_album(self):
+        state = await self.checkout_media_state([
+            {'id': 'photo-a', 'type': 'photo', 'url': 'data:image/png;base64,AAAA',
+             'telegram_file_id': 'BQAC-old-a', 'telegram_send_as': 'document', 'cached_channel_id': '-1001'},
+            {'id': 'video-b', 'type': 'video', 'url': 'data:video/mp4;base64,BBBB',
+             'telegram_file_id': 'BQAC-old-b', 'telegram_send_as': 'document', 'cached_channel_id': '-1001'}])
+        self.bot.send_media_group = AsyncMock(return_value=[
+            SimpleNamespace(photo=[SimpleNamespace(file_id='native-a')]),
+            SimpleNamespace(video=SimpleNamespace(file_id='native-b'))])
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        medias = saved['flow_bots'][0]['payments']['generated_medias']
+        self.assertEqual([m['telegram_file_id'] for m in medias], ['native-a', 'native-b'])
+        self.assertEqual([m['telegram_send_as'] for m in medias], ['photo', 'video'])
+        self.assertEqual([m['cached_channel_id'] for m in medias], ['-1002', '-1002'])
+        self.assertTrue(all(m['album_cached'] for m in medias))
+        self.assertEqual(medias[1]['url'], 'tg://file_id/native-b')
+        await self.manager._generate_flow_checkout(self.callback, saved['flow_bots'][0], saved, 'plan-a', 0, [])
+        self.assertEqual(self.bot.send_media_group.await_count, 3)
+        self.assertEqual([m.media for m in self.bot.send_media_group.call_args.kwargs['media']], ['native-a', 'native-b'])
+
+    async def test_checkout_internal_repair_save_does_not_contaminate_replaced_source(self):
+        state = await self.checkout_media_state([{
+            'id': 'checkout-photo', 'type': 'photo', 'url': 'data:image/png;base64,AAAA',
+            'telegram_file_id': 'broken-old', 'telegram_send_as': 'photo', 'cached_channel_id': '-1001'}])
+        expected = None
+        async def photo(**kw):
+            nonlocal expected
+            if kw['photo'] == 'broken-old':
+                raise RuntimeError('fake rejected file ID')
+            if not isinstance(kw['photo'], str):
+                edited = main._panel_state(await main._read_state_from_db())
+                edited['flow_bots'][0]['payments']['generated_medias'] = [{
+                    'id': 'checkout-photo', 'type': 'photo', 'url': 'data:image/png;base64,BBBB'}]
+                await main._write_state_to_db(edited)
+                expected = copy.deepcopy(await main._read_state_from_db())
+            return SimpleNamespace(photo=[SimpleNamespace(file_id='repaired-new')])
+        self.bot.send_photo.side_effect = photo
+        self.bot.send_document = AsyncMock(side_effect=RuntimeError('fake rejected file ID'))
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['flow_bots'], expected['flow_bots'])
+        self.assertNotIn('telegram_file_id', saved['flow_bots'][0]['payments']['generated_medias'][0])
+        self.assertEqual(saved['tx_records'], expected['tx_records'])
+        self.assertTrue(any('PIX-' + self.created[-1][0] in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
+
+    async def checkout_internal_save_path(self, path):
+        single = path in ('single-warm', 'single-direct')
+        medias = [{'id': 'photo-a', 'type': 'photo', 'url': 'data:image/png;base64,AAAA',
+                   'telegram_file_id': 'broken-old', 'telegram_send_as': 'photo', 'cached_channel_id': '-1001'}]
+        if not single:
+            medias.append({'id': 'photo-b', 'type': 'photo', 'url': 'data:image/png;base64,AAAA',
+                           'telegram_file_id': 'broken-b', 'telegram_send_as': 'photo', 'cached_channel_id': '-1001'})
+        if path == 'album-warm':
+            for m in medias:
+                m.update(telegram_send_as='document', telegram_file_id='BQAC-' + m['id'])
+        if path == 'album-direct':
+            for m in medias:
+                m.pop('telegram_file_id')
+        if path == 'album-retry':
+            for m in medias:
+                m['album_cached'] = True
+        state = await self.checkout_media_state(medias)
+        expected = None
+        saves = []
+        original_saver = self.manager.state_saver
+        async def save(candidate, **kw):
+            saves.append(bool(kw.get('checkout_media_cache')))
+            return await original_saver(candidate, **kw)
+        self.manager.state_saver = save
+        async def replace():
+            nonlocal expected
+            if expected is None:
+                # This must be possible while transport is held: no DB lock
+                # may be retained across the upload/download/send.
+                edited = main._panel_state(await main._read_state_from_db())
+                edited['flow_bots'][0]['payments']['generated_medias'] = [
+                    {'id': m['id'], 'type': m['type'], 'url': 'data:image/png;base64,BBBB'} for m in medias]
+                edited['publish']['support_username'] = '@replacement-support'
+                await main._write_state_to_db(edited)
+                expected = copy.deepcopy(await main._read_state_from_db())
+        async def photo(**kw):
+            if isinstance(kw['photo'], str) and kw['photo'].startswith('broken'):
+                raise RuntimeError('fake rejected file ID')
+            if not isinstance(kw['photo'], str):
+                await replace()
+            return SimpleNamespace(photo=[SimpleNamespace(file_id='repaired-' + str(kw['chat_id']))])
+        self.bot.send_photo.side_effect = photo
+        self.bot.send_document = AsyncMock(side_effect=RuntimeError('fake rejected file ID'))
+        group_calls = 0
+        async def group(**kw):
+            nonlocal group_calls
+            group_calls += 1
+            if path == 'album-fallback' or (path == 'album-retry' and group_calls == 1):
+                raise RuntimeError('fake album rejection')
+            await replace()
+            return [SimpleNamespace(photo=[SimpleNamespace(file_id='native-' + str(i))]) for i in range(2)]
+        if not single:
+            self.bot.send_media_group = AsyncMock(side_effect=group)
+        with ExitStack() as stack:
+            if path == 'single-direct':
+                stack.enter_context(patch.object(self.manager, 'warm_media_item_in_channel', new=AsyncMock(return_value=None)))
+            if path in ('album-direct', 'album-fallback'):
+                stack.enter_context(patch.object(self.manager, 'warm_media_group_in_channel', new=AsyncMock(return_value=0)))
+            await asyncio.wait_for(self.manager._generate_flow_checkout(
+                self.callback, state['flow_bots'][0], state, 'plan-a', 0, []), 5)
+        self.assertIsNotNone(expected)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['flow_bots'], expected['flow_bots'])
+        self.assertEqual(saved['publish'], expected['publish'])
+        self.assertEqual(saved['tx_records'], expected['tx_records'])
+        self.assertEqual(saves, [False, True])  # Mandatory Pix, then checked cache only.
+        self.assertTrue(any('PIX-' + self.created[-1][0] in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
+
+    async def test_checkout_single_warm_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('single-warm')
+
+    async def test_checkout_single_direct_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('single-direct')
+
+    async def test_checkout_album_warm_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('album-warm')
+
+    async def test_checkout_album_direct_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('album-direct')
+
+    async def test_checkout_album_retry_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('album-retry')
+
+    async def test_checkout_album_single_fallback_avoids_internal_generic_save(self):
+        await self.checkout_internal_save_path('album-fallback')
+
+    async def test_checkout_cache_writer_preserves_each_concurrent_cache_field(self):
+        before = {'id': 'video', 'name': 'video.mp4', 'type': 'video', 'url': 'data:video/mp4;base64,AAAA',
+                  'telegram_file_id': 'broken-old', 'telegram_send_as': 'document',
+                  'cached_channel_id': '-1001', 'album_cached': False}
+        after = dict(before, telegram_file_id='repaired-new', telegram_send_as='video',
+                     cached_channel_id='-1002', album_cached=True, url='tg://file_id/repaired-new')
+        for field, value in [('telegram_file_id', 'newer-cache'), ('telegram_send_as', 'animation'),
+                             ('cached_channel_id', '-1003'), ('album_cached', True)]:
+            for remove in (False, True):
+                with self.subTest(field=field, remove=remove):
+                    state = await self.checkout_media_state([copy.deepcopy(before)])
+                    candidate = copy.deepcopy(state)
+                    edited = copy.deepcopy(state)
+                    media = edited['flow_bots'][0]['payments']['generated_medias'][0]
+                    if remove:
+                        media.pop(field)
+                    else:
+                        media[field] = value
+                    await main._write_state_to_db(edited)
+                    expected = copy.deepcopy(await main._read_state_from_db())
+                    await main._write_state_to_db(candidate, runtime_only=True, checkout_media_cache={
+                        'bot_id': 'flow-a', 'bot_token': self.bot.token, 'updates': [(before, after)]})
+                    main._STATE_CACHE = None
+                    self.assertEqual((await main._read_state_from_db())['flow_bots'], expected['flow_bots'])
+
+    async def test_checkout_two_repair_writers_preserve_first_commit_in_both_orders(self):
+        before = {'id': 'video', 'type': 'video', 'url': 'data:video/mp4;base64,AAAA',
+                  'telegram_file_id': 'broken-old', 'telegram_send_as': 'document', 'cached_channel_id': '-1001'}
+        for order in (('repair-a', 'repair-b'), ('repair-b', 'repair-a')):
+            with self.subTest(order=order):
+                state = await self.checkout_media_state([copy.deepcopy(before)])
+                for fid in order:
+                    after = dict(before, telegram_file_id=fid, telegram_send_as='video',
+                                 cached_channel_id='-1002', album_cached=True, url='tg://file_id/' + fid)
+                    await main._write_state_to_db(copy.deepcopy(state), runtime_only=True, checkout_media_cache={
+                        'bot_id': 'flow-a', 'bot_token': self.bot.token, 'updates': [(before, after)]})
+                main._STATE_CACHE = None
+                media = (await main._read_state_from_db())['flow_bots'][0]['payments']['generated_medias'][0]
+                self.assertEqual(media, dict(before, telegram_file_id=order[0], telegram_send_as='video',
+                                           cached_channel_id='-1002', album_cached=True, url='tg://file_id/' + order[0]))
+
+    async def checkout_repair_with_edit(self, mutation, at_commit=False):
+        self.manager.state_saver = main._write_state_to_db
+        reset = copy.deepcopy(await main._read_state_from_db())
+        reset['flow_bots'] = copy.deepcopy(self.state['flow_bots'])
+        await main._write_state_to_db(reset)
+        state = await self.checkout_media_state([{
+            'id': 'checkout-photo', 'type': 'photo', 'name': 'photo.jpg', 'url': 'data:image/png;base64,AAAA',
+            'telegram_file_id': 'broken-old', 'telegram_send_as': 'photo', 'cached_channel_id': '-1001'}])
+        original_saver = self.manager.state_saver
+        expected = None
+        async def edit():
+            nonlocal expected
+            edited = main._panel_state(await main._read_state_from_db())
+            edited['publish']['support_username'] = '@edited_support'
+            mutation(edited['flow_bots'][0])
+            await main._write_state_to_db(edited)
+            expected = copy.deepcopy(await main._read_state_from_db())
+        async def save(candidate, **kw):
+            if at_commit and kw.get('checkout_media_cache'):
+                await edit()
+            return await original_saver(candidate, **kw)
+        self.manager.state_saver = save
+        async def photo(**kw):
+            if kw['photo'] == 'broken-old':
+                raise RuntimeError('fake rejected file ID')
+            if not isinstance(kw['photo'], str) and not at_commit:
+                await edit()
+            return SimpleNamespace(photo=[SimpleNamespace(file_id='repaired-new')])
+        self.bot.send_photo.side_effect = photo
+        self.bot.send_document = AsyncMock(side_effect=RuntimeError('fake rejected file ID'))
+        await asyncio.wait_for(self.manager._generate_flow_checkout(
+            self.callback, state['flow_bots'][0], state, 'plan-a', 0, []), 5)
+        self.assertIsNotNone(expected)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['flow_bots'], expected['flow_bots'])
+        self.assertEqual(saved['publish'], expected['publish'])
+        self.assertEqual(saved['tx_records'], expected['tx_records'])
+        self.assertEqual(saved['memory'], expected['memory'])
+
+    async def test_checkout_repair_keeps_newer_writer_during_upload_and_before_lock(self):
+        for at_commit in (False, True):
+            with self.subTest(at_commit=at_commit):
+                await self.checkout_repair_with_edit(lambda bot: bot['payments']['generated_medias'][0].update(
+                    telegram_file_id='newer-cache', telegram_send_as='document', cached_channel_id='-1003', album_cached=True), at_commit)
+
+    async def test_checkout_repair_preserves_removal_and_replacement_during_upload(self):
+        mutations = {
+            'remove-media': lambda bot: bot['payments'].update(generated_medias=[]),
+            'source': lambda bot: bot['payments'].update(generated_medias=[{
+                'id': 'checkout-photo', 'type': 'photo', 'url': 'data:image/png;base64,BBBB'}]),
+            'type': lambda bot: bot['payments']['generated_medias'][0].update(type='video'),
+            'name': lambda bot: bot['payments']['generated_medias'][0].update(name='other.jpg'),
+            'bot': lambda bot: bot.update(token='222:replacement-only', bot_id='222'),
+            'remove-bot': lambda bot: bot.update(id='remaining-peer', token='222:replacement-only', bot_id='222'),
+        }
+        for name, mutation in mutations.items():
+            for at_commit in (False, True):
+                with self.subTest(mutation=name, at_commit=at_commit):
+                    await self.checkout_repair_with_edit(mutation, at_commit)
+
+    async def test_checkout_cache_scope_leaves_later_noncheckout_cache_saves_enabled(self):
+        state = await self.checkout_media_state()
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        state = await main._read_state_from_db()
+        state['flow_bots'][0]['welcome'] = {'medias': [{'id': 'welcome', 'type': 'photo', 'url': 'data:image/png;base64,BBBB'}]}
+        await main._write_state_to_db(state)
+        state = await main._read_state_from_db()
+        saves = AsyncMock(wraps=main._write_state_to_db)
+        self.manager.state_saver = saves
+        await self.manager._send_flow_medias(7, state['flow_bots'][0]['welcome']['medias'], bot_instance=self.bot)
+        saves.assert_awaited_once()
+        self.assertEqual(saves.call_args.kwargs, {'runtime_only': True})
+        main._STATE_CACHE = None
+        self.assertEqual((await main._read_state_from_db())['flow_bots'][0]['welcome']['medias'][0]['telegram_file_id'], 'media-cached')
+
+    async def test_checkout_failed_transaction_commit_prevents_media_and_qr(self):
+        state = await self.checkout_media_state()
+        self.bot.send_media_group = AsyncMock()
+        self.manager.state_saver = AsyncMock(side_effect=RuntimeError('fake commit failure'))
+        with self.assertRaisesRegex(RuntimeError, 'fake commit failure'):
+            await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        self.bot.send_photo.assert_not_awaited()
+        self.bot.send_media_group.assert_not_awaited()
+        self.bot.send_message.assert_not_awaited()
+        self.assertFalse(self.manager.tx_records)
+        main._STATE_CACHE = None
+        self.assertFalse((await main._read_state_from_db())['tx_records'])
 
     async def held_checkout_media_edit(self, mutation, at_commit=False):
         state = await self.checkout_media_state()
