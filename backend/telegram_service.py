@@ -2852,7 +2852,23 @@ class ActiveBotManager:
         target_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
         bot_tok_val = str(getattr(target_bot, "token", "") or _CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or "").strip()
 
-        await self._send_flow_medias(chat_id, pay_cfg.get("generated_medias", []), bot_instance=target_bot)
+        # Sending mutates file IDs; keep those mutations off the stale flow bot.
+        generated_before = copy.deepcopy(pay_cfg.get("generated_medias", []))
+        generated_medias = copy.deepcopy(generated_before)
+        await self._send_flow_medias(chat_id, generated_medias, bot_instance=target_bot)
+        cache_updates = [(before, after) for before, after in zip(generated_before, generated_medias)
+                         if isinstance(after, dict) and after.get("telegram_file_id")
+                         and after != before]
+        if cache_updates and self.state_getter and self.state_saver:
+            try:
+                fresh_state = copy.deepcopy(await self.state_getter())
+                await self.state_saver(fresh_state, runtime_only=True, checkout_media_cache={
+                    "bot_id": str(fb.get("id") or ""), "bot_token": bot_tok_val,
+                    "updates": cache_updates,
+                })
+            except Exception as cache_err:
+                # Cache is best-effort; the Pix itself was already committed.
+                logger.warning(f"Falha ao persistir cache de mídia do checkout: {cache_err}")
 
         safe_cb = f"checkpix:{tx_id[:50]}"
         confirm_kb = InlineKeyboardMarkup(inline_keyboard=[

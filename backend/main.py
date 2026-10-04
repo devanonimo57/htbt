@@ -858,7 +858,7 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -920,6 +920,13 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 # Runtime send completion must never restore the configuration
                 # captured before an await. Transfer runtime onto fresh config.
                 runtime_state = state
+                if checkout_media_cache:
+                    # This checkout's generated-media cache transfers only via
+                    # the source/origin-checked payload below, never by bare ID.
+                    runtime_state = copy.deepcopy(state)
+                    for bot in runtime_state.get("flow_bots", []):
+                        if str(bot.get("id") or "") == checkout_media_cache["bot_id"]:
+                            bot.get("payments", {}).pop("generated_medias", None)
                 state = _merge_config_preserving_runtime(copy.deepcopy(existing_state), runtime_state)
                 # getMe metadata is runtime-owned, but only for the same token;
                 # never resurrect a removed/replaced bot or overwrite panel fields.
@@ -1024,6 +1031,26 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                         st_learning["confirmed_purchases"] = (
                             int(ex_learning.get("confirmed_purchases") or 0) + len(newly_counted)
                         )
+
+            if runtime_only and checkout_media_cache:
+                # Match under the writer lock, not before awaiting it: a panel
+                # save can remove/replace the bot or source while upload runs.
+                cached_bot = next((bot for bot in state.get("flow_bots", [])
+                                   if str(bot.get("id") or "") == checkout_media_cache["bot_id"]
+                                   and bot.get("token") == checkout_media_cache["bot_token"]), None)
+                if cached_bot:
+                    for before, after in checkout_media_cache["updates"]:
+                        matches = [media for media in cached_bot.get("payments", {}).get("generated_medias", [])
+                                   if isinstance(media, dict) and all(media.get(key) == before.get(key)
+                                       for key in ("id", "url", "type", "name"))]
+                        if len(matches) != 1 or matches[0].get("telegram_file_id"):
+                            continue
+                        media = matches[0]
+                        for field in ("telegram_file_id", "telegram_send_as", "cached_channel_id", "album_cached"):
+                            if field in after:
+                                media[field] = after[field]
+                        if str(after.get("url") or "").startswith("tg://file_id/"):
+                            media["url"] = after["url"]
 
             # Missing rows in a stale snapshot do not imply deletion. The
             # selected client's rows are removed only by explicit keys.
