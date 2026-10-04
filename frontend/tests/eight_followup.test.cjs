@@ -78,7 +78,7 @@ async function campaignEdits() {
   console.log('PASS campaign merge: edits, deletions, secrets, dirty + accepted run/reconcile');
 }
 async function cacheSaveRaces() {
-  for (const change of ['save-first','removed','replaced-media','replaced-bot','caption-edit','save-mask']) {
+  for (const change of ['save-first','removed','removed-bot','replaced-media','replaced-bot','caption-edit','save-mask']) {
     const {c} = setup(), d = deferred();
     const bot = {id:'a',bot_id:'111',token:'111:fake-old',welcome:{medias:[{id:'m',type:'Fotos',url:'data:image/png;base64,AAAA',caption:'old'}]}};
     c.STATE.flow_bots = [bot]; c.nbGetCurrentBot = () => null;
@@ -87,10 +87,12 @@ async function cacheSaveRaces() {
     const pending = c.nbAutoWarmMediaItem(bot,bot.welcome.medias[0],'welcome');
     await c.saveFullState();
     if(change==='removed') c.STATE.flow_bots[0].welcome.medias=[];
+    if(change==='removed-bot') c.STATE.flow_bots=[];
     if(change==='replaced-media') c.STATE.flow_bots[0].welcome.medias[0].url='data:image/png;base64,BBBB';
     if(change==='replaced-bot') c.STATE.flow_bots[0] = {id:'a',bot_id:'222',token:'222:fake-new',welcome:{medias:[{id:'m',type:'Fotos',url:'data:image/png;base64,AAAA'}]}};
     if(change==='caption-edit') c.STATE.flow_bots[0].welcome.medias[0].caption='typed caption';
     d.resolve(); await pending;
+    if(change==='removed-bot') { assert.equal(c.STATE.flow_bots.length,0); continue; }
     const live = c.STATE.flow_bots[0].welcome.medias[0];
     if(change==='removed') assert.equal(live,undefined);
     else if(change.startsWith('replaced')) assert.equal(live.telegram_file_id,undefined);

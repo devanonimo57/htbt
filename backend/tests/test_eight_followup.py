@@ -231,6 +231,29 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         main._STATE_CACHE = None
         self.assertEqual((await main._read_state_from_db())['flow_bots'][0]['bot_id'], '222')
 
+    async def test_cache_pending_transport_keeps_captured_token_after_removal(self):
+        started, finish = asyncio.Event(), asyncio.Event()
+        observed = []
+        async def warm(media, state, fb, bot_instance):
+            started.set()
+            await finish.wait()
+            observed.append((fb['id'], bot_instance.token))
+            return 'cached-A'
+        task = asyncio.create_task(self.cache_request({'bot_id': 'flow-a', 'origin_bot_numeric_id': '111', 'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}}, warm=warm))
+        await asyncio.wait_for(started.wait(), 5)
+        edited = main._panel_state(await main._read_state_from_db())
+        edited['flow_bots'][0].update(id='remaining-peer', token='222:replacement-only', bot_id='222')
+        await main._write_state_to_db(edited, preserve_runtime=True)
+        finish.set()
+        response, factory, transport = await task
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(observed, [('flow-a', self.bot.token)])
+        factory.assert_not_called()
+        main._STATE_CACHE = None
+        bots = (await main._read_state_from_db())['flow_bots']
+        self.assertEqual([b['id'] for b in bots], ['remaining-peer'])
+        self.assertEqual(bots[0]['bot_id'], '222')
+
     async def held_checkout(self):
         state = await main._read_state_from_db()
         state['flow_bots'][0]['payments'].update(secondary_enabled=True, secondary_message='SECONDARY')
