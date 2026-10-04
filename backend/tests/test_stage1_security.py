@@ -330,7 +330,7 @@ class Stage1SecurityTests(unittest.IsolatedAsyncioTestCase):
     async def _setup_manager(self):
         mgr = tg_srv.ActiveBotManager()
         bot = MagicMock()
-        bot.token = "123456:MOCK"
+        bot.token = self.mock_state["flow_bots"][0]["token"]
         bot.send_message = AsyncMock()
         bot.send_photo = AsyncMock()
         bot.send_video = AsyncMock()

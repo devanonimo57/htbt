@@ -76,6 +76,113 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         texts=[c.kwargs['text'] for c in self.bot.send_message.await_args_list]
         self.assertEqual(texts.count('NEW SAVED DOWNSELL'),2)
         self.assertNotIn('ORIGINAL GENERAL',texts)
+    async def test_cache_switch_real_caller_does_not_contact_or_modify_b(self):
+        self.node('cache-switch')
+        output=json.loads((REPORT/'cache-switch-result.json').read_text())
+        self.assertNotIn('request',output)
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][1]['cache_channel_id'],'-1002')
+        self.factory_mock.assert_not_called()
+    async def test_verify_channel_rejects_unknown_or_wrong_origin_before_transport(self):
+        response=await self.client.post('/api/flow-bots/verify-channel',json={
+            'bot_id':'missing','token':'***configured***','channel_id':'-1001'})
+        self.assertEqual(response.status_code,404,response.text)
+        response=await self.client.post('/api/flow-bots/verify-channel',json={
+            'bot_id':'flow-a','origin_bot_numeric_id':'222','channel_id':'-1001'})
+        self.assertEqual(response.status_code,409,response.text)
+        self.factory_mock.assert_not_called()
+
+    async def test_verify_channel_held_transport_cannot_restore_replaced_bot_config(self):
+        reached,finish=asyncio.Event(),asyncio.Event()
+        async def get_chat(**kwargs):
+            reached.set()
+            await finish.wait()
+            return SimpleNamespace(id=-1001,title='Fixture',username='fixture')
+        self.bot.get_chat=AsyncMock(side_effect=get_chat)
+        task=asyncio.create_task(self.client.post('/api/flow-bots/verify-channel',json={
+            'bot_id':'flow-a','origin_bot_numeric_id':'111','channel_id':'-1001'}))
+        try:
+            await asyncio.wait_for(reached.wait(),5)
+            fresh=copy.deepcopy(await main._read_state_from_db())
+            fresh['flow_bots'][0].update(token='333:test-only',bot_id='333',cache_channel_id='-1009')
+            fresh['flow_bots'][0]['welcome']['message']='NEW SERVER CONFIG'
+            await main._write_state_to_db(fresh)
+            finish.set()
+            response=await asyncio.wait_for(task,5)
+            self.assertIn(response.status_code,(409,400),response.text)
+        finally:
+            finish.set()
+            await asyncio.gather(task,return_exceptions=True)
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][0]['token'],'333:test-only')
+        self.assertEqual(saved['flow_bots'][0]['cache_channel_id'],'-1009')
+        self.assertEqual(saved['flow_bots'][0]['welcome']['message'],'NEW SERVER CONFIG')
+        self.assertEqual(saved['flow_bots'][1]['cache_channel_id'],'-1002')
+
+    async def test_cache_frontend_guards_and_real_response_preserve_edit_delete_secret_source(self):
+        self.node('cache-controls')
+        state=copy.deepcopy(await main._read_state_from_db())
+        state['flow_bots'][0]['welcome']['medias']=[{'id':'m1','type':'photo','url':'https://example.invalid/old-source'}]
+        await main._write_state_to_db(state)
+        initial=(await self.client.get('/api/state')).json()
+        self.evidence('cache-contract',{'initial':initial})
+        self.node('cache-contract',REPORT/'cache-contract.json')
+        produced=json.loads((REPORT/'cache-contract-result.json').read_text())
+        response=await self.client.post('/api/state',json=produced['firstPost'])
+        self.assertEqual(response.status_code,200,response.text)
+        async def warm(st):
+            st['flow_bots'][0]['welcome']['medias'][0]['telegram_file_id']='old-source-cache'
+            return 1
+        with patch.object(self.manager,'warm_all_state_medias',new=warm):
+            response=await self.client.post('/api/flow-bots/verify-channel',json=produced['request'])
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['status'],'ok')
+        self.evidence('cache-contract',{'initial':initial,'action':response.json()})
+        self.node('cache-contract',REPORT/'cache-contract.json')
+        output=json.loads((REPORT/'cache-contract-result.json').read_text())
+        response=await self.client.post('/api/state',json=output['post'])
+        self.assertEqual(response.status_code,200,response.text)
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][0]['welcome']['message'],'NEW CACHE WELCOME')
+        self.assertEqual(saved['flow_bots'][0]['welcome']['medias'][0]['url'],'https://example.invalid/new-source')
+        self.assertNotIn('telegram_file_id',saved['flow_bots'][0]['welcome']['medias'][0])
+        self.assertEqual(saved['publish']['gateway_secret'],'new-cache-secret')
+        self.assertFalse(saved['flow_bots'][1]['plans'])
+        self.assertEqual(saved['flow_bots'][1]['cache_channel_id'],'-1002')
+
+    async def test_cache_warming_source_replacement_preserves_new_config_and_skips_old_id(self):
+        state=copy.deepcopy(await main._read_state_from_db())
+        state['flow_bots'][0]['welcome']['medias']=[{'id':'m1','type':'photo','url':'https://example.invalid/old'}]
+        await main._write_state_to_db(state)
+        async def warm(st):
+            fresh=copy.deepcopy(await main._read_state_from_db())
+            fresh['flow_bots'][0]['welcome']['medias'][0]['url']='https://example.invalid/new'
+            fresh['flow_bots'][0]['welcome']['message']='NEW SERVER WELCOME'
+            await main._write_state_to_db(fresh)
+            st['flow_bots'][0]['welcome']['medias'][0]['telegram_file_id']='old-source-id'
+            return 1
+        with patch.object(self.manager,'warm_all_state_medias',new=warm):
+            response=await self.client.post('/api/flow-bots/verify-channel',json={
+                'bot_id':'flow-a','origin_bot_numeric_id':'111','channel_id':'-1001'})
+        self.assertEqual(response.status_code,200,response.text)
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][0]['welcome']['message'],'NEW SERVER WELCOME')
+        media=saved['flow_bots'][0]['welcome']['medias'][0]
+        self.assertEqual(media['url'],'https://example.invalid/new')
+        self.assertNotIn('telegram_file_id',media)
+
+    async def test_cache_config_save_does_not_transfer_ids_between_bot_origins(self):
+        state=copy.deepcopy(await main._read_state_from_db())
+        state['flow_bots'][0]['welcome']['medias']=[{'id':'m1','type':'photo','url':'https://example.invalid/shared-source','telegram_file_id':'old-bot-id'}]
+        await main._write_state_to_db(state)
+        edited=(await self.client.get('/api/state')).json()
+        edited['flow_bots'][0].update(token='333:test-only',bot_id='333')
+        edited['flow_bots'][0]['welcome']['medias'][0].pop('telegram_file_id')
+        response=await self.client.post('/api/state',json=edited)
+        self.assertEqual(response.status_code,200,response.text)
+        saved=await self.cold()
+        self.assertNotIn('telegram_file_id',saved['flow_bots'][0]['welcome']['medias'][0])
+
     def node(self, mode, contract=None):
         args=['node',str(SCRIPT),mode]+([str(contract)] if contract else [])
         result=subprocess.run(args,capture_output=True,text=True,timeout=30,env={**os.environ,'HOTBOT_REPORT':str(REPORT)})

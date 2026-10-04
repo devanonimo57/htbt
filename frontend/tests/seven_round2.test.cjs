@@ -54,7 +54,7 @@ async function cacheSwitch(){
  assert.equal(await c.nbSwitchMainView('bots'),true);
  c.nbOpenBotDetail('flow-b');assert.equal(c.NB_MAIN_VIEW,'detail');
  gate.resolve();await pending;
- assert.equal(request.bot_id,'flow-b');assert.equal(request.channel_id,'-1001');
+ assert.equal(request,undefined,'A request must not use B after navigation');
  return{request,post,selected_before:'flow-a',selected_after:'flow-b',original_channel_b:'-1002'};
 }
 async function downsellFailure(all=false,kind='http'){
@@ -74,6 +74,49 @@ async function downsellTrack(){
  vm.runInContext(block('function nbSwitchDownsellTrack(','function nbRenderDownsellTab('),c);
  const pending=c.nbTestDownsellSequence(0);c.nbSwitchDownsellTrack('pix');gate.resolve();await pending;
  assert.equal(request.track,'general');return{request,track_at_click:'general'};
+}
+async function cacheContract(contract){
+ const {c,el}=setup(contract?.initial),gate=deferred();let request,post,firstPost,dirty=0;
+ c.markUnsaved=()=>dirty++;el('nb-bot-cache-channel').value='-1001';
+ c.adminFetch=async(url,opt)=>{if(url==='/api/state'){post=JSON.parse(opt.body);firstPost ||= clone(post);return{ok:true,json:async()=>({state:post})}}
+  request=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>contract?.action||{status:'ok',title:'Fixture',state:clone(firstPost)}}};
+ const pending=c.nbVerifyCacheChannel();for(let i=0;i<30&&!request;i++)await Promise.resolve();assert(request);
+ el('nb-welcome-msg').value='NEW CACHE WELCOME';c.nbOnWelcomeInput();c.STATE.publish.gateway_secret='new-cache-secret';
+ const media=c.STATE.flow_bots[0].welcome.medias[0];if(media)media.url='https://example.invalid/new-source';
+ c.STATE.flow_bots[1].plans=[];
+ gate.resolve();await pending;
+ assert.equal(c.STATE.flow_bots[0].welcome.message,'NEW CACHE WELCOME');assert.equal(c.STATE.publish.gateway_secret,'new-cache-secret');
+ if(media){assert.equal(c.STATE.flow_bots[0].welcome.medias[0].url,'https://example.invalid/new-source');assert(!c.STATE.flow_bots[0].welcome.medias[0].telegram_file_id)}
+ assert.match(el('nb-cache-channel-status').textContent,/Conectado/);assert(dirty>0);
+ await c.saveFullState();return{request,firstPost,post};
+}
+async function cacheControls(){
+ for(const kind of ['http','offline']){
+  const {c,el}=setup();let requests=0;el('nb-bot-cache-channel').value='-1001';
+  c.adminFetch=async(url,opt)=>{if(url==='/api/state'){if(kind==='offline')throw new Error('offline');return{ok:false,status:500}}requests++;return{ok:true,json:async()=>({status:'ok'})}};
+  await c.nbVerifyCacheChannel();assert.equal(requests,0);assert.match(el('nb-cache-channel-status').textContent,/salvar/);
+ }
+ for(const mutation of ['channel','channel-roundtrip','token','remove','replace','bot-roundtrip']){
+  const {c,el}=setup(),gate=deferred();let requests=0,saves=0;el('nb-bot-cache-channel').value='-1001';
+  c.adminFetch=async(url,opt)=>{if(url==='/api/state'){const posted=JSON.parse(opt.body);if(++saves===1)await gate.promise;return{ok:true,json:async()=>({state:posted})}}requests++;return{ok:true,json:async()=>({status:'error'})}};
+  const pending=c.nbVerifyCacheChannel();
+  if(mutation.startsWith('channel')){el('nb-bot-cache-channel').value='-1009';c.nbOnCacheChannelInput('-1009');if(mutation==='channel-roundtrip'){el('nb-bot-cache-channel').value='-1001';c.nbOnCacheChannelInput('-1001')}}
+  if(mutation==='token')c.STATE.flow_bots[0].token='333:test-only';
+  if(mutation==='remove')c.STATE.flow_bots.splice(0,1);
+  if(mutation==='replace')c.STATE.flow_bots[0]={...clone(c.STATE.flow_bots[0]),bot_id:'333',token:'333:test-only'};
+  if(mutation==='bot-roundtrip'){await c.nbSwitchMainView('bots');c.nbOpenBotDetail('flow-b');c.nbOpenBotDetail('flow-a')}
+  gate.resolve();await pending;assert.equal(requests,0,mutation);
+ }
+ for(const mutation of ['bot','bot-roundtrip','channel','token','remove']){
+  const {c,el}=setup(),gate=deferred();let request,firstPost;el('nb-bot-cache-channel').value='-1001';
+  c.adminFetch=async(url,opt)=>{if(url==='/api/state'){const posted=JSON.parse(opt.body);firstPost ||= clone(posted);return{ok:true,json:async()=>({state:posted})}}request=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>({status:'ok',title:'OLD RESPONSE',state:firstPost})}};
+  const pending=c.nbVerifyCacheChannel();for(let i=0;i<30&&!request;i++)await Promise.resolve();assert(request);
+  if(mutation.startsWith('bot')){await c.nbSwitchMainView('bots');c.nbOpenBotDetail('flow-b');if(mutation==='bot-roundtrip')c.nbOpenBotDetail('flow-a')}
+  if(mutation==='channel'){el('nb-bot-cache-channel').value='-1009';c.nbOnCacheChannelInput('-1009')}
+  if(mutation==='token')c.STATE.flow_bots[0].token='333:test-only';if(mutation==='remove')c.STATE.flow_bots.splice(0,1);
+  el('nb-cache-channel-status').textContent='NEW CONTEXT';gate.resolve();await pending;assert.equal(el('nb-cache-channel-status').textContent,'NEW CONTEXT',mutation);
+ }
+ await cacheContract();
 }
 async function previewControls(){
  const outputs=[];
@@ -129,6 +172,9 @@ async function previewControls(){
  if(mode==='downsell-failure'){const outputs=[];for(const all of [false,true])for(const kind of ['http','offline','false'])outputs.push(await downsellFailure(all,kind));fs.writeFileSync(path.join(report,'downsell-failure-result.json'),JSON.stringify(outputs));console.log('Downsell failed-save contract passed');return;}
  if(mode==='downsell-track'){const output=await downsellTrack();fs.writeFileSync(path.join(report,'downsell-track-result.json'),JSON.stringify(output));console.log('Downsell track contract passed');return;}
  if(mode==='preview-controls'){fs.writeFileSync(path.join(report,'preview-controls-result.json'),JSON.stringify(await previewControls()));console.log('Preview controls passed');return;}
+ if(mode==='cache-switch'){const output=await cacheSwitch();fs.writeFileSync(path.join(report,'cache-switch-result.json'),JSON.stringify(output));console.log('Cache switch passed');return;}
+ if(mode==='cache-controls'){await cacheControls();console.log('Cache guards passed');return;}
+ if(mode==='cache-contract'){const contract=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));fs.writeFileSync(path.join(report,'cache-contract-result.json'),JSON.stringify(await cacheContract(contract)));console.log('Cache contract passed');return;}
  assert.equal(mode,'crm');await crm();
  let scripts=0;for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++}}
  console.log(JSON.stringify({passed:mode,parsed_inline_scripts:scripts}));

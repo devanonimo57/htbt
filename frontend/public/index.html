@@ -8212,6 +8212,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbOnCacheChannelInput(val) {
       const clean = (val || "").trim();
       const b = nbGetCurrentBot();
+      if (b && b.cache_channel_id !== clean) nbOnCacheChannelInput.contextRevision = (nbOnCacheChannelInput.contextRevision || 0) + 1;
       if (b) b.cache_channel_id = clean;
       STATE.publish = STATE.publish || {};
       STATE.publish.cache_channel_id = clean;
@@ -8221,59 +8222,65 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbVerifyCacheChannel() {
       const b = nbGetCurrentBot();
-      const chId = (document.getElementById('nb-bot-cache-channel')?.value || "").trim();
+      const chId = (document.getElementById('nb-bot-cache-channel')?.value || '').trim();
       const stEl = document.getElementById('nb-cache-channel-status');
-      if (!chId) {
-        if (stEl) {
-          stEl.textContent = "Informe o ID do canal (ex: -100...)";
-          stEl.className = "text-[11px] text-amber-400";
-        }
+      if (!b || !chId) {
+        if (stEl) stEl.textContent = 'Informe o ID do canal (ex: -100...)';
         return;
       }
-      if (stEl) {
-        stEl.textContent = "Sincronizando canal e enviando mídias para cache...";
-        stEl.className = "text-[11px] text-amber-300";
+      const botId = b.id, token = b.token, publicOrigin = String(b.bot_id || '');
+      const origin = token && token !== '***configured***' && token.includes(':') ? token.split(':')[0] : publicOrigin;
+      if (!/^\d+$/.test(origin) || (publicOrigin && origin !== publicOrigin)) {
+        if (stEl) stEl.textContent = 'Verifique a identidade do bot antes de verificar o canal.';
+        return;
       }
       nbOnCacheChannelInput(chId);
+      const submitted = JSON.parse(JSON.stringify(STATE));
+      const detailRevision = nbOpenBotDetail.contextRevision || 0;
+      const viewRevision = nbSwitchMainView.contextRevision || 0;
+      const channelRevision = nbOnCacheChannelInput.contextRevision || 0;
+      const request = nbVerifyCacheChannel.sequence = (nbVerifyCacheChannel.sequence || 0) + 1;
+      const valid = () => {
+        const live = nbGetCurrentBot();
+        const sameToken = live?.token === token || (token !== '***configured***'
+          && live?.token === '***configured***' && publicOrigin === origin);
+        return request === nbVerifyCacheChannel.sequence && NB_CURRENT_BOT_ID === botId
+          && detailRevision === (nbOpenBotDetail.contextRevision || 0)
+          && viewRevision === (nbSwitchMainView.contextRevision || 0)
+          && channelRevision === (nbOnCacheChannelInput.contextRevision || 0)
+          && live?.id === botId && sameToken && String(live.bot_id || '') === publicOrigin
+          && String(live.cache_channel_id || '').trim() === chId
+          && (document.getElementById('nb-bot-cache-channel')?.value || '').trim() === chId;
+      };
+      if (stEl) { stEl.textContent = 'Salvando e verificando o canal...'; stEl.className = 'text-[11px] text-amber-300'; }
       try {
-        await saveFullState();
-        const curBot = nbGetCurrentBot();
-        const res = await adminFetch("/api/flow-bots/verify-channel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bot_id: curBot?.id || "",
-            token: curBot?.token || STATE.publish?.bot_token || "",
-            channel_id: chId
-          })
+        if (!await saveFullState()) throw new Error('Não foi possível salvar. O canal não foi verificado.');
+        if (!valid()) return;
+        const res = await adminFetch('/api/flow-bots/verify-channel', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({bot_id: botId, token, origin_bot_numeric_id: origin, channel_id: chId})
         });
         const data = await res.json();
-        if (data.status === "ok") {
-          if (data.state) {
-            const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-            STATE = { ...data.state, saved_profiles: mergedProfiles };
-            saveLocalBackup();
-            const refreshedBot = nbGetCurrentBot();
-            if (refreshedBot) nbLoadBotIntoTabs(refreshedBot);
-          }
-          if (stEl) {
-            const wCount = Number(data.warmed_medias || 0);
-            stEl.textContent = wCount > 0
-              ? `✓ Conectado: ${data.title} (${wCount} mídia(s) enviada(s) ao cache)`
-              : `✓ Conectado: ${data.title}`;
-            stEl.className = "text-[11px] text-emerald-400 font-semibold";
-          }
-        } else if (stEl) {
-          stEl.textContent = `Erro: ${data.message || 'Bot sem acesso ao canal'}`;
-          stEl.className = "text-[11px] text-rose-400";
+        if (!valid()) return;
+        if (!res.ok || data.status !== 'ok') throw new Error(data.message || data.detail || 'Bot sem acesso ao canal');
+        if (data.state) {
+          const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+          STATE = nbMergeStateResponse(data.state, submitted, STATE);
+          STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
+          saveLocalBackup();
+          if (newerEdits) markUnsaved();
+          nbLoadBotIntoTabs(nbGetCurrentBot());
         }
-      } catch (e) {
         if (stEl) {
-          stEl.textContent = "Erro ao verificar canal";
-          stEl.className = "text-[11px] text-rose-400";
+          const count = Number(data.warmed_medias || 0);
+          stEl.textContent = `✓ Conectado: ${data.title || chId}${count ? ` (${count} mídia(s) enviada(s) ao cache)` : ''}`;
+          stEl.className = 'text-[11px] text-emerald-400 font-semibold';
         }
+      } catch (err) {
+        if (stEl && valid()) { stEl.textContent = err?.message || 'Erro ao verificar canal'; stEl.className = 'text-[11px] text-rose-400'; }
       }
     }
+
 
     function nbInsertVar(textareaId, token) {
       const el = document.getElementById(textareaId);

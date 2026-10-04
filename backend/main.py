@@ -402,7 +402,9 @@ def _preserve_media_file_ids(inc_medias: Any, ex_medias: Any) -> None:
         if isinstance(m, dict) and not m.get("telegram_file_id"):
             mid = str(m.get("id") or "").strip()
             key = f"{mid}|{m.get('url', '')}"
-            matched = ex_by_key.get(key) or (ex_by_id.get(mid) if mid else None)
+            matched = ex_by_key.get(key)
+            if matched and any(m.get(field) != matched.get(field) for field in ('type', 'name')):
+                matched = None
             if matched and matched.get("telegram_file_id"):
                 m["telegram_file_id"] = str(matched["telegram_file_id"])
                 if matched.get("cached_channel_id"):
@@ -465,6 +467,8 @@ def _merge_config_preserving_runtime(incoming: Dict[str, Any], existing: Dict[st
             if old_bot:
                 fb["sales_today"] = int(old_bot.get("sales_today") or 0)
                 fb["revenue_today"] = round(float(old_bot.get("revenue_today") or 0.0), 2)
+                if fb.get("token") != old_bot.get("token"):
+                    continue  # Telegram file IDs do not belong to a replacement bot.
                 if isinstance(fb.get("welcome"), dict) and isinstance(old_bot.get("welcome"), dict):
                     _preserve_media_file_ids(fb["welcome"].get("medias"), old_bot["welcome"].get("medias"))
                 if isinstance(fb.get("payments"), dict) and isinstance(old_bot.get("payments"), dict):
@@ -858,6 +862,60 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
+def _flow_cache_slots(bot):
+    slots = {}
+    def walk(value, path):
+        if isinstance(value, dict):
+            if value.get('id') and 'url' in value:
+                slots[path] = value
+            else:
+                for key, child in value.items():
+                    walk(child, path + (key,))
+        elif isinstance(value, list):
+            ids = [str(child.get('id') or '') for child in value if isinstance(child, dict)]
+            for child in value:
+                if isinstance(child, dict) and child.get('id') and ids.count(str(child['id'])) == 1:
+                    walk(child, path + (str(child['id']),))
+    walk(bot, ())
+    return slots
+
+
+def _flow_cache_event(before, after, state, channel_id=None):
+    old, new = _flow_cache_slots(before), _flow_cache_slots(after)
+    return {'bot_id': str(before['id']), 'token': before['token'],
+            'previous_channel': before.get('cache_channel_id'), 'channel_id': channel_id,
+            'previous_publish_channel': state.get('publish', {}).get('cache_channel_id'),
+            'updates': [(slot, copy.deepcopy(media), copy.deepcopy(new[slot]))
+                        for slot, media in old.items() if slot in new and media != new[slot]]}
+
+
+def _apply_flow_cache_event(existing_state, event):
+    state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
+    state._row_base = copy.deepcopy(dict(existing_state))
+    bot = next((b for b in state.get('flow_bots', []) if str(b.get('id')) == event['bot_id']), None)
+    if not bot or bot.get('token') != event['token'] or bot.get('cache_channel_id') != event['previous_channel']:
+        raise HTTPException(status_code=409, detail='O bot ou o canal foi alterado durante a verificação.')
+    slots = _flow_cache_slots(bot)
+    cache_fields = ('telegram_file_id', 'telegram_send_as', 'cached_channel_id', 'album_cached')
+    for slot, before, after in event['updates']:
+        media = slots.get(tuple(slot))
+        if media is None or any(media.get(k) != before.get(k) for k in ('id', 'url', 'type', 'name') + cache_fields):
+            continue
+        for field in cache_fields:
+            if field in after:
+                media[field] = after[field]
+            else:
+                media.pop(field, None)
+        if str(after.get('url') or '').startswith('tg://file_id/'):
+            media['url'] = after['url']
+    if event.get('channel_id') is not None:
+        bot['cache_channel_id'] = event['channel_id']
+        pub = state.setdefault('publish', {})
+        if pub.get('bot_token') == event['token'] and pub.get('cache_channel_id') == event['previous_publish_channel']:
+            pub['cache_channel_id'] = event['channel_id']
+    return state
+
+
 def _apply_checkout_event(existing_state, event):
     """Reconcile one generated Pix onto current rows inside the writer lock."""
     state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
@@ -898,7 +956,7 @@ def _apply_checkout_event(existing_state, event):
     return state
 
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -914,6 +972,8 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 except Exception:
                     existing_state = {}
 
+            if flow_cache_event:
+                state = _apply_flow_cache_event(existing_state, flow_cache_event)
             if checkout_start:
                 state = _StateSnapshot(copy.deepcopy(dict(existing_state)))
                 state._row_base = copy.deepcopy(dict(existing_state))
@@ -1965,29 +2025,33 @@ async def verify_flow_bot_token(req: VerifyTokenRequest):
 class VerifyChannelRequest(BaseModel):
     bot_id: Optional[str] = ""
     token: Optional[str] = ""
+    origin_bot_numeric_id: Optional[str] = ""
     channel_id: str
 
 @app.post("/api/flow-bots/verify-channel", dependencies=[Depends(verify_admin_auth)])
 async def verify_flow_channel(req: VerifyChannelRequest):
     from telegram_service import _create_bot_instance
-    state = await _read_state_from_db()
+    state = copy.deepcopy(await _read_state_from_db())
     target_fb = None
     if req.bot_id:
         for b in (state.get("flow_bots") or []):
             if isinstance(b, dict) and str(b.get("id")) == str(req.bot_id):
                 target_fb = b
                 break
+    if req.bot_id and not target_fb:
+        raise HTTPException(status_code=404, detail="Bot solicitado não encontrado.")
     if not target_fb:
         target_fb = bot_manager._get_active_flow_bot(state)
-
-    tok = (req.token or "").strip()
-    if not tok or tok == REDACTED_SECRET_MASK:
-        tok = (
-            (target_fb.get("token") if isinstance(target_fb, dict) else "")
-            or state.get("publish", {}).get("bot_token")
-            or bot_manager.current_token
-            or ""
-        ).strip()
+    if not target_fb:
+        raise HTTPException(status_code=404, detail="Bot não encontrado.")
+    tok = str(target_fb.get("token") or "").strip()
+    supplied_token = (req.token or "").strip()
+    if supplied_token and supplied_token != REDACTED_SECRET_MASK and supplied_token != tok:
+        raise HTTPException(status_code=409, detail="Token do bot foi alterado.")
+    origin = tok.split(":", 1)[0] if ":" in tok else ""
+    if req.origin_bot_numeric_id and (not req.origin_bot_numeric_id.isdecimal() or req.origin_bot_numeric_id != origin):
+        raise HTTPException(status_code=409, detail="Identidade do bot de origem não confere.")
+    before_bot = copy.deepcopy(target_fb)
     ch_id = (req.channel_id or "").strip()
     if not ch_id:
         return {"status": "error", "message": "ID do canal vazio"}
@@ -1999,11 +2063,16 @@ async def verify_flow_channel(req: VerifyChannelRequest):
         parsed_ch = int(ch_id) if ch_id.lstrip("-").isdigit() else ch_id
         chat = await temp_bot.get_chat(chat_id=parsed_ch)
         resolved_id = str(chat.id)
-        state.setdefault("publish", {})["cache_channel_id"] = resolved_id
-        if isinstance(target_fb, dict):
-            target_fb["cache_channel_id"] = resolved_id
-        warmed = await bot_manager.warm_all_state_medias(state)
-        state = await _write_state_to_db(state)
+        live_state = await _read_state_from_db()
+        live_bot = next((b for b in live_state.get("flow_bots", []) if str(b.get("id")) == str(target_fb["id"])), None)
+        if not live_bot or live_bot.get("token") != tok or live_bot.get("cache_channel_id") != before_bot.get("cache_channel_id"):
+            raise HTTPException(status_code=409, detail="O bot ou o canal foi alterado durante a verificação.")
+        target_fb["cache_channel_id"] = resolved_id
+        # Warm only this bot on detached configuration; apply source-checked
+        # cache deltas to current configuration under the writer lock.
+        warm_state = {"flow_bots": [target_fb], "publish": {"bot_token": tok, "cache_channel_id": resolved_id}}
+        warmed = await bot_manager.warm_all_state_medias(warm_state)
+        state = await _write_state_to_db(state, flow_cache_event=_flow_cache_event(before_bot, target_fb, state, resolved_id))
         return {
             "status": "ok",
             "channel_id": resolved_id,
@@ -2012,6 +2081,8 @@ async def verify_flow_channel(req: VerifyChannelRequest):
             "warmed_medias": warmed,
             "state": _panel_state(state)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:

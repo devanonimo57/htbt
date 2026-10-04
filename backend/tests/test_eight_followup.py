@@ -501,7 +501,7 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         saves = []
         original_saver = self.manager.state_saver
         async def save(candidate, **kw):
-            saves.append(bool(kw.get('checkout_media_cache')))
+            saves.append(next((key for key in ('checkout_start', 'checkout_event', 'checkout_media_cache') if kw.get(key)), 'generic'))
             return await original_saver(candidate, **kw)
         self.manager.state_saver = save
         async def replace():
@@ -546,7 +546,7 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         self.assertEqual(saved['flow_bots'], expected['flow_bots'])
         self.assertEqual(saved['publish'], expected['publish'])
         self.assertEqual(saved['tx_records'], expected['tx_records'])
-        self.assertEqual(saves, [False, True])  # Mandatory Pix, then checked cache only.
+        self.assertEqual(saves, ['checkout_start', 'checkout_event', 'checkout_media_cache'])  # Admission, mandatory Pix, checked cache; no generic nested saves.
         self.assertTrue(any('PIX-' + self.created[-1][0] in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
 
     async def test_checkout_single_warm_avoids_internal_generic_save(self):
