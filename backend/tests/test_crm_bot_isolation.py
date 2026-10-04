@@ -6,6 +6,15 @@ from test_stage1_security import app_main, tg_srv
 
 
 class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
+    def committed_block(self, state, **kwargs):
+        # Model the fresh writer intent, not the old pre-commit live mutation.
+        event = kwargs.get('lead_block_event')
+        if event:
+            lead = app_main._client_map(state)[(event['origin'],event['uid'],False)]
+            lead['blocked'] = not bool(lead.get('blocked',False))
+            self.mock_published['memory']['leads'] = state['memory']['leads']
+        return state
+
     def make_state(self):
         alpha = {"telegram_id": "42", "bot_id": "alpha", "origin_bot_numeric_id": "111", "first_name": "A",
                  "blocked": False, "history": []}
@@ -19,14 +28,15 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
 
     async def test_block_targets_only_selected_bot(self):
         state, alpha, beta = self.make_state()
+        self.mock_published = state
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
-             patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)):
+             patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=self.committed_block)):
             result = await app_main.handle_lead_action(
                 app_main.LeadActionRequest(user_id="42", bot_id="beta", action="toggle_block")
             )
         self.assertEqual(result["status"], "ok")
         self.assertFalse(alpha["blocked"])
-        self.assertTrue(beta["blocked"])
+        self.assertTrue(app_main._client_map(state)[("222","42",False)]["blocked"])
 
     async def test_ambiguous_user_without_bot_rejected(self):
         state, alpha, beta = self.make_state()
@@ -135,12 +145,13 @@ class CrmBotIsolation(unittest.IsolatedAsyncioTestCase):
                     "blocked": False, "history": []}
         state["memory"]["leads"].append(new_lead)
         state["flow_bots"][1]["token"] = "333:replacement"
+        self.mock_published = state
         with patch.object(app_main, "_read_state_from_db", new=AsyncMock(return_value=state)), \
-             patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=lambda s, **kw: s)):
+             patch.object(app_main, "_write_state_to_db", new=AsyncMock(side_effect=self.committed_block)):
             await app_main.handle_lead_action(app_main.LeadActionRequest(
                 user_id="42", bot_id="beta", origin_bot_numeric_id="333", action="toggle_block"
             ))
-        self.assertTrue(new_lead["blocked"])
+        self.assertTrue(app_main._client_map(state)[("333","42",False)]["blocked"])
         self.assertFalse(beta["blocked"])
 
     async def test_legacy_lead_purchase_cannot_authorize_send(self):

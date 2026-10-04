@@ -30,7 +30,7 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
         state['remarketing_campaigns'] = [{'id': 'camp', 'bot_id': 'flow', 'segment': 'all',
                                            'message': 'Oferta', 'include_plans': False}]
         state['memory']['leads'] = [
-            {'telegram_id': str(uid), 'bot_id': 'flow', 'origin_bot_numeric_id': '111', 'history': []}
+            {'telegram_id': str(uid), 'bot_id': 'flow', 'origin_bot_numeric_id': '111', 'created_at': '2026-10-01T00:00:00', 'history': []}
             for uid in (41, 42, 43)
         ]
         await main._write_state_to_db(state)
@@ -142,7 +142,7 @@ class RemarketingInterruption(unittest.IsolatedAsyncioTestCase):
     async def test_send_is_bounded_and_resumes_without_duplicate(self):
         state = await main._read_state_from_db()
         state['memory']['leads'].extend(
-            {'telegram_id': str(uid), 'bot_id': 'flow', 'origin_bot_numeric_id': '111', 'history': []}
+            {'telegram_id': str(uid), 'bot_id': 'flow', 'origin_bot_numeric_id': '111', 'created_at': '2026-10-01T00:00:00', 'history': []}
             for uid in range(100, 112))
         await main._write_state_to_db(state)
         self.release_second.set()

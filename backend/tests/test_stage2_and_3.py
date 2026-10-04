@@ -456,8 +456,13 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         )
 
         # 2. Alterar status aceita tanto `status` quanto `access_status`
+        async def committed_access(st, **kwargs):
+            event = kwargs['access_status_event']
+            st['tx_records'][event['tx_id']]['access_status'] = event['status']
+            self.server_state = st
+            return st
         with patch.object(app_main, "_read_state_from_db", AsyncMock(return_value=self.server_state)), \
-             patch.object(app_main, "_write_state_to_db", AsyncMock(side_effect=lambda s, **kw: s)):
+             patch.object(app_main, "_write_state_to_db", AsyncMock(side_effect=committed_access)):
             req_status = app_main.AccessStatusUpdateRequest(tx_id="tx_live_1001", status="Ativo")
             res_status = await app_main.update_vip_access_status(req_status)
             self.assertEqual(res_status["status"], "ok")

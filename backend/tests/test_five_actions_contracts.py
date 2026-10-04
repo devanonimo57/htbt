@@ -113,6 +113,36 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
         self.assertIn('application/json',response.headers.get('content-type',''))
         self.assertIn('salvar',response.json()['detail'])
 
+    async def test_each_action_failed_commit_real_response_next_save_preserves_intent(self):
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from unittest.mock import patch
+        import httpx
+        for kind in ('block','access','delete'):
+            with self.subTest(kind=kind):
+                tx=await self.checkout() if kind=='access' else None
+                initial=(await self.client.get('/api/state')).json()
+                before=copy.deepcopy(await main._read_state_from_db())
+                name=kind+'-failure-contract'
+                self.evidence(name,{'initial':initial,'tx_id':tx})
+                request=json.loads(self.node('request',kind,name))
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app,raise_app_exceptions=False),base_url='http://test') as client:
+                    with patch.object(AsyncSession,'commit',side_effect=RuntimeError('offline action commit failure')):
+                        response=await client.request(request['method'],request['url'],json=request.get('body'))
+                self.assertEqual(response.status_code,500,response.text)
+                self.assertEqual((await main._read_state_from_db())['memory'],before['memory'])
+                self.assertEqual((await self.cold())['tx_records'],before['tx_records'])
+                action=response.json() if 'application/json' in response.headers.get('content-type','') else {'detail':response.text}
+                self.evidence(name,{'initial':initial,'tx_id':tx,'action':action,'http_status':response.status_code,**({'raw_text':response.text} if 'application/json' not in response.headers.get('content-type','') else {})})
+                self.node('failure',kind,name)
+                observed=json.loads((REPORT/(kind+'-observed.json')).read_text(encoding='utf8'))
+                response=await self.client.post('/api/state',json=observed['post'])
+                self.assertEqual(response.status_code,200,response.text)
+                cold=await self.cold()
+                self.assertEqual(cold['flow_bots'][0]['welcome']['message'],'NEW EDIT DURING ACTION')
+                self.assertEqual(cold['publish']['gateway_secret'],'NEW ACTION SECRET')
+                self.assertEqual(cold['memory'],before['memory'])
+                self.assertEqual(cold['tx_records'],before['tx_records'])
+
     async def test_failed_ban_preserves_active_access_and_reports_ui_error(self):
         tx=await self.checkout(channel=True)
         initial=(await self.client.get('/api/state')).json()
@@ -129,6 +159,10 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cold['tx_records'][tx]['status'],'paid')
         self.evidence('removal-contract',{'initial':initial,'tx_id':tx,'action':response.json(),'http_status':response.status_code})
         self.node('removal-response','remove','removal-contract')
+        observed=json.loads((REPORT/'removal-ui-observed.json').read_text(encoding='utf8'))
+        saved=await self.client.post('/api/state',json=observed['post'])
+        self.assertEqual(saved.status_code,200,saved.text)
+        self.assertEqual((await self.cold())['tx_records'][tx]['access_status'],'Ativo')
         self.assertEqual((await main._read_state_from_db())['tx_records'][tx]['access_status'],'Ativo')
 
     async def test_actions_preserve_new_panel_edits_real_response_and_cold_save(self):
@@ -137,6 +171,8 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
                 # Restore the single customer's active placement before each action.
                 state=copy.deepcopy(await main._read_state_from_db())
                 state['flow_bots'][0]['welcome']['message']='ORIGINAL'
+                state['flow_bots'][0]['welcome']['medias']=[{'id':'remove-m','url':'https://example.invalid/old','type':'photo'}]
+                state['flow_bots'][1]['plans']=[{'id':'remove-p','name':'Delete me'}]
                 await main._write_state_to_db(state)
                 tx=await self.checkout() if kind=='access' else None
                 initial=(await self.client.get('/api/state')).json()

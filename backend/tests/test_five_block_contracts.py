@@ -1,4 +1,4 @@
-"""Independent defect-demonstration probes: green asserts the observed bug."""
+"""Expected-correct CRM block commit and follow-up worker contracts."""
 import asyncio, copy, json, tempfile, unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +11,7 @@ import test_checkout_webhook_integration as fixture
 from models import ClientRecord, BotConfig, PixRecord
 
 import os
-OUT = Path(os.environ['HOTBOT_REPORT'])
+OUT = Path(os.environ.get('HOTBOT_REPORT') or tempfile.mkdtemp(prefix='five-contract-'))
 OUT.mkdir(parents=True, exist_ok=True)
 tempfile.tempdir = 'C:/Users/Yago/AppData/Local/hermes/cache/scratch'
 

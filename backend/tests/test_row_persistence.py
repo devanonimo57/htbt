@@ -24,8 +24,8 @@ class RowPersistenceTests(unittest.IsolatedAsyncioTestCase):
             {'id': 'b', 'bot_id': '222', 'token': '222:local', 'active': False},
         ]
         state['memory'] = {'leads': [
-            {'telegram_id': '7', 'bot_id': 'a', 'origin_bot_numeric_id': '111', 'stage': 'Conversando'},
-            {'telegram_id': '7', 'bot_id': 'b', 'origin_bot_numeric_id': '222', 'stage': 'Conversando'},
+            {'telegram_id': '7', 'bot_id': 'a', 'origin_bot_numeric_id': '111', 'created_at': '2026-10-01T00:00:00', 'stage': 'Conversando'},
+            {'telegram_id': '7', 'bot_id': 'b', 'origin_bot_numeric_id': '222', 'created_at': '2026-10-01T00:00:00', 'stage': 'Conversando'},
         ], 'deleted_leads': []}
         state['tx_records'] = {
             'p1': {'user_id': 7, 'bot_id': 'a', 'bot_token': '111:local', 'status': 'paid', 'amount': 10, 'paid_at': datetime.now(timezone.utc).isoformat(), 'sales_counted': True},
