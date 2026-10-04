@@ -73,7 +73,46 @@ async function downsellTrack(){
  c.adminFetch=async(url,opt)=>{if(url==='/api/state'){const posted=JSON.parse(opt.body);await gate.promise;return{ok:true,json:async()=>({state:posted})}}request=JSON.parse(opt.body);return{ok:true,json:async()=>({status:'success',channel_id:'-1001',bot_username:'@fixture'})}};
  vm.runInContext(block('function nbSwitchDownsellTrack(','function nbRenderDownsellTab('),c);
  const pending=c.nbTestDownsellSequence(0);c.nbSwitchDownsellTrack('pix');gate.resolve();await pending;
- assert.equal(request.track,'pix');return{request,track_at_click:'general'};
+ assert.equal(request.track,'general');return{request,track_at_click:'general'};
+}
+async function previewControls(){
+ const outputs=[];
+ for(const all of [false,true]){
+  for(const mutation of ['remove','reorder','replace','edit','token','bot','bot-roundtrip']){
+   const {c}=setup(),gate=deferred(),requests=[];
+   c.STATE.flow_bots[0].downsell_general.sequences.push({id:'general-2',message:'SECOND',medias:[]});
+   vm.runInContext(block('function nbSwitchDownsellTrack(','function nbRenderDownsellTab('),c);
+   let saves=0;c.adminFetch=async(url,opt)=>{if(url==='/api/state'){const posted=JSON.parse(opt.body);if(++saves===1)await gate.promise;return{ok:true,json:async()=>({state:posted})}}requests.push(JSON.parse(opt.body));return{ok:true,json:async()=>({status:'error'})}};
+   const pending=all?c.nbTestAllDownsellSequences():c.nbTestDownsellSequence(0);
+   const b=c.STATE.flow_bots[0],seqs=b.downsell_general.sequences;
+   if(mutation==='remove')seqs.splice(0,1);
+   if(mutation==='reorder')seqs.reverse();
+   if(mutation==='replace')seqs[0]={id:'replacement',message:'OTHER',medias:[]};
+   if(mutation==='edit')seqs[0].message='NEW EDIT';
+   if(mutation==='token')b.token='333:test-only';
+   if(mutation.startsWith('bot')){assert.equal(await c.nbSwitchMainView('bots'),true);c.nbOpenBotDetail('flow-b');if(mutation==='bot-roundtrip')c.nbOpenBotDetail('flow-a');}
+   gate.resolve();await pending;assert.equal(requests.length,0,`${all}/${mutation}`);
+  }
+  const {c,el}=setup(),sendGate=deferred(),refreshGate=deferred();let sendReached=false,getReached=false,post,request;
+  let dirty=0;c.markUnsaved=()=>dirty++;
+  c.STATE.flow_bots[0].plans=[{id:'remove-plan',name:'Delete later'}];
+  c.STATE.flow_bots[0].downsell_general.sequences[0].message='NEW SAVED DOWNSELL';
+  c.adminFetch=async(url,opt)=>{
+   if(url==='/api/state'&&opt){post=JSON.parse(opt.body);return{ok:true,json:async()=>({state:post})}}
+   if(url==='/api/state'){getReached=true;await refreshGate.promise;return{ok:true,json:async()=>clone(post)}}
+   request=JSON.parse(opt.body);sendReached=true;await sendGate.promise;return{ok:true,json:async()=>({status:'success',sent_count:all?1:1,channel_id:'-1001'})};
+  };
+  const pending=all?c.nbTestAllDownsellSequences():c.nbTestDownsellSequence(0);
+  for(let i=0;i<30&&!sendReached;i++)await Promise.resolve();assert(sendReached);
+  el('nb-welcome-msg').value='EDIT DURING SEND';c.nbOnWelcomeInput();
+  c.STATE.publish.gateway_secret='new-local-secret';c.STATE.flow_bots[0].plans=[];
+  sendGate.resolve();for(let i=0;i<30&&!getReached;i++)await Promise.resolve();assert(getReached);
+  c.STATE.flow_bots[1].welcome.message='EDIT DURING GET';refreshGate.resolve();await pending;
+  assert.equal(c.STATE.flow_bots[0].welcome.message,'EDIT DURING SEND');assert.equal(c.STATE.flow_bots[1].welcome.message,'EDIT DURING GET');
+  assert.equal(c.STATE.publish.gateway_secret,'new-local-secret');assert.equal(c.STATE.flow_bots[0].plans.length,0);assert(dirty>0);assert.match(el('nb-ds-test-banner').innerHTML,/Sucesso/);
+  outputs.push({all,request,post});
+ }
+ return outputs;
 }
 (async()=>{
  const mode=process.argv[2]||'crm';
@@ -88,6 +127,8 @@ async function downsellTrack(){
   fs.writeFileSync(path.join(report,'crm-node-result.json'),JSON.stringify(output,null,2));console.log('CRM contract passed');return;
  }
  if(mode==='downsell-failure'){const outputs=[];for(const all of [false,true])for(const kind of ['http','offline','false'])outputs.push(await downsellFailure(all,kind));fs.writeFileSync(path.join(report,'downsell-failure-result.json'),JSON.stringify(outputs));console.log('Downsell failed-save contract passed');return;}
+ if(mode==='downsell-track'){const output=await downsellTrack();fs.writeFileSync(path.join(report,'downsell-track-result.json'),JSON.stringify(output));console.log('Downsell track contract passed');return;}
+ if(mode==='preview-controls'){fs.writeFileSync(path.join(report,'preview-controls-result.json'),JSON.stringify(await previewControls()));console.log('Preview controls passed');return;}
  assert.equal(mode,'crm');await crm();
  let scripts=0;for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++}}
  console.log(JSON.stringify({passed:mode,parsed_inline_scripts:scripts}));

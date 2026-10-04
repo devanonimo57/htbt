@@ -57,6 +57,25 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         self.bot.send_message.assert_not_awaited()
         saved=await self.cold()
         self.assertEqual(saved['flow_bots'][0]['downsell_general']['sequences'][0]['message'],'ORIGINAL GENERAL')
+    async def test_downsell_track_switch_real_caller_sends_clicked_general(self):
+        self.node('downsell-track')
+        output=json.loads((REPORT/'downsell-track-result.json').read_text())
+        response=await self.client.post('/api/flow-bots/downsell/test-send',json=output['request'])
+        self.assertEqual(response.status_code,200,response.text)
+        texts=[c.kwargs['text'] for c in self.bot.send_message.await_args_list]
+        self.assertIn('ORIGINAL GENERAL',texts)
+        self.assertNotIn('ORIGINAL PIX',texts)
+    async def test_downsell_preview_saved_text_stable_ids_and_refresh_controls(self):
+        self.node('preview-controls')
+        outputs=json.loads((REPORT/'preview-controls-result.json').read_text())
+        for output in outputs:
+            response=await self.client.post('/api/state',json=output['post'])
+            self.assertEqual(response.status_code,200,response.text)
+            response=await self.client.post('/api/flow-bots/downsell/test-send',json=output['request'])
+            self.assertEqual(response.status_code,200,response.text)
+        texts=[c.kwargs['text'] for c in self.bot.send_message.await_args_list]
+        self.assertEqual(texts.count('NEW SAVED DOWNSELL'),2)
+        self.assertNotIn('ORIGINAL GENERAL',texts)
     def node(self, mode, contract=None):
         args=['node',str(SCRIPT),mode]+([str(contract)] if contract else [])
         result=subprocess.run(args,capture_output=True,text=True,timeout=30,env={**os.environ,'HOTBOT_REPORT':str(REPORT)})

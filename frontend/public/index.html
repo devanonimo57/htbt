@@ -8121,6 +8121,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     // Ao clicar no Bot na tela inicial, abre DIRETO o modo que está definido nos 3 pontinhos:
     function nbOpenBotDetail(botId) {
+      nbOpenBotDetail.contextRevision = (nbOpenBotDetail.contextRevision || 0) + 1;
       if (botId) NB_CURRENT_BOT_ID = botId;
       const b = nbGetCurrentBot();
       if (!b) return;
@@ -8832,114 +8833,82 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbTestDownsellSequence(sIdx) {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      const btn = document.getElementById(`nb-ds-test-btn-${sIdx}`);
-      const banner = document.getElementById('nb-ds-test-banner');
-      const originalText = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-[10px]"></i><span>Enviando...</span>';
-      }
-      if (banner) {
-        banner.className = 'p-3.5 rounded-xl border border-purple-500/40 bg-purple-950/40 text-xs text-purple-200 flex items-center gap-2';
-        banner.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Disparando teste da Sequência #${sIdx + 1} no canal de cache pelo bot <strong>${escapeHtml(b.username || '@bot')}</strong>...</span>`;
-        banner.classList.remove('hidden');
-      }
-
-      try {
-        if (!await nbSaveCurrentBot()) throw new Error('Não foi possível salvar. O teste não foi enviado.');
-        const res = await adminFetch('/api/flow-bots/downsell/test-send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bot_id: b.id,
-            track: NB_DOWNSELL_TRACK,
-            seq_idx: sIdx
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.status === 'success') {
-          if (banner) {
-            banner.className = 'p-3.5 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
-            banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> Sequência #${sIdx + 1} disparada no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. ${data.warmed_medias ? `(${data.warmed_medias} mídia(s) aquecida(s) no Telegram)` : ''}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-          }
-          await loadInitialState();
-          const refreshedBot = nbGetCurrentBot();
-          if (refreshedBot) nbRenderDownsellTab(refreshedBot);
-        } else {
-          if (banner) {
-            banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
-            banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro ao testar:</strong> ${escapeHtml(data?.message || data?.detail || 'Falha ao enviar')}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-          }
-        }
-      } catch (err) {
-        if (banner) {
-          banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
-          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro de conexão:</strong> ${escapeHtml(err?.message || err)}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-        }
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = originalText;
-        }
-      }
+      return nbRunDownsellPreview(sIdx);
     }
 
     async function nbTestAllDownsellSequences() {
-      const b = nbGetCurrentBot();
-      if (!b) return;
-      const btn = document.getElementById('nb-ds-test-all-btn');
-      const banner = document.getElementById('nb-ds-test-banner');
-      const originalText = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i><span>Disparando todas no canal...</span>';
-      }
-      if (banner) {
-        banner.className = 'p-3.5 rounded-xl border border-purple-500/40 bg-purple-950/40 text-xs text-purple-200 flex items-center gap-2';
-        banner.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Disparando todas as sequências no canal de cache pelo bot <strong>${escapeHtml(b.username || '@bot')}</strong>...</span>`;
-        banner.classList.remove('hidden');
-      }
+      return nbRunDownsellPreview(-1);
+    }
 
+    async function nbRunDownsellPreview(sIdx) {
+      const b = nbGetCurrentBot();
+      const track = NB_DOWNSELL_TRACK;
+      const key = track === 'pix' ? 'downsell_pix' : 'downsell_general';
+      const sequences = b?.[key]?.sequences || [];
+      const selected = sIdx < 0 ? sequences : sequences.slice(sIdx, sIdx + 1);
+      if (!b || !selected.length || selected.some(s => !s.id)) return;
+      const botId = b.id, token = b.token, publicOrigin = String(b.bot_id || '');
+      const origin = token && token !== '***configured***' && token.includes(':') ? token.split(':')[0] : publicOrigin;
+      if (!/^\d+$/.test(origin) || (publicOrigin && origin !== publicOrigin)) return;
+      const submitted = JSON.parse(JSON.stringify(STATE));
+      const signature = JSON.stringify(sequences);
+      const detailRevision = nbOpenBotDetail.contextRevision || 0;
+      const viewRevision = nbSwitchMainView.contextRevision || 0;
+      const request = nbRunDownsellPreview.sequence = (nbRunDownsellPreview.sequence || 0) + 1;
+      const valid = () => {
+        const live = nbGetCurrentBot();
+        return request === nbRunDownsellPreview.sequence && NB_CURRENT_BOT_ID === botId
+          && detailRevision === (nbOpenBotDetail.contextRevision || 0)
+          && viewRevision === (nbSwitchMainView.contextRevision || 0)
+          && live?.id === botId && live.token === token && String(live.bot_id || '') === publicOrigin
+          && JSON.stringify(live[key]?.sequences || []) === signature;
+      };
+      const feedbackCurrent = () => valid() && NB_DOWNSELL_TRACK === track;
+      const btn = document.getElementById(sIdx < 0 ? 'nb-ds-test-all-btn' : `nb-ds-test-btn-${sIdx}`);
+      const banner = document.getElementById('nb-ds-test-banner');
+      const originalText = btn?.innerHTML || '';
+      const show = (ok, message) => {
+        if (!banner || !feedbackCurrent()) return;
+        banner.className = ok ? 'p-3.5 rounded-xl border border-emerald-500/60 text-xs text-emerald-200'
+          : 'p-3.5 rounded-xl border border-rose-500/60 text-xs text-rose-200';
+        banner.innerHTML = `${ok ? '<strong>Sucesso!</strong> ' : '<strong>Teste não concluído:</strong> '}${escapeHtml(message)}`;
+        banner.classList.remove('hidden');
+      };
+      if (btn) { btn.disabled = true; btn.innerHTML = 'Enviando...'; }
+      if (banner) { banner.textContent = 'Salvando antes de testar...'; banner.classList.remove('hidden'); }
       try {
         if (!await nbSaveCurrentBot()) throw new Error('Não foi possível salvar. O teste não foi enviado.');
+        if (!valid()) return;
         const res = await adminFetch('/api/flow-bots/downsell/test-send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bot_id: b.id,
-            track: NB_DOWNSELL_TRACK,
-            seq_idx: -1
-          })
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({bot_id: botId, origin_bot_numeric_id: origin, track, seq_idx: sIdx,
+            seq_id: sIdx < 0 ? '' : selected[0].id, seq_ids: sequences.map(s => s.id)})
         });
         const data = await res.json();
-        if (res.ok && data.status === 'success') {
-          if (banner) {
-            banner.className = 'p-3.5 rounded-xl border border-emerald-500/60 bg-emerald-950/40 text-xs text-emerald-200 flex items-center justify-between gap-3';
-            banner.innerHTML = `<div><i class="fa-solid fa-circle-check text-emerald-400 mr-2"></i><strong>Sucesso!</strong> ${data.sent_count} sequência(s) disparada(s) no canal de cache (${escapeHtml(data.channel_id)}) pelo bot <strong>${escapeHtml(data.bot_username)}</strong>. Todas as mídias aquecidas no Telegram.</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-emerald-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-          }
-          await loadInitialState();
-          const refreshedBot = nbGetCurrentBot();
-          if (refreshedBot) nbRenderDownsellTab(refreshedBot);
-        } else {
-          if (banner) {
-            banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
-            banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro ao testar:</strong> ${escapeHtml(data?.message || data?.detail || 'Falha ao enviar')}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-          }
+        if (!valid()) return;
+        if (!res.ok || data.status !== 'success') {
+          show(false, data?.message || data?.detail || 'Falha ao enviar');
+          return;
         }
+        // This GET did not save edits made during the send or during refresh.
+        const refresh = await adminFetch('/api/state');
+        if (!refresh.ok) throw new Error('Teste enviado, mas não foi possível atualizar os dados.');
+        const fresh = await refresh.json();
+        if (!valid()) return;
+        const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+        STATE = nbMergeStateResponse(fresh, submitted, STATE);
+        STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
+        saveLocalBackup();
+        if (newerEdits) markUnsaved();
+        show(true, `${data.sent_count || 1} sequência(s) da trilha ${track === 'pix' ? 'PIX' : 'Geral'} enviada(s) no canal ${data.channel_id || ''}.`);
+        if (feedbackCurrent()) nbRenderDownsellTab(nbGetCurrentBot());
       } catch (err) {
-        if (banner) {
-          banner.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/40 text-xs text-rose-200 flex items-center justify-between gap-3';
-          banner.innerHTML = `<div><i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i><strong>Erro de conexão:</strong> ${escapeHtml(err?.message || err)}</div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="text-rose-400 hover:text-white text-xs"><i class="fa-solid fa-xmark"></i></button>`;
-        }
+        show(false, err?.message || String(err));
       } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = originalText;
-        }
+        if (btn && feedbackCurrent()) { btn.disabled = false; btn.innerHTML = originalText; }
       }
     }
+
 
     // =========================================================
     // ABA 4: ORDER BUMP
@@ -9435,6 +9404,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         } finally { NB_LEAVING_DETAIL = false; }
       }
       NB_AI_DETAIL_OPEN = false;
+      if (NB_MAIN_VIEW !== view) nbSwitchMainView.contextRevision = (nbSwitchMainView.contextRevision || 0) + 1;
       NB_MAIN_VIEW = view;
       switchWorkspace('neurotbot');
       nbUpdateHeaderRevenueWidget();
