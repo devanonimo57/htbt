@@ -1165,7 +1165,18 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                         # Transfer this stale writer's field/history delta, not
                         # its old whole lead over the just-published event.
                         if identity in old_clients:
-                            lead = _merge_late_cache_delta(live_clients[identity], old_clients[identity], lead)
+                            before = old_clients[identity]
+                            current = live_clients[identity]
+                            created = before.get('created_at')
+                            if (not created or lead.get('created_at') != created
+                                    or current.get('created_at') != created
+                                    or str(lead.get('bot_id') or '') != str(before.get('bot_id') or '')
+                                    or str(current.get('bot_id') or '') != str(before.get('bot_id') or '')):
+                                # Same SQL slot is not proof of the same customer
+                                # incarnation. Discard an unprovable old delta.
+                                incoming[idx] = copy.deepcopy(current)
+                                continue
+                            lead = _merge_late_cache_delta(current, before, lead)
                             incoming[idx] = lead
                         # Detached snapshots may edit history but cannot revoke
                         # an already exposed offer; revocation uses the live state.

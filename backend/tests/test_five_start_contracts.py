@@ -47,6 +47,64 @@ class FiveStartContracts(unittest.IsolatedAsyncioTestCase):
         await main._write_state_to_db(state, runtime_only=True)
         return lead
 
+    async def test_old_start_cannot_contaminate_paid_reentry(self):
+        await self.seed_lead()
+        state = await main._read_state_from_db()
+        state['flow_bots'][0]['welcome'] = {'message':'OLD SESSION WELCOME'}
+        await main._write_state_to_db(state)
+        old_created = (await main._read_state_from_db())['memory']['leads'][0]['created_at']
+        reached, release = asyncio.Event(), asyncio.Event()
+        async def old_answer(*a, **kw):
+            reached.set(); await release.wait(); return SimpleNamespace(message_id=1)
+        old_task = asyncio.create_task(self.handler('handle_start')(self.start_message(old_answer)))
+        try:
+            await asyncio.wait_for(reached.wait(), 5)
+            await main.delete_lead('7', bot_id='flow-a')
+            state = await main._read_state_from_db()
+            state['flow_bots'][0]['welcome']['message'] = 'NEW SESSION WELCOME'
+            await main._write_state_to_db(state)
+            new_user = types.User(id=7, is_bot=False, first_name='NEW PROFILE')
+            await self.handler('handle_start')(self.start_message(AsyncMock(return_value=SimpleNamespace(message_id=2)), new_user))
+            # A real newly paid checkout belongs to the new incarnation.
+            checkout_state = await main._read_state_from_db()
+            await self.manager._generate_flow_checkout(self.callback, checkout_state['flow_bots'][0], checkout_state, 'plan-a', 0, [])
+            tx = self.created[-1][0]
+            self.gateway_status[tx] = 'paid'
+            self.assertEqual((await main.webhook_gateway({'id':tx, 'status':'paid'}))['action'], 'approved')
+            before = copy.deepcopy((await main._read_state_from_db())['memory'])
+            self.assertEqual(before['leads'][0]['stage'], 'Entrega concluída')
+            self.assertNotEqual(before['leads'][0]['created_at'], old_created)
+            release.set(); await asyncio.wait_for(old_task, 5)
+        finally:
+            release.set(); await asyncio.gather(old_task, return_exceptions=True)
+        cold = await self.cold()
+        active = cold['memory']['leads'][0]; archived = cold['memory']['deleted_leads'][0]
+        evidence('NEW-02-stale-start-reentry', {'before_completion':before,
+                 'cold_active':active, 'cold_archived':archived, 'old_created':old_created,
+                 'cold_pix':cold['tx_records'][tx]})
+        self.assertEqual(cold['tx_records'][tx]['status'], 'paid')
+        self.assertTrue(cold['tx_records'][tx]['delivered'])
+        self.assertEqual(active['stage'], 'Entrega concluída')
+        self.assertEqual(active['created_at'], before['leads'][0]['created_at'])
+        self.assertNotIn('OLD SESSION WELCOME', [h['content'] for h in active['history']])
+        self.assertIn('NEW SESSION WELCOME', [h['content'] for h in active['history']])
+        self.assertNotIn('OLD SESSION WELCOME', [h['content'] for h in archived['history']])
+
+    async def test_queued_writer_fails_closed_on_missing_creation_time(self):
+        await self.seed_lead()
+        live = await main._read_state_from_db()
+        live['memory']['leads'][0].pop('created_at')
+        await main._write_state_to_db(live, runtime_only=True)
+        stale = copy.deepcopy(await main._read_state_from_db())
+        fresh = await main._read_state_from_db()
+        fresh['memory']['leads'][0]['history'].append({'role':'user','content':'CURRENT'})
+        await main._write_state_to_db(fresh, runtime_only=True)
+        stale['memory']['leads'][0]['history'].append({'role':'assistant','content':'UNPROVEN'})
+        await main._write_state_to_db(stale, runtime_only=True)
+        histories = [h['content'] for h in (await self.cold())['memory']['leads'][0]['history']]
+        self.assertIn('CURRENT', histories)
+        self.assertNotIn('UNPROVEN', histories)
+
     async def test_start_rejects_missing_or_ambiguous_transport(self):
         for bot in (None, SimpleNamespace(token='opaque'), SimpleNamespace(token='111:test', id=222)):
             with self.subTest(bot=bot):
