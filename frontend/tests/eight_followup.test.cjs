@@ -42,7 +42,7 @@ async function campaignEdits() {
   const {c, el} = setup(), d = deferred(); let dirty = 0, saved = 0;
   c.markUnsaved = () => dirty++; c.markSaved = () => saved++;
   c.STATE.flow_bots = [{id:'a', token:'111:fake-old', welcome:{message:'before', medias:[{id:'m1'},{id:'m2'}]}}, {id:'b'}];
-  c.STATE.remarketing_campaigns = [{id:'camp', run_id:'old', message:'offer'}, {id:'deleted'}];
+  c.STATE.remarketing_campaigns = [{id:'camp', run_id:'old', bot_id:'a', message:'offer'}, {id:'deleted'}];
   const server = JSON.parse(JSON.stringify(c.STATE)); server.flow_bots[0].sales_today = 2;
   server.remarketing_campaigns[0] = {...server.remarketing_campaigns[0], run_id:'new-run', sent_count:1, status:'Finalizada'};
   c.adminFetch = async () => { await d.promise; return {ok:true, json:async()=>({has_more:false, sent_count:1, total_targets:1, state:server})}; };
@@ -50,13 +50,13 @@ async function campaignEdits() {
   const pending = c.nbSendRemarketingCampaign('camp', true);
   c.STATE.flow_bots[0].welcome.message = 'typed while sending'; c.STATE.flow_bots[0].token = '111:fake-fresh';
   c.STATE.flow_bots[0].welcome.medias.shift(); c.STATE.flow_bots.splice(1,1);
-  c.STATE.remarketing_campaigns[0].message = 'new edited offer'; c.STATE.remarketing_campaigns.splice(1,1);
+  c.STATE.remarketing_campaigns[0].message = 'new edited offer'; c.STATE.remarketing_campaigns[0].bot_id = 'edited-target'; c.STATE.remarketing_campaigns.splice(1,1);
   d.resolve(); await pending;
   assert.equal(c.STATE.flow_bots[0].welcome.message, 'typed while sending');
   assert.equal(c.STATE.flow_bots[0].token, '111:fake-fresh'); assert.equal(c.STATE.flow_bots.length, 1);
   assert.equal(c.STATE.flow_bots[0].welcome.medias.length, 1);
   assert.equal(c.STATE.remarketing_campaigns.length, 1); assert.equal(c.STATE.remarketing_campaigns[0].message, 'new edited offer');
-  assert.equal(c.STATE.remarketing_campaigns[0].run_id, 'new-run'); assert.equal(c.STATE.remarketing_campaigns[0].sent_count, 1);
+  assert.equal(c.STATE.remarketing_campaigns[0].bot_id, 'edited-target'); assert.equal(c.STATE.remarketing_campaigns[0].run_id, 'new-run'); assert.equal(c.STATE.remarketing_campaigns[0].sent_count, 1);
   assert.ok(!c.STATE.remarketing_campaigns[0].pending_run_id); assert.ok(dirty > 0); assert.equal(saved, 0);
   // Removing the sending campaign while pending must never recreate it.
   const second = setup(), hold = deferred(); second.c.STATE.remarketing_campaigns = [{id:'camp', run_id:'r'}];

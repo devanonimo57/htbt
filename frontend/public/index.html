@@ -7028,7 +7028,11 @@ quer que eu te mostre as opções de acesso?</textarea>
           // Runtime file IDs belong to the media source and Telegram origin,
           // not merely to a reusable configuration/item ID.
           if (old.url !== undefined && (live.url !== old.url || live.type !== old.type)) return live;
-          if (old.bot_id && live.bot_id && old.bot_id !== live.bot_id) return live;
+          if (old.token !== undefined) {
+            const origin = bot => bot.token && bot.token !== '***configured***' && bot.token.includes(':')
+              ? bot.token.split(':')[0] : bot.bot_id;
+            if (origin(old) && origin(live) && origin(old) !== origin(live)) return live;
+          }
         }
         if (same(old, live)) return fresh;
         if (Array.isArray(live) && Array.isArray(old) && Array.isArray(fresh)) {
