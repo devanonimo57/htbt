@@ -2698,8 +2698,12 @@ class ActiveBotManager:
         # The caller may hold the shared cache: publish only after commit.
         import copy
         state = copy.deepcopy(state)
-        lead = await self._get_or_create_lead(state, callback.from_user)
-        self._cancel_downsell(str(callback.from_user.id))
+        checkout_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
+        checkout_token = str(getattr(checkout_bot, "token", "") or "").strip()
+        checkout_origin = checkout_token.split(":", 1)[0] if ":" in checkout_token else ""
+        lead = await self._get_or_create_lead(state, callback.from_user, bot_token=checkout_token)
+        if checkout_origin.isdecimal():
+            self._cancel_downsell(str(callback.from_user.id), bot_id=checkout_origin)
 
         # Valida desconto contra descontos efetivamente autorizados pelo downsell no servidor
         auth_discounts = lead.get("authorized_flow_discounts") or []
