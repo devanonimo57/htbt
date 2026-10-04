@@ -168,6 +168,69 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
     async def test_reverse_distinct_paid_pix_keep_both_histories(self):
         await self.concurrent_settlements(reverse=True)
 
+    async def cache_request(self, payload, warm=None):
+        main.app.dependency_overrides[main.verify_admin_auth] = lambda: None
+        self.addCleanup(main.app.dependency_overrides.clear)
+        fake = SimpleNamespace(token=self.bot.token, session=SimpleNamespace(close=AsyncMock()))
+        with patch.object(telegram_service, '_create_bot_instance', return_value=fake) as factory, \
+             patch.object(self.manager, 'warm_media_item_in_channel', new=AsyncMock(side_effect=warm or (lambda *a, **kw: 'cached-A'))) as transport:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='http://test') as client:
+                response = await client.post('/api/flow-bots/cache-media', json=payload)
+        return response, factory, transport
+
+    async def test_cache_explicit_unknown_bot_fails_before_side_effects(self):
+        response, factory, transport = await self.cache_request({'bot_id': 'deleted-flow-b', 'channel_id': '-1002', 'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}})
+        self.assertEqual(response.status_code, 404)
+        factory.assert_not_called()
+        transport.assert_not_awaited()
+
+    async def test_cache_reused_config_id_rejects_old_public_origin(self):
+        state = await main._read_state_from_db()
+        state['flow_bots'][0].update(token='222:replacement-only', bot_id='222')
+        await main._write_state_to_db(state)
+        response, factory, transport = await self.cache_request({'bot_id': 'flow-a', 'origin_bot_numeric_id': '111', 'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}})
+        self.assertEqual(response.status_code, 409)
+        factory.assert_not_called()
+        transport.assert_not_awaited()
+
+    async def test_cache_explicit_bot_without_token_cannot_use_publish_token(self):
+        state = await main._read_state_from_db()
+        state['flow_bots'].append({'id': 'flow-no-token', 'token': '', 'bot_id': '222'})
+        await main._write_state_to_db(state)
+        response, factory, transport = await self.cache_request({'bot_id': 'flow-no-token', 'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}})
+        self.assertEqual(response.json()['status'], 'error')
+        factory.assert_not_called()
+        transport.assert_not_awaited()
+
+    async def test_cache_omitted_bot_preserves_legacy_selection(self):
+        response, factory, transport = await self.cache_request({'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['telegram_file_id'], 'cached-A')
+        factory.assert_not_called()  # Reuses the matching running origin.
+        self.assertEqual(transport.call_args.kwargs['bot_instance'].token, self.bot.token)
+        self.assertEqual(transport.call_args.kwargs['fb']['id'], 'flow-a')
+
+    async def test_cache_pending_transport_keeps_captured_token_after_replacement(self):
+        started, finish = asyncio.Event(), asyncio.Event()
+        observed = []
+        async def warm(media, state, fb, bot_instance):
+            started.set()
+            await finish.wait()
+            observed.append((fb['id'], bot_instance.token))
+            return 'cached-A'
+        task = asyncio.create_task(self.cache_request({'bot_id': 'flow-a', 'origin_bot_numeric_id': '111', 'media': {'id': 'm', 'url': 'data:image/png;base64,AAAA'}}, warm=warm))
+        await asyncio.wait_for(started.wait(), 5)
+        edited = main._panel_state(await main._read_state_from_db())
+        edited['flow_bots'][0].update(token='222:replacement-only', bot_id='222')
+        await main._write_state_to_db(edited, preserve_runtime=True)
+        finish.set()
+        response, factory, transport = await task
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(observed, [('flow-a', self.bot.token)])
+        factory.assert_not_called()
+        main._STATE_CACHE = None
+        self.assertEqual((await main._read_state_from_db())['flow_bots'][0]['bot_id'], '222')
+
     async def held_checkout(self):
         state = await main._read_state_from_db()
         state['flow_bots'][0]['payments'].update(secondary_enabled=True, secondary_message='SECONDARY')

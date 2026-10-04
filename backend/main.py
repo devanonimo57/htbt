@@ -1937,6 +1937,7 @@ async def verify_flow_channel(req: VerifyChannelRequest):
 
 class CacheMediaRequest(BaseModel):
     bot_id: Optional[str] = ""
+    origin_bot_numeric_id: Optional[str] = ""
     channel_id: Optional[str] = ""
     media: Dict[str, Any]
 
@@ -1944,25 +1945,27 @@ class CacheMediaRequest(BaseModel):
 @app.post("/api/flow-bots/cache-media", dependencies=[Depends(verify_admin_auth)])
 async def cache_flow_media(req: CacheMediaRequest):
     from telegram_service import _create_bot_instance
-    state = await _read_state_from_db()
+    state = copy.deepcopy(await _read_state_from_db())
     fb = None
     for b in (state.get("flow_bots") or []):
         if isinstance(b, dict) and (not req.bot_id or str(b.get("id")) == str(req.bot_id)):
             fb = b
             break
+    if req.bot_id and not fb:
+        raise HTTPException(status_code=404, detail="Bot solicitado não encontrado.")
     if not fb:
         fb = bot_manager._get_active_flow_bot(state)
 
-    tok = (
-        (fb.get("token") if isinstance(fb, dict) else "")
-        or state.get("publish", {}).get("bot_token")
-        or bot_manager.current_token
-        or ""
-    ).strip()
-    if tok == REDACTED_SECRET_MASK:
+    tok = str((fb.get("token") if isinstance(fb, dict) else "") or "").strip()
+    # Only an omitted identity keeps the legacy active/publish fallback.
+    if not req.bot_id and (not tok or tok == REDACTED_SECRET_MASK):
         tok = (state.get("publish", {}).get("bot_token") or bot_manager.current_token or "").strip()
     if not tok or tok == REDACTED_SECRET_MASK:
         return {"status": "error", "message": "Token do bot não configurado"}
+    origin = tok.split(":", 1)[0] if ":" in tok else ""
+    if req.origin_bot_numeric_id and (not req.origin_bot_numeric_id.isdecimal()
+                                      or req.origin_bot_numeric_id != origin):
+        raise HTTPException(status_code=409, detail="Identidade do bot de origem não confere.")
 
     media_copy = dict(req.media or {})
     if req.channel_id and isinstance(fb, dict):
