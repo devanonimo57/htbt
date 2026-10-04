@@ -38,4 +38,43 @@ async function modalContexts() {
   assert.match(html, /id="nb-inp-bot-token"[^>]*oninput="nbInvalidateBotModal\(\)"/);
   console.log('PASS token context: 7 stale cases + current submission');
 }
-(async () => { await modalContexts(); })().catch(e => { console.error(e); process.exitCode = 1; });
+async function campaignEdits() {
+  const {c, el} = setup(), d = deferred(); let dirty = 0, saved = 0;
+  c.markUnsaved = () => dirty++; c.markSaved = () => saved++;
+  c.STATE.flow_bots = [{id:'a', token:'111:fake-old', welcome:{message:'before', medias:[{id:'m1'},{id:'m2'}]}}, {id:'b'}];
+  c.STATE.remarketing_campaigns = [{id:'camp', run_id:'old', message:'offer'}, {id:'deleted'}];
+  const server = JSON.parse(JSON.stringify(c.STATE)); server.flow_bots[0].sales_today = 2;
+  server.remarketing_campaigns[0] = {...server.remarketing_campaigns[0], run_id:'new-run', sent_count:1, status:'Finalizada'};
+  c.adminFetch = async () => { await d.promise; return {ok:true, json:async()=>({has_more:false, sent_count:1, total_targets:1, state:server})}; };
+  vm.runInContext(block('async function nbSendRemarketingCampaign(', 'async function nbReconcileRemarketing('), c);
+  const pending = c.nbSendRemarketingCampaign('camp', true);
+  c.STATE.flow_bots[0].welcome.message = 'typed while sending'; c.STATE.flow_bots[0].token = '111:fake-fresh';
+  c.STATE.flow_bots[0].welcome.medias.shift(); c.STATE.flow_bots.splice(1,1);
+  c.STATE.remarketing_campaigns[0].message = 'new edited offer'; c.STATE.remarketing_campaigns.splice(1,1);
+  d.resolve(); await pending;
+  assert.equal(c.STATE.flow_bots[0].welcome.message, 'typed while sending');
+  assert.equal(c.STATE.flow_bots[0].token, '111:fake-fresh'); assert.equal(c.STATE.flow_bots.length, 1);
+  assert.equal(c.STATE.flow_bots[0].welcome.medias.length, 1);
+  assert.equal(c.STATE.remarketing_campaigns.length, 1); assert.equal(c.STATE.remarketing_campaigns[0].message, 'new edited offer');
+  assert.equal(c.STATE.remarketing_campaigns[0].run_id, 'new-run'); assert.equal(c.STATE.remarketing_campaigns[0].sent_count, 1);
+  assert.ok(!c.STATE.remarketing_campaigns[0].pending_run_id); assert.ok(dirty > 0); assert.equal(saved, 0);
+  // Removing the sending campaign while pending must never recreate it.
+  const second = setup(), hold = deferred(); second.c.STATE.remarketing_campaigns = [{id:'camp', run_id:'r'}];
+  const response = JSON.parse(JSON.stringify(second.c.STATE));
+  second.c.adminFetch = async()=>{ await hold.promise; return {ok:true,json:async()=>({state:response, has_more:true})}; };
+  vm.runInContext(block('async function nbSendRemarketingCampaign(', 'async function nbReconcileRemarketing('),second.c);
+  const send = second.c.nbSendRemarketingCampaign('camp'); second.c.STATE.remarketing_campaigns = []; hold.resolve(); await send;
+  assert.equal(second.c.STATE.remarketing_campaigns.length, 0);
+  const reconciliation = setup(), held = deferred();
+  reconciliation.c.STATE.flow_bots = [{id:'a',welcome:{message:'old'}}];
+  reconciliation.c.STATE.remarketing_campaigns = [{id:'camp',run_id:'run'}];
+  const oldState = JSON.parse(JSON.stringify(reconciliation.c.STATE)); oldState.remarketing_campaigns[0].sent_count = 1;
+  reconciliation.c.adminFetch = async()=>{ await held.promise; return {ok:true,json:async()=>({state:oldState})}; };
+  vm.runInContext(block('async function nbReconcileRemarketing(', 'async function nbDeleteRemarketingCampaign('),reconciliation.c);
+  const reconcile = reconciliation.c.nbReconcileRemarketing('camp','111:7','sent');
+  reconciliation.c.STATE.flow_bots[0].welcome.message = 'reconcile newer edit'; held.resolve(); await reconcile;
+  assert.equal(reconciliation.c.STATE.flow_bots[0].welcome.message, 'reconcile newer edit');
+  assert.equal(reconciliation.c.STATE.remarketing_campaigns[0].sent_count, 1);
+  console.log('PASS campaign merge: edits, deletions, secrets, dirty + accepted run/reconcile');
+}
+(async () => { await modalContexts(); await campaignEdits(); })().catch(e => { console.error(e); process.exitCode = 1; });

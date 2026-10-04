@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
-const source=html.slice(html.indexOf('async function nbSendRemarketingCampaign('),html.indexOf('async function nbDeleteRemarketingCampaign('));
+const source=html.slice(html.indexOf('function nbMergeStateResponse('), html.indexOf('async function loadInitialState(')) + html.slice(html.indexOf('async function nbSendRemarketingCampaign('),html.indexOf('async function nbDeleteRemarketingCampaign('));
 function setup(responses, campaign={id:'camp',name:'C',run_id:'old-id',deliveries:{'111:41':'uncertain'}}){
  const requests=[],els=new Map();let backups=[];
  const c=vm.createContext({STATE:{remarketing_campaigns:[campaign]},document:{getElementById(id){if(!els.has(id))els.set(id,{textContent:'',classList:{remove(){}}});return els.get(id)}},confirm:()=>true,crypto:{randomUUID:()=> 'proposed-id'},saveLocalBackup(){backups.push(JSON.parse(JSON.stringify(c.STATE)))},getMergedSavedProfiles:()=>[],nbRenderRemarketingView(){},adminFetch:async(url,opt)=>{requests.push({url,payload:JSON.parse(opt.body)});const response=responses.shift();if(response instanceof Error)throw response;return response},console});

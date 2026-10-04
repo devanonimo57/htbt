@@ -6951,27 +6951,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const sequence = saveFullState.sequence = (saveFullState.sequence || 0) + 1;
       // Three-way merge: keep edits made after POST, accept fresh server runtime.
       const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-      const mergeResponse = (server, before, current) => {
-        if (same(before, current)) return server;
-        if (Array.isArray(current) && Array.isArray(before) && Array.isArray(server)) {
-          if ([...current, ...before, ...server].every(x => x && typeof x === 'object' && x.id)) {
-            const oldById = new Map(before.map(x => [x.id, x]));
-            const serverById = new Map(server.map(x => [x.id, x]));
-            return current.map(x => mergeResponse(serverById.get(x.id), oldById.get(x.id), x));
-          }
-          return current;
-        }
-        if (current && before && server && !Array.isArray(current) &&
-            typeof current === 'object' && typeof before === 'object' && typeof server === 'object') {
-          const result = {};
-          for (const key of new Set([...Object.keys(server), ...Object.keys(before), ...Object.keys(current)])) {
-            const value = mergeResponse(server[key], before[key], current[key]);
-            if (value !== undefined) result[key] = value;
-          }
-          return result;
-        }
-        return current;
-      };
+      const mergeResponse = nbMergeStateResponse;
       try {
         const res = await adminFetch("/api/state", {
           method: "POST",
@@ -7015,6 +6995,56 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (status) { status.textContent = 'A versão enviada foi salva; há novas alterações não salvas.'; status.className = 'text-xs text-amber-400'; }
       }
       return savedOk && !newerEdits;
+    }
+
+    function nbMergeStateResponse(server, before, current, runtimeOnly = false) {
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (runtimeOnly) {
+        // A send response did not save configuration. Project only runtime
+        // onto the request's editable snapshot before the three-way merge.
+        const projected = JSON.parse(JSON.stringify(before));
+        for (const key of ['memory', 'tx_records', 'learning']) {
+          if (server[key] !== undefined) projected[key] = server[key];
+        }
+        for (const bot of projected.flow_bots || []) {
+          const fresh = (server.flow_bots || []).find(b => b.id === bot.id);
+          if (!fresh || (bot.bot_id && fresh.bot_id && bot.bot_id !== fresh.bot_id)) continue;
+          for (const key of ['sales_today', 'revenue_today']) {
+            if (fresh[key] !== undefined) bot[key] = fresh[key];
+          }
+        }
+        for (const campaign of projected.remarketing_campaigns || []) {
+          const fresh = (server.remarketing_campaigns || []).find(c => c.id === campaign.id);
+          if (!fresh) continue;
+          for (const key of ['run_id', 'run_ids', 'run_message', 'status', 'sent_count',
+            'total_targets', 'deliveries', 'last_sent_at', 'retry_not_before']) {
+            if (fresh[key] !== undefined) campaign[key] = fresh[key];
+          }
+        }
+        server = projected;
+      }
+      const merge = (fresh, old, live) => {
+        if (same(old, live)) return fresh;
+        if (Array.isArray(live) && Array.isArray(old) && Array.isArray(fresh)) {
+          if ([...live, ...old, ...fresh].every(x => x && typeof x === 'object' && x.id)) {
+            const oldById = new Map(old.map(x => [x.id, x]));
+            const freshById = new Map(fresh.map(x => [x.id, x]));
+            return live.map(x => merge(freshById.get(x.id), oldById.get(x.id), x));
+          }
+          return live;
+        }
+        if (live && old && fresh && !Array.isArray(live) &&
+            typeof live === 'object' && typeof old === 'object' && typeof fresh === 'object') {
+          const result = {};
+          for (const key of new Set([...Object.keys(fresh), ...Object.keys(old), ...Object.keys(live)])) {
+            const value = merge(fresh[key], old[key], live[key]);
+            if (value !== undefined) result[key] = value;
+          }
+          return result;
+        }
+        return live;
+      };
+      return merge(server, before, current);
     }
 
     async function loadInitialState() {
@@ -10276,6 +10306,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         let totalTargets = 0;
         let retryAfter = 0;
         while (more) {
+        const submitted = JSON.parse(JSON.stringify(STATE));
         const res = await adminFetch("/api/flow-bots/remarketing/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -10301,20 +10332,23 @@ quer que eu te mostre as opções de acesso?</textarea>
           throw new Error('Falha no lote de remarketing');
         }
         const data = await res.json();
-        c.run_id = data.state?.remarketing_campaigns?.find(x => x.id === campaignId)?.run_id || runId;
-        delete c.pending_run_id;
-        delete c.pending_new_run;
+        const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+        if (data.state) STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+        const liveCampaign = (STATE.remarketing_campaigns || []).find(x => x.id === campaignId);
+        if (liveCampaign) {
+          if (liveCampaign.pending_run_id === runId) {
+            delete liveCampaign.pending_run_id;
+            delete liveCampaign.pending_new_run;
+          }
+        }
         newRun = false;
+        if (newerEdits && typeof markUnsaved === 'function') markUnsaved();
         saveLocalBackup();
         totalSent += Number(data.sent_count || 0);
         totalTargets = Number(data.total_targets || 0);
         retryAfter = Number(data.retry_after || 0);
         more = data.has_more === true && retryAfter <= 0;
-        if (data && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
-          saveLocalBackup();
-        }
+        if (!liveCampaign) more = false; // A local deletion is not undone by the send.
         if (banner) banner.textContent = `Campanha em andamento: ${totalSent} enviadas (${totalTargets} leads).`;
         nbRenderRemarketingView();
         }
@@ -10329,6 +10363,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function nbReconcileRemarketing(campaignId, recipient, resolution) {
       if (!confirm(`Verificou ${recipient} no Telegram? Esta decisão NÃO reenviará mensagem.`)) return;
       const banner = document.getElementById('nb-rmk-feedback-banner');
+      const submitted = JSON.parse(JSON.stringify(STATE));
       try {
         const res = await adminFetch('/api/flow-bots/remarketing/reconcile', {
           method: 'POST', headers: {'Content-Type':'application/json'},
@@ -10336,7 +10371,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         });
         if (!res.ok) throw new Error('Reconciliation failed');
         const data = await res.json();
-        STATE = {...data.state, saved_profiles:getMergedSavedProfiles(data.state.saved_profiles)};
+        const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+        STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+        if (newerEdits && typeof markUnsaved === 'function') markUnsaved();
         saveLocalBackup();
         nbRenderRemarketingView();
       } catch (e) {

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
-const source = html.slice(html.indexOf('async function nbSendRemarketingCampaign('), html.indexOf('async function nbDeleteRemarketingCampaign('));
+const source = html.slice(html.indexOf('function nbMergeStateResponse('), html.indexOf('async function loadInitialState(')) + html.slice(html.indexOf('async function nbSendRemarketingCampaign('), html.indexOf('async function nbDeleteRemarketingCampaign('));
 assert(source.length > 0);
 const banner = {classList:{remove(){},add(){}}, textContent:''};
 const responses = [{sent_count:10,total_targets:12,has_more:true,state:{remarketing_campaigns:[{id:'c'}]}},
