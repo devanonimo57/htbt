@@ -47,6 +47,16 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         return await main._read_state_from_db()
     def evidence(self,name,value):
         (REPORT/(name+'.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2),encoding='utf8')
+    async def test_failed_save_downsell_single_and_all_emit_no_delivery(self):
+        self.node('downsell-failure')
+        outputs=json.loads((REPORT/'downsell-failure-result.json').read_text())
+        for output in outputs:
+            self.assertFalse(output['requests'])
+            if output.get('post'):
+                self.assertEqual(output['post']['flow_bots'][0]['downsell_general']['sequences'][0]['message'],'NEW UNSAVED DOWNSELL')
+        self.bot.send_message.assert_not_awaited()
+        saved=await self.cold()
+        self.assertEqual(saved['flow_bots'][0]['downsell_general']['sequences'][0]['message'],'ORIGINAL GENERAL')
     def node(self, mode, contract=None):
         args=['node',str(SCRIPT),mode]+([str(contract)] if contract else [])
         result=subprocess.run(args,capture_output=True,text=True,timeout=30,env={**os.environ,'HOTBOT_REPORT':str(REPORT)})

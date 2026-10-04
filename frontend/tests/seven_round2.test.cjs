@@ -57,15 +57,16 @@ async function cacheSwitch(){
  assert.equal(request.bot_id,'flow-b');assert.equal(request.channel_id,'-1001');
  return{request,post,selected_before:'flow-a',selected_after:'flow-b',original_channel_b:'-1002'};
 }
-async function downsellFailure(all=false){
+async function downsellFailure(all=false,kind='http'){
  const {c,el}=setup();const requests=[];let post;
  vm.runInContext(block('function nbSwitchDownsellTrack(','function nbRenderDownsellTab('),c);
  vm.runInContext(block('function nbUpdateDownsellSeq(','function nbToggleDownsellPlan('),c);
  c.nbUpdateDownsellSeq(0,'message','NEW UNSAVED DOWNSELL');
- c.adminFetch=async(url,opt)=>{if(url==='/api/state'){post=JSON.parse(opt.body);return{ok:false,status:500}}requests.push({url,body:JSON.parse(opt.body)});return{ok:true,json:async()=>({status:'success',sent_count:1,channel_id:'-1001',bot_username:'@fixture'})}};
+ c.adminFetch=async(url,opt)=>{if(url==='/api/state'){post=JSON.parse(opt.body);if(kind==='offline')throw new Error('offline');return{ok:false,status:500}}requests.push({url,body:JSON.parse(opt.body)});return{ok:true,json:async()=>({status:'success',sent_count:1,channel_id:'-1001',bot_username:'@fixture'})}};
+ if(kind==='false') c.nbSaveCurrentBot=async()=>false;
  await (all?c.nbTestAllDownsellSequences():c.nbTestDownsellSequence(0));
- assert.equal(requests.length,1);assert.match(el('nb-ds-test-banner').innerHTML,/Sucesso/);
- return{request:requests[0].body,post,save_http_status:500,banner:el('nb-ds-test-banner').innerHTML};
+ assert.equal(requests.length,0);assert.doesNotMatch(el('nb-ds-test-banner').innerHTML,/Sucesso/);assert.match(el('nb-ds-test-banner').innerHTML,/salvar/i);
+ return{requests,post,save_http_status:500,banner:el('nb-ds-test-banner').innerHTML};
 }
 async function downsellTrack(){
  const {c}=setup(),gate=deferred();let request;
@@ -86,6 +87,7 @@ async function downsellTrack(){
   const contract=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));const output=await crm(contract);
   fs.writeFileSync(path.join(report,'crm-node-result.json'),JSON.stringify(output,null,2));console.log('CRM contract passed');return;
  }
+ if(mode==='downsell-failure'){const outputs=[];for(const all of [false,true])for(const kind of ['http','offline','false'])outputs.push(await downsellFailure(all,kind));fs.writeFileSync(path.join(report,'downsell-failure-result.json'),JSON.stringify(outputs));console.log('Downsell failed-save contract passed');return;}
  assert.equal(mode,'crm');await crm();
  let scripts=0;for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++}}
  console.log(JSON.stringify({passed:mode,parsed_inline_scripts:scripts}));
