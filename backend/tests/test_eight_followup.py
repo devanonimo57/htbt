@@ -375,6 +375,85 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         self.assertEqual(self.bot.send_media_group.await_count, 3)
         self.assertEqual([m.media for m in self.bot.send_media_group.call_args.kwargs['media']], ['native-a', 'native-b'])
 
+    async def direct_album_conversion_state(self, kind='document'):
+        video = kind == 'animation'
+        prefix = 'CgAC' if video else 'BQAC'
+        medias = [
+            {'id': 'direct-a', 'type': 'video' if video else 'photo',
+             'url': 'tg://file_id/' + prefix + '-old-a' if video else 'data:image/png;base64,AAAA',
+             'telegram_file_id': prefix + '-old-a', 'telegram_send_as': kind},
+            {'id': 'direct-b', 'type': 'photo', 'url': 'data:image/png;base64,BBBB',
+             'telegram_file_id': 'BQAC-old-b', 'telegram_send_as': 'document'}]
+        state = await self.checkout_media_state(medias)
+        state['flow_bots'][0]['cache_channel_id'] = ''
+        state['publish']['cache_channel_id'] = ''
+        state['publish']['delivery_destination'] = ''
+        await main._write_state_to_db(state)
+        state = await main._read_state_from_db()
+        self.assertEqual(self.manager._get_candidate_cache_channels(state, state['flow_bots'][0]), [])
+        async def download(file_id, destination):
+            destination.write(b'fake-video-bytes')
+        self.bot.download = AsyncMock(side_effect=download)
+        self.bot.send_media_group = AsyncMock(return_value=[
+            SimpleNamespace(video=SimpleNamespace(file_id='native-a')) if video else
+            SimpleNamespace(photo=[SimpleNamespace(file_id='native-a')]),
+            SimpleNamespace(photo=[SimpleNamespace(file_id='native-b')])])
+        return state
+
+    async def direct_album_conversion_is_reused(self, kind):
+        state = await self.direct_album_conversion_state(kind)
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        first_inputs = self.bot.send_media_group.call_args.kwargs['media']
+        self.assertTrue(all(isinstance(m.media, telegram_service.BufferedInputFile) for m in first_inputs))
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        medias = saved['flow_bots'][0]['payments']['generated_medias']
+        self.assertEqual([m['telegram_file_id'] for m in medias], ['native-a', 'native-b'])
+        self.assertEqual([m['telegram_send_as'] for m in medias],
+                         ['video' if kind == 'animation' else 'photo', 'photo'])
+        self.assertTrue(all(m['album_cached'] for m in medias))
+        downloads = self.bot.download.await_count
+        await self.manager._generate_flow_checkout(self.callback, saved['flow_bots'][0], saved, 'plan-a', 0, [])
+        self.assertEqual(self.bot.send_media_group.await_count, 2)  # Only recipients, no warm channel.
+        self.assertEqual([m.media for m in self.bot.send_media_group.call_args.kwargs['media']], ['native-a', 'native-b'])
+        self.assertEqual(self.bot.download.await_count, downloads)
+        main._STATE_CACHE = None
+        persisted = await main._read_state_from_db()
+        self.assertEqual(len(persisted['tx_records']), 2)
+        self.assertTrue(all(tx['status'] == 'pending' for tx in persisted['tx_records'].values()))
+        for tx_id, _ in self.created:
+            self.assertTrue(any('PIX-' + tx_id in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
+
+    async def test_checkout_direct_document_album_persists_and_reuses_native_ids(self):
+        await self.direct_album_conversion_is_reused('document')
+
+    async def test_checkout_direct_animation_album_persists_and_reuses_native_ids(self):
+        await self.direct_album_conversion_is_reused('animation')
+
+    async def test_checkout_direct_album_conversion_does_not_cache_replaced_source(self):
+        state = await self.direct_album_conversion_state()
+        response = self.bot.send_media_group.return_value
+        expected = {}
+        async def send(**kw):
+            nonlocal expected
+            edited = main._panel_state(await main._read_state_from_db())
+            edited['flow_bots'][0]['payments']['generated_medias'] = [
+                {'id': 'direct-a', 'type': 'photo', 'url': 'data:image/png;base64,CCCC'},
+                {'id': 'direct-b', 'type': 'photo', 'url': 'data:image/png;base64,DDDD'}]
+            edited['publish']['support_username'] = '@direct_album_edit'
+            await main._write_state_to_db(edited)
+            expected = copy.deepcopy(await main._read_state_from_db())
+            return response
+        self.bot.send_media_group.side_effect = send
+        await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['flow_bots'], expected['flow_bots'])
+        self.assertEqual(saved['publish'], expected['publish'])
+        self.assertEqual(saved['tx_records'], expected['tx_records'])
+        self.assertTrue(all('telegram_file_id' not in m for m in saved['flow_bots'][0]['payments']['generated_medias']))
+        self.assertTrue(any('PIX-' + self.created[-1][0] in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
+
     async def test_checkout_internal_repair_save_does_not_contaminate_replaced_source(self):
         state = await self.checkout_media_state([{
             'id': 'checkout-photo', 'type': 'photo', 'url': 'data:image/png;base64,AAAA',

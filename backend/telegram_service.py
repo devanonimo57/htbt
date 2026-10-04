@@ -1607,14 +1607,17 @@ class ActiveBotManager:
                 if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
                     updated = False
                     for m, sent_msg in zip(valid_items, sent_msgs):
-                        if not (m.get("telegram_file_id") or "").strip():
-                            is_vid = self._is_video_media(m)
-                            fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
-                            if fid:
-                                m["telegram_file_id"] = str(fid)
-                                m["telegram_send_as"] = detected_kind
-                                m["album_cached"] = True
-                                updated = True
+                        # A successful direct album may convert an existing
+                        # document/animation ID into a native photo/video ID.
+                        is_vid = self._is_video_media(m)
+                        fid, detected_kind = self._extract_sent_file_id(sent_msg, "video" if is_vid else "photo")
+                        if fid and (str(fid) != m.get("telegram_file_id")
+                                    or detected_kind != m.get("telegram_send_as")
+                                    or not m.get("album_cached")):
+                            m["telegram_file_id"] = str(fid)
+                            m["telegram_send_as"] = detected_kind
+                            m["album_cached"] = True
+                            updated = True
                     if persist_cache and updated and state and self.state_saver:
                         try:
                             await self.state_saver(state, runtime_only=True)
