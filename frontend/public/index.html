@@ -5954,12 +5954,22 @@ quer que eu te mostre as opções de acesso?</textarea>
     async function deleteLead(telegramId, e, botId) {
       if (e) e.stopPropagation();
       if (!confirm(`Mover o lead ${telegramId} para Excluídos e encerrar o acompanhamento dos Pix pendentes? O QR do provedor ainda poderá ser pago.`)) return;
+      const submitted = JSON.parse(JSON.stringify(STATE));
+      const scope = nbLeadDeleteScope(botId);
       try {
-        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}?bot_id=${encodeURIComponent(nbLeadDeleteScope(botId))}`, { method: 'DELETE' });
+        const res = await adminFetch(`/api/leads/${encodeURIComponent(telegramId)}?bot_id=${encodeURIComponent(scope)}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Servidor recusou exclusão');
         const data = await res.json();
-        if (data.state) STATE = data.state;
-        else await nbRefreshLeadsState();
+        let server = data.state;
+        if (!server) {
+          const refresh = await adminFetch('/api/state');
+          if (!refresh.ok) throw new Error('Falha ao atualizar leads');
+          server = await refresh.json();
+        }
+        const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+        STATE = nbMergeStateResponse(server, submitted, STATE, true);
+        STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
+        if (newerEdits) markUnsaved();
         saveLocalBackup(); renderMemoryLeads(); renderLearningKpis(); nbRenderClientsView();
       } catch (err) { alert('Não foi possível mover o lead para Excluídos. Tente novamente.'); }
     }
@@ -9993,14 +10003,16 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbToggleLeadBlock() {
       if (!NB_ACTIVE_CHAT_USER_ID || !NB_ACTIVE_CHAT_BOT_ID) return;
+      const submitted = JSON.parse(JSON.stringify(STATE));
+      const userId = NB_ACTIVE_CHAT_USER_ID, botId = NB_ACTIVE_CHAT_BOT_ID, originBotId = NB_ACTIVE_CHAT_ORIGIN_BOT_ID;
       try {
         const res = await adminFetch("/api/flow-bots/leads/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: NB_ACTIVE_CHAT_USER_ID,
-            bot_id: NB_ACTIVE_CHAT_BOT_ID,
-            origin_bot_numeric_id: NB_ACTIVE_CHAT_ORIGIN_BOT_ID,
+            user_id: userId,
+            bot_id: botId,
+            origin_bot_numeric_id: originBotId,
             action: "toggle_block"
           })
         });
@@ -10010,11 +10022,14 @@ quer que eu te mostre as opções de acesso?</textarea>
           return;
         }
         if (data && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+          STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+          STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
           saveLocalBackup();
+          if (newerEdits) markUnsaved();
         }
-        nbOpenLeadChatModal(NB_ACTIVE_CHAT_USER_ID, NB_ACTIVE_CHAT_BOT_ID, NB_ACTIVE_CHAT_ORIGIN_BOT_ID);
+        if (NB_ACTIVE_CHAT_USER_ID === userId && NB_ACTIVE_CHAT_BOT_ID === botId
+            && NB_ACTIVE_CHAT_ORIGIN_BOT_ID === originBotId) nbOpenLeadChatModal(userId, botId, originBotId);
         nbRenderClientsView();
       } catch (e) {}
     }
@@ -10084,6 +10099,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     async function nbUpdateAccessStatus(txId, newStatus) {
       if (!txId || !newStatus) return;
+      const submitted = JSON.parse(JSON.stringify(STATE));
       const banner = document.getElementById('nb-acc-feedback-banner');
       try {
         const res = await adminFetch("/api/flow-bots/access/update-status", {
@@ -10092,13 +10108,15 @@ quer que eu te mostre as opções de acesso?</textarea>
           body: JSON.stringify({ tx_id: txId, access_status: newStatus, status: newStatus })
         });
         const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data?.detail || "Falha ao atualizar status de acesso.");
+        if (!res.ok || data?.status === "error") {
+          throw new Error(data?.message || data?.detail || "Falha ao atualizar status de acesso.");
         }
         if (data && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+          STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+          STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
           saveLocalBackup();
+          if (newerEdits) markUnsaved();
         }
         if (banner) {
           banner.classList.remove('hidden');
