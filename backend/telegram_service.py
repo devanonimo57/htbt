@@ -2074,10 +2074,16 @@ class ActiveBotManager:
                     _CURRENT_BOT_CTX.set(msg_bot)
             target_bot = msg_bot or _CURRENT_BOT_CTX.get() or self.bot
 
+            # /start belongs only to the verified transport, never a context
+            # fallback or a peer bot's task for the same Telegram user.
+            origin = msg_bot_tok.split(':', 1)[0] if ':' in msg_bot_tok else ''
+            if (not msg_bot or not origin.isdecimal()
+                    or str(getattr(msg_bot, 'id', origin)) != origin):
+                return
             state = await self.state_getter()
-            lead = await self._get_or_create_lead(state, message.from_user)
-            self._cancel_downsell(str(message.from_user.id))
-            self._cancel_upsell(str(message.from_user.id))
+            lead = await self._get_or_create_lead(state, message.from_user, bot_token=msg_bot_tok)
+            self._cancel_downsell(str(message.from_user.id), bot_id=origin)
+            self._cancel_upsell(str(message.from_user.id), bot_id=origin)
 
             # Ao enviar /start, reinicia o histórico, etapa e downsells do lead para permitir novo ciclo limpo
             lead["history"] = []
