@@ -2686,6 +2686,9 @@ class ActiveBotManager:
         disc_pct: int,
         accepted_bumps: List[Dict[str, Any]]
     ):
+        # The caller may hold the shared cache: publish only after commit.
+        import copy
+        state = copy.deepcopy(state)
         lead = await self._get_or_create_lead(state, callback.from_user)
         self._cancel_downsell(str(callback.from_user.id))
 
@@ -2809,14 +2812,19 @@ class ActiveBotManager:
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),
         }
-        self.tx_records[tx_id] = tx_record
         state.setdefault("tx_records", {})[tx_id] = tx_record
 
         lead["last_tx_id"] = tx_id
         lead["last_tx_is_upsell"] = False
+        valor_str = f"R$ {total_price:.2f}".replace(".", ",")
+        lead.setdefault("history", []).append({
+            "role": "assistant",
+            "content": f"[PIX Flow — {full_plan_label} ({valor_str})] {pix_code}"
+        })
+        await self.state_saver(state, runtime_only=True)
+        self.tx_records[tx_id] = tx_record
         self.active_tx_map[tx_id] = callback.from_user.id
 
-        valor_str = f"R$ {total_price:.2f}".replace(".", ",")
         pay_cfg = fb.get("payments", {})
         pix_fmt_mode = pay_cfg.get("pix_format", "Código (monoespaçado)")
         safe_pix = html.escape(pix_code)
@@ -2863,12 +2871,6 @@ class ActiveBotManager:
                 pix_code_fmt=pix_code_formatted
             )
             await self._safe_send_html(chat_id, sec_txt, bot_instance=target_bot)
-
-        lead.setdefault("history", []).append({
-            "role": "assistant",
-            "content": f"[PIX Flow — {full_plan_label} ({valor_str})] {pix_code}"
-        })
-        await self.state_saver(state, runtime_only=True)
 
         self._schedule_flow_downsell(callback.from_user, track="pix", bot_token=bot_tok_val)
         self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
