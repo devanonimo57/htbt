@@ -172,9 +172,21 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
                 state=copy.deepcopy(await main._read_state_from_db())
                 state['flow_bots'][0]['welcome']['message']='ORIGINAL'
                 state['flow_bots'][0]['welcome']['medias']=[{'id':'remove-m','url':'https://example.invalid/old','type':'photo'}]
-                state['flow_bots'][1]['plans']=[{'id':'remove-p','name':'Delete me'}]
+                state['flow_bots'][1]['plans']=copy.deepcopy(state['flow_bots'][0]['plans'])
                 await main._write_state_to_db(state)
                 tx=await self.checkout() if kind=='access' else None
+                # Real paid peer checkout: each action must leave B intact.
+                peer_bot=SimpleNamespace(token='222:test-only',send_message=AsyncMock())
+                self.manager.extra_bots[peer_bot.token]=peer_bot
+                peer_callback=SimpleNamespace(from_user=self.user,bot=peer_bot,message=self.callback.message)
+                current=await main._read_state_from_db()
+                await self.manager._generate_flow_checkout(peer_callback,current['flow_bots'][1],current,'plan-a',0,[])
+                peer_tx=self.created[-1][0];self.gateway_status[peer_tx]='paid'
+                approved=await self.client.post('/api/webhook/syncpay',json={'id':peer_tx,'status':'paid'})
+                self.assertEqual(approved.status_code,200,approved.text)
+                self.assertEqual(approved.json()['action'],'approved',approved.text)
+                before_peer=copy.deepcopy((await self.cold())['tx_records'][peer_tx])
+                before_lead=copy.deepcopy(main._client_map(await main._read_state_from_db())[('222','7',False)])
                 initial=(await self.client.get('/api/state')).json()
                 self.evidence(kind+'-contract',{'initial':initial,'tx_id':tx})
                 request=json.loads(self.node('request',kind,kind+'-contract'))
@@ -191,4 +203,8 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(cold['publish']['gateway_secret'],'NEW ACTION SECRET')
                 self.assertFalse(cold['flow_bots'][0]['welcome']['medias'])
                 self.assertFalse(cold['flow_bots'][1]['plans'])
+                self.assertEqual(cold['tx_records'][peer_tx],before_peer)
+                self.assertEqual(main._client_map(cold)[('222','7',False)],before_lead)
+                self.assertTrue(cold['tx_records'][peer_tx]['delivered'])
+                self.assertTrue(cold['tx_records'][peer_tx]['sales_counted'])
                 self.evidence(kind+'-cold',{'typed':'NEW EDIT DURING ACTION','frontend':observed['after'],'cold_db_welcome':cold['flow_bots'][0]['welcome']['message'],'node':output})
