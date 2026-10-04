@@ -2987,6 +2987,31 @@ def _crm_verified_bot_origin(lead: Dict[str, Any]) -> str:
     return recorded if recorded.isdecimal() else ""
 
 
+async def _record_crm_message(origin: str, uid: str, bot_id: str, created_at: str, text: str) -> bool:
+    """Append only to the still-existing original row, never insert a lead.
+
+    Serialize fresh read/update/commit with deletions and all state writers.
+    Configuration, archived rows and replacement origins are not touched.
+    """
+    global _STATE_CACHE
+    async with _DB_LOCK:
+        async with async_session() as session:
+            row = await session.get(ClientRecord, (origin, uid, False))
+            if row is None:
+                return False
+            lead = json.loads(row.data_json)
+            if (str(lead.get('bot_id') or '') != bot_id
+                    or str(lead.get('origin_bot_numeric_id') or '') != origin
+                    or str(lead.get('created_at') or '') != created_at):
+                return False
+            lead.setdefault('history', []).append({'role': 'assistant', 'content': text})
+            lead['history'] = lead['history'][-MAX_HISTORY_PER_LEAD:]
+            row.data_json = json.dumps(lead, ensure_ascii=False)
+            await session.commit()
+            _STATE_CACHE = None
+            return True
+
+
 class LeadActionRequest(BaseModel):
     telegram_id: Optional[str] = ""
     user_id: Optional[str] = ""
@@ -3043,6 +3068,7 @@ async def handle_lead_action(req: LeadActionRequest):
         if (not configured_bot_numeric_id.isdecimal()
                 or recorded_bot_numeric_id != configured_bot_numeric_id):
             return {"status": "error", "message": "Identidade do bot de origem não verificável para este lead."}
+        lead_created_at = str(target_lead.get("created_at") or "")
         temp_bot = None
         try:
             temp_bot = _create_bot_instance(tok)
@@ -3050,9 +3076,9 @@ async def handle_lead_action(req: LeadActionRequest):
                 await temp_bot.send_message(chat_id=int(tid), text=txt, parse_mode="HTML")
             except Exception:
                 await temp_bot.send_message(chat_id=int(tid), text=txt)
-            target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
-            state = await _write_state_to_db(state, runtime_only=True)
-            return {"status": "ok", "state": _panel_state(state)}
+            recorded = await _record_crm_message(recorded_bot_numeric_id, tid, lead_bot_id, lead_created_at, txt)
+            state = await _read_state_from_db()
+            return {"status": "ok", "history_recorded": recorded, "state": _panel_state(state)}
         except Exception as e:
             return {"status": "error", "message": str(e)}
         finally:

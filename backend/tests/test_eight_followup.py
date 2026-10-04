@@ -72,6 +72,43 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         self.assertEqual(saved['flow_bots'][0]['bot_id'], '222')
         self.assertEqual(saved['flow_bots'][0]['username'], '@replacement')
 
+    async def test_crm_completion_does_not_resurrect_archived_lead(self):
+        task, finish = await self.held_crm()
+        await main.delete_lead('7', bot_id='flow-a')
+        archived_before = copy.deepcopy((await main._read_state_from_db())['memory']['deleted_leads'])
+        finish.set()
+        self.assertEqual((await task)['status'], 'ok')
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertFalse(saved['memory']['leads'])
+        self.assertEqual(saved['memory']['deleted_leads'], archived_before)
+
+    async def test_crm_completion_does_not_recreate_permanently_deleted_lead(self):
+        task, finish = await self.held_crm()
+        await main.delete_lead('7', bot_id='flow-a')
+        await main.permanently_delete_lead('7', bot_id='flow-a')
+        finish.set()
+        self.assertEqual((await task)['status'], 'ok')
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertFalse(saved['memory']['leads'])
+        self.assertFalse(saved['memory']['deleted_leads'])
+
+    async def test_crm_completion_does_not_write_into_replacement_lead(self):
+        task, finish = await self.held_crm()
+        await main.delete_lead('7', bot_id='flow-a')
+        edited = main._panel_state(await main._read_state_from_db())
+        edited['flow_bots'][0].update(token='222:replacement-only', bot_id='222', username='@replacement')
+        await main._write_state_to_db(edited, preserve_runtime=True)
+        state = await main._read_state_from_db()
+        await self.manager._get_or_create_lead(state, self.user, bot_token='222:replacement-only')
+        await main._write_state_to_db(state, runtime_only=True)
+        expected = copy.deepcopy((await main._read_state_from_db())['memory'])
+        finish.set()
+        self.assertEqual((await task)['status'], 'ok')
+        main._STATE_CACHE = None
+        self.assertEqual((await main._read_state_from_db())['memory'], expected)
+
     async def held_checkout(self):
         state = await main._read_state_from_db()
         state['flow_bots'][0]['payments'].update(secondary_enabled=True, secondary_message='SECONDARY')
