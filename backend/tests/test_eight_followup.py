@@ -15,6 +15,63 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         await super().asyncSetUp()
         self.manager._schedule_flow_downsell = lambda *a, **kw: None
 
+    async def held_crm(self):
+        state = await main._read_state_from_db()
+        await self.manager._get_or_create_lead(state, self.user, bot_token=self.bot.token)
+        await main._write_state_to_db(state, runtime_only=True)
+        started, finish = asyncio.Event(), asyncio.Event()
+        async def send(**kw):
+            started.set()
+            await finish.wait()
+            return SimpleNamespace(message_id=1)
+        temp_bot = SimpleNamespace(send_message=AsyncMock(side_effect=send), session=SimpleNamespace(close=AsyncMock()))
+        self.factory = patch.object(telegram_service, '_create_bot_instance', return_value=temp_bot)
+        self.factory_mock = self.factory.start()
+        self.addCleanup(self.factory.stop)
+        main.app.dependency_overrides[main.verify_admin_auth] = lambda: None
+        self.addCleanup(main.app.dependency_overrides.clear)
+        async def request():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='http://test') as client:
+                response = await client.post('/api/flow-bots/leads/action', json={
+                    'telegram_id': '7', 'bot_id': 'flow-a', 'origin_bot_numeric_id': '111',
+                    'action': 'send_message', 'message': 'CRM HELD MESSAGE'})
+                self.assertEqual(response.status_code, 200)
+                return response.json()
+        task = asyncio.create_task(request())
+        await asyncio.wait_for(started.wait(), 5)
+        return task, finish
+
+    async def test_crm_completion_preserves_new_configuration(self):
+        task, finish = await self.held_crm()
+        edited = main._panel_state(await main._read_state_from_db())
+        edited['publish']['support_username'] = '@new_support'
+        edited['flow_bots'][0]['plans'][0]['delivery_external_url'] = 'https://example.invalid/new'
+        edited['flow_bots'][0].update(username='@fresh_verified', first_name='Fresh')
+        await main._write_state_to_db(edited, preserve_runtime=True)
+        finish.set()
+        self.assertEqual((await task)['status'], 'ok')
+        self.factory_mock.assert_called_once_with(self.bot.token)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['publish']['support_username'], '@new_support')
+        self.assertEqual(saved['flow_bots'][0]['plans'][0]['delivery_external_url'], 'https://example.invalid/new')
+        self.assertEqual(saved['flow_bots'][0]['username'], '@fresh_verified')
+        self.assertEqual(saved['memory']['leads'][0]['history'][-1]['content'], 'CRM HELD MESSAGE')
+
+    async def test_crm_completion_keeps_replaced_token_metadata(self):
+        task, finish = await self.held_crm()
+        edited = main._panel_state(await main._read_state_from_db())
+        edited['flow_bots'][0].update(token='222:replacement-only', bot_id='222', username='@replacement', first_name='Replacement')
+        await main._write_state_to_db(edited, preserve_runtime=True)
+        finish.set()
+        self.assertEqual((await task)['status'], 'ok')
+        self.factory_mock.assert_called_once_with(self.bot.token)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertEqual(saved['flow_bots'][0]['token'], '222:replacement-only')
+        self.assertEqual(saved['flow_bots'][0]['bot_id'], '222')
+        self.assertEqual(saved['flow_bots'][0]['username'], '@replacement')
+
     async def held_checkout(self):
         state = await main._read_state_from_db()
         state['flow_bots'][0]['payments'].update(secondary_enabled=True, secondary_message='SECONDARY')

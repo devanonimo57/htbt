@@ -3051,7 +3051,7 @@ async def handle_lead_action(req: LeadActionRequest):
             except Exception:
                 await temp_bot.send_message(chat_id=int(tid), text=txt)
             target_lead.setdefault("history", []).append({"role": "assistant", "content": txt})
-            state = await _write_state_to_db(state, preserve_runtime=False)
+            state = await _write_state_to_db(state, runtime_only=True)
             return {"status": "ok", "state": _panel_state(state)}
         except Exception as e:
             return {"status": "error", "message": str(e)}
