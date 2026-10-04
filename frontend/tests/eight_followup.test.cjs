@@ -77,4 +77,53 @@ async function campaignEdits() {
   assert.equal(reconciliation.c.STATE.remarketing_campaigns[0].sent_count, 1);
   console.log('PASS campaign merge: edits, deletions, secrets, dirty + accepted run/reconcile');
 }
-(async () => { await modalContexts(); await campaignEdits(); })().catch(e => { console.error(e); process.exitCode = 1; });
+async function cacheSaveRaces() {
+  for (const change of ['save-first','removed','replaced-media','replaced-bot','caption-edit','save-mask']) {
+    const {c} = setup(), d = deferred();
+    const bot = {id:'a',bot_id:'111',token:'111:fake-old',welcome:{medias:[{id:'m',type:'Fotos',url:'data:image/png;base64,AAAA',caption:'old'}]}};
+    c.STATE.flow_bots = [bot]; c.nbGetCurrentBot = () => null;
+    c.adminFetch = async (url,opt) => url.includes('cache-media') ? (await d.promise, {json:async()=>({status:'ok',telegram_file_id:'cached-A',telegram_send_as:'photo'})}) : {ok:true,json:async()=>{const state=JSON.parse(opt.body); if(change==='save-mask') state.flow_bots[0].token='***configured***'; return {state};}};
+    vm.runInContext(block('async function nbAutoWarmMediaItem(', 'function nbHandleMediaUpload('), c);
+    const pending = c.nbAutoWarmMediaItem(bot,bot.welcome.medias[0],'welcome');
+    await c.saveFullState();
+    if(change==='removed') c.STATE.flow_bots[0].welcome.medias=[];
+    if(change==='replaced-media') c.STATE.flow_bots[0].welcome.medias[0].url='data:image/png;base64,BBBB';
+    if(change==='replaced-bot') c.STATE.flow_bots[0] = {id:'a',bot_id:'222',token:'222:fake-new',welcome:{medias:[{id:'m',type:'Fotos',url:'data:image/png;base64,AAAA'}]}};
+    if(change==='caption-edit') c.STATE.flow_bots[0].welcome.medias[0].caption='typed caption';
+    d.resolve(); await pending;
+    const live = c.STATE.flow_bots[0].welcome.medias[0];
+    if(change==='removed') assert.equal(live,undefined);
+    else if(change.startsWith('replaced')) assert.equal(live.telegram_file_id,undefined);
+    else { assert.equal(live.telegram_file_id,'cached-A',change); assert.ok(!live._caching,change); if(change==='caption-edit') assert.equal(live.caption,'typed caption'); }
+  }
+  // Older save response must not erase completed cache or hide its failed save.
+  const {c,el} = setup(), cacheGate=deferred(), saveGate=deferred(); let saves=0;
+  const b={id:'a',bot_id:'111',token:'***configured***',welcome:{medias:[{id:'m',url:'data:image/png;base64,AAAA'}]}};
+  c.STATE.flow_bots=[b]; c.nbGetCurrentBot=()=>null;
+  c.adminFetch=async(url,opt)=>{if(url.includes('cache-media')){await cacheGate.promise;return{json:async()=>({status:'ok',telegram_file_id:'completed'})}}; const posted=JSON.parse(opt.body); if(++saves===1){await saveGate.promise;return{ok:true,json:async()=>({state:posted})}} return{ok:false,status:500};};
+  vm.runInContext(block('async function nbAutoWarmMediaItem(', 'function nbHandleMediaUpload('),c);
+  const warm=c.nbAutoWarmMediaItem(b,b.welcome.medias[0],'welcome'), save=c.saveFullState();
+  cacheGate.resolve();await warm;saveGate.resolve();await save;
+  const media=c.STATE.flow_bots[0].welcome.medias[0];assert.equal(media.telegram_file_id,'completed');assert.ok(!media._caching);
+  assert.match(el('nb-save-status').textContent,/não salvas|Não foi possível/);
+  for (const replacement of ['media','bot']) {
+    const {c} = setup(), hold = deferred();
+    c.STATE.flow_bots=[{id:'a',bot_id:'111',token:'***configured***',welcome:{medias:[{id:'m',type:'Fotos',url:'old-source'}]}}];
+    c.adminFetch=async(url,opt)=>{const state=JSON.parse(opt.body);state.flow_bots[0].welcome.medias[0].telegram_file_id='old-origin-file';await hold.promise;return{ok:true,json:async()=>({state})};};
+    const save=c.saveFullState();
+    if(replacement==='media') c.STATE.flow_bots[0].welcome.medias[0].url='new-source';
+    else {c.STATE.flow_bots[0].bot_id='222';c.STATE.flow_bots[0].token='222:fake-replacement';}
+    hold.resolve();await save;
+    assert.equal(c.STATE.flow_bots[0].welcome.medias[0].telegram_file_id,undefined,`stale runtime for replaced ${replacement}`);
+  }
+  // A second upload for the same item wins, independent of response order.
+  const sup=setup(), first=deferred(), second=deferred();
+  sup.c.STATE.flow_bots=[{id:'a',bot_id:'111',token:'***configured***',welcome:{medias:[{id:'m',url:'src'}]}}];sup.c.nbGetCurrentBot=()=>null;
+  let calls=0;sup.c.saveFullState=async()=>true;
+  sup.c.adminFetch=async()=>{const n=++calls;await (n===1?first:second).promise;return{json:async()=>({status:'ok',telegram_file_id:n===1?'old-upload':'new-upload'})};};
+  vm.runInContext(block('async function nbAutoWarmMediaItem(', 'function nbHandleMediaUpload('),sup.c);
+  const sb=sup.c.STATE.flow_bots[0], sm=sb.welcome.medias[0];const old=sup.c.nbAutoWarmMediaItem(sb,sm,'welcome'), fresh=sup.c.nbAutoWarmMediaItem(sb,sm,'welcome');
+  second.resolve();await fresh;first.resolve();await old;assert.equal(sm.telegram_file_id,'new-upload');assert.ok(!sm._caching);
+  console.log('PASS cache/save: live IDs, removed/replaced context, captions, superseding, redaction + failed persistence');
+}
+(async () => { await modalContexts(); await campaignEdits(); await cacheSaveRaces(); })().catch(e => { console.error(e); process.exitCode = 1; });

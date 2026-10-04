@@ -7024,6 +7024,12 @@ quer que eu te mostre as opções de acesso?</textarea>
         server = projected;
       }
       const merge = (fresh, old, live) => {
+        if (old && live && old.id && live.id === old.id) {
+          // Runtime file IDs belong to the media source and Telegram origin,
+          // not merely to a reusable configuration/item ID.
+          if (old.url !== undefined && (live.url !== old.url || live.type !== old.type)) return live;
+          if (old.bot_id && live.bot_id && old.bot_id !== live.bot_id) return live;
+        }
         if (same(old, live)) return fresh;
         if (Array.isArray(live) && Array.isArray(old) && Array.isArray(fresh)) {
           if ([...live, ...old, ...fresh].every(x => x && typeof x === 'object' && x.id)) {
@@ -9193,51 +9199,79 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbAutoWarmMediaItem(b, item, section) {
-      if (!b || !item || item.telegram_file_id) return;
+      if (!b || !item || !item.id || item.telegram_file_id) return;
       const botId = b.id, botOrigin = b.bot_id, botToken = b.token;
-      const originExists = () => (STATE.flow_bots || []).some(bot => bot.id === botId && bot.bot_id === botOrigin && bot.token === botToken);
-      if (!originExists()) return;
-      item._caching = true;
+      const sourceUrl = item.url, sourceType = item.type;
+      const bumpMedias = section === 'orderbump' ? NB_OB_TEMP_MEDIAS : null;
+      let track, sequenceId;
+      if (section === 'downsell') {
+        for (const key of ['downsell_general', 'downsell_pix']) {
+          const sequence = (b[key]?.sequences || []).find(s => (s.medias || []).some(m => m.id === item.id));
+          if (sequence) { track = key; sequenceId = sequence.id; break; }
+        }
+        if (!sequenceId) return;
+      }
+      const requests = nbAutoWarmMediaItem.requests || (nbAutoWarmMediaItem.requests = new Map());
+      const key = JSON.stringify([botId, botOrigin, section, track, sequenceId, item.id]);
+      const requestId = (nbAutoWarmMediaItem.sequence || 0) + 1;
+      nbAutoWarmMediaItem.sequence = requestId;
+      requests.set(key, requestId);
+      const liveItem = () => {
+        if (requests.get(key) !== requestId) return null;
+        const bot = (STATE.flow_bots || []).find(bot => bot.id === botId && bot.bot_id === botOrigin
+          && (bot.token === botToken || (bot.token === '***configured***' && botOrigin)));
+        if (!bot) return null;
+        let medias;
+        if (section === 'welcome') medias = bot.welcome?.medias;
+        else if (section === 'pay_gen') medias = bot.payments?.generated_medias;
+        else if (section === 'pay_app') medias = bot.payments?.approved_medias;
+        else if (section === 'downsell') medias = bot[track]?.sequences?.find(s => s.id === sequenceId)?.medias;
+        else if (section === 'orderbump' && NB_OB_TEMP_MEDIAS === bumpMedias) medias = bumpMedias;
+        const live = (medias || []).find(m => m.id === item.id);
+        return live && live.url === sourceUrl && live.type === sourceType ? live : null;
+      };
+      if (!liveItem()) { requests.delete(key); return; }
+      liveItem()._caching = true;
       if (section === 'orderbump' && nbGetCurrentBot()?.id === botId) {
-        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', bumpMedias, 'orderbump');
       } else if (nbGetCurrentBot()?.id === botId) {
         nbLoadBotIntoTabs(b);
       }
-      const effCh = (
-        b.cache_channel_id ||
-        STATE.publish?.cache_channel_id ||
+      const effCh = (b.cache_channel_id || STATE.publish?.cache_channel_id ||
         b.plans?.find(p => p.delivery_channel_id && p.delivery_channel_id !== '-1003939135982')?.delivery_channel_id ||
-        b.fallback_delivery?.channel_id ||
-        ""
-      ).trim();
+        b.fallback_delivery?.channel_id || '').trim();
       try {
-        const res = await adminFetch("/api/flow-bots/cache-media", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            bot_id: b.id,
-            channel_id: effCh,
-            media: item
-          })
+        const res = await adminFetch('/api/flow-bots/cache-media', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({bot_id:botId, origin_bot_numeric_id:botOrigin, channel_id:effCh, media:item})
         });
         const data = await res.json();
-        delete item._caching;
-        if (!originExists()) return;
-        if (data && data.status === "ok" && data.telegram_file_id) {
-          item.telegram_file_id = data.telegram_file_id;
-          if (data.cached_channel_id) item.cached_channel_id = data.cached_channel_id;
-          if (data.media?.url) item.url = data.media.url;
-          if (section !== 'orderbump') {
-            await saveFullState();
+        const live = liveItem();
+        if (!live) return;
+        delete live._caching;
+        if (data?.status === 'ok' && data.telegram_file_id) {
+          // A save/response may already have installed a newer completed cache.
+          if (!live.telegram_file_id) {
+            live.telegram_file_id = data.telegram_file_id;
+            for (const field of ['cached_channel_id', 'telegram_send_as']) {
+              if (data[field]) live[field] = data[field];
+            }
+            if (data.media?.url) live.url = data.media.url;
           }
+          delete live._cacheError;
+          markUnsaved();
+          if (section !== 'orderbump') await saveFullState();
         } else {
-          item._cacheError = data?.message || "Salve ou verifique o canal";
+          live._cacheError = data?.message || 'Salve ou verifique o canal';
         }
       } catch (e) {
-        delete item._caching;
+        const live = liveItem();
+        if (live) { delete live._caching; live._cacheError = 'Falha ao enviar ao canal'; }
+      } finally {
+        if (requests.get(key) === requestId) requests.delete(key);
       }
-      if (section === 'orderbump' && nbGetCurrentBot()?.id === botId) {
-        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', NB_OB_TEMP_MEDIAS, 'orderbump');
+      if (section === 'orderbump' && nbGetCurrentBot()?.id === botId && NB_OB_TEMP_MEDIAS === bumpMedias) {
+        nbRenderMediaChips('nb-ob-medias-list', 'nb-ob-media-count', bumpMedias, 'orderbump');
       } else if (nbGetCurrentBot()?.id === botId) {
         nbLoadBotIntoTabs((STATE.flow_bots || []).find(bot => bot.id === botId));
       }
