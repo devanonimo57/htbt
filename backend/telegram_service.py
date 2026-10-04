@@ -3120,6 +3120,29 @@ class ActiveBotManager:
 
             # Lead retrieval sob lock do par (bot_id, user_id)
             async with self._get_lead_lock(str(user_id), bot_id=effective_bot_id):
+                # A different Pix can finish while this task waits for the same
+                # customer's lock. Refresh history, counters and delivery flags
+                # only after acquisition, never commit the pre-lock snapshot.
+                state = await self.state_getter() if self.state_getter else state
+                tx_record = state.setdefault("tx_records", {}).get(tx_id)
+                if not tx_record or int(tx_record.get("user_id", 0)) != int(user_id):
+                    return False
+                if tx_record.get("status") in ("cancelled", "canceled"):
+                    return False
+                if tx_record.get("delivered"):
+                    return True
+                if str(tx_record.get("bot_token") or "").strip() != tx_bot_token:
+                    return False
+                if is_flow_tx:
+                    flow_bot = self._get_active_flow_bot(state, bot_token=tx_bot_token, bot_id=tx_bot_id)
+                    if not flow_bot:
+                        tx_record["status"] = "paid"
+                        tx_record.setdefault("paid_at", datetime.utcnow().isoformat())
+                        tx_record.setdefault("sales_counted", False)
+                        tx_record["attribution_uncertain"] = True
+                        tx_record["access_status"] = "Pendente (Bot de origem não confere)"
+                        await self.state_saver(state, runtime_only=True)
+                        return False
                 memory = state.setdefault("memory", {})
                 tx_origin_numeric_id = tx_bot_token.split(":", 1)[0] if ":" in tx_bot_token else ""
 
@@ -3138,6 +3161,15 @@ class ActiveBotManager:
                 lead = active_lead or archived_lead
                 if lead is None:
                     lead = await self._get_or_create_lead(state, types.User(id=user_id, is_bot=False, first_name="Assinante"), bot_token=tx_bot_token)
+
+                def current_purchase_lead():
+                    # A runtime save may replace untouched lead objects while
+                    # merging fresh rows; append to the candidate's current row.
+                    current_memory = state.get("memory", {})
+                    return next((item for key in ("leads", "deleted_leads")
+                                 for item in current_memory.get(key, [])
+                                 if matches_purchase_lead(item)), lead)
+
                 self._cancel_downsell(str(user_id), bot_id=effective_bot_id)
 
                 is_upsell_payment = bool(tx_record.get("is_upsell"))
@@ -3240,6 +3272,7 @@ class ActiveBotManager:
                         )
                         tx_record["delivered"] = True
                         tx_record["access_status"] = "Entregue"
+                        lead = current_purchase_lead()
                         lead.setdefault("history", []).append({
                             "role": "assistant",
                             "content": "[Upsell pago e entregue com sucesso]"
@@ -3412,6 +3445,7 @@ class ActiveBotManager:
                     self.tx_records[tx_id] = tx_record
                     state["tx_records"][tx_id] = tx_record
 
+                    lead = current_purchase_lead()
                     self._advance_stage(lead, "Entrega concluída")
                     lead.setdefault("history", []).append({
                         "role": "assistant",
@@ -3476,6 +3510,7 @@ class ActiveBotManager:
                 self.tx_records[tx_id] = tx_record
                 state["tx_records"][tx_id] = tx_record
 
+                lead = current_purchase_lead()
                 self._advance_stage(lead, "Entrega concluída")
                 lead.setdefault("history", []).append({
                     "role": "assistant",

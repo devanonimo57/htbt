@@ -109,6 +109,65 @@ class EightFollowup(fixture.CheckoutWebhookIntegration):
         main._STATE_CACHE = None
         self.assertEqual((await main._read_state_from_db())['memory'], expected)
 
+    async def concurrent_settlements(self, reverse=False):
+        for _ in range(2):
+            state = await main._read_state_from_db()
+            await self.manager._generate_flow_checkout(self.callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+        tx_ids = [x[0] for x in self.created]
+        if reverse:
+            tx_ids.reverse()
+        started, finish, queued = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        calls = 0
+        async def send(**kw):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                started.set()
+                await finish.wait()
+            return SimpleNamespace(message_id=calls)
+        self.bot.send_message.side_effect = send
+        original_lock = self.manager._get_lead_lock
+        requests = 0
+        class ObservedLock:
+            def __init__(self, lock, notify):
+                self.lock, self.notify = lock, notify
+            async def __aenter__(self):
+                if self.notify:
+                    queued.set()
+                return await self.lock.__aenter__()
+            async def __aexit__(self, *args):
+                return await self.lock.__aexit__(*args)
+        def observe(*args, **kw):
+            nonlocal requests
+            requests += 1
+            return ObservedLock(original_lock(*args, **kw), requests == 2)
+        self.manager._get_lead_lock = observe
+        for tx in tx_ids:
+            self.gateway_status[tx] = 'paid'
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='http://test') as client:
+            first = asyncio.create_task(client.post('/api/webhook/syncpay', json={'id': tx_ids[0], 'status': 'paid'}))
+            await asyncio.wait_for(started.wait(), 5)
+            second = asyncio.create_task(client.post('/api/webhook/syncpay', json={'id': tx_ids[1], 'status': 'paid'}))
+            await asyncio.wait_for(queued.wait(), 5)
+            finish.set()
+            for response in await asyncio.gather(first, second):
+                self.assertEqual(response.json()['action'], 'approved')
+            for tx in tx_ids:
+                await client.post('/api/webhook/syncpay', json={'id': tx, 'status': 'paid'})
+        self.assertEqual(calls, 2)
+        main._STATE_CACHE = None
+        saved = await main._read_state_from_db()
+        self.assertTrue(all(saved['tx_records'][tx]['delivered'] for tx in tx_ids))
+        self.assertEqual(saved['flow_bots'][0]['sales_today'], 2)
+        self.assertEqual(saved['flow_bots'][0]['revenue_today'], 20)
+        self.assertEqual(sum('Entrega concluída' in h['content'] for h in saved['memory']['leads'][0]['history']), 2)
+
+    async def test_distinct_paid_pix_keep_both_histories(self):
+        await self.concurrent_settlements()
+
+    async def test_reverse_distinct_paid_pix_keep_both_histories(self):
+        await self.concurrent_settlements(reverse=True)
+
     async def held_checkout(self):
         state = await main._read_state_from_db()
         state['flow_bots'][0]['payments'].update(secondary_enabled=True, secondary_message='SECONDARY')
