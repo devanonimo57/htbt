@@ -261,4 +261,3 @@ class FiveStartContracts(unittest.IsolatedAsyncioTestCase):
         downsell_b.cancel(); upsell_b.cancel()
         await asyncio.gather(old_a, upsell_a, return_exceptions=True)
         await asyncio.gather(downsell_b, upsell_b, return_exceptions=True)
-

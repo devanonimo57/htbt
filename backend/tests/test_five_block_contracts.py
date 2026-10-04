@@ -126,4 +126,3 @@ class FiveBlockContracts(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(sql['blocked'])
         self.bot.send_message.assert_awaited_once()
         self.assertFalse((await self.cold())['memory']['leads'][0]['blocked'])
-
