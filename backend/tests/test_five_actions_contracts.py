@@ -37,6 +37,100 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(rec['delivery_channel_id'],'-100800')
             self.assertEqual(rec['bot_token'],'111:test-only')
         return tx
+    async def test_removal_success_held_transport_preserves_fresh_state_and_other_purchase(self):
+        tx = await self.checkout(channel=True)
+        other = await self.checkout(channel=True)
+        before = copy.deepcopy((await self.cold())['tx_records'][other])
+        initial = (await self.client.get('/api/state')).json()
+        self.evidence('success-removal-contract',{'initial':initial,'tx_id':tx})
+        request = json.loads(self.node('request','remove','success-removal-contract'))
+        reached,finish = asyncio.Event(),asyncio.Event()
+        async def ban(**kwargs):
+            self.assertFalse(main._DB_LOCK.locked())
+            reached.set(); await finish.wait(); return True
+        self.bot.ban_chat_member = AsyncMock(side_effect=ban)
+        task = asyncio.create_task(self.client.post(request['url'],json=request['body']))
+        try:
+            await asyncio.wait_for(reached.wait(),5)
+            live = await main._read_state_from_db()
+            self.assertEqual(live['tx_records'][tx]['access_status'],'Ativo')
+            detached = copy.deepcopy(live)
+            detached['flow_bots'][0]['welcome']['message'] = 'FRESH DURING BAN'
+            detached['memory']['leads'][0]['history'].append({'role':'user','content':'DURING BAN'})
+            await asyncio.wait_for(main._write_state_to_db(detached),5)
+            finish.set(); response = await asyncio.wait_for(task,5)
+        finally:
+            finish.set(); await asyncio.gather(task,return_exceptions=True)
+        self.assertEqual(response.status_code,200,response.text)
+        self.factory_mock.assert_called_with('111:test-only')
+        cold = await self.cold()
+        self.assertEqual(cold['tx_records'][tx]['access_status'],'Removido')
+        self.assertEqual(cold['tx_records'][other],before)
+        self.assertEqual(cold['flow_bots'][0]['welcome']['message'],'FRESH DURING BAN')
+        self.assertIn('DURING BAN',[h['content'] for h in cold['memory']['leads'][0]['history']])
+        self.assertEqual(cold['flow_bots'][0]['sales_today'],2)
+        for rec in cold['tx_records'].values():
+            self.assertEqual(rec['status'],'paid');self.assertTrue(rec['sales_counted']);self.assertTrue(rec['delivered'])
+        self.evidence('success-removal-contract',{'initial':initial,'tx_id':tx,'action':response.json(),'http_status':200})
+        self.node('removal-response','remove','success-removal-contract')
+
+    async def test_removal_missing_identity_and_unconfirmed_ban_fail_closed(self):
+        tx = await self.checkout(channel=True)
+        original_state = copy.deepcopy(await self.cold())
+        for case in ('bot','token','channel','wrong-origin','wrong-transport','false-ban'):
+            with self.subTest(case=case):
+                state = await main._read_state_from_db()
+                state['flow_bots'] = copy.deepcopy(original_state['flow_bots'])
+                state['tx_records'][tx] = copy.deepcopy(original_state['tx_records'][tx])
+                if case=='bot': state['flow_bots'] = []
+                if case=='token': state['tx_records'][tx].pop('bot_token')
+                if case=='channel': state['tx_records'][tx].pop('delivery_channel_id')
+                if case=='wrong-origin': state['flow_bots'][0]['token']='333:test-only'
+                self.bot.id = 222 if case=='wrong-transport' else 111
+                await main._write_state_to_db(state)
+                self.bot.ban_chat_member = AsyncMock(return_value=False)
+                response = await self.client.post('/api/flow-bots/access/update-status',json={'tx_id':tx,'status':'Removido'})
+                self.assertIn(response.status_code,(409,502),response.text)
+                self.assertEqual((await main._read_state_from_db())['tx_records'][tx]['access_status'],'Ativo')
+                rec = (await self.cold())['tx_records'][tx]
+                self.assertEqual(rec['access_status'],'Ativo');self.assertTrue(rec['sales_counted']);self.assertTrue(rec['delivered'])
+                if case!='false-ban': self.bot.ban_chat_member.assert_not_awaited()
+        self.bot.id=111
+
+    async def test_successful_ban_failed_sql_commit_does_not_publish_removed(self):
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from unittest.mock import patch
+        import httpx
+        tx = await self.checkout(channel=True)
+        before = copy.deepcopy(await main._read_state_from_db())
+        self.bot.ban_chat_member = AsyncMock(return_value=True)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app,raise_app_exceptions=False),base_url='http://test') as client:
+            with patch.object(AsyncSession,'commit',side_effect=RuntimeError('offline removal commit failure')):
+                response = await client.post('/api/flow-bots/access/update-status',json={'tx_id':tx,'status':'Removido'})
+        self.assertEqual(response.status_code,500,response.text)
+        self.assertEqual((await main._read_state_from_db())['tx_records'],before['tx_records'])
+        self.assertEqual((await self.cold())['tx_records'],before['tx_records'])
+        self.assertIn('application/json',response.headers.get('content-type',''))
+        self.assertIn('salvar',response.json()['detail'])
+
+    async def test_failed_ban_preserves_active_access_and_reports_ui_error(self):
+        tx=await self.checkout(channel=True)
+        initial=(await self.client.get('/api/state')).json()
+        self.evidence('removal-contract',{'initial':initial,'tx_id':tx})
+        request=json.loads(self.node('request','remove','removal-contract'))
+        self.bot.ban_chat_member=AsyncMock(side_effect=RuntimeError('fixture: Telegram rejected ban (no rights)'))
+        response=await self.client.post(request['url'],json=request['body'])
+        self.assertEqual(response.status_code,502,response.text)
+        self.bot.ban_chat_member.assert_awaited_once_with(chat_id=-100800,user_id=7)
+        cold=await self.cold()
+        self.assertEqual(cold['tx_records'][tx]['access_status'],'Ativo')
+        self.assertTrue(cold['tx_records'][tx]['delivered'])
+        self.assertTrue(cold['tx_records'][tx]['sales_counted'])
+        self.assertEqual(cold['tx_records'][tx]['status'],'paid')
+        self.evidence('removal-contract',{'initial':initial,'tx_id':tx,'action':response.json(),'http_status':response.status_code})
+        self.node('removal-response','remove','removal-contract')
+        self.assertEqual((await main._read_state_from_db())['tx_records'][tx]['access_status'],'Ativo')
+
     async def test_actions_preserve_new_panel_edits_real_response_and_cold_save(self):
         for kind in ('block','access','delete'):
             with self.subTest(kind=kind):

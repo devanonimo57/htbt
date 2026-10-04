@@ -1074,7 +1074,7 @@ def _merge_late_cache_delta(committed, before, live, path=()):
     return copy.deepcopy(live)
 
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None, lead_block_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None, lead_block_event: Optional[Dict[str, Any]] = None, access_status_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -1100,11 +1100,17 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             delete_tx_ids = sorted(set(str(t) for t in (delete_tx_ids or [])) | (pending_pix - set(existing_state.get('tx_records', {}))))
             publication_live = existing_state
             publication_before = None
-            if checkout_start or checkout_event or flow_cache_event or lead_block_event or (runtime_only and state is not existing_state):
+            if checkout_start or checkout_event or flow_cache_event or lead_block_event or access_status_event or (runtime_only and state is not existing_state):
                 # Freeze event/queued-runtime reconciliation before row/config
                 # awaits; the still-published live reference remains the delta source.
                 publication_before = copy.deepcopy(existing_state)
                 existing_state = publication_before
+            if access_status_event:
+                state = copy.deepcopy(existing_state)
+                rec = state.get('tx_records', {}).get(access_status_event['tx_id'])
+                if not isinstance(rec, dict) or any(rec.get(k) != v for k, v in access_status_event['identity'].items()):
+                    raise HTTPException(status_code=409, detail='Compra alterada durante a atualização do acesso.')
+                rec['access_status'] = access_status_event['status']
             if lead_block_event:
                 state = copy.deepcopy(existing_state)
                 identity = (lead_block_event['origin'], lead_block_event['uid'], False)
@@ -3313,49 +3319,57 @@ class AccessStatusUpdateRequest(BaseModel):
 @app.post("/api/flow-bots/access/update-status", dependencies=[Depends(verify_admin_auth)])
 async def update_vip_access_status(req: AccessStatusUpdateRequest):
     from telegram_service import _create_bot_instance
-    state = await _read_state_from_db()
-    tx_map = state.get("tx_records") or {}
-    rec = tx_map.get(req.tx_id)
-    if not isinstance(rec, dict):
-        raise HTTPException(status_code=404, detail="Registro de acesso não encontrado.")
-
     resolved_status = (req.access_status or req.status or "").strip()
     if not resolved_status:
         raise HTTPException(status_code=400, detail="Informe o novo status de acesso.")
-
-    rec["access_status"] = resolved_status
-    if resolved_status == "Removido":
-        fb_match = next(
-            (b for b in (state.get("flow_bots") or []) if isinstance(b, dict) and str(b.get("id")) == str(rec.get("bot_id") or "")),
-            None
-        )
-        ch_target = (
-            str(rec.get("delivery_channel_id") or "").strip()
-            or (str((fb_match.get("fallback_delivery") or {}).get("channel_id") or "").strip() if isinstance(fb_match, dict) else "")
-        )
-        uid = int(rec.get("user_id") or 0)
-        tok = (
-            str(rec.get("bot_token") or "").strip()
-            or (str(fb_match.get("token") or "").strip() if isinstance(fb_match, dict) else "")
-            or str(state.get("publish", {}).get("bot_token") or "").strip()
-        )
-        if ch_target and uid and tok and tok != REDACTED_SECRET_MASK:
+    # A per-Pix lock is allowed across transport; the global writer is not.
+    async with bot_manager._get_tx_lock(req.tx_id):
+        state = await _read_state_from_db()
+        rec = (state.get('tx_records') or {}).get(req.tx_id)
+        if not isinstance(rec, dict):
+            raise HTTPException(status_code=404, detail="Registro de acesso não encontrado.")
+        identity = {k: copy.deepcopy(rec.get(k)) for k in
+                    ('bot_id', 'bot_token', 'origin_bot_numeric_id', 'user_id', 'delivery_channel_id', 'created_at')}
+        if resolved_status == "Removido":
+            tok = str(rec.get('bot_token') or '').strip()
+            origin = tok.split(':', 1)[0] if ':' in tok else ''
+            configs = [b for b in state.get('flow_bots', []) if isinstance(b, dict)
+                       and str(b.get('id') or '') == str(rec.get('bot_id') or '')]
+            if (not origin.isdecimal() or tok == REDACTED_SECRET_MASK or len(configs) != 1
+                    or str(configs[0].get('token') or '').split(':', 1)[0] != origin
+                    or str(rec.get('origin_bot_numeric_id') or origin) != origin):
+                raise HTTPException(status_code=409, detail='Bot de origem da compra não comprovado; acesso não removido.')
+            ch_target = str(rec.get('delivery_channel_id') or '').strip()
+            uid = str(rec.get('user_id') or '')
+            if not ch_target or not uid.isdecimal() or int(uid) <= 0:
+                raise HTTPException(status_code=409, detail='Canal ou cliente da compra não comprovado; acesso não removido.')
             temp_bot = None
             try:
+                # Use only the token captured by the purchase, never a mutable
+                # bot configuration's fallback credential or delivery channel.
                 temp_bot = _create_bot_instance(tok)
-                parsed_ch = int(ch_target) if ch_target.lstrip("-").isdigit() else ch_target
-                await temp_bot.ban_chat_member(chat_id=parsed_ch, user_id=uid)
-            except Exception:
-                pass
+                if str(getattr(temp_bot, 'id', origin)) != origin:
+                    raise RuntimeError('Identidade Telegram divergente')
+                parsed_ch = int(ch_target) if ch_target.lstrip('-').isdigit() else ch_target
+                confirmed = await temp_bot.ban_chat_member(chat_id=parsed_ch, user_id=int(uid))
+                if confirmed is not True:
+                    raise RuntimeError('Telegram não confirmou a remoção')
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail='Telegram não confirmou a remoção; acesso não foi marcado como Removido.') from exc
             finally:
                 if temp_bot:
                     try:
                         await temp_bot.session.close()
                     except Exception:
                         pass
-
-    state = await _write_state_to_db(state, preserve_runtime=False)
-    return {"status": "ok", "access_status": resolved_status, "state": _panel_state(state)}
+        event = {'tx_id': req.tx_id, 'identity': identity, 'status': resolved_status}
+        try:
+            state = await _write_state_to_db(copy.deepcopy(state), runtime_only=True, access_status_event=event)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail='Não foi possível salvar o status de acesso; atualização não confirmada.') from exc
+        return {"status": "ok", "access_status": resolved_status, "state": _panel_state(state)}
 
 
 def _crm_verified_bot_origin(lead: Dict[str, Any]) -> str:

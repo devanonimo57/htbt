@@ -52,7 +52,10 @@ async function run(){
  if(mode==='removal-response'){
   gate.resolve();await pending;
   const output={request,banner:el('nb-acc-feedback-banner').textContent};
-  assert.match(output.banner,/Status do acesso atualizado.*Removido/);
+  if(contract.http_status>=400){
+   assert.doesNotMatch(output.banner,/✓|Status do acesso atualizado/);
+   assert.match(output.banner,/remover|remoção|Telegram|falha/i);
+  }else assert.match(output.banner,/Status do acesso atualizado.*Removido/);
   fs.writeFileSync(path.join(REPORT,'removal-ui-observed.json'),JSON.stringify(output,null,2));console.log(JSON.stringify(output));return;
  }
  throw Error('Unknown mode');
