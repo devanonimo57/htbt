@@ -1074,7 +1074,7 @@ def _merge_late_cache_delta(committed, before, live, path=()):
     return copy.deepcopy(live)
 
 
-async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None, lead_block_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
         async with async_session() as session:
@@ -1100,11 +1100,20 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             delete_tx_ids = sorted(set(str(t) for t in (delete_tx_ids or [])) | (pending_pix - set(existing_state.get('tx_records', {}))))
             publication_live = existing_state
             publication_before = None
-            if checkout_start or checkout_event or flow_cache_event or (runtime_only and state is not existing_state):
+            if checkout_start or checkout_event or flow_cache_event or lead_block_event or (runtime_only and state is not existing_state):
                 # Freeze event/queued-runtime reconciliation before row/config
                 # awaits; the still-published live reference remains the delta source.
                 publication_before = copy.deepcopy(existing_state)
                 existing_state = publication_before
+            if lead_block_event:
+                state = copy.deepcopy(existing_state)
+                identity = (lead_block_event['origin'], lead_block_event['uid'], False)
+                target = _client_map(state).get(identity)
+                if (not target or not lead_block_event['created_at']
+                        or target.get('created_at') != lead_block_event['created_at']
+                        or str(target.get('bot_id') or '') != lead_block_event['bot_id']):
+                    raise HTTPException(status_code=409, detail='Lead alterado durante a ação.')
+                target['blocked'] = not bool(target.get('blocked', False))
             if flow_cache_event:
                 state = _apply_flow_cache_event(existing_state, flow_cache_event)
             if checkout_start:
@@ -3410,9 +3419,14 @@ async def handle_lead_action(req: LeadActionRequest):
     target_lead = matches[0]
 
     if req.action == "toggle_block":
-        target_lead["blocked"] = not bool(target_lead.get("blocked", False))
-        state = await _write_state_to_db(state, preserve_runtime=False)
-        return {"status": "ok", "blocked": target_lead["blocked"], "state": _panel_state(state)}
+        origin = _crm_verified_bot_origin(target_lead)
+        if not origin:
+            raise HTTPException(status_code=409, detail='Origem do lead não comprovada.')
+        event = {'origin': origin, 'uid': tid, 'bot_id': str(target_lead.get('bot_id') or ''),
+                 'created_at': target_lead.get('created_at')}
+        state = await _write_state_to_db(copy.deepcopy(state), runtime_only=True, lead_block_event=event)
+        blocked = _client_map(state)[(origin, tid, False)]['blocked']
+        return {"status": "ok", "blocked": blocked, "state": _panel_state(state)}
 
     if req.action == "send_message":
         txt = (req.message or "").strip()
