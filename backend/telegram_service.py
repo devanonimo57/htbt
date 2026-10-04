@@ -1703,8 +1703,12 @@ class ActiveBotManager:
                 elapsed_mins += wait_mins
 
                 state = await self.state_getter()
-                lead = await self._get_or_create_lead(state, user, bot_token=bot_token)
-                if lead.get("stage") in paid_stages or lead.get("blocked"):
+                origin = str(bot_token).split(":", 1)[0] if ":" in str(bot_token) else ""
+                lead = next((l for l in state.get("memory", {}).get("leads", [])
+                             if str(l.get("telegram_id")) == str(user.id)
+                             and str(l.get("origin_bot_numeric_id")) == origin
+                             and str(l.get("bot_id")) == bot_id), None)
+                if lead is None or lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
                 if track == "general" and lead.get("stage") == "Gerou checkout":
                     return
@@ -2701,7 +2705,21 @@ class ActiveBotManager:
         checkout_bot = getattr(callback, "bot", None) or _CURRENT_BOT_CTX.get() or self.bot
         checkout_token = str(getattr(checkout_bot, "token", "") or "").strip()
         checkout_origin = checkout_token.split(":", 1)[0] if ":" in checkout_token else ""
+        if not checkout_origin.isdecimal() or checkout_token != str(fb.get("token") or "").strip():
+            return
+        had_lead = any(str(l.get("telegram_id")) == str(callback.from_user.id)
+                       and str(l.get("origin_bot_numeric_id")) == checkout_origin
+                       for l in state.get("memory", {}).get("leads", []))
         lead = await self._get_or_create_lead(state, callback.from_user, bot_token=checkout_token)
+        # Admit a new lead before network I/O; completion never recreates a deleted one.
+        state = copy.deepcopy(await self.state_saver(state, runtime_only=True, checkout_start={
+            "lead": lead, "allow_create": not had_lead,
+        }))
+        lead = next((l for l in state.get("memory", {}).get("leads", [])
+                     if str(l.get("telegram_id")) == str(callback.from_user.id)
+                     and str(l.get("origin_bot_numeric_id")) == checkout_origin), None)
+        if lead is None:
+            return
         if checkout_origin.isdecimal():
             self._cancel_downsell(str(callback.from_user.id), bot_id=checkout_origin)
 
@@ -2758,7 +2776,6 @@ class ActiveBotManager:
 
         # Fail-closed: nunca cria PIX sim_ caso o gateway falhe ou não esteja configurado
         if not pushin_token:
-            await self.state_saver(state, runtime_only=True)
             await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ O pagamento via PIX está temporariamente indisponível. Tente novamente em instantes."
@@ -2777,7 +2794,6 @@ class ActiveBotManager:
                 raise ValueError("Gateway não retornou id ou qr_code válidos")
         except Exception as e:
             logger.error(f"Erro Gateway PIX Flow ({gw_provider}): {e}")
-            await self.state_saver(state, runtime_only=True)
             await (target_bot or self.bot).send_message(
                 chat_id=chat_id,
                 text="⚠️ Não foi possível gerar a cobrança PIX no momento. Por favor, tente novamente em instantes."
@@ -2811,7 +2827,7 @@ class ActiveBotManager:
             "user_id": int(callback.from_user.id),
             "mode": "flow",
             "bot_id": str(fb.get("id") or ""),
-            "bot_token": str(_CURRENT_BOT_TOKEN_CTX.get() or fb.get("token") or self.current_token or ""),
+            "bot_token": checkout_token, "origin_bot_numeric_id": checkout_origin,
             "plan_id": str(plan.get("id") if plan else plan_id),
             "offer_name": full_plan_label,
             "plan_duration": dur_val,
