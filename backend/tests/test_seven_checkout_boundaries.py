@@ -329,4 +329,3 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
                 if not task.done():
                     task.cancel()
             await asyncio.gather(*set(tasks), return_exceptions=True)
-
