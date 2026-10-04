@@ -13,6 +13,18 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
         await super().asyncSetUp()
         self.manager._schedule_flow_downsell = lambda *a, **kw: None
 
+    async def test_checkout_unverified_or_mismatched_origin_cannot_cancel_peer_tasks(self):
+        state = copy.deepcopy(await main._read_state_from_db())
+        with patch.object(self.manager, '_cancel_downsell') as cancel:
+            for token in ('***configured***', '222:fake-secondary'):
+                callback = SimpleNamespace(from_user=self.user, bot=SimpleNamespace(token=token))
+                await self.manager._generate_flow_checkout(callback, state['flow_bots'][0], state, 'plan-a', 0, [])
+            cancel.assert_not_called()
+        self.assertFalse(self.created)
+        self.bot.send_message.assert_not_awaited()
+        main._STATE_CACHE = None
+        self.assertFalse((await main._read_state_from_db())['tx_records'])
+
     def gate_gateway(self, total):
         original = telegram_service.PushinPayClient
         reached, finish = asyncio.Event(), asyncio.Event()
@@ -30,7 +42,7 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
             return SimpleNamespace(create_pix_charge=create)
         return patch.object(telegram_service, 'PushinPayClient', new=client), reached, finish
 
-    async def test_simultaneous_checkout_loses_one_pending_history(self):
+    async def test_simultaneous_checkout_retains_two_distinct_pending_histories(self):
         state = copy.deepcopy(await main._read_state_from_db())
         await self.manager._get_or_create_lead(state, self.user, bot_token=self.bot.token)
         await main._write_state_to_db(state, runtime_only=True)
@@ -61,7 +73,7 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
             self.assertTrue(any('PIX-' + tx_id in c.kwargs['text'] for c in self.bot.send_message.call_args_list))
         self.assertEqual(len({h['tx_id'] for h in checkout_history}), 2)
 
-    async def test_checkout_finishing_after_archive_recreates_active_lead(self):
+    async def test_checkout_finishing_after_archive_keeps_pix_without_active_lead(self):
         state = copy.deepcopy(await main._read_state_from_db())
         await self.manager._get_or_create_lead(state, self.user, bot_token=self.bot.token)
         await main._write_state_to_db(state, runtime_only=True)
@@ -281,7 +293,7 @@ class SevenCheckoutBoundaries(fixture.CheckoutWebhookIntegration):
     async def test_simultaneous_checkout_reverse_order_preserves_newer_runtime(self):
         await self.ordered_checkouts(True)
 
-    async def test_checkout_on_a_cancels_b_downsell_for_same_user(self):
+    async def test_checkout_on_a_preserves_b_downsell_and_reschedules_a(self):
         state = copy.deepcopy(await main._read_state_from_db())
         other = copy.deepcopy(state['flow_bots'][0])
         other.update(id='flow-b', token='222:fake-secondary', bot_id='222')

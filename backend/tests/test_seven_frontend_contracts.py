@@ -1,6 +1,4 @@
-"""Offline ASGI contract replay of payloads emitted by shipped HTML Node VM.
-Green assertions below demonstrate defects; they do not certify correctness.
-"""
+"""Offline regressions replay shipped HTML payloads against real ASGI and cold rows."""
 import asyncio, copy, json, subprocess, unittest, os, tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +9,7 @@ import test_checkout_webhook_integration as fixture
 
 ROOT=Path(__file__).resolve().parents[2]
 SCRIPT=ROOT/'frontend/tests/seven_round2.test.cjs'
-REPORT=Path(os.environ.get('HOTBOT_REPORT', tempfile.mkdtemp(prefix='hotbot-contract-')))
+REPORT=Path(os.environ.get('HOTBOT_REPORT') or tempfile.mkdtemp(prefix='hotbot-contract-'))
 REPORT.mkdir(parents=True,exist_ok=True)
 class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -247,7 +245,10 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         result=subprocess.run(args,capture_output=True,text=True,timeout=30,env={**os.environ,'HOTBOT_REPORT':str(REPORT)})
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         return result
-    async def test_crm_real_response_erases_new_frontend_edit_and_next_save_persists_old_value(self):
+    async def test_crm_real_response_preserves_new_edits_deletes_secrets_and_next_save(self):
+        state=copy.deepcopy(await main._read_state_from_db())
+        state['flow_bots'][0]['welcome']['medias']=[{'id':'crm-media','type':'photo','url':'https://example.invalid/old-media'}]
+        await main._write_state_to_db(state)
         initial=(await self.client.get('/api/state')).json()
         self.evidence('crm-initial', initial)
         producer=self.node('crm-request', REPORT/'crm-initial.json')
@@ -263,4 +264,7 @@ class SevenFrontendContracts(unittest.IsolatedAsyncioTestCase):
         saved=await self.client.post('/api/state',json=output['post']);self.assertEqual(saved.status_code,200)
         cold=await self.cold();self.assertEqual(cold['flow_bots'][0]['welcome']['message'],'NEW UNSAVED WELCOME')
         self.assertEqual(cold['memory']['leads'][0]['history'][-1]['content'],'AUDIT CRM MESSAGE')
+        self.assertEqual(cold['publish']['gateway_secret'],'new-crm-secret')
+        self.assertFalse(cold['flow_bots'][0]['welcome']['medias'])
+        self.assertFalse(cold['flow_bots'][1]['plans'])
         self.evidence('crm-observed',{'new_typed_message':'NEW UNSAVED WELCOME','after_frontend':output['after'],'cold_db_welcome':cold['flow_bots'][0]['welcome']['message'],'crm_history_preserved':True})
