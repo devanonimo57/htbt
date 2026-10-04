@@ -9974,6 +9974,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const botId = NB_ACTIVE_CHAT_BOT_ID;
       const originBotId = NB_ACTIVE_CHAT_ORIGIN_BOT_ID;
       if (!text || !userId || !botId) return;
+      const submitted = JSON.parse(JSON.stringify(STATE));
       if (btn) btn.disabled = true;
       try {
         const res = await adminFetch("/api/flow-bots/leads/action", {
@@ -9993,9 +9994,11 @@ quer que eu te mostre as opções de acesso?</textarea>
           return;
         }
         if (data && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+          STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+          STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
           saveLocalBackup();
+          if (newerEdits) markUnsaved();
         }
         const sameChat = NB_ACTIVE_CHAT_USER_ID === userId && NB_ACTIVE_CHAT_BOT_ID === botId
           && NB_ACTIVE_CHAT_ORIGIN_BOT_ID === originBotId;
