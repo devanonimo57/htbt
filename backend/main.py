@@ -1166,6 +1166,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             # Do not turn a stale copy's untouched rows into writes (or into
             # stale values in the returned cache). Only explicit deletion drops rows.
             live_clients = _client_map(existing_state)
+            first_creation_collision = False
             for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
                 incoming = state.get('memory', {}).get(key, [])
                 incoming[:] = [lead for lead in incoming
@@ -1179,20 +1180,36 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     elif identity in live_clients and state is not _STATE_CACHE:
                         # Transfer this stale writer's field/history delta, not
                         # its old whole lead over the just-published event.
-                        if identity in old_clients:
-                            before = old_clients[identity]
-                            current = live_clients[identity]
-                            created = before.get('created_at')
-                            if (not created or lead.get('created_at') != created
-                                    or current.get('created_at') != created
-                                    or str(lead.get('bot_id') or '') != str(before.get('bot_id') or '')
-                                    or str(current.get('bot_id') or '') != str(before.get('bot_id') or '')):
-                                # Same SQL slot is not proof of the same customer
-                                # incarnation. Discard an unprovable old delta.
-                                incoming[idx] = copy.deepcopy(current)
-                                continue
+                        before = old_clients.get(identity)
+                        first_creation_collision |= before is None
+                        current = live_clients[identity]
+                        created = lead.get('created_at')
+                        if (not created or current.get('created_at') != created
+                                or str(current.get('bot_id') or '') != str(lead.get('bot_id') or '')
+                                or (before is not None and (
+                                    before.get('created_at') != created
+                                    or str(before.get('bot_id') or '') != str(lead.get('bot_id') or '')))):
+                            # Baseline absence is not replacement authority: a
+                            # first /start can outlive archive/delete and reentry.
+                            incoming[idx] = copy.deepcopy(current)
+                            continue
+                        if before is not None:
                             lead = _merge_late_cache_delta(current, before, lead)
-                            incoming[idx] = lead
+                        else:
+                            # Same first incarnation, but no committed ancestry
+                            # to prove field edits/removals. Retain current fields;
+                            # admit occurrence-aware first histories and forward
+                            # funnel progress only, never an old whole-row reset.
+                            merged = copy.deepcopy(current)
+                            if 'history' in lead:
+                                merged['history'] = _merge_late_cache_delta(
+                                    current.get('history', []), [], lead['history'])
+                            order = bot_manager.STAGE_ORDER
+                            target, stage = lead.get('stage'), current.get('stage')
+                            if target in order and (stage not in order or order.index(target) >= order.index(stage)):
+                                bot_manager._advance_stage(merged, target)
+                            lead = merged
+                        incoming[idx] = lead
                         # Detached snapshots may edit history but cannot revoke
                         # an already exposed offer; revocation uses the live state.
                         live_discounts = live_clients[identity].get('authorized_flow_discounts', [])
@@ -1207,6 +1224,12 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             if runtime_only:
                 # Runtime send completion must never restore the configuration
                 # captured before an await. Transfer runtime onto fresh config.
+                if first_creation_collision:
+                    # The first handler's learning summary describes its old
+                    # lead snapshot, not the reconciled rows (possibly paid).
+                    # Keep the current summary; new settlements are replayed
+                    # against current accounting below as usual.
+                    state['learning'] = copy.deepcopy(existing_state.get('learning', {}))
                 runtime_state = state
                 if checkout_media_cache:
                     # This checkout's generated-media cache transfers only via
