@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 import main
 import test_seven_frontend_contracts as original
-REPORT=Path(os.environ['HOTBOT_REPORT']); REPORT.mkdir(parents=True,exist_ok=True)
+REPORT=Path(os.environ.get('HOTBOT_REPORT', str(Path(__file__).resolve().parent / 'report'))); REPORT.mkdir(parents=True,exist_ok=True)
 ROOT=Path(__file__).resolve().parents[2]
 class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -15,7 +15,8 @@ class FiveActionsContracts(unittest.IsolatedAsyncioTestCase):
     def evidence(self,name,value):
         (REPORT/(name+'.json')).write_text(json.dumps(value,ensure_ascii=False,indent=2),encoding='utf8')
     def node(self,mode,kind,name):
-        result=subprocess.run(['node','--require','C:/Users/Yago/hotbot-eight-followup-report/offline-node.cjs',str(ROOT/'frontend/tests/five_actions.test.cjs'),mode,kind,str(REPORT/(name+'.json'))],capture_output=True,text=True,timeout=30)
+        env=dict(os.environ); env['HOTBOT_REPORT']=str(REPORT)
+        result=subprocess.run(['node','--require','C:/Users/Yago/hotbot-eight-followup-report/offline-node.cjs',str(ROOT/'frontend/tests/five_actions.test.cjs'),mode,kind,str(REPORT/(name+'.json'))],capture_output=True,text=True,timeout=30,env=env)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         return result.stdout
     async def checkout(self,channel=False):

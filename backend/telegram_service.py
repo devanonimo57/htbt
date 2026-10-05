@@ -1716,11 +1716,28 @@ class ActiveBotManager:
             if not fb:
                 return
             bot_id = str(fb.get("id") or "")
-            ds_cfg = fb.get("downsell_pix" if track == "pix" else "downsell_general", {})
-            if not ds_cfg.get("enabled", False):
+            ds_cfg = fb.get("downsell_general", {})
+            enabled = ds_cfg.get("enabled", False)
+            if not enabled and track == "pix":
+                legacy_pix_cfg = fb.get("downsell_pix", {})
+                if legacy_pix_cfg.get("enabled", False):
+                    ds_cfg = legacy_pix_cfg
+                    enabled = True
+            if not enabled:
                 return
+
+            all_seqs = ds_cfg.get("sequences", [])
+            if track == "pix":
+                sequences = [s for s in all_seqs if s.get("trigger") == "pix" or (s.get("trigger") is None and ds_cfg is fb.get("downsell_pix"))]
+                if not sequences and fb.get("downsell_pix", {}).get("sequences"):
+                    sequences = fb.get("downsell_pix", {}).get("sequences", [])
+            else:
+                sequences = [s for s in all_seqs if s.get("trigger", "start") in ("start", "general")]
+                if not sequences and all_seqs:
+                    sequences = all_seqs
+
             sequences = sorted(
-                ds_cfg.get("sequences", []),
+                sequences,
                 key=lambda s: max(1, int(s.get("delay_minutes") or 1))
             )
             elapsed_mins = 0
@@ -1744,9 +1761,12 @@ class ActiveBotManager:
                              if str(l.get("telegram_id")) == str(user.id)
                              and str(l.get("origin_bot_numeric_id")) == origin
                              and str(l.get("bot_id")) == bot_id), None)
-                if lead is None or lead.get("stage") in paid_stages or lead.get("blocked"):
+                if lead is None or lead.get("blocked"):
                     return
-                if track == "general" and lead.get("stage") == "Gerou checkout":
+                aud = seq.get("target_audience", "new")
+                if aud == "new" and (lead.get("stage") in paid_stages or lead.get("paid")):
+                    return
+                if track in ("general", "start") and lead.get("stage") == "Gerou checkout":
                     return
 
                 fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
@@ -1783,6 +1803,72 @@ class ActiveBotManager:
                     await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
                     lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
                 await self.state_saver(state, runtime_only=True)
+
+            # Ciclo recorrente / loop infinito para sequencias com loop_enabled
+            loop_sequences = [s for s in sequences if s.get("loop_enabled")]
+            if loop_sequences:
+                while True:
+                    for seq in loop_sequences:
+                        loop_delay = max(1, int(seq.get("delay_minutes") or 10))
+                        await asyncio.sleep(loop_delay * 60)
+
+                        state = await self.state_getter()
+                        origin = str(bot_token).split(":", 1)[0] if ":" in str(bot_token) else ""
+                        lead = next((l for l in state.get("memory", {}).get("leads", [])
+                                     if str(l.get("telegram_id")) == str(user.id)
+                                     and str(l.get("origin_bot_numeric_id")) == origin
+                                     and str(l.get("bot_id")) == bot_id), None)
+                        if lead is None or lead.get("blocked"):
+                            return
+                        aud = seq.get("target_audience", "new")
+                        if aud == "new" and (lead.get("stage") in paid_stages or lead.get("paid")):
+                            return
+                        if track in ("general", "start") and lead.get("stage") == "Gerou checkout":
+                            return
+
+                        fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
+                        if not fb:
+                            return
+                        eff_tok = (str(fb.get("token") or "").strip() or bot_token or self.current_token).strip()
+                        live_bot = None
+                        if eff_tok:
+                            _CURRENT_BOT_TOKEN_CTX.set(eff_tok)
+                            live_bot = self._get_bot_by_token(eff_tok)
+                            if live_bot:
+                                _CURRENT_BOT_CTX.set(live_bot)
+
+                        msg_tmpl = (seq.get("message") or "").strip()
+                        seq_medias = seq.get("medias") or []
+                        has_seq_medias = any(
+                            isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
+                            for m in seq_medias[:3]
+                        )
+                        if not msg_tmpl and not has_seq_medias:
+                            continue
+
+                        disc_str = seq.get("discount", "Sem desconto")
+                        disc_pct = self._parse_discount_pct(disc_str)
+                        if disc_pct > 0:
+                            auth_discounts = lead.setdefault("authorized_flow_discounts", [])
+                            if disc_pct not in auth_discounts:
+                                auth_discounts.append(disc_pct)
+                        kb = self._build_flow_plans_kb(
+                            fb,
+                            filter_plan_ids=seq.get("plan_ids") or None,
+                            discount_str=disc_str
+                        )
+                        lead["from_downsell"] = True
+                        if not msg_tmpl and has_seq_medias:
+                            attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb, bot_instance=live_bot)
+                            if not attached_kb and kb:
+                                await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb, bot_instance=live_bot)
+                            lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} (Loop) — Mídia]"})
+                        else:
+                            await self._send_flow_medias(user.id, seq_medias, bot_instance=live_bot)
+                            txt = self._render_flow_vars(msg_tmpl, user, fb)
+                            await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
+                            lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} (Loop)] {txt}"})
+                        await self.state_saver(state, runtime_only=True)
         except asyncio.CancelledError:
             pass
         except Exception as e:

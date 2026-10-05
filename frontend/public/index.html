@@ -592,7 +592,7 @@
              ABA 3: DOWNSELL (PRINTS 6 & 7)
         ==================================================== -->
         <div id="nbtab-panel-downsell" class="nb-subtab-panel hidden space-y-5">
-          <div class="inline-flex p-1 rounded-lg bg-[#14130f] border border-[#25231b]">
+          <div class="hidden">
             <button type="button" id="nb-ds-pill-general" onclick="nbSwitchDownsellTrack('general')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition">Geral</button>
             <button type="button" id="nb-ds-pill-pix" onclick="nbSwitchDownsellTrack('pix')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition">PIX Gerado</button>
           </div>
@@ -612,11 +612,17 @@
               </div>
             </div>
             <div class="border-t border-[#1e1d15] pt-3 flex flex-wrap items-center justify-between gap-3">
-              <p id="nb-ds-header-desc" class="text-xs text-zinc-400">Sequências enviadas após o /start para leads que não compraram. Recupere vendas com ofertas alternativas.</p>
-              <button type="button" id="nb-ds-test-all-btn" onclick="nbTestAllDownsellSequences()" class="px-3 py-1.5 rounded-lg bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-xs font-bold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara todas as sequências desta trilha no canal de cache usando este bot">
-                <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
-                <span>Disparar todas no canal de cache</span>
-              </button>
+              <p id="nb-ds-header-desc" class="text-xs text-zinc-400">Sequências enviadas aos leads com gatilho personalizado (no /start ou após gerar PIX) e ciclo recorrente.</p>
+              <div class="flex items-center gap-2">
+                <button type="button" id="nb-ds-collapse-all-btn" onclick="nbToggleAllDownsellCollapse()" class="px-3 py-1.5 rounded-lg bg-[#1b1912] hover:bg-[#252219] border border-[#332f1f] text-xs font-semibold text-zinc-300 flex items-center gap-1.5 transition cursor-pointer" title="Recolher ou expandir todas as sequências">
+                  <i class="fa-solid fa-up-down-left-right text-[10px] text-zinc-400"></i>
+                  <span id="nb-ds-collapse-all-btn-txt">Recolher todos</span>
+                </button>
+                <button type="button" id="nb-ds-test-all-btn" onclick="nbTestAllDownsellSequences()" class="px-3 py-1.5 rounded-lg bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-xs font-bold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara todas as sequências desta trilha no canal de cache usando este bot">
+                  <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
+                  <span>Disparar todas no canal de cache</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -8648,124 +8654,192 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!b) b = nbGetCurrentBot();
       if (!b) return;
       const isPix = NB_DOWNSELL_TRACK === 'pix';
-      document.getElementById('nb-ds-pill-general').className = !isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
-      document.getElementById('nb-ds-pill-pix').className = isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
+      const pillGen = document.getElementById('nb-ds-pill-general');
+      const pillPix = document.getElementById('nb-ds-pill-pix');
+      if (pillGen) pillGen.className = !isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
+      if (pillPix) pillPix.className = isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
 
       const ds = nbGetActiveDownsellObj(b);
       const seqs = ds.sequences || (ds.sequences = []);
 
-      document.getElementById('nb-ds-header-title').textContent = isPix ? "Downsell — PIX Gerado" : "Downsell — Geral";
-      document.getElementById('nb-ds-header-desc').textContent = isPix
-        ? "Sequências enviadas após a geração do PIX para clientes que ainda não finalizaram o pagamento."
-        : "Sequências enviadas após o /start para leads que não compraram. Recupere vendas com ofertas alternativas.";
-      document.getElementById('nb-ds-count-badge').textContent = `${seqs.length}/20`;
-      document.getElementById('nb-ds-enabled-toggle').checked = Boolean(ds.enabled);
+      const titleEl = document.getElementById('nb-ds-header-title');
+      if (titleEl) titleEl.textContent = isPix ? "Downsell — PIX Gerado" : "Downsell — Geral";
+      const descEl = document.getElementById('nb-ds-header-desc');
+      if (descEl) {
+        descEl.textContent = isPix
+          ? "Sequências enviadas após a geração do PIX para clientes que ainda não finalizaram o pagamento."
+          : "Sequências automáticas com gatilho personalizado (no /start ou após gerar PIX) e ciclo recorrente configurável.";
+      }
+      const countEl = document.getElementById('nb-ds-count-badge');
+      if (countEl) countEl.textContent = `${seqs.length}/20`;
+      const toggleEl = document.getElementById('nb-ds-enabled-toggle');
+      if (toggleEl) toggleEl.checked = Boolean(ds.enabled);
 
       const plans = b.plans || [];
       const container = document.getElementById('nb-ds-sequences-container');
       const discounts = ["Sem desconto", "5% OFF", "10% OFF", "15% OFF", "20% OFF", "25% OFF", "30% OFF", "40% OFF", "50% OFF"];
 
       let hasInvalid = false;
-      container.innerHTML = seqs.map((seq, sIdx) => {
-        const msg = seq.message || "";
-        const hasMedias = Array.isArray(seq.medias) && seq.medias.length > 0;
-        if (!msg.trim() && !hasMedias) hasInvalid = true;
-        const selectedIds = Array.isArray(seq.plan_ids) ? seq.plan_ids : plans.map(p => p.id);
-        const planChips = plans.map(p => {
-          const isSel = selectedIds.includes(p.id);
-          const pFmt = `R$${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
+      if (container) {
+        container.innerHTML = seqs.map((seq, sIdx) => {
+          const msg = seq.message || "";
+          const hasMedias = Array.isArray(seq.medias) && seq.medias.length > 0;
+          if (!msg.trim() && !hasMedias) hasInvalid = true;
+          const isCollapsed = Boolean(seq._collapsed);
+          const triggerVal = seq.trigger || (isPix ? 'pix' : 'start');
+          const audienceVal = seq.target_audience || 'new';
+          const isLoop = Boolean(seq.loop_enabled);
+
+          const selectedIds = Array.isArray(seq.plan_ids) ? seq.plan_ids : plans.map(p => p.id);
+          const planChips = plans.map(p => {
+            const isSel = selectedIds.includes(p.id);
+            const pFmt = `R$${Number(p.price || 0).toFixed(2).replace('.', ',')}`;
+            return `
+              <button type="button" onclick="nbToggleDownsellPlan(${sIdx}, '${escapeHtml(p.id)}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
+                ${isSel ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
+                <span>${escapeHtml(p.name)} — ${pFmt}</span>
+              </button>
+            `;
+          }).join('');
+
           return `
-            <button type="button" onclick="nbToggleDownsellPlan(${sIdx}, '${escapeHtml(p.id)}')" class="px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 transition ${isSel ? 'bg-white text-black' : 'bg-[#171611] text-zinc-400 border border-[#2c2a1f]'}">
-              ${isSel ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}
-              <span>${escapeHtml(p.name)} — ${pFmt}</span>
-            </button>
+            <div class="nb-card p-4 space-y-3 transition-all" draggable="true" ondragstart="nbOnDownsellDragStart(event, ${sIdx})" ondragover="nbOnDownsellDragOver(event)" ondrop="nbOnDownsellDrop(event, ${sIdx})">
+              <!-- HEADER DO CARD -->
+              <div class="flex items-center justify-between gap-2 border-b border-[#1e1d15] pb-2.5">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                  <span class="cursor-grab text-zinc-500 hover:text-zinc-300 p-1" title="Arraste para reposicionar"><i class="fa-solid fa-grip-vertical text-xs"></i></span>
+                  <div class="flex items-center gap-0.5">
+                    <button type="button" onclick="nbMoveDownsellSeq(${sIdx}, -1)" ${sIdx === 0 ? 'disabled class="opacity-20 cursor-not-allowed"' : 'class="text-zinc-400 hover:text-white p-0.5"'} title="Mover para cima"><i class="fa-solid fa-chevron-up text-[11px]"></i></button>
+                    <button type="button" onclick="nbMoveDownsellSeq(${sIdx}, 1)" ${sIdx === seqs.length - 1 ? 'disabled class="opacity-20 cursor-not-allowed"' : 'class="text-zinc-400 hover:text-white p-0.5"'} title="Mover para baixo"><i class="fa-solid fa-chevron-down text-[11px]"></i></button>
+                  </div>
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
+                  <h4 class="text-xs font-bold text-white cursor-pointer select-none" onclick="nbToggleDownsellCollapse(${sIdx})">Sequência ${sIdx + 1}</h4>
+                  
+                  <!-- BADGES RESUMO -->
+                  <span class="px-2 py-0.5 rounded bg-[#1e1d15] text-[10px] text-zinc-300 font-mono"><i class="fa-regular fa-clock mr-1"></i>${seq.delay_minutes || 10}min</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${triggerVal === 'pix' ? 'bg-amber-950/70 border border-amber-700/60 text-amber-300' : 'bg-purple-950/70 border border-purple-700/60 text-purple-300'}">${triggerVal === 'pix' ? '⚡ PIX Gerado' : '🚀 No /start'}</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${audienceVal === 'all' ? 'bg-blue-950/70 border border-blue-700/60 text-blue-300' : 'bg-zinc-800 text-zinc-300'}">${audienceVal === 'all' ? '👥 Todos' : '✨ Novos (sem compra)'}</span>
+                  ${isLoop ? '<span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 flex items-center gap-1"><i class="fa-solid fa-arrows-rotate text-[9px]"></i>Loop</span>' : ''}
+                  ${isCollapsed ? `<span class="text-[11px] text-zinc-500 truncate max-w-[200px] ml-1 select-none" onclick="nbToggleDownsellCollapse(${sIdx})">${escapeHtml((msg || '').slice(0, 30)) || (hasMedias ? '📷 Mídia anexa' : 'Vazio')}</span>` : ''}
+                </div>
+
+                <div class="flex items-center gap-2 text-xs shrink-0">
+                  <button type="button" id="nb-ds-test-btn-${sIdx}" onclick="nbTestDownsellSequence(${sIdx})" class="px-2.5 py-1 rounded-md bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-[11px] font-semibold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara teste desta sequência no canal de cache">
+                    <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
+                    <span>Testar no canal</span>
+                  </button>
+                  <button type="button" onclick="nbDuplicateDownsellSeq(${sIdx})" class="p-1 hover:text-white text-zinc-400" title="Duplicar sequência"><i class="fa-regular fa-copy"></i></button>
+                  <button type="button" onclick="nbDeleteDownsellSeq(${sIdx})" class="p-1 hover:text-rose-400 text-rose-500/80" title="Excluir sequência"><i class="fa-regular fa-trash-can"></i></button>
+                  <button type="button" onclick="nbToggleDownsellCollapse(${sIdx})" class="p-1 hover:text-white text-zinc-400" title="${isCollapsed ? 'Expandir' : 'Recolher'}"><i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'} text-xs"></i></button>
+                </div>
+              </div>
+
+              <!-- CORPO DO CARD (COLAPSÁVEL) -->
+              <div class="${isCollapsed ? 'hidden' : 'space-y-4 pt-1'}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">ENVIAR APÓS (MINUTOS)</label>
+                    <input type="number" min="1" value="${seq.delay_minutes || 10}" oninput="nbUpdateDownsellSeq(${sIdx}, 'delay_minutes', parseInt(this.value || 1))" class="nb-input">
+                    <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Contado a partir do gatilho configurado, não da sequência anterior.</p>
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCONTO</label>
+                    <select onchange="nbUpdateDownsellSeq(${sIdx}, 'discount', this.value)" class="nb-input">
+                      ${discounts.map(d => `<option value="${d}" ${(seq.discount || 'Sem desconto') === d ? 'selected' : ''}>${d}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+
+                <!-- GATILHO E DESTINATÁRIOS -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">GATILHO DE DISPARO</label>
+                    <select onchange="nbUpdateDownsellSeq(${sIdx}, 'trigger', this.value); nbRenderDownsellTab();" class="nb-input">
+                      <option value="start" ${triggerVal === 'start' ? 'selected' : ''}>No /start (1ª entrada do lead)</option>
+                      <option value="pix" ${triggerVal === 'pix' ? 'selected' : ''}>Ao gerar PIX (pagamento pendente)</option>
+                    </select>
+                    <p class="text-[11px] text-zinc-500 mt-1">Define quando o contador regressivo deste downsell começa.</p>
+                  </div>
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESTINATÁRIOS</label>
+                    <select onchange="nbUpdateDownsellSeq(${sIdx}, 'target_audience', this.value); nbRenderDownsellTab();" class="nb-input">
+                      <option value="new" ${audienceVal === 'new' ? 'selected' : ''}>Novos (nunca compraram)</option>
+                      <option value="all" ${audienceVal === 'all' ? 'selected' : ''}>Todos os cadastrados deste bot</option>
+                    </select>
+                    <p class="text-[11px] text-zinc-500 mt-1">Filtro de entrega no momento do envio da oferta.</p>
+                  </div>
+                </div>
+
+                <!-- CICLO RECORRENTE / LOOP -->
+                <div class="p-3 rounded-lg bg-[#14130f] border border-[#25231b] flex items-center justify-between gap-4">
+                  <div>
+                    <div class="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <i class="fa-solid fa-arrows-rotate text-[#a855f7]"></i>
+                      <span>Repetir esta sequência no ciclo recorrente</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-400 mt-0.5">Ao terminar a fila inicial, as sequências com repetição ativada continuam disparando ciclicamente em ordem no intervalo configurado.</p>
+                  </div>
+                  <label class="nb-toggle shrink-0">
+                    <input type="checkbox" ${isLoop ? 'checked' : ''} onchange="nbUpdateDownsellSeq(${sIdx}, 'loop_enabled', this.checked); nbRenderDownsellTab();">
+                    <span class="nb-toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">PLANOS EXIBIDOS NESTA SEQUÊNCIA</label>
+                  <div class="flex flex-wrap gap-2">
+                    ${planChips || '<span class="text-xs text-zinc-500">Cadastre um plano na aba Planos</span>'}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-zinc-500 font-normal normal-case">(opcional se houver mídia)</span></label>
+                  <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${escapeHtml(msg)}</textarea>
+                  <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
+                </div>
+
+                <div class="border-t border-[#1e1d15] pt-3 space-y-2.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Mídias</span>
+                    <span class="text-xs text-zinc-500 font-mono">${(seq.medias || []).length}/3</span>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <button type="button" onclick="nbTriggerMediaUpload('downsell', ${sIdx})" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
+                      <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
+                      <span>Adicionar mídia</span>
+                    </button>
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
+                      <span class="nb-toggle">
+                        <input type="checkbox" ${seq.send_uncompressed ? 'checked' : ''} onchange="nbUpdateDownsellSeq(${sIdx}, 'send_uncompressed', this.checked)">
+                        <span class="nb-toggle-slider"></span>
+                      </span>
+                      <span>Enviar sem compressão</span>
+                    </label>
+                  </div>
+                  <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
+                    ${(seq.medias || []).map((m, mIdx) => {
+                      const badge = m.telegram_file_id
+                        ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-700/60 text-[10px] text-emerald-300 font-semibold" title="file_id: ${escapeHtml(m.telegram_file_id)}">✓ Cache Telegram</span>`
+                        : (m._caching
+                            ? `<span class="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-[10px] text-amber-300 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Enviando ao canal...</span>`
+                            : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400">Pendente cache</span>`);
+                      return `
+                        <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
+                          <i class="fa-regular fa-image text-[#a855f7]"></i> ${escapeHtml(m.name || 'Mídia')}
+                          ${badge}
+                          <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
+                        </span>
+                      `;
+                    }).join('')}
+                  </div>
+                  <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
+                  <div id="nb-ds-err-${sIdx}" class="${(!msg.trim() && !hasMedias) ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">Adicione uma mensagem ou mídia.</div>
+                </div>
+              </div>
+            </div>
           `;
         }).join('');
-
-        return `
-          <div class="nb-card p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-[#1e1d15] pb-3">
-              <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
-                <h4 class="text-xs font-bold text-white">Sequência ${sIdx + 1}</h4>
-              </div>
-              <div class="flex items-center gap-2 text-xs">
-                <button type="button" id="nb-ds-test-btn-${sIdx}" onclick="nbTestDownsellSequence(${sIdx})" class="px-2.5 py-1 rounded-md bg-[#201433] hover:bg-[#2c1c45] border border-[#a855f7]/60 text-[11px] font-semibold text-purple-200 flex items-center gap-1.5 transition cursor-pointer" title="Dispara teste desta sequência no canal de cache">
-                  <i class="fa-solid fa-paper-plane text-[10px] text-[#a855f7]"></i>
-                  <span>Testar no canal</span>
-                </button>
-                <button type="button" onclick="nbDuplicateDownsellSeq(${sIdx})" class="p-1 hover:text-white text-zinc-400" title="Duplicar sequência"><i class="fa-regular fa-copy"></i></button>
-                <button type="button" onclick="nbDeleteDownsellSeq(${sIdx})" class="p-1 hover:text-rose-400 text-rose-500/80" title="Excluir sequência"><i class="fa-regular fa-trash-can"></i></button>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">ENVIAR APÓS (MINUTOS)</label>
-                <input type="number" min="1" value="${seq.delay_minutes || 10}" oninput="nbUpdateDownsellSeq(${sIdx}, 'delay_minutes', parseInt(this.value || 1))" class="nb-input">
-                <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Contado a partir do gatilho da trilha (o /start, ou a geração do PIX), não da sequência anterior.</p>
-              </div>
-              <div>
-                <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCONTO</label>
-                <select onchange="nbUpdateDownsellSeq(${sIdx}, 'discount', this.value)" class="nb-input">
-                  ${discounts.map(d => `<option value="${d}" ${(seq.discount || 'Sem desconto') === d ? 'selected' : ''}>${d}</option>`).join('')}
-                </select>
-              </div>
-            </div>
-
-            <div class="space-y-1.5">
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">PLANOS EXIBIDOS NESTA SEQUÊNCIA</label>
-              <div class="flex flex-wrap gap-2">
-                ${planChips || '<span class="text-xs text-zinc-500">Cadastre um plano na aba Planos</span>'}
-              </div>
-            </div>
-
-            <div>
-              <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">MENSAGEM <span class="text-zinc-500 font-normal normal-case">(opcional se houver mídia)</span></label>
-              <textarea rows="3" maxlength="4000" oninput="nbUpdateDownsellSeq(${sIdx}, 'message', this.value)" placeholder="Ex.: Não conseguiu pagar? ⏰ ÚLTIMOS MINUTOS ⏰&#10;Só agora: oferta com desconto para garantir sua vaga!" class="nb-input resize-y">${escapeHtml(msg)}</textarea>
-              <div class="text-right text-[11px] text-zinc-500 mt-1" id="nb-ds-counter-${sIdx}">${msg.length}/4000 caracteres</div>
-            </div>
-
-            <div class="border-t border-[#1e1d15] pt-3 space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-white">Mídias</span>
-                <span class="text-xs text-zinc-500 font-mono">${(seq.medias || []).length}/3</span>
-              </div>
-              <div class="flex items-center gap-4">
-                <button type="button" onclick="nbTriggerMediaUpload('downsell', ${sIdx})" class="px-3.5 py-2 rounded-lg bg-[#171611] hover:bg-[#222018] border border-[#2c2a1f] text-xs font-semibold text-zinc-200 flex items-center gap-2 transition">
-                  <i class="fa-solid fa-arrow-up-from-bracket text-[11px]"></i>
-                  <span>Adicionar mídia</span>
-                </button>
-                <label class="flex items-center gap-2 cursor-pointer text-xs text-zinc-400">
-                  <span class="nb-toggle">
-                    <input type="checkbox" ${seq.send_uncompressed ? 'checked' : ''} onchange="nbUpdateDownsellSeq(${sIdx}, 'send_uncompressed', this.checked)">
-                    <span class="nb-toggle-slider"></span>
-                  </span>
-                  <span>Enviar sem compressão</span>
-                </label>
-              </div>
-              <div id="nb-ds-medias-${sIdx}" class="flex flex-wrap gap-2">
-                ${(seq.medias || []).map((m, mIdx) => {
-                  const badge = m.telegram_file_id
-                    ? `<span class="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-700/60 text-[10px] text-emerald-300 font-semibold" title="file_id: ${escapeHtml(m.telegram_file_id)}">✓ Cache Telegram</span>`
-                    : (m._caching
-                        ? `<span class="px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-700/60 text-[10px] text-amber-300 font-semibold"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Enviando ao canal...</span>`
-                        : `<span class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px] text-zinc-400">Pendente cache</span>`);
-                  return `
-                    <span class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1b1912] border border-[#332f1f] text-xs text-zinc-200">
-                      <i class="fa-regular fa-image text-[#a855f7]"></i> ${escapeHtml(m.name || 'Mídia')}
-                      ${badge}
-                      <button type="button" onclick="nbRemoveMedia('downsell', ${mIdx}, ${sIdx})" class="text-zinc-500 hover:text-rose-400"><i class="fa-solid fa-xmark"></i></button>
-                    </span>
-                  `;
-                }).join('')}
-              </div>
-              <p class="text-[11px] text-zinc-500">O arquivo vai uma vez para o canal de cache e depois é reenviado pelo file_id — sem novo upload a cada lead.</p>
-              <div id="nb-ds-err-${sIdx}" class="${(!msg.trim() && !hasMedias) ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden'}">Adicione uma mensagem ou mídia.</div>
-            </div>
-          </div>
-        `;
-      }).join('');
+      }
 
       const valEl = document.getElementById('nb-ds-validation');
       if (valEl) {
@@ -8793,7 +8867,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         const hasMedias = Array.isArray(ds.sequences[sIdx].medias) && ds.sequences[sIdx].medias.length > 0;
         if (errEl) errEl.className = (!val.trim() && !hasMedias) ? 'border-l-2 border-rose-500 pl-2.5 text-xs text-rose-400' : 'hidden';
         const anyInvalid = ds.sequences.some(s => !(s.message || "").trim() && !(Array.isArray(s.medias) && s.medias.length > 0));
-        document.getElementById('nb-ds-validation').textContent = anyInvalid ? "Há sequências sem mensagem e sem mídia." : "";
+        const valEl = document.getElementById('nb-ds-validation');
+        if (valEl) valEl.textContent = anyInvalid ? "Há sequências sem mensagem e sem mídia." : "";
       }
     }
 
@@ -8822,6 +8897,10 @@ quer que eu te mostre as opções de acesso?</textarea>
         delay_minutes: 10,
         discount: "Sem desconto",
         plan_ids: (b.plans || []).map(p => p.id),
+        trigger: "start",
+        target_audience: "new",
+        loop_enabled: false,
+        _collapsed: false,
         message: "",
         medias: [],
         send_uncompressed: false
@@ -8837,6 +8916,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!orig || ds.sequences.length >= 20) return;
       const copy = JSON.parse(JSON.stringify(orig));
       copy.id = "seq_" + Date.now();
+      copy._collapsed = false;
       ds.sequences.splice(sIdx + 1, 0, copy);
       nbRenderDownsellTab(b);
     }
@@ -8846,6 +8926,68 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!b) return;
       const ds = nbGetActiveDownsellObj(b);
       ds.sequences.splice(sIdx, 1);
+      nbRenderDownsellTab(b);
+    }
+
+    function nbToggleDownsellCollapse(sIdx) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      if (ds.sequences && ds.sequences[sIdx]) {
+        ds.sequences[sIdx]._collapsed = !ds.sequences[sIdx]._collapsed;
+        nbRenderDownsellTab(b);
+      }
+    }
+
+    function nbToggleAllDownsellCollapse() {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      const seqs = ds.sequences || [];
+      const anyOpen = seqs.some(s => !s._collapsed);
+      seqs.forEach(s => { s._collapsed = anyOpen; });
+      const btnTxt = document.getElementById('nb-ds-collapse-all-btn-txt');
+      if (btnTxt) btnTxt.textContent = anyOpen ? 'Expandir todos' : 'Recolher todos';
+      nbRenderDownsellTab(b);
+    }
+
+    function nbMoveDownsellSeq(sIdx, dir) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      const seqs = ds.sequences || [];
+      const targetIdx = sIdx + dir;
+      if (targetIdx < 0 || targetIdx >= seqs.length) return;
+      const [moved] = seqs.splice(sIdx, 1);
+      seqs.splice(targetIdx, 0, moved);
+      nbRenderDownsellTab(b);
+    }
+
+    let nbDownsellDragIdx = null;
+    function nbOnDownsellDragStart(ev, sIdx) {
+      nbDownsellDragIdx = sIdx;
+      if (ev.dataTransfer) {
+        ev.dataTransfer.effectAllowed = 'move';
+        try { ev.dataTransfer.setData('text/plain', String(sIdx)); } catch (e) {}
+      }
+    }
+
+    function nbOnDownsellDragOver(ev) {
+      ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+    }
+
+    function nbOnDownsellDrop(ev, targetIdx) {
+      ev.preventDefault();
+      if (nbDownsellDragIdx === null || nbDownsellDragIdx === targetIdx) return;
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      const ds = nbGetActiveDownsellObj(b);
+      const seqs = ds.sequences || [];
+      if (nbDownsellDragIdx < 0 || nbDownsellDragIdx >= seqs.length || targetIdx < 0 || targetIdx >= seqs.length) return;
+      const [moved] = seqs.splice(nbDownsellDragIdx, 1);
+      seqs.splice(targetIdx, 0, moved);
+      nbDownsellDragIdx = null;
       nbRenderDownsellTab(b);
     }
 

@@ -2091,7 +2091,8 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     if webhook_secret:
         headers = request.headers if request and hasattr(request, "headers") else {}
         sig = (
-            headers.get("x-webhook-secret")
+            headers.get("x-pushinpay-token")
+            or headers.get("x-webhook-secret")
             or headers.get("x-webhook-token")
             or headers.get("x-signature")
             or ""

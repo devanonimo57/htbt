@@ -1,7 +1,8 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
 const ROOT=path.resolve(__dirname,'../..');
-const REPORT=process.env.HOTBOT_REPORT;
+const REPORT=process.env.HOTBOT_REPORT || path.resolve(__dirname, 'report');
+fs.mkdirSync(REPORT, { recursive: true });
 const library=fs.readFileSync(ROOT+'/frontend/tests/seven_round2.test.cjs','utf8');
 const host=vm.createContext({require,__dirname:ROOT+'/frontend/tests',process,console});
 vm.runInContext(library.slice(0,library.indexOf('(async()=>{'))+'\nglobalThis.H={setup,block,clone,deferred,fixture};',host);
