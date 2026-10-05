@@ -1924,6 +1924,11 @@ class ActiveBotManager:
                 pending = [s for s in sequences if str(s.get('id')) not in sent]
                 looping = False
                 if pending:
+                    # A newly active initial card resumes the first passage.
+                    # Rest/partial-cycle state belongs to the previous completed
+                    # passage, not the one that is now waiting for its event.
+                    progress.pop('rest_until', None)
+                    progress.pop('loop_sent', None)
                     seq = pending[0]
                     trigger = 'pix' if seq.get('trigger') == 'pix' else 'start'
                     if anchors.get(trigger) is None:
