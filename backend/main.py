@@ -525,6 +525,67 @@ _STATE_COMMITTED_OWNER = None
 _DB_LOCK = _asyncio.Lock()
 
 
+class _FrozenDict(dict):
+    """Private, recursively immutable SQL ancestry; never a live cache row."""
+    def _readonly(self, *args, **kwargs):
+        raise TypeError('Committed state is immutable')
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _readonly
+
+    def __deepcopy__(self, memo):
+        # Explicit copies remain ordinary editable data. Snapshot ancestry itself
+        # is shared directly, never thawed by _StateSnapshot.__deepcopy__.
+        return copy.deepcopy(dict(self), memo)
+
+
+class _FrozenList(list):
+    def _readonly(self, *args, **kwargs):
+        raise TypeError('Committed state is immutable')
+    __setitem__ = __delitem__ = append = clear = extend = insert = pop = remove = reverse = sort = __iadd__ = __imul__ = _readonly
+
+    def __deepcopy__(self, memo):
+        return copy.deepcopy(list(self), memo)
+
+
+def _freeze(value):
+    if isinstance(value, (_FrozenDict, _FrozenList)):
+        return value
+    if isinstance(value, dict):
+        return _FrozenDict({key: _freeze(child) for key, child in value.items()})
+    if isinstance(value, list):
+        return _FrozenList(_freeze(child) for child in value)
+    return value
+
+
+def _config_view(state):
+    """Project before copying/serializing: row payloads are not configuration."""
+    result = {key: value for key, value in state.items() if key != 'tx_records'}
+    result['memory'] = {key: value for key, value in state.get('memory', {}).items()
+                        if key not in ('leads', 'deleted_leads')}
+    return result
+
+
+def _capture_publication(state):
+    """Freeze only dirty rows; unchanged immutable committed rows are reusable."""
+    baseline = getattr(state, '_row_base', None) or {}
+    old_clients = _client_map(baseline)
+    old_pix = baseline.get('tx_records', {})
+    result = _StateSnapshot(_freeze(_config_view(state)))
+    result['memory'] = _FrozenDict({**result.get('memory', {}), **{
+        key: _FrozenList(old_clients[identity] if isinstance(old_clients.get(identity), _FrozenDict)
+                         and lead == old_clients[identity] else _freeze(lead)
+                         for lead in state.get('memory', {}).get(key, [])
+                         for identity in [(_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived)])
+        for archived, key in ((False, 'leads'), (True, 'deleted_leads'))}})
+    result['tx_records'] = _FrozenDict({tid: old_pix[tid]
+        if isinstance(old_pix.get(tid), _FrozenDict) and rec == old_pix[tid] else _freeze(rec)
+        for tid, rec in state.get('tx_records', {}).items()})
+    result._row_base = baseline
+    result._pending_client_deletes = getattr(state, '_pending_client_deletes', frozenset())
+    result._pending_pix_deletes = getattr(state, '_pending_pix_deletes', frozenset())
+    result._seen_client_keys = getattr(state, '_seen_client_keys', frozenset())
+    return result
+
+
 class _StateSnapshot(dict):
     """Keep a copy's row ancestry for three-way merging of stale writers."""
 
@@ -544,8 +605,8 @@ class _StateSnapshot(dict):
         self._capture_client_presence()
         result = type(self)(copy.deepcopy(dict(self), memo))
         memo[id(self)] = result
-        # A separate memo is essential: the baseline must not alias the copy.
-        result._row_base = copy.deepcopy(self._row_base if self._row_base is not None else dict(self))
+        # Immutable committed ancestry may be shared; mutable cache rows may not.
+        result._row_base = _freeze(self._row_base if self._row_base is not None else dict(self))
         result._pending_client_deletes = self._pending_client_deletes
         result._pending_pix_deletes = self._pending_pix_deletes
         result._seen_client_keys = self._seen_client_keys
@@ -875,14 +936,14 @@ async def _read_state_from_db() -> Dict[str, Any]:
                 await _project_remarketing_deliveries(session, hydrated)
                 confirmed = copy.deepcopy(hydrated)
                 _STATE_CACHE = _StateSnapshot(_normalize_providers(hydrated))
-                _STATE_COMMITTED = confirmed
-                _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
+                _STATE_COMMITTED = _freeze(confirmed)
+                _STATE_CACHE._row_base = _STATE_COMMITTED
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
             except Exception:
                 _STATE_CACHE = _StateSnapshot(_normalize_providers(json.loads(json.dumps(DEFAULT_SHARKBOT_STATE))))
-                _STATE_COMMITTED = copy.deepcopy(dict(_STATE_CACHE))
-                _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
+                _STATE_COMMITTED = _freeze(dict(_STATE_CACHE))
+                _STATE_CACHE._row_base = _STATE_COMMITTED
                 _STATE_COMMITTED_OWNER = _STATE_CACHE
                 return _STATE_CACHE
 
@@ -982,10 +1043,10 @@ def _apply_checkout_event(existing_state, event):
     return state
 
 
-def _merge_late_cache_delta(committed, before, live, path=()):
+def _merge_late_cache_delta(committed, before, live, path=(), *, owned=False):
     """Apply only edits since capture, without certifying them as SQL writes."""
     if before == live:
-        return copy.deepcopy(committed)
+        return committed if owned else copy.deepcopy(committed)
     if isinstance(before, dict) and isinstance(live, dict) and isinstance(committed, dict):
         # A stable panel ID alone cannot carry cache across a bot or source
         # replacement. Compare the captured origin/source, not event output.
@@ -993,17 +1054,17 @@ def _merge_late_cache_delta(committed, before, live, path=()):
                 or ('url' in before and any(before.get(k) != live.get(k)
                                            for k in ('id', 'url', 'type', 'name')))):
             return copy.deepcopy(live)
-        merged = copy.deepcopy(committed)
+        merged = dict(committed) if owned else copy.deepcopy(committed)
         for key in before.keys() - live.keys():
             merged.pop(key, None)
         for key, value in live.items():
             if key not in before:
                 if key in merged and isinstance(value, (dict, list)):
-                    merged[key] = _merge_late_cache_delta(merged[key], type(value)(), value, path + (key,))
+                    merged[key] = _merge_late_cache_delta(merged[key], type(value)(), value, path + (key,), owned=owned)
                 else:
                     merged[key] = copy.deepcopy(value)
             elif before[key] != value:
-                merged[key] = _merge_late_cache_delta(merged.get(key), before[key], value, path + (key,))
+                merged[key] = _merge_late_cache_delta(merged.get(key), before[key], value, path + (key,), owned=owned)
         if path == ('memory',):
             # Coexisting active/archived rows are independent customers.
             old = _client_map({'memory': before})
@@ -1024,7 +1085,7 @@ def _merge_late_cache_delta(committed, before, live, path=()):
                                   and old.get(opposite, {}).get('created_at') == created
                                   and saved.get(opposite, {}).get('created_at') == created
                                   and current.get(opposite, {}).get('created_at') != created else None)
-                    rows.append(_merge_late_cache_delta(saved[source], old[source], lead)
+                    rows.append(_merge_late_cache_delta(saved[source], old[source], lead, owned=owned)
                                 if source in old and source in saved
                                 and saved[source].get('created_at') == old[source].get('created_at')
                                 else copy.deepcopy(lead))
@@ -1032,7 +1093,7 @@ def _merge_late_cache_delta(committed, before, live, path=()):
                 # supplied another row with their same immutable identity.
                 known = {(_origin_for_lead(l, {}), str(l.get('telegram_id')))
                          for k in ('leads', 'deleted_leads') for l in live.get(k, [])}
-                rows.extend(copy.deepcopy(l) for l in committed.get(key, [])
+                rows.extend(l if owned else copy.deepcopy(l) for l in committed.get(key, [])
                             if (_origin_for_lead(l, {}), str(l.get('telegram_id')), archived) not in old
                             and (_origin_for_lead(l, {}), str(l.get('telegram_id'))) not in known)
                 merged[key] = rows
@@ -1058,12 +1119,12 @@ def _merge_late_cache_delta(committed, before, live, path=()):
                 if key not in old:
                     merged.append(copy.deepcopy(current[key]))
                 elif key in saved:
-                    merged.append(_merge_late_cache_delta(saved[key], old[key], current[key]))
-            merged.extend(copy.deepcopy(saved[key]) for key in committed_ids if key not in old and key not in current)
+                    merged.append(_merge_late_cache_delta(saved[key], old[key], current[key], owned=owned))
+            merged.extend(saved[key] if owned else copy.deepcopy(saved[key]) for key in committed_ids if key not in old and key not in current)
             return merged
         # Subtract removed occurrences and add only new occurrences, not the
         # entire live list (which would duplicate checkout-owned history).
-        merged = copy.deepcopy(committed)
+        merged = list(committed) if owned else copy.deepcopy(committed)
         unchanged = copy.deepcopy(before)
         added = []
         for value in live:
@@ -1094,6 +1155,17 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
     async with _DB_LOCK:
         if isinstance(_STATE_CACHE, _StateSnapshot):
             _STATE_CACHE._capture_client_presence()
+        # Only the currently published, SQL-confirmed snapshot can prove a
+        # genuine no-op. Detached old writers and pending intents must reconcile.
+        if (runtime_only and state is _STATE_CACHE and _STATE_COMMITTED_OWNER is state
+                and isinstance(state, _StateSnapshot) and state._row_base is not None
+                and not (preserve_runtime or remarketing_new_run or delete_tx_ids or delete_client_keys
+                         or checkout_media_cache or checkout_event or checkout_start or flow_cache_event
+                         or lead_block_event or access_status_event
+                         or state._pending_client_deletes or state._pending_pix_deletes
+                         or state.get('remarketing_campaigns'))
+                and state == state._row_base):
+            return state
         async with async_session() as session:
             result = await session.execute(select(BotConfig))
             config = result.scalars().first()
@@ -1117,11 +1189,18 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             delete_tx_ids = sorted(set(str(t) for t in (delete_tx_ids or [])) | (pending_pix - set(existing_state.get('tx_records', {}))))
             publication_live = existing_state
             publication_before = None
-            if checkout_start or checkout_event or flow_cache_event or lead_block_event or access_status_event or (runtime_only and state is not existing_state):
+            if checkout_start or checkout_event or flow_cache_event or lead_block_event or access_status_event or runtime_only:
                 # Freeze event/queued-runtime reconciliation before row/config
                 # awaits; the still-published live reference remains the delta source.
-                publication_before = copy.deepcopy(existing_state)
+                publication_before = _capture_publication(existing_state)
                 existing_state = publication_before
+            if not (checkout_start or checkout_event or flow_cache_event or lead_block_event or access_status_event):
+                if runtime_only and state is publication_live:
+                    state = copy.deepcopy(existing_state)
+                elif runtime_only and not isinstance(state, _StateSnapshot):
+                    # Legacy plain/shallow dicts have no detached ownership proof.
+                    # Keep their safe full-copy fallback, never share live rows.
+                    state = copy.deepcopy(state)
             if access_status_event:
                 state = copy.deepcopy(existing_state)
                 rec = state.get('tx_records', {}).get(access_status_event['tx_id'])
@@ -1201,7 +1280,8 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                 for idx, lead in enumerate(incoming):
                     identity = (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived)
                     if identity not in dirty_clients and identity in live_clients:
-                        incoming[idx] = copy.deepcopy(live_clients[identity])
+                        if lead is live_clients[identity] or lead != live_clients[identity]:
+                            incoming[idx] = copy.deepcopy(live_clients[identity])
                     elif identity in live_clients and state is not _STATE_CACHE:
                         # Transfer this stale writer's field/history delta, not
                         # its old whole lead over the just-published event.
@@ -1244,7 +1324,8 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             tx_map = state.setdefault('tx_records', {})
             for tid, record in existing_state.get('tx_records', {}).items():
                 if str(tid) not in dirty_pix and str(tid) not in (delete_tx_ids or []):
-                    tx_map[tid] = copy.deepcopy(record)
+                    if tx_map.get(tid) is record or tx_map.get(tid) != record:
+                        tx_map[tid] = copy.deepcopy(record)
 
             if runtime_only:
                 # Runtime send completion must never restore the configuration
@@ -1263,7 +1344,12 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     for bot in runtime_state.get("flow_bots", []):
                         if str(bot.get("id") or "") == checkout_media_cache["bot_id"]:
                             bot.get("payments", {}).pop("generated_medias", None)
-                state = _merge_config_preserving_runtime(copy.deepcopy(existing_state), runtime_state)
+                state = _merge_config_preserving_runtime(
+                    copy.deepcopy(_config_view(existing_state)), _config_view(runtime_state))
+                # These rows already belong to the detached writer. Do not copy
+                # and serialize them again just to merge small configuration.
+                state['memory'] = runtime_state['memory']
+                state['tx_records'] = runtime_state['tx_records']
                 # getMe metadata is runtime-owned, but only for the same token;
                 # never resurrect a removed/replaced bot or overwrite panel fields.
                 runtime_bots = {str(b.get('id')): b for b in runtime_state.get('flow_bots', []) if isinstance(b, dict)}
@@ -1416,11 +1502,10 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             persisted_clients, persisted_pix = await _persist_records(
                 session, state, delete_tx_ids, delete_client_keys,
                 dirty_clients=dirty_clients, dirty_pix=dirty_pix)
-            config_state = copy.deepcopy(state)
-            config_state.pop("tx_records", None)
-            config_state.setdefault("memory", {}).pop("leads", None)
-            config_state["memory"].pop("deleted_leads", None)
-            config.full_state_json = json.dumps(config_state, ensure_ascii=False)
+            config_state = copy.deepcopy(_config_view(state))
+            confirmed_config = getattr(existing_state, '_row_base', None)
+            if not confirmed_config or config_state != _config_view(confirmed_config):
+                config.full_state_json = json.dumps(config_state, ensure_ascii=False)
             publish = state.get("publish", {})
             config.is_active = bool(publish.get("is_live", False))
             config.telegram_bot_token = publish.get("bot_token", "")
@@ -1463,7 +1548,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     await session.delete(order)
             await session.commit()
             if publication_before is not None:
-                state = _merge_late_cache_delta(state, publication_before, publication_live)
+                state = _merge_late_cache_delta(state, publication_before, publication_live, owned=True)
             _STATE_CACHE = _StateSnapshot(state)
             _STATE_CACHE._seen_client_keys = frozenset(_client_map(_STATE_CACHE))
             if publication_before is not None:
@@ -1473,20 +1558,21 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
                     set(publication_before.get('tx_records', {})) - set(publication_live.get('tx_records', {})))
             # Cache rows copied during reconciliation are not necessarily writes.
             # Advance ancestry only with the exact JSON payloads committed to SQL.
-            _STATE_COMMITTED = copy.deepcopy(dict(config_state))
+            committed_config = dict(config_state)
             confirmed = getattr(existing_state, '_row_base', None)
             if confirmed is None:
                 confirmed = existing_state
             confirmed_clients = {**_client_map(confirmed), **persisted_clients}
             for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
-                _STATE_COMMITTED['memory'][key] = [copy.deepcopy(lead)
+                committed_config['memory'][key] = [_freeze(lead)
                     for identity, lead in confirmed_clients.items()
                     if identity[2] == archived and identity not in deleted_keys]
-            _STATE_COMMITTED['tx_records'] = {
-                tid: copy.deepcopy(rec) for tid, rec in
+            committed_config['tx_records'] = {
+                tid: _freeze(rec) for tid, rec in
                 {**confirmed.get('tx_records', {}), **persisted_pix}.items()
                 if str(tid) not in (delete_tx_ids or [])}
-            _STATE_CACHE._row_base = copy.deepcopy(_STATE_COMMITTED)
+            _STATE_COMMITTED = _freeze(committed_config)
+            _STATE_CACHE._row_base = _STATE_COMMITTED
             _STATE_COMMITTED_OWNER = _STATE_CACHE
         return _STATE_CACHE
 
