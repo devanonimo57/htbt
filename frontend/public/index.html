@@ -592,16 +592,11 @@
              ABA 3: DOWNSELL (PRINTS 6 & 7)
         ==================================================== -->
         <div id="nbtab-panel-downsell" class="nb-subtab-panel hidden space-y-5">
-          <div class="hidden">
-            <button type="button" id="nb-ds-pill-general" onclick="nbSwitchDownsellTrack('general')" class="px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition">Geral</button>
-            <button type="button" id="nb-ds-pill-pix" onclick="nbSwitchDownsellTrack('pix')" class="px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition">PIX Gerado</button>
-          </div>
-
           <div class="nb-card p-5 space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span class="w-1.5 h-1.5 rounded-full bg-[#a855f7]"></span>
-                <h3 id="nb-ds-header-title" class="text-xs font-bold text-white">Downsell — Geral</h3>
+                <h3 id="nb-ds-header-title" class="text-xs font-bold text-white">Downsell</h3>
               </div>
               <div class="flex items-center gap-3">
                 <span id="nb-ds-count-badge" class="text-xs text-zinc-500 font-mono">1/20</span>
@@ -624,6 +619,12 @@
                 </button>
               </div>
             </div>
+          </div>
+
+          <div class="nb-card p-4 space-y-2">
+            <label for="nb-ds-loop-rest" class="text-xs font-bold text-zinc-200">Descanso entre ciclos (minutos)</label>
+            <input id="nb-ds-loop-rest" type="number" min="1" value="10" oninput="nbUpdateDownsellRest(this.value)" class="nb-input">
+            <p class="text-xs text-zinc-400">Após a passagem inicial, aguarda este intervalo e repete apenas os cartões com loop ativado, na ordem da lista. Uma nova entrada ou outro Pix não reinicia os gatilhos.</p>
           </div>
 
           <div id="nb-ds-test-banner" class="hidden p-3.5 rounded-xl text-xs space-y-1"></div>
@@ -8634,6 +8635,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     // ABA 3: DOWNSELL (GERAL & PIX GERADO)
     // =========================================================
     function nbSwitchDownsellTrack(track) {
+      // Legacy preview callers can still invalidate their old feedback;
+      // the real renderer/accessor always exposes the single unified list.
       NB_DOWNSELL_TRACK = track;
       const b = nbGetCurrentBot();
       if (b) nbRenderDownsellTab(b);
@@ -8642,28 +8645,47 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbGetActiveDownsellObj(b) {
       if (!b) b = nbGetCurrentBot();
       if (!b) return { enabled: false, sequences: [] };
-      if (NB_DOWNSELL_TRACK === 'pix') {
-        if (!b.downsell_pix) b.downsell_pix = { enabled: false, sequences: [] };
-        return b.downsell_pix;
-      }
       if (!b.downsell_general) b.downsell_general = { enabled: true, sequences: [] };
-      return b.downsell_general;
+      const ds = b.downsell_general;
+      ds.sequences = ds.sequences || [];
+      const legacy = b.downsell_pix;
+      if (legacy?.sequences?.length) {
+        if (!ds.enabled && legacy.enabled) ds.sequences.forEach(s => { s.enabled = false; });
+        const ids = new Set(ds.sequences.map(s => s.id));
+        legacy.sequences.forEach(s => {
+          const migrated = { ...s, trigger: s.trigger || 'pix', enabled: Boolean(legacy.enabled) && s.enabled !== false };
+          if (!migrated.id || ids.has(migrated.id)) migrated.id = nbNewDownsellId();
+          ids.add(migrated.id);
+          ds.sequences.push(migrated);
+        });
+        ds.enabled = Boolean(ds.enabled || legacy.enabled);
+        b.downsell_pix = { enabled: false, sequences: [] };
+      }
+      if (!ds.loop_rest_minutes) ds.loop_rest_minutes = 10;
+      NB_DOWNSELL_TRACK = 'general';
+      return ds;
+    }
+
+    function nbNewDownsellId() {
+      const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${nbNewDownsellId.counter = (nbNewDownsellId.counter || 0) + 1}`;
+      return `seq_${suffix}`;
+    }
+
+    function nbUpdateDownsellRest(value) {
+      const b = nbGetCurrentBot();
+      if (!b) return;
+      nbGetActiveDownsellObj(b).loop_rest_minutes = Math.max(1, parseInt(value, 10) || 1);
     }
 
     function nbRenderDownsellTab(b) {
       if (!b) b = nbGetCurrentBot();
       if (!b) return;
-      const isPix = NB_DOWNSELL_TRACK === 'pix';
-      const pillGen = document.getElementById('nb-ds-pill-general');
-      const pillPix = document.getElementById('nb-ds-pill-pix');
-      if (pillGen) pillGen.className = !isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
-      if (pillPix) pillPix.className = isPix ? "px-3.5 py-1.5 rounded-md text-xs font-bold bg-[#242219] text-white transition" : "px-3.5 py-1.5 rounded-md text-xs font-medium text-zinc-400 hover:text-white transition";
-
+      const isPix = false;
       const ds = nbGetActiveDownsellObj(b);
       const seqs = ds.sequences || (ds.sequences = []);
 
       const titleEl = document.getElementById('nb-ds-header-title');
-      if (titleEl) titleEl.textContent = isPix ? "Downsell — PIX Gerado" : "Downsell — Geral";
+      if (titleEl) titleEl.textContent = "Downsell";
       const descEl = document.getElementById('nb-ds-header-desc');
       if (descEl) {
         descEl.textContent = isPix
@@ -8674,6 +8696,8 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (countEl) countEl.textContent = `${seqs.length}/20`;
       const toggleEl = document.getElementById('nb-ds-enabled-toggle');
       if (toggleEl) toggleEl.checked = Boolean(ds.enabled);
+      const restEl = document.getElementById('nb-ds-loop-rest');
+      if (restEl) restEl.value = ds.loop_rest_minutes;
 
       const plans = b.plans || [];
       const container = document.getElementById('nb-ds-sequences-container');
@@ -8740,7 +8764,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                   <div>
                     <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">ENVIAR APÓS (MINUTOS)</label>
                     <input type="number" min="1" value="${seq.delay_minutes || 10}" oninput="nbUpdateDownsellSeq(${sIdx}, 'delay_minutes', parseInt(this.value || 1))" class="nb-input">
-                    <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Contado a partir do gatilho configurado, não da sequência anterior.</p>
+                    <p class="text-[11px] text-zinc-500 mt-1 leading-relaxed">Contado a partir do primeiro gatilho configurado, não da sequência anterior. A ordem da lista é respeitada: um cartão posterior não ultrapassa o anterior.</p>
                   </div>
                   <div>
                     <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DESCONTO</label>
@@ -8756,7 +8780,7 @@ quer que eu te mostre as opções de acesso?</textarea>
                     <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">GATILHO DE DISPARO</label>
                     <select onchange="nbUpdateDownsellSeq(${sIdx}, 'trigger', this.value); nbRenderDownsellTab();" class="nb-input">
                       <option value="start" ${triggerVal === 'start' ? 'selected' : ''}>No /start (1ª entrada do lead)</option>
-                      <option value="pix" ${triggerVal === 'pix' ? 'selected' : ''}>Ao gerar PIX (pagamento pendente)</option>
+                      <option value="pix" ${triggerVal === 'pix' ? 'selected' : ''}>Ao gerar o primeiro PIX (pagamento pendente)</option>
                     </select>
                     <p class="text-[11px] text-zinc-500 mt-1">Define quando o contador regressivo deste downsell começa.</p>
                   </div>
@@ -8771,6 +8795,10 @@ quer que eu te mostre as opções de acesso?</textarea>
                 </div>
 
                 <!-- CICLO RECORRENTE / LOOP -->
+                <label class="flex items-center gap-2 text-xs text-zinc-300">
+                  <input type="checkbox" ${seq.enabled !== false ? 'checked' : ''} onchange="nbUpdateDownsellSeq(${sIdx}, 'enabled', this.checked)">
+                  Cartão ativado
+                </label>
                 <div class="p-3 rounded-lg bg-[#14130f] border border-[#25231b] flex items-center justify-between gap-4">
                   <div>
                     <div class="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
@@ -8893,7 +8921,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const ds = nbGetActiveDownsellObj(b);
       if (ds.sequences.length >= 20) return;
       ds.sequences.push({
-        id: "seq_" + Date.now(),
+        id: nbNewDownsellId(),
         delay_minutes: 10,
         discount: "Sem desconto",
         plan_ids: (b.plans || []).map(p => p.id),
@@ -8915,7 +8943,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const orig = ds.sequences[sIdx];
       if (!orig || ds.sequences.length >= 20) return;
       const copy = JSON.parse(JSON.stringify(orig));
-      copy.id = "seq_" + Date.now();
+      copy.id = nbNewDownsellId();
       copy._collapsed = false;
       ds.sequences.splice(sIdx + 1, 0, copy);
       nbRenderDownsellTab(b);

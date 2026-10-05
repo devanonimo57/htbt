@@ -1,7 +1,9 @@
 import asyncio
 import base64
+import copy
 import html
 import logging
+import math
 import os
 import random
 import secrets
@@ -148,6 +150,10 @@ class _RefCountedAsyncLock:
 
     def locked(self) -> bool:
         return self.lock.locked()
+
+
+class _FlowDownsellSendRevoked(Exception):
+    """A downsell send lost authorization; never a retryable transport error."""
 
 
 class ActiveBotManager:
@@ -390,6 +396,7 @@ class ActiveBotManager:
         self.polling_task = asyncio.create_task(self._run_polling(bot_inst=test_bot, bot_token=token))
         await self._sync_extra_bots(state)
         self._resume_pending_pix_polls(state)
+        self._resume_flow_downsells(state)
         if not self._delivery_retry_task or self._delivery_retry_task.done():
             self._delivery_retry_task = asyncio.create_task(self._delivery_retry_loop())
         logger.info(f"Bot iniciado em produção: @{me.username}")
@@ -923,7 +930,9 @@ class ActiveBotManager:
         chat_id: Any,
         text: str,
         reply_markup: Optional[InlineKeyboardMarkup] = None,
-        bot_instance: Optional[Bot] = None
+        bot_instance: Optional[Bot] = None,
+        *,
+        pre_send=None
     ):
         target_bot = bot_instance or _CURRENT_BOT_CTX.get() or self.bot
         if not target_bot:
@@ -931,7 +940,11 @@ class ActiveBotManager:
         target_bot_token = getattr(target_bot, "token", "") or _CURRENT_BOT_TOKEN_CTX.get() or ""
         extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
         try:
+            if pre_send is not None:
+                await pre_send()
             return await target_bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", **extra_kw)
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception as e:
             err_s = str(e).lower()
             if isinstance(e, TelegramForbiddenError) or any(
@@ -947,7 +960,11 @@ class ActiveBotManager:
                     wait_sec = float(digits) if digits else 2.0
                 await asyncio.sleep(min(float(wait_sec), 10.0))
                 try:
+                    if pre_send is not None:
+                        await pre_send()
                     return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
+                except _FlowDownsellSendRevoked:
+                    raise
                 except Exception as e_after:
                     err_sa = str(e_after).lower()
                     if isinstance(e_after, TelegramForbiddenError) or any(
@@ -957,7 +974,11 @@ class ActiveBotManager:
                     return None
 
             try:
+                if pre_send is not None:
+                    await pre_send()
                 return await target_bot.send_message(chat_id=chat_id, text=text, **extra_kw)
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception as e2:
                 err_s2 = str(e2).lower()
                 if isinstance(e2, TelegramForbiddenError) or any(
@@ -1074,24 +1095,46 @@ class ActiveBotManager:
         send_as: str,
         caption: Optional[str] = None,
         has_spoiler: bool = False,
-        reply_markup: Optional[InlineKeyboardMarkup] = None
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        *,
+        pre_send=None
     ):
         extra_kw = {"reply_markup": reply_markup} if reply_markup is not None else {}
         if send_as == "document":
+            if pre_send is not None:
+                await pre_send()
             return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
         if send_as == "animation":
             try:
+                if pre_send is not None:
+                    await pre_send()
                 return await bot_instance.send_animation(chat_id=chat_id, animation=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception:
+                if pre_send is not None:
+                    await pre_send()
                 return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
         if send_as == "video":
             try:
+                if pre_send is not None:
+                    await pre_send()
                 return await bot_instance.send_video(chat_id=chat_id, video=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception:
+                if pre_send is not None:
+                    await pre_send()
                 return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
         try:
+            if pre_send is not None:
+                await pre_send()
             return await bot_instance.send_photo(chat_id=chat_id, photo=fid, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception:
+            if pre_send is not None:
+                await pre_send()
             return await bot_instance.send_document(chat_id=chat_id, document=fid, caption=caption, **extra_kw)
 
     async def warm_media_item_in_channel(
@@ -1477,7 +1520,8 @@ class ActiveBotManager:
         reply_markup: Optional[InlineKeyboardMarkup] = None,
         bot_instance: Optional[Bot] = None,
         *,
-        persist_cache: bool = True
+        persist_cache: bool = True,
+        pre_send=None
     ) -> Optional[str]:
         if not isinstance(m, dict):
             return None
@@ -1498,9 +1542,12 @@ class ActiveBotManager:
                     send_as=send_as,
                     caption=caption,
                     has_spoiler=has_spoiler,
-                    reply_markup=reply_markup
+                    reply_markup=reply_markup,
+                    pre_send=pre_send
                 )
                 return cached_fid
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception:
                 m.pop("telegram_file_id", None)
 
@@ -1514,6 +1561,8 @@ class ActiveBotManager:
                 state = await self.state_getter()
                 ctx_tok = getattr(target_bot, "token", "") or ""
                 fb = self._get_active_flow_bot(state, bot_token=ctx_tok) if isinstance(state, dict) else None
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception:
             state = None
 
@@ -1528,6 +1577,8 @@ class ActiveBotManager:
             if persist_cache and state and self.state_saver:
                 try:
                     await self.state_saver(state, runtime_only=True)
+                except _FlowDownsellSendRevoked:
+                    raise
                 except Exception:
                     pass
             eff_send_as = m.get("telegram_send_as") or ("video" if is_video else "photo")
@@ -1538,7 +1589,8 @@ class ActiveBotManager:
                 send_as=eff_send_as,
                 caption=caption,
                 has_spoiler=has_spoiler,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                pre_send=pre_send
             )
             return str(fid)
 
@@ -1550,12 +1602,20 @@ class ActiveBotManager:
         sent = None
         try:
             if is_video:
+                if pre_send is not None:
+                    await pre_send()
                 sent = await target_bot.send_video(chat_id=chat_id, video=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
             else:
+                if pre_send is not None:
+                    await pre_send()
                 sent = await target_bot.send_photo(chat_id=chat_id, photo=inp, caption=caption, has_spoiler=has_spoiler, **extra_kw)
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception as primary_err:
             if hasattr(target_bot, "send_document"):
                 inp_doc = self._build_input_file(url, default_fn)
+                if pre_send is not None:
+                    await pre_send()
                 sent = await target_bot.send_document(chat_id=chat_id, document=inp_doc, caption=caption, **extra_kw)
             else:
                 raise primary_err
@@ -1569,6 +1629,8 @@ class ActiveBotManager:
             if persist_cache and state and self.state_saver:
                 try:
                     await self.state_saver(state, runtime_only=True)
+                except _FlowDownsellSendRevoked:
+                    raise
                 except Exception:
                     pass
             return str(fid)
@@ -1581,7 +1643,8 @@ class ActiveBotManager:
         reply_markup: Optional[InlineKeyboardMarkup] = None,
         bot_instance: Optional[Bot] = None,
         *,
-        persist_cache: bool = True
+        persist_cache: bool = True,
+        pre_send=None
     ) -> bool:
         # Detached checkout media use one source-checked writer after sending;
         # every single/album fallback must avoid generic stale-state saves.
@@ -1599,9 +1662,11 @@ class ActiveBotManager:
             for idx, m in enumerate(valid_items):
                 try:
                     rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                    await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache)
+                    await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache, pre_send=pre_send)
                     if rm is not None:
                         attached = True
+                except _FlowDownsellSendRevoked:
+                    raise
                 except Exception as e:
                     logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
             return attached
@@ -1614,6 +1679,8 @@ class ActiveBotManager:
                 state = await self.state_getter()
                 ctx_tok = getattr(target_bot, "token", "") or ""
                 fb = self._get_active_flow_bot(state, bot_token=ctx_tok) if isinstance(state, dict) else None
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception:
             state = None
 
@@ -1628,6 +1695,8 @@ class ActiveBotManager:
         if persist_cache and warmed_cnt > 0 and state and self.state_saver:
             try:
                 await self.state_saver(state, runtime_only=True)
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception:
                 pass
 
@@ -1639,6 +1708,8 @@ class ActiveBotManager:
                     group_inputs.append(inp_item)
 
             if len(group_inputs) >= 2:
+                if pre_send is not None:
+                    await pre_send()
                 sent_msgs = await target_bot.send_media_group(chat_id=chat_id, media=group_inputs)
                 if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
                     updated = False
@@ -1657,9 +1728,13 @@ class ActiveBotManager:
                     if persist_cache and updated and state and self.state_saver:
                         try:
                             await self.state_saver(state, runtime_only=True)
+                        except _FlowDownsellSendRevoked:
+                            raise
                         except Exception:
                             pass
                 return False
+        except _FlowDownsellSendRevoked:
+            raise
         except Exception as group_err:
             logger.warning(f"Tentando reconversão de álbum lado a lado após erro ({group_err})...")
             try:
@@ -1669,6 +1744,8 @@ class ActiveBotManager:
                     if inp_item:
                         group_inputs_retry.append(inp_item)
                 if len(group_inputs_retry) >= 2:
+                    if pre_send is not None:
+                        await pre_send()
                     sent_msgs = await target_bot.send_media_group(chat_id=chat_id, media=group_inputs_retry)
                     if isinstance(sent_msgs, list) and len(sent_msgs) == len(valid_items):
                         for m, sent_msg in zip(valid_items, sent_msgs):
@@ -1681,9 +1758,13 @@ class ActiveBotManager:
                         if persist_cache and state and self.state_saver:
                             try:
                                 await self.state_saver(state, runtime_only=True)
+                            except _FlowDownsellSendRevoked:
+                                raise
                             except Exception:
                                 pass
                     return False
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception as retry_err:
                 logger.warning(f"Fallback para envio individual após falha no álbum: {retry_err}")
 
@@ -1691,184 +1772,271 @@ class ActiveBotManager:
         for idx, m in enumerate(valid_items):
             try:
                 rm = reply_markup if (idx == len(valid_items) - 1 and reply_markup is not None) else None
-                await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache)
+                await self._send_single_media_cached(chat_id, m, reply_markup=rm, bot_instance=target_bot, persist_cache=persist_cache, pre_send=pre_send)
                 if rm is not None:
                     attached = True
+            except _FlowDownsellSendRevoked:
+                raise
             except Exception as e:
                 logger.warning(f"Falha ao enviar mídia do fluxo: {e}")
         return attached
 
-    def _schedule_flow_downsell(self, user: types.User, track: str = "general", bot_token: str = ""):
+    def _schedule_flow_downsell(self, user: types.User, track: str = "general", bot_token: str = "", lead_created_at=None):
         uid = str(user.id)
         tok = (bot_token or _CURRENT_BOT_TOKEN_CTX.get() or self.active_token or "").strip()
         bot_prefix = tok.split(":", 1)[0] if (tok and ":" in tok) else ""
-        self._cancel_downsell(uid, bot_id=bot_prefix)
-        task = asyncio.create_task(self._flow_downsell_worker(user, track, bot_token=tok))
+        key = f"{bot_prefix}:{uid}" if bot_prefix else uid
+        existing = self.downsell_tasks.get(key)
+        if existing and not existing.done():
+            if lead_created_at is None or getattr(existing, '_hotbot_incarnation', None) == lead_created_at:
+                return
+            self._cancel_downsell(uid, bot_id=bot_prefix)
+        kwargs = {'bot_token': tok}
+        if lead_created_at is not None:
+            kwargs['lead_created_at'] = lead_created_at
+        task = asyncio.create_task(self._flow_downsell_worker(user, track, **kwargs))
+        task._hotbot_incarnation = lead_created_at
+        task._hotbot_flow_downsell = True
         self.downsell_tasks[uid] = task
         if bot_prefix:
             self.downsell_tasks[f"{bot_prefix}:{uid}"] = task
 
-    async def _flow_downsell_worker(self, user: types.User, track: str, bot_token: str = ""):
-        paid_stages = ("Pagamento aprovado", "Entrega concluída", "Compra aprovada", "Comprou upsell")
+    @staticmethod
+    def _downsell_timestamp(value):
+        try:
+            dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            return dt.replace(tzinfo=timezone.utc).timestamp() if dt.tzinfo is None else dt.timestamp()
+        except (ValueError, TypeError):
+            return None
+
+    @staticmethod
+    def _flow_downsell_sequences(fb):
+        """Panel order is authoritative; legacy Pix cards retain their trigger."""
+        cfg = fb.get('downsell_general') or {}
+        sequences = [dict(s, trigger=s.get('trigger', 'start'))
+                     for s in cfg.get('sequences', []) if isinstance(s, dict)] if cfg.get('enabled') else []
+        legacy = fb.get('downsell_pix') or {}
+        known = {str(s.get('id')) for s in sequences}
+        if legacy.get('enabled'):
+            sequences.extend(dict(s, trigger=s.get('trigger', 'pix'))
+                             for s in legacy.get('sequences', [])
+                             if isinstance(s, dict) and str(s.get('id')) not in known)
+        return cfg, [s for s in sequences if s.get('enabled', True)
+                     and ((s.get('message') or '').strip() or any(
+                         isinstance(m, dict) and (m.get('telegram_file_id') or m.get('url'))
+                         for m in (s.get('medias') or [])[:3]))]
+
+    def _flow_downsell_context(self, state, user, bot_token, bot_id, incarnation):
+        origin = bot_token.split(':', 1)[0]
+        fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
+        lead = next((l for l in state.get('memory', {}).get('leads', [])
+                     if str(l.get('telegram_id')) == str(user.id)
+                     and str(l.get('origin_bot_numeric_id')) == origin
+                     and str(l.get('bot_id')) == bot_id
+                     and l.get('created_at') == incarnation), None)
+        if (not fb or not lead or lead.get('blocked')
+                or str(fb.get('token') or '').strip() != bot_token):
+            return None
+        progress = lead.setdefault('flow_downsell', {'anchors': {}, 'sent': []})
+        anchors = progress.setdefault('anchors', {})
+        # Checkout records are durable before transport awaits. Never anchor to
+        # a pending charge from a removed customer's previous incarnation.
+        pix_times = [self._downsell_timestamp(r.get('created_at'))
+                     for r in state.get('tx_records', {}).values()
+                     if str(r.get('user_id')) == str(user.id)
+                     and str(r.get('origin_bot_numeric_id') or str(r.get('bot_token') or '').split(':', 1)[0]) == origin
+                     and (r.get('lead_created_at') == incarnation
+                          or (not r.get('lead_created_at') and str(r.get('created_at') or '') >= str(incarnation)))]
+        pix_times = [t for t in pix_times if t is not None]
+        if pix_times:
+            anchors.setdefault('pix', min(pix_times))
+        paid = [r for r in state.get('tx_records', {}).values()
+                if str(r.get('user_id')) == str(user.id)
+                and str(r.get('origin_bot_numeric_id') or str(r.get('bot_token') or '').split(':', 1)[0]) == origin
+                and r.get('status') == 'paid']
+        first = min(anchors.values()) if anchors else datetime.now(timezone.utc).timestamp()
+        # Any newly confirmed distinct Pix stops this bot's cycle, regardless
+        # of audience or last_tx_id. Older buyers can still receive 'all'.
+        if any(self._downsell_timestamp(r.get('paid_at')) is None
+               or self._downsell_timestamp(r.get('paid_at')) >= first for r in paid):
+            return None
+        cfg, sequences = self._flow_downsell_sequences(fb)
+        bought = bool(paid) or bool(lead.get('paid')) or any(
+            stage in ('Pagamento aprovado', 'Entrega concluída', 'Compra aprovada', 'Comprou upsell')
+            for stage in lead.get('stage_history', []))
+        sequences = [s for s in sequences if s.get('target_audience', 'new') != 'new' or not bought]
+        return lead, fb, progress, cfg, sequences
+
+    def _resume_flow_downsells(self, state):
+        """Restore checkpoints only for active, immutable customer incarnations."""
+        for lead in state.get('memory', {}).get('leads', []):
+            if not lead.get('flow_downsell') or lead.get('blocked'):
+                continue
+            origin = str(lead.get('origin_bot_numeric_id') or '')
+            fb = next((b for b in state.get('flow_bots', [])
+                       if str(b.get('id')) == str(lead.get('bot_id'))
+                       and str(b.get('token') or '').split(':', 1)[0] == origin
+                       and b.get('active', True)), None)
+            if fb:
+                user = types.User(id=int(lead['telegram_id']), is_bot=False,
+                                  first_name=lead.get('first_name') or 'Cliente')
+                self._schedule_flow_downsell(user, track='resume', bot_token=fb['token'], lead_created_at=lead.get('created_at'))
+
+    async def _flow_downsell_worker(self, user: types.User, track: str, bot_token: str = "", lead_created_at=None):
         try:
             state = await self.state_getter()
             fb = self._get_active_flow_bot(state, bot_token=bot_token)
             if not fb:
                 return
-            bot_id = str(fb.get("id") or "")
-            ds_cfg = fb.get("downsell_general", {})
-            enabled = ds_cfg.get("enabled", False)
-            if not enabled and track == "pix":
-                legacy_pix_cfg = fb.get("downsell_pix", {})
-                if legacy_pix_cfg.get("enabled", False):
-                    ds_cfg = legacy_pix_cfg
-                    enabled = True
-            if not enabled:
+            if not self._flow_downsell_sequences(fb)[1]:
                 return
-
-            all_seqs = ds_cfg.get("sequences", [])
-            if track == "pix":
-                sequences = [s for s in all_seqs if s.get("trigger") == "pix" or (s.get("trigger") is None and ds_cfg is fb.get("downsell_pix"))]
-                if not sequences and fb.get("downsell_pix", {}).get("sequences"):
-                    sequences = fb.get("downsell_pix", {}).get("sequences", [])
-            else:
-                sequences = [s for s in all_seqs if s.get("trigger", "start") in ("start", "general")]
-                if not sequences and all_seqs:
-                    sequences = all_seqs
-
-            sequences = sorted(
-                sequences,
-                key=lambda s: max(1, int(s.get("delay_minutes") or 1))
-            )
-            elapsed_mins = 0
-            for seq in sequences:
-                msg_tmpl = (seq.get("message") or "").strip()
-                seq_medias = seq.get("medias") or []
-                has_seq_medias = any(
-                    isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
-                    for m in seq_medias[:3]
-                )
-                if not msg_tmpl and not has_seq_medias:
-                    continue
-                target_mins = max(1, int(seq.get("delay_minutes") or 1))
-                wait_mins = max(1, target_mins - elapsed_mins)
-                await asyncio.sleep(wait_mins * 60)
-                elapsed_mins += wait_mins
-
+            bot_id = str(fb.get('id') or '')
+            origin = bot_token.split(':', 1)[0]
+            initial = next((l for l in state.get('memory', {}).get('leads', [])
+                            if str(l.get('telegram_id')) == str(user.id)
+                            and str(l.get('origin_bot_numeric_id')) == origin
+                            and str(l.get('bot_id')) == bot_id), None)
+            if not initial:
+                # Keep one finite admission-completion wakeup. A late first
+                # handler can schedule after removal, but never creates a row.
+                await asyncio.sleep(60)
+                return
+            incarnation = lead_created_at or initial.get('created_at')
+            if initial.get('created_at') != incarnation:
+                return
+            initial.setdefault('flow_downsell', {'anchors': {}, 'sent': []})
+            if track in ('start', 'general'):
+                initial['flow_downsell'].setdefault('anchors', {}).setdefault(
+                    'start', datetime.now(timezone.utc).timestamp())
+            await self.state_saver(state, runtime_only=True)
+            wake_floor = 0
+            while True:
                 state = await self.state_getter()
-                origin = str(bot_token).split(":", 1)[0] if ":" in str(bot_token) else ""
-                lead = next((l for l in state.get("memory", {}).get("leads", [])
-                             if str(l.get("telegram_id")) == str(user.id)
-                             and str(l.get("origin_bot_numeric_id")) == origin
-                             and str(l.get("bot_id")) == bot_id), None)
-                if lead is None or lead.get("blocked"):
+                context = self._flow_downsell_context(state, user, bot_token, bot_id, incarnation)
+                if context is None:
                     return
-                aud = seq.get("target_audience", "new")
-                if aud == "new" and (lead.get("stage") in paid_stages or lead.get("paid")):
+                lead, fb, progress, cfg, sequences = context
+                if not sequences:
                     return
-                if track in ("general", "start") and lead.get("stage") == "Gerou checkout":
+                now = max(datetime.now(timezone.utc).timestamp(), wake_floor)
+                anchors = progress['anchors']
+                sent = progress.setdefault('sent', [])
+                pending = [s for s in sequences if str(s.get('id')) not in sent]
+                looping = False
+                if pending:
+                    seq = pending[0]
+                    trigger = 'pix' if seq.get('trigger') == 'pix' else 'start'
+                    if anchors.get(trigger) is None:
+                        # An active earlier card owns its place even before its
+                        # event. Recheck in bounded sleeps; later initial cards
+                        # and every loop wait for the actual first passage.
+                        await self.state_saver(state, runtime_only=True)
+                        await asyncio.sleep(60)
+                        wake_floor = now + 60
+                        continue
+                    due = anchors[trigger] + max(1, int(seq.get('delay_minutes') or 1)) * 60
+                else:
+                    loops = [s for s in sequences if s.get('loop_enabled')
+                             and anchors.get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
+                    if not loops:
+                        return
+                    looping = True
+                    loop_sent = progress.setdefault('loop_sent', [])
+                    remaining = [s for s in loops if str(s.get('id')) not in loop_sent]
+                    if not remaining or 'rest_until' not in progress:
+                        progress['loop_sent'] = []
+                        progress['rest_until'] = now + max(1, int(cfg.get('loop_rest_minutes') or 10)) * 60
+                        remaining = loops
+                        await self.state_saver(state, runtime_only=True)
+                    seq = remaining[0]
+                    due = progress['rest_until']
+                if due > now:
+                    # Reload current order/config and payment/deletion at every
+                    # wakeup; capped sleeps also allow edits to take effect.
+                    await self.state_saver(state, runtime_only=True)
+                    wait_seconds = min(60, max(1, math.ceil(due - now)))
+                    await asyncio.sleep(wait_seconds)
+                    wake_floor = now + wait_seconds
+                    continue
+                live_bot = self._get_bot_by_token(bot_token)
+                if (not live_bot or getattr(live_bot, 'token', None) != bot_token
+                        or str(getattr(live_bot, 'id', '')) != origin):
                     return
-
-                fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
-                if not fb:
-                    return
-                eff_tok = (str(fb.get("token") or "").strip() or bot_token or self.current_token).strip()
-                live_bot = None
-                if eff_tok:
-                    _CURRENT_BOT_TOKEN_CTX.set(eff_tok)
-                    live_bot = self._get_bot_by_token(eff_tok)
-                    if live_bot:
-                        _CURRENT_BOT_CTX.set(live_bot)
-
-                disc_str = seq.get("discount", "Sem desconto")
+                _CURRENT_BOT_TOKEN_CTX.set(bot_token)
+                _CURRENT_BOT_CTX.set(live_bot)
+                disc_str = seq.get('discount', 'Sem desconto')
                 disc_pct = self._parse_discount_pct(disc_str)
                 if disc_pct > 0:
-                    auth_discounts = lead.setdefault("authorized_flow_discounts", [])
-                    if disc_pct not in auth_discounts:
-                        auth_discounts.append(disc_pct)
-                kb = self._build_flow_plans_kb(
-                    fb,
-                    filter_plan_ids=seq.get("plan_ids") or None,
-                    discount_str=disc_str
-                )
-                lead["from_downsell"] = True
-                if not msg_tmpl and has_seq_medias:
-                    attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb, bot_instance=live_bot)
-                    if not attached_kb and kb:
-                        await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb, bot_instance=live_bot)
-                    lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} — Mídia]"})
-                else:
-                    await self._send_flow_medias(user.id, seq_medias, bot_instance=live_bot)
-                    txt = self._render_flow_vars(msg_tmpl, user, fb)
-                    await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
-                    lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track}] {txt}"})
+                    discounts = lead.setdefault('authorized_flow_discounts', [])
+                    if disc_pct not in discounts:
+                        discounts.append(disc_pct)
+                lead['from_downsell'] = True
                 await self.state_saver(state, runtime_only=True)
+                kb = self._build_flow_plans_kb(fb, filter_plan_ids=seq.get('plan_ids') or None, discount_str=disc_str)
+                medias = copy.deepcopy(seq.get('medias') or [])
+                text = self._render_flow_vars((seq.get('message') or '').strip(), user, fb)
+                expected_card = copy.deepcopy(seq)
+                expected_plans = copy.deepcopy(fb.get('plans') or [])
 
-            # Ciclo recorrente / loop infinito para sequencias com loop_enabled
-            loop_sequences = [s for s in sequences if s.get("loop_enabled")]
-            if loop_sequences:
-                while True:
-                    for seq in loop_sequences:
-                        loop_delay = max(1, int(seq.get("delay_minutes") or 10))
-                        await asyncio.sleep(loop_delay * 60)
+                async def authorize_send():
+                    # Authorization is checked at each transport edge, not just
+                    # around the compound album/warm/retry operation. No writer
+                    # lock is held while warming, downloading or sending.
+                    fresh_state = await self.state_getter()
+                    current = self._flow_downsell_context(fresh_state, user, bot_token, bot_id, incarnation)
+                    if (current is None or getattr(live_bot, 'token', None) != bot_token
+                            or str(getattr(live_bot, 'id', '')) != origin
+                            or self._get_bot_by_token(bot_token) is not live_bot):
+                        raise _FlowDownsellSendRevoked()
+                    current_card = next((s for s in current[4]
+                                         if str(s.get('id')) == str(expected_card.get('id'))), None)
+                    pending_now = [s for s in current[4]
+                                   if str(s.get('id')) not in current[2].get('sent', [])]
+                    if looping:
+                        candidates = [] if pending_now else [s for s in current[4]
+                            if s.get('loop_enabled') and str(s.get('id')) not in current[2].get('loop_sent', [])
+                            and current[2]['anchors'].get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
+                    else:
+                        candidates = pending_now
+                    selected = candidates[0] if candidates else None
+                    if (current_card != expected_card or selected != expected_card
+                            or (current[1].get('plans') or []) != expected_plans):
+                        raise _FlowDownsellSendRevoked()
 
-                        state = await self.state_getter()
-                        origin = str(bot_token).split(":", 1)[0] if ":" in str(bot_token) else ""
-                        lead = next((l for l in state.get("memory", {}).get("leads", [])
-                                     if str(l.get("telegram_id")) == str(user.id)
-                                     and str(l.get("origin_bot_numeric_id")) == origin
-                                     and str(l.get("bot_id")) == bot_id), None)
-                        if lead is None or lead.get("blocked"):
-                            return
-                        aud = seq.get("target_audience", "new")
-                        if aud == "new" and (lead.get("stage") in paid_stages or lead.get("paid")):
-                            return
-                        if track in ("general", "start") and lead.get("stage") == "Gerou checkout":
-                            return
-
-                        fb = self._get_active_flow_bot(state, bot_token=bot_token, bot_id=bot_id)
-                        if not fb:
-                            return
-                        eff_tok = (str(fb.get("token") or "").strip() or bot_token or self.current_token).strip()
-                        live_bot = None
-                        if eff_tok:
-                            _CURRENT_BOT_TOKEN_CTX.set(eff_tok)
-                            live_bot = self._get_bot_by_token(eff_tok)
-                            if live_bot:
-                                _CURRENT_BOT_CTX.set(live_bot)
-
-                        msg_tmpl = (seq.get("message") or "").strip()
-                        seq_medias = seq.get("medias") or []
-                        has_seq_medias = any(
-                            isinstance(m, dict) and ((m.get("telegram_file_id") or "").strip() or (m.get("url") or "").strip())
-                            for m in seq_medias[:3]
-                        )
-                        if not msg_tmpl and not has_seq_medias:
-                            continue
-
-                        disc_str = seq.get("discount", "Sem desconto")
-                        disc_pct = self._parse_discount_pct(disc_str)
-                        if disc_pct > 0:
-                            auth_discounts = lead.setdefault("authorized_flow_discounts", [])
-                            if disc_pct not in auth_discounts:
-                                auth_discounts.append(disc_pct)
-                        kb = self._build_flow_plans_kb(
-                            fb,
-                            filter_plan_ids=seq.get("plan_ids") or None,
-                            discount_str=disc_str
-                        )
-                        lead["from_downsell"] = True
-                        if not msg_tmpl and has_seq_medias:
-                            attached_kb = await self._send_flow_medias(user.id, seq_medias, reply_markup=kb, bot_instance=live_bot)
-                            if not attached_kb and kb:
-                                await self._safe_send_html(user.id, "👇 <b>Escolha seu plano abaixo:</b>", reply_markup=kb, bot_instance=live_bot)
-                            lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} (Loop) — Mídia]"})
-                        else:
-                            await self._send_flow_medias(user.id, seq_medias, bot_instance=live_bot)
-                            txt = self._render_flow_vars(msg_tmpl, user, fb)
-                            await self._safe_send_html(user.id, txt, reply_markup=kb, bot_instance=live_bot)
-                            lead.setdefault("history", []).append({"role": "assistant", "content": f"[Downsell {track} (Loop)] {txt}"})
-                        await self.state_saver(state, runtime_only=True)
+                try:
+                    attached = await self._send_flow_medias(user.id, medias, reply_markup=kb if not text else None,
+                                                           bot_instance=live_bot, persist_cache=False,
+                                                           pre_send=authorize_send)
+                except _FlowDownsellSendRevoked:
+                    # A live card edit is retried only after selecting/rendering
+                    # fresh configuration. Disabled/paid/removed contexts exit.
+                    continue
+                # A media await can outlive block/payment/deletion or replacement.
+                fresh = await self.state_getter()
+                current = self._flow_downsell_context(fresh, user, bot_token, bot_id, incarnation)
+                if current is None:
+                    return
+                if not any(str(s.get('id')) == str(seq.get('id')) for s in current[4]):
+                    continue
+                if text or (kb and not attached):
+                    try:
+                        await self._safe_send_html(user.id, text or '👇 <b>Escolha seu plano abaixo:</b>',
+                                                   reply_markup=kb, bot_instance=live_bot, pre_send=authorize_send)
+                    except _FlowDownsellSendRevoked:
+                        continue
+                fresh = await self.state_getter()
+                current = self._flow_downsell_context(fresh, user, bot_token, bot_id, incarnation)
+                if current is None:
+                    return
+                lead, _, progress, _, _ = current
+                completed = progress.setdefault('loop_sent' if looping else 'sent', [])
+                sid = str(seq.get('id'))
+                if sid not in completed:
+                    completed.append(sid)
+                lead.setdefault('history', []).append({'role':'assistant',
+                    'content': f"[Downsell {'Loop' if looping else seq.get('trigger', 'start')}] {text or '[Mídia]'}"})
+                await self.state_saver(fresh, runtime_only=True)
+                await asyncio.sleep(0)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -1885,9 +2053,12 @@ class ActiveBotManager:
             for k in list(self.downsell_tasks.keys()):
                 if k == uid or k.endswith(f":{uid}"):
                     keys_to_pop.append(k)
-        for k in set(keys_to_pop):
-            task = self.downsell_tasks.pop(k, None)
-            if task and not task.done():
+        tasks = {self.downsell_tasks[k] for k in keys_to_pop if k in self.downsell_tasks}
+        for k, task in list(self.downsell_tasks.items()):
+            if task in tasks:
+                self.downsell_tasks.pop(k, None)
+        for task in tasks:
+            if not task.done() and task is not asyncio.current_task():
                 task.cancel()
 
     def _verify_secret_test_token(self, candidate: str) -> bool:
@@ -2210,7 +2381,9 @@ class ActiveBotManager:
                 return
             state = await self.state_getter()
             lead = await self._get_or_create_lead(state, message.from_user, bot_token=msg_bot_tok)
-            self._cancel_downsell(str(message.from_user.id), bot_id=origin)
+            prior = self.downsell_tasks.get(f"{origin}:{message.from_user.id}")
+            if not getattr(prior, '_hotbot_flow_downsell', False):
+                self._cancel_downsell(str(message.from_user.id), bot_id=origin)
             self._cancel_upsell(str(message.from_user.id), bot_id=origin)
 
             # Ao enviar /start, reinicia o histórico, etapa e downsells do lead para permitir novo ciclo limpo
@@ -2234,6 +2407,8 @@ class ActiveBotManager:
 
             flow_bot = self._get_active_flow_bot(state, bot_token=msg_bot_tok)
             if flow_bot:
+                lead.setdefault('flow_downsell', {'anchors': {}, 'sent': []}).setdefault('anchors', {}).setdefault(
+                    'start', datetime.now(timezone.utc).timestamp())
                 welcome = flow_bot.get("welcome", {})
                 welcome_medias = welcome.get("medias", [])
                 has_welcome_medias = any(
@@ -2284,7 +2459,8 @@ class ActiveBotManager:
 
                 self._advance_stage(lead, "Viu os planos")
                 await self.state_saver(state, runtime_only=True)
-                self._schedule_flow_downsell(message.from_user, track="general", bot_token=msg_bot_tok)
+                self._schedule_flow_downsell(message.from_user, track="general", bot_token=msg_bot_tok,
+                                             lead_created_at=lead.get('created_at'))
                 return
 
             style = state.get("style", {})
@@ -2860,9 +3036,6 @@ class ActiveBotManager:
                      and str(l.get("origin_bot_numeric_id")) == checkout_origin), None)
         if lead is None:
             return
-        if checkout_origin.isdecimal():
-            self._cancel_downsell(str(callback.from_user.id), bot_id=checkout_origin)
-
         checkout_lead_before = copy.deepcopy(lead)
 
         # Valida desconto contra descontos efetivamente autorizados pelo downsell no servidor
@@ -2982,6 +3155,7 @@ class ActiveBotManager:
             "access_status": "Pendente",
             "status": "pending",
             "created_at": datetime.utcnow().isoformat(),
+            "lead_created_at": lead.get('created_at'),
         }
         state.setdefault("tx_records", {})[tx_id] = tx_record
 
@@ -3063,7 +3237,8 @@ class ActiveBotManager:
             )
             await self._safe_send_html(chat_id, sec_txt, bot_instance=target_bot)
 
-        self._schedule_flow_downsell(callback.from_user, track="pix", bot_token=bot_tok_val)
+        self._schedule_flow_downsell(callback.from_user, track="pix", bot_token=bot_tok_val,
+                                     lead_created_at=checkout_lead_before.get('created_at'))
         self._start_pix_poll_task(callback.from_user.id, tx_id, pushin_token, gw_provider, gw_secret)
 
     def _start_pix_poll_task(
@@ -3361,7 +3536,7 @@ class ActiveBotManager:
                                  for item in current_memory.get(key, [])
                                  if matches_purchase_lead(item)), lead)
 
-                self._cancel_downsell(str(user_id), bot_id=effective_bot_id)
+                self._cancel_downsell(str(user_id), bot_id=tx_origin_numeric_id)
 
                 is_upsell_payment = bool(tx_record.get("is_upsell"))
                 paid_val = float(tx_record.get("amount") or (lead.get("flow_plan_price") or 9.90))

@@ -17,7 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlite_policy import create_application_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select, func, case, update, delete
 
@@ -29,7 +30,7 @@ from telegram_service import bot_manager
 _DEFAULT_DB_PATH = "/var/data/hotbot.db" if os.path.isdir("/var/data") and os.access("/var/data", os.W_OK) else "./hotbot.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{_DEFAULT_DB_PATH}")
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_application_engine(DATABASE_URL, echo=False)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 app = FastAPI(title="SharkBot IA Clone - SaaS", description="Motor completo de atendimento IA e vendas no Telegram")
