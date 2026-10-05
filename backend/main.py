@@ -530,14 +530,24 @@ class _StateSnapshot(dict):
     _row_base: Optional[Dict[str, Any]] = None
     _pending_client_deletes = frozenset()
     _pending_pix_deletes = frozenset()
+    _seen_client_keys = frozenset()
+
+    def _capture_client_presence(self):
+        # Published cache-only admissions are real observed rows, even before
+        # their first SQL commit. Detached, newly staged admissions are not.
+        # Keep this evidence on the snapshot, never in global tombstones.
+        if self is _STATE_CACHE:
+            self._seen_client_keys |= frozenset(_client_map(self))
 
     def __deepcopy__(self, memo):
+        self._capture_client_presence()
         result = type(self)(copy.deepcopy(dict(self), memo))
         memo[id(self)] = result
         # A separate memo is essential: the baseline must not alias the copy.
         result._row_base = copy.deepcopy(self._row_base if self._row_base is not None else dict(self))
         result._pending_client_deletes = self._pending_client_deletes
         result._pending_pix_deletes = self._pending_pix_deletes
+        result._seen_client_keys = self._seen_client_keys
         return result
 MAX_ACTIVE_LEADS = 500
 MAX_HISTORY_PER_LEAD = 60
@@ -843,9 +853,13 @@ async def _discount_needed_elsewhere(state, campaign_id, recipient, discount):
 async def _read_state_from_db() -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     if _STATE_CACHE is not None:
+        if isinstance(_STATE_CACHE, _StateSnapshot):
+            _STATE_CACHE._capture_client_presence()
         return _STATE_CACHE
     async with _DB_LOCK:
         if _STATE_CACHE is not None:
+            if isinstance(_STATE_CACHE, _StateSnapshot):
+                _STATE_CACHE._capture_client_presence()
             return _STATE_CACHE
         async with async_session() as session:
             result = await session.execute(select(BotConfig))
@@ -1077,6 +1091,8 @@ def _merge_late_cache_delta(committed, before, live, path=()):
 async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = False, delete_tx_ids: Optional[List[str]] = None, delete_client_keys=None, *, remarketing_new_run: bool = False, runtime_only: bool = False, checkout_media_cache: Optional[Dict[str, Any]] = None, checkout_event: Optional[Dict[str, Any]] = None, checkout_start: Optional[Dict[str, Any]] = None, flow_cache_event: Optional[Dict[str, Any]] = None, lead_block_event: Optional[Dict[str, Any]] = None, access_status_event: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     global _STATE_CACHE, _STATE_COMMITTED, _STATE_COMMITTED_OWNER
     async with _DB_LOCK:
+        if isinstance(_STATE_CACHE, _StateSnapshot):
+            _STATE_CACHE._capture_client_presence()
         async with async_session() as session:
             result = await session.execute(select(BotConfig))
             config = result.scalars().first()
@@ -1167,10 +1183,18 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             # stale values in the returned cache). Only explicit deletion drops rows.
             live_clients = _client_map(existing_state)
             first_creation_collision = False
+            seen_clients = getattr(state, '_seen_client_keys', frozenset())
+            observed_clients = old_clients.keys() | seen_clients
             for archived, key in ((False, 'leads'), (True, 'deleted_leads')):
                 incoming = state.get('memory', {}).get(key, [])
+                # A vacated observed position is not a first insertion. Its SQL
+                # ancestry can be empty when /start was held on its first reply.
+                first_creation_collision |= any(
+                    (identity := (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived))
+                    in seen_clients and identity not in old_clients and identity not in live_clients
+                    for lead in incoming)
                 incoming[:] = [lead for lead in incoming
-                    if ((_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived) not in old_clients
+                    if ((_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived) not in observed_clients
                         or (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived) in live_clients)
                     and (_origin_for_lead(lead, state), str(lead.get('telegram_id')), archived) not in delete_client_keys]
                 for idx, lead in enumerate(incoming):
@@ -1440,6 +1464,7 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             if publication_before is not None:
                 state = _merge_late_cache_delta(state, publication_before, publication_live)
             _STATE_CACHE = _StateSnapshot(state)
+            _STATE_CACHE._seen_client_keys = frozenset(_client_map(_STATE_CACHE))
             if publication_before is not None:
                 _STATE_CACHE._pending_client_deletes = frozenset(
                     set(_client_map(publication_before)) - set(_client_map(publication_live)))

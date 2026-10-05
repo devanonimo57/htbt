@@ -1966,12 +1966,15 @@ class ActiveBotManager:
                 if not ds.get("enabled", False):
                     return
 
-                lead = await self._get_or_create_lead(
-                    state,
-                    types.User(id=user_id, is_bot=False, first_name=user_first_name),
-                    bot_token=effective_tok
-                )
-                if lead.get("stage") in paid_stages or lead.get("blocked"):
+                # Follow-ups are completions, not customer admissions. Never
+                # recreate a removed first lead after an external send or delay.
+                origin = effective_tok.split(":", 1)[0] if ":" in effective_tok else ""
+                lead = next((l for l in state.get("memory", {}).get("leads", [])
+                             if str(l.get("telegram_id")) == str(user_id)
+                             and origin.isdecimal()
+                             and str(l.get("origin_bot_numeric_id")) == origin
+                             and not l.get("bot_id")), None)
+                if lead is None or lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
 
                 sent_steps = lead.setdefault("sent_downsell_steps", [])
@@ -1992,12 +1995,15 @@ class ActiveBotManager:
                 state = await self.state_getter()
                 if self._get_active_flow_bot(state, bot_token=effective_tok):
                     return
-                lead = await self._get_or_create_lead(
-                    state,
-                    types.User(id=user_id, is_bot=False, first_name=user_first_name),
-                    bot_token=effective_tok
-                )
-                if lead.get("stage") in paid_stages or lead.get("blocked"):
+                # Follow-ups are completions, not customer admissions. Never
+                # recreate a removed first lead after an external send or delay.
+                origin = effective_tok.split(":", 1)[0] if ":" in effective_tok else ""
+                lead = next((l for l in state.get("memory", {}).get("leads", [])
+                             if str(l.get("telegram_id")) == str(user_id)
+                             and origin.isdecimal()
+                             and str(l.get("origin_bot_numeric_id")) == origin
+                             and not l.get("bot_id")), None)
+                if lead is None or lead.get("stage") in paid_stages or lead.get("blocked"):
                     return
 
                 target_bot = None
