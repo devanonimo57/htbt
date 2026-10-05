@@ -28,7 +28,8 @@ class CheckoutWebhookIntegration(unittest.IsolatedAsyncioTestCase):
         main._STATE_CACHE = None
         await main._create_schema()
 
-        self.bot = SimpleNamespace(token="111:test-only", send_message=AsyncMock(), create_chat_invite_link=AsyncMock())
+        self.bot = SimpleNamespace(token="111:test-only", id=111, unban_chat_member=AsyncMock(return_value=True),
+                                   send_message=AsyncMock(), create_chat_invite_link=AsyncMock())
         self.manager = telegram_service.ActiveBotManager()
         self.manager.bot = self.bot
         self.manager.current_token = self.bot.token

@@ -3272,15 +3272,20 @@ async def resend_vip_access(req: AccessResendRequest):
             rec = state.get('tx_records', {}).get(tid)
             if not isinstance(rec, dict) or rec.get('status') != 'paid' or rec.get('bot_token') != rec_token:
                 continue
-            temp_bot = _create_bot_instance(tok)
+            temp_bot = _create_bot_instance(rec_token)
             eff_type = rec.get("delivery_dest_type") or "Canal ou grupo"
             ch_target = (rec.get("delivery_channel_id") or "").strip()
             ext_url = (rec.get("delivery_external_url") or "").strip()
+            resend_primary = not rec.get('primary_access_delivered') or bool(rec.get('delivered'))
             invite_url = ""
 
-            if eff_type == "Link externo" and ext_url:
+            if not resend_primary:
+                invite_url = str(rec.get('invite_url') or '')
+            elif eff_type == "Link externo" and ext_url:
                 invite_url = ext_url
             elif ch_target:
+                from telegram_service import _confirm_channel_reentry
+                await _confirm_channel_reentry(temp_bot, tid, rec, _read_state_from_db)
                 try:
                     parsed_ch = int(ch_target) if ch_target.lstrip("-").isdigit() else ch_target
                     inv = await temp_bot.create_chat_invite_link(
@@ -3292,7 +3297,6 @@ async def resend_vip_access(req: AccessResendRequest):
                 except Exception:
                     invite_url = ""
 
-            resend_primary = not rec.get('primary_access_delivered') or bool(rec.get('delivered'))
             if resend_primary and (not invite_url or invite_url == "https://t.me/+link_exclusivo_vip"):
                 continue
 

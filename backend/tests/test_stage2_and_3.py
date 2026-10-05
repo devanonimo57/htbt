@@ -120,6 +120,8 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         mgr = tg_srv.ActiveBotManager()
         bot = MagicMock()
         bot.token = "123456:MOCK"
+        bot.id = 123456
+        bot.unban_chat_member = AsyncMock(return_value=True)
         bot.send_message = AsyncMock()
         bot.send_photo = AsyncMock()
         bot.send_video = AsyncMock()
@@ -501,6 +503,9 @@ class Stage2And3Tests(unittest.IsolatedAsyncioTestCase):
         }
 
         fake_bot = MagicMock()
+        fake_bot.token = "123456:MOCK_BOT_TOKEN_FOR_TEST"
+        fake_bot.id = 123456
+        fake_bot.unban_chat_member = AsyncMock(return_value=True)
         fake_invite = MagicMock()
         fake_invite.invite_link = "https://t.me/+real_unique_invite_123"
         fake_bot.create_chat_invite_link = AsyncMock(return_value=fake_invite)

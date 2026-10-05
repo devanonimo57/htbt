@@ -76,6 +76,42 @@ def _create_bot_instance(token: str) -> Bot:
         return Bot(token=token)
 
 
+async def _confirm_channel_reentry(bot, tx_id, purchase, state_getter):
+    """Unban only the captured purchase target; never kick an existing member."""
+    fields = ('bot_id', 'bot_token', 'origin_bot_numeric_id', 'user_id',
+              'delivery_dest_type', 'delivery_channel_id', 'created_at')
+    identity = {key: purchase.get(key) for key in fields}
+    token = str(identity['bot_token'] or '').strip()
+    origin = token.split(':', 1)[0] if ':' in token else ''
+    channel = str(identity['delivery_channel_id'] or '').strip()
+    uid = str(identity['user_id'] or '')
+    if (not origin.isdecimal() or not channel or not uid.isdecimal() or int(uid) <= 0
+            or str(getattr(bot, 'token', '')).split(':', 1)[0] != origin
+            or str(getattr(bot, 'id', '')) != origin):
+        raise RuntimeError('Canal, cliente ou bot de origem da compra não comprovado.')
+
+    async def validate_current_purchase():
+        current = await state_getter()
+        record = (current.get('tx_records') or {}).get(tx_id)
+        configs = [item for item in current.get('flow_bots', []) if isinstance(item, dict)
+                   and str(item.get('id') or '') == str(identity['bot_id'] or '')]
+        if (not isinstance(record, dict) or record.get('status') != 'paid'
+                or any(record.get(key) != value for key, value in identity.items())
+                or str(identity['origin_bot_numeric_id'] or origin) != origin
+                or len(configs) != 1
+                or str(configs[0].get('token') or '').split(':', 1)[0] != origin):
+            raise RuntimeError('Identidade da compra mudou; reingresso não confirmado.')
+
+    await validate_current_purchase()
+    parsed_channel = int(channel) if channel.lstrip('-').isdigit() else channel
+    confirmed = await bot.unban_chat_member(chat_id=parsed_channel, user_id=int(uid), only_if_banned=True)
+    if confirmed is not True:
+        raise RuntimeError('Telegram não confirmou o reingresso do cliente.')
+    # No database writer lock is held across transport. Check the current
+    # purchase/config again before creating or sending a usable invitation.
+    await validate_current_purchase()
+
+
 class _RefCountedAsyncLock:
     """Lock assíncrono com contagem de referências.
     Garante que um lock NUNCA seja descartado prematuramente enquanto houver
@@ -3404,6 +3440,7 @@ class ActiveBotManager:
                     elif ch_target and (target_bot or self.bot):
                         try:
                             active_bot_deliv = target_bot or self.bot
+                            await _confirm_channel_reentry(active_bot_deliv, tx_id, tx_record, self.state_getter)
                             invite = await active_bot_deliv.create_chat_invite_link(
                                 chat_id=ch_target,
                                 member_limit=1,

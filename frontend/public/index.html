@@ -10035,6 +10035,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbResendAccess(txIdOrAll) {
+      const submitted = JSON.parse(JSON.stringify(STATE));
       const banner = document.getElementById('nb-acc-feedback-banner');
       const btn = document.getElementById('nb-btn-bulk-resend-access');
       const isSingle = Boolean(txIdOrAll && txIdOrAll !== "all");
@@ -10073,9 +10074,11 @@ quer que eu te mostre as opções de acesso?</textarea>
           throw new Error(data?.detail || "Falha na requisição de reenvio.");
         }
         if (data && data.state) {
-          const mergedProfiles = getMergedSavedProfiles(data.state.saved_profiles);
-          STATE = { ...data.state, saved_profiles: mergedProfiles };
+          const newerEdits = JSON.stringify(submitted) !== JSON.stringify(STATE);
+          STATE = nbMergeStateResponse(data.state, submitted, STATE, true);
+          STATE.saved_profiles = getMergedSavedProfiles(STATE.saved_profiles);
           saveLocalBackup();
+          if (newerEdits) markUnsaved();
         }
         if (banner) {
           const sentCount = Number(data.sent_count || 0);

@@ -12,6 +12,8 @@ class PaymentDeliveryRules(unittest.IsolatedAsyncioTestCase):
         mgr = tg_srv.ActiveBotManager()
         bot = MagicMock()
         bot.token = "111:alpha"
+        bot.id = 111
+        bot.unban_chat_member = AsyncMock(return_value=True)
         bot.create_chat_invite_link = AsyncMock(side_effect=RuntimeError("sem permissão"))
         bot.send_message = AsyncMock()
         mgr.bot = bot
@@ -228,6 +230,9 @@ class PaymentDeliveryRules(unittest.IsolatedAsyncioTestCase):
         tx.update({"status": "paid", "automatic_delivery_attempts": 2,
                    "invite_url": "https://t.me/+expired", "delivered": False})
         temp_bot = MagicMock()
+        temp_bot.token = '111:alpha'
+        temp_bot.id = 111
+        temp_bot.unban_chat_member = AsyncMock(return_value=True)
         temp_bot.send_message = AsyncMock()
         temp_bot.create_chat_invite_link = AsyncMock(side_effect=RuntimeError("no permission"))
         temp_bot.session.close = AsyncMock()

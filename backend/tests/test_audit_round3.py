@@ -181,6 +181,8 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
             "bot_id": "fb_alpha",
             "bot_token": "777:MOCK_ALPHA_TOKEN",
             "plan_id": "plan_alpha_vip",
+            "delivery_dest_type": "Canal ou grupo",
+            "delivery_channel_id": "-100777000",
             "amount": 50.00,
             "status": "pending",
             "delivered": False,
@@ -189,6 +191,8 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
 
         mock_bot = AsyncMock()
         mock_bot.token = "777:MOCK_ALPHA_TOKEN"
+        mock_bot.id = 777
+        mock_bot.unban_chat_member = AsyncMock(return_value=True)
         # Primeira passagem: Telegram falha ao criar convite (ex: bot não é admin do canal)
         mock_bot.create_chat_invite_link.side_effect = RuntimeError("Bot is not an admin in channel")
         bot_manager.extra_bots["777:MOCK_ALPHA_TOKEN"] = mock_bot
@@ -363,6 +367,8 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
             "mode": "flow",
             "bot_id": "fb_alpha",
             "bot_token": "777:MOCK_ALPHA_TOKEN",
+            "delivery_dest_type": "Canal ou grupo",
+            "delivery_channel_id": "-100777000",
             "amount": 50.00,
             "status": "paid",
             "sales_counted": True,  # Já persistido no disco antes do reinício
@@ -376,6 +382,8 @@ class AuditRound3Tests(unittest.IsolatedAsyncioTestCase):
         fresh_mgr.state_saver = bot_manager.state_saver
         mock_bot = AsyncMock()
         mock_bot.token = "777:MOCK_ALPHA_TOKEN"
+        mock_bot.id = 777
+        mock_bot.unban_chat_member = AsyncMock(return_value=True)
         mock_invite = SimpleNamespace(invite_link="https://t.me/+reboot_vip")
         mock_bot.create_chat_invite_link.return_value = mock_invite
         fresh_mgr.extra_bots["777:MOCK_ALPHA_TOKEN"] = mock_bot

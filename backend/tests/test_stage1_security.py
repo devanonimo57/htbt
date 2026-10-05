@@ -331,6 +331,8 @@ class Stage1SecurityTests(unittest.IsolatedAsyncioTestCase):
         mgr = tg_srv.ActiveBotManager()
         bot = MagicMock()
         bot.token = self.mock_state["flow_bots"][0]["token"]
+        bot.id = int(bot.token.split(':', 1)[0])
+        bot.unban_chat_member = AsyncMock(return_value=True)
         bot.send_message = AsyncMock()
         bot.send_photo = AsyncMock()
         bot.send_video = AsyncMock()
