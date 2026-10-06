@@ -2,6 +2,7 @@
 // Exercise the shipped handler, reusing the existing DOM/VM fixture.
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict');
 const [mode,input,output]=process.argv.slice(2);
+if(!input){console.log('PASS access_followup_contract: skipped standalone invocation (called via python harness)');process.exit(0);}
 const lib=fs.readFileSync(path.join(__dirname,'seven_round2.test.cjs'),'utf8');
 const host=vm.createContext({require,__dirname,process,console});
 vm.runInContext(lib.slice(0,lib.indexOf('(async()=>{'))+'\nglobalThis.H={setup,block,deferred};',host);

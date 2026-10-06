@@ -17,6 +17,9 @@ import main
 import telegram_service as service
 import test_checkout_webhook_integration as fixture
 
+REPORT = Path(os.environ.get('HOTBOT_REPORT', str(Path(__file__).resolve().parent / 'report')))
+REPORT.mkdir(parents=True, exist_ok=True)
+
 
 class Clock(datetime):
     value = datetime(2030, 1, 1, tzinfo=timezone.utc)
@@ -101,7 +104,7 @@ class GeminiDownsell(unittest.IsolatedAsyncioTestCase):
         self.clock_patch.stop()
         main.app.dependency_overrides.clear()
         await self.client.aclose()
-        Path(os.environ['HOTBOT_REPORT'], self._testMethodName + '.json').write_text(json.dumps({
+        Path(REPORT, self._testMethodName + '.json').write_text(json.dumps({
             'wait_seconds': self.gate.delays,
             'A_messages': self.messages(),
             'B_messages': [c.kwargs.get('text') for c in self.peer.send_message.call_args_list],

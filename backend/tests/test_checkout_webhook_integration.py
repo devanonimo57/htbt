@@ -73,7 +73,10 @@ class CheckoutWebhookIntegration(unittest.IsolatedAsyncioTestCase):
         main.engine, main.async_session = self.original_engine, self.original_session
         main._STATE_CACHE = None
         await self.engine.dispose()
-        self.tmp.cleanup()
+        try:
+            self.tmp.cleanup()
+        except Exception:
+            pass
 
     async def test_two_pix_webhooks_count_each_once_and_keep_delivery_markers(self):
         for _ in range(2):
@@ -129,3 +132,21 @@ class CheckoutWebhookIntegration(unittest.IsolatedAsyncioTestCase):
         async with main.async_session() as session:
             rows = (await session.execute(select(PixRecord))).scalars().all()
         self.assertEqual({row.tx_id for row in rows}, set(tx_ids))
+
+    async def test_unknown_transaction_rejected_without_gateway_query(self):
+        query_called = []
+        def probe_gateway(*args, **kwargs):
+            async def check_transaction_status(tx_id):
+                query_called.append(tx_id)
+                return {'status': 'paid', 'raw': {'amount': 10}}
+            return SimpleNamespace(check_transaction_status=check_transaction_status)
+
+        with patch.multiple('main', PushinPayClient=probe_gateway):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url='http://test') as client:
+                res = await client.post('/api/webhook/syncpay', json={'id': 'non-existent-tx-999', 'status': 'paid'})
+                self.assertEqual(res.status_code, 200)
+                data = res.json()
+                self.assertEqual(data.get('status'), 'rejected')
+                self.assertEqual(data.get('action'), 'unknown_transaction_id')
+                self.assertEqual(len(query_called), 0, 'Gateway must not be queried for unknown transaction IDs')
+

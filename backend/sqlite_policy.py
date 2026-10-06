@@ -1,4 +1,5 @@
 """SQLite-only durable connection policy. No transport or handler retries."""
+import os
 import sqlite3
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
@@ -20,11 +21,13 @@ def create_application_engine(url, **kwargs):
     sqlite_file = (parsed.get_backend_name() == 'sqlite'
                    and parsed.database not in (None, '', ':memory:')
                    and parsed.query.get('mode') != 'memory')
-    if sqlite_file and not sqlite_wal_runtime_is_patched(sqlite3.sqlite_version_info):
+    allow_legacy = os.getenv("HOTBOT_ALLOW_LEGACY_SQLITE", "0").strip().lower() in ("1", "true", "yes")
+    if sqlite_file and not allow_legacy and not sqlite_wal_runtime_is_patched(sqlite3.sqlite_version_info):
         raise RuntimeError(
             f'SQLite {sqlite3.sqlite_version} is unsafe for concurrent WAL; '
             'install an isolated runtime with SQLite 3.51.3+ '
-            '(or fixed backport 3.44.6/3.50.7) before starting HotBot.')
+            '(or fixed backport 3.44.6/3.50.7) before starting HotBot. '
+            'Define HOTBOT_ALLOW_LEGACY_SQLITE=1 to bypass at your own risk.')
     engine = create_async_engine(url, **kwargs)
     if sqlite_file:
         @event.listens_for(engine.sync_engine, 'connect')

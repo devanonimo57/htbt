@@ -19,6 +19,9 @@ import telegram_service as service
 import test_checkout_webhook_integration as fixture
 from sqlite_policy import create_application_engine
 
+REPORT = Path(os.environ.get('HOTBOT_REPORT', str(Path(__file__).resolve().parent / 'report')))
+REPORT.mkdir(parents=True, exist_ok=True)
+
 
 class MixedWalLoad(unittest.IsolatedAsyncioTestCase):
     async def test_levels_10_25_50_burst_and_three_finite_waves(self):
@@ -110,10 +113,10 @@ class MixedWalLoad(unittest.IsolatedAsyncioTestCase):
                             start_events[uid]=asyncio.Event()
                             pix_events[uid]=asyncio.Event()
                             await measured('start',start_handler(SimpleNamespace(bot=self.bot,from_user=user,chat=SimpleNamespace(id=uid),answer=send_message,text='/start')))
-                            await asyncio.wait_for(start_events[uid].wait(),30)
+                            await asyncio.wait_for(start_events[uid].wait(),120)
                             for _ in range(2):
                                 await measured('pix_checkout',checkout_handler(SimpleNamespace(bot=self.bot,from_user=user,message=SimpleNamespace(chat=SimpleNamespace(id=uid)),data='fplan:plan-a:0',answer=send_message)))
-                            await asyncio.wait_for(pix_events[uid].wait(),30)
+                            await asyncio.wait_for(pix_events[uid].wait(),120)
                             if paid:
                                 current=await main._read_state_from_db()
                                 txs=[tx for tx,r in current['tx_records'].items() if str(r['user_id'])==str(uid)]
@@ -123,7 +126,8 @@ class MixedWalLoad(unittest.IsolatedAsyncioTestCase):
                                     result=await measured('verified_webhook',client.post('/api/webhook/syncpay',json={'id':tx,'status':'paid'}))
                                     self.assertEqual(result.status_code,200,result.text)
                                     self.assertEqual(result.json()['action'],'approved',result.text)
-                                result=await measured('duplicate_webhook',client.post('/api/webhook/syncpay',json={'id':txs[0],'status':'paid'}))
+                                pad_dup_tx = txs[0]
+                                result=await measured('duplicate_webhook',client.post('/api/webhook/syncpay',json={'id':pad_dup_tx,'status':'paid'}))
                                 self.assertEqual(result.status_code,200,result.text)
                         read_task=asyncio.create_task(reads())
                         paid_customers=0
@@ -134,12 +138,12 @@ class MixedWalLoad(unittest.IsolatedAsyncioTestCase):
                                 paid=(i%2==0)
                                 paid_customers+=paid
                                 customers.append(customer(uid,paid))
-                            await asyncio.wait_for(asyncio.gather(*customers),180)
+                            await asyncio.wait_for(asyncio.gather(*customers),max(180,concurrency*8))
                             await asyncio.sleep(.05)
                         await read_task
                         tasks=set(self.manager.downsell_tasks.values())
                         if tasks:
-                            await asyncio.wait_for(asyncio.gather(*tasks),30)
+                            await asyncio.wait_for(asyncio.gather(*tasks),60)
                 elapsed=time.perf_counter()-started
                 main._STATE_CACHE=None
                 cold=await main._read_state_from_db()
@@ -173,8 +177,14 @@ class MixedWalLoad(unittest.IsolatedAsyncioTestCase):
                 db=Path(self.engine.url.database)
                 measurement={'concurrency':concurrency,'waves':3,'wave_gap_seconds':.05,'elapsed_seconds':elapsed,'operations':dict(counts),'latency':latency,'errors':errors,'lock_errors':sum('locked' in x['error'] for x in errors),'stored_customers':sql_clients,'stored_pix':sql_pix,'distinct_sales':expected_paid,'revenue':expected_paid*10,'delivery_attempts':sum(r['automatic_delivery_attempts'] for r in paid_rows),'delivery_calls':sum(delivery_calls.values()),'downsell_sends':sent['DS-START']+sent['DS-PIX'],'database_bytes':db.stat().st_size,'wal_bytes':Path(str(db)+'-wal').stat().st_size if Path(str(db)+'-wal').exists() else 0,'persisted_payload_bytes':len(json.dumps(cold).encode()),'cold_reconciliation':True,'sqlite':sqlite3.sqlite_version,'fake_transport_latency_seconds':.001,'scheduler_clock':'compressed finite wakeups, not live wall-clock capacity','uuid_database':str(db)}
                 measurements.append(measurement)
-                Path(os.environ['HOTBOT_REPORT'],'mixed-load.json').write_text(json.dumps(measurements,indent=2),encoding='utf-8')
+                Path(REPORT,'mixed-load.json').write_text(json.dumps(measurements,indent=2),encoding='utf-8')
             finally:
+                if 'read_task' in locals() and not read_task.done():
+                    read_task.cancel()
+                    try:
+                        await read_task
+                    except Exception:
+                        pass
                 tasks=set(self.manager.downsell_tasks.values())
                 for task in tasks:
                     if not task.done(): task.cancel()

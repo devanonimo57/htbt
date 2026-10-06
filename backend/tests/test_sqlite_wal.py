@@ -13,6 +13,9 @@ import httpx
 import test_checkout_webhook_integration as fixtures
 from sqlite_policy import create_application_engine, sqlite_wal_runtime_is_patched
 
+REPORT = Path(os.environ.get('HOTBOT_REPORT', str(Path(__file__).resolve().parent / 'report')))
+REPORT.mkdir(parents=True, exist_ok=True)
+
 
 class SQLiteRuntimeSafety(unittest.TestCase):
     def test_fixed_releases_and_unsafe_releases(self):
@@ -61,7 +64,7 @@ class WalPaymentLifecycle(fixtures.CheckoutWebhookIntegration):
             saved = await main._read_state_from_db()
             self.assertTrue(saved['tx_records'][tx]['sales_counted'])
             self.assertTrue(saved['tx_records'][tx]['delivered'])
-            Path(os.environ['HOTBOT_REPORT'], 'long-reader.json').write_text(json.dumps({'reader_held_seconds_before_payment':5.2,'payment_seconds':elapsed,'reader_open_through_commit':True,'action':response.json()['action'],'sqlite':sqlite3.sqlite_version}))
+            Path(REPORT, 'long-reader.json').write_text(json.dumps({'reader_held_seconds_before_payment':5.2,'payment_seconds':elapsed,'reader_open_through_commit':True,'action':response.json()['action'],'sqlite':sqlite3.sqlite_version}))
         finally:
             reader.rollback()
             reader.close()

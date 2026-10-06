@@ -13,7 +13,8 @@ import telegram_service
 import test_checkout_webhook_integration as fixture
 
 ROOT=Path(__file__).resolve().parents[2]
-REPORT=Path(os.environ['HOTBOT_REPORT'])
+REPORT=Path(os.environ.get('HOTBOT_REPORT', str(Path(__file__).resolve().parent / 'report')))
+REPORT.mkdir(parents=True, exist_ok=True)
 
 class GeminiDownsellFrontend(unittest.IsolatedAsyncioTestCase):
     async def run_ui(self, mode):

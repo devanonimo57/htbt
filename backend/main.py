@@ -2206,10 +2206,12 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     if status not in ("paid", "completed", "approved", "settled"):
         return {"status": "received", "action": "ignored_non_paid_status", "transaction_id": transaction_id}
 
-    # Cobranças locais canceladas por exclusão não devem consultar o gateway
+    # Cobranças locais canceladas ou inexistentes não devem consultar o gateway
     # novamente nem liberar acesso. O QR externo pode continuar pagável.
     state = await _read_state_from_db()
     tx_record = (state.get("tx_records") or {}).get(transaction_id) or bot_manager.tx_records.get(transaction_id)
+    if not tx_record:
+        return {"status": "rejected", "action": "unknown_transaction_id", "transaction_id": transaction_id}
     if isinstance(tx_record, dict) and tx_record.get("status") in ("cancelled", "canceled"):
         return {"status": "received", "action": "archived_or_cancelled_tx", "transaction_id": transaction_id}
 
