@@ -1197,9 +1197,10 @@ async def _write_state_to_db(state: Dict[str, Any], preserve_runtime: bool = Fal
             if not (checkout_start or checkout_event or flow_cache_event or lead_block_event or access_status_event):
                 if runtime_only and state is publication_live:
                     state = copy.deepcopy(existing_state)
-                elif runtime_only and not isinstance(state, _StateSnapshot):
-                    # Legacy plain/shallow dicts have no detached ownership proof.
-                    # Keep their safe full-copy fallback, never share live rows.
+                elif runtime_only:
+                    # Even a detached snapshot can be retained by its caller or
+                    # share rows with an earlier publication. Own a fresh copy
+                    # before preparation, preserving the snapshot's ancestry.
                     state = copy.deepcopy(state)
             if access_status_event:
                 state = copy.deepcopy(existing_state)
