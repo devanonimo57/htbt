@@ -118,13 +118,19 @@ class PushinPayClient:
         if not base:
             host = (os.getenv("VPS_HOST") or os.getenv("HOST") or "").strip()
             if host:
+                scheme = "https" if host.startswith("https://") else "http"
                 if host.startswith("http://"):
                     host = host[7:]
                 elif host.startswith("https://"):
                     host = host[8:]
                 host = host.rstrip("/")
-                port = (os.getenv("PORT") or "8000").strip()
-                base = f"http://{host}:{port}" if ":" not in host else f"http://{host}"
+                if ":" in host:
+                    base = f"{scheme}://{host}"
+                elif scheme == "https":
+                    base = f"https://{host}"
+                else:
+                    port = (os.getenv("PORT") or "8000").strip()
+                    base = f"http://{host}:{port}"
         if base:
             if not base.startswith("http://") and not base.startswith("https://"):
                 base = f"https://{base}"

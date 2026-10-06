@@ -131,6 +131,65 @@ class AuditRound5Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.server_state["memory"]["leads"]), 1)
         self.assertEqual(self.server_state["learning"]["evaluated_results"], 1)
 
+    async def test_resolve_default_webhook_preserves_https_scheme(self):
+        with patch.dict(os.environ, {"VPS_HOST": "https://secure-vps.com", "WEBHOOK_BASE_URL": ""}, clear=False):
+            url = app_main.PushinPayClient._resolve_default_webhook("/api/webhook/syncpay")
+            self.assertEqual(url, "https://secure-vps.com/api/webhook/syncpay")
+
+    async def test_webhook_uses_transaction_credentials_when_dashboard_changes(self):
+        tx_id = "tx_sync_isolate_1"
+        self.server_state["tx_records"] = {
+            tx_id: {
+                "user_id": 111,
+                "amount": 29.9,
+                "cents": 2990,
+                "status": "pending",
+                "gateway_provider": "syncpay",
+                "gateway_token": "client_id_sync_persisted",
+                "gateway_secret": "client_secret_sync_persisted"
+            }
+        }
+        # Painel global agora está configurado como PushinPay
+        self.server_state["publish"] = {
+            "gateway_provider": "pushinpay",
+            "pushin_pay_token": "token_pushin_dashboard",
+            "gateway_secret": ""
+        }
+        captured_kwargs = {}
+        def mock_client_factory(*args, **kwargs):
+            captured_kwargs.update(kwargs)
+            mock_client = AsyncMock()
+            mock_client.check_transaction_status = AsyncMock(return_value={"status": "paid", "raw": {"amount": 29.9}})
+            return mock_client
+
+        req = SimpleNamespace(headers={}, url=SimpleNamespace(path="/api/webhook/syncpay"))
+        with patch.object(app_main, "PushinPayClient", side_effect=mock_client_factory), \
+             patch.object(app_main.bot_manager, "notify_payment_by_tx_id", AsyncMock(return_value=True)):
+            res = await app_main.webhook_gateway({"id": tx_id, "status": "paid"}, request=req)
+            self.assertEqual(res["status"], "success")
+            self.assertEqual(captured_kwargs["provider"], "syncpay")
+            self.assertEqual(captured_kwargs["token"], "client_id_sync_persisted")
+            self.assertEqual(captured_kwargs["secret"], "client_secret_sync_persisted")
+
+    async def test_webhook_route_mismatch_rejected(self):
+        tx_id = "tx_sync_route_mismatch"
+        self.server_state["tx_records"] = {
+            tx_id: {
+                "user_id": 111,
+                "amount": 10.0,
+                "cents": 1000,
+                "status": "pending",
+                "gateway_provider": "syncpay",
+                "gateway_token": "tok_sync",
+                "gateway_secret": "sec_sync"
+            }
+        }
+        # Notificação recebida na rota errada (/api/webhook/pushinpay)
+        req = SimpleNamespace(headers={}, url=SimpleNamespace(path="/api/webhook/pushinpay"))
+        res = await app_main.webhook_gateway({"id": tx_id, "status": "paid"}, request=req)
+        self.assertEqual(res["status"], "rejected")
+        self.assertEqual(res["action"], "provider_mismatch")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2220,17 +2220,22 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
         return {"status": "received", "action": "archived_or_cancelled_tx", "transaction_id": transaction_id}
 
     # Fail-closed: NUNCA confia apenas no JSON do webhook; consulta o status oficial no gateway
+    # Prioridade: credenciais capturadas na emissão da cobrança; fallback para o painel atual
+    rec_prov = str(tx_record.get("gateway_provider") or "").lower().strip() if isinstance(tx_record, dict) else ""
+    rec_tok = str(tx_record.get("gateway_token") or "").strip() if isinstance(tx_record, dict) else ""
+    rec_sec = str(tx_record.get("gateway_secret") or "").strip() if isinstance(tx_record, dict) else ""
+
     pub = state.get("publish", {})
-    token = (pub.get("pushin_pay_token") or "").strip()
-    gw_provider = (pub.get("gateway_provider") or "syncpay").strip()
-    gw_secret = (pub.get("gateway_secret") or "").strip()
+    gw_provider = rec_prov or (pub.get("gateway_provider") or "syncpay").strip()
+    token = rec_tok or (pub.get("pushin_pay_token") or "").strip()
+    gw_secret = rec_sec or (pub.get("gateway_secret") or "").strip()
+
     req_path = str(request.url.path) if request and hasattr(request, "url") and hasattr(request.url, "path") else ""
-    if "pushinpay" in req_path:
-        gw_provider = "pushinpay"
-    elif "syncpay" in req_path:
-        gw_provider = "syncpay"
-    elif isinstance(tx_record, dict) and tx_record.get("gateway_provider"):
-        gw_provider = str(tx_record["gateway_provider"]).strip()
+    route_prov = "pushinpay" if "pushinpay" in req_path else ("syncpay" if "syncpay" in req_path else "")
+    if rec_prov and route_prov and rec_prov != route_prov:
+        return {"status": "rejected", "action": "provider_mismatch", "transaction_id": transaction_id}
+    if not rec_prov and route_prov:
+        gw_provider = route_prov
 
     if not token or token == REDACTED_SECRET_MASK:
         return {"status": "rejected", "action": "gateway_not_configured", "transaction_id": transaction_id}
