@@ -2224,6 +2224,13 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     token = (pub.get("pushin_pay_token") or "").strip()
     gw_provider = (pub.get("gateway_provider") or "syncpay").strip()
     gw_secret = (pub.get("gateway_secret") or "").strip()
+    req_path = str(request.url.path) if request and hasattr(request, "url") and hasattr(request.url, "path") else ""
+    if "pushinpay" in req_path:
+        gw_provider = "pushinpay"
+    elif "syncpay" in req_path:
+        gw_provider = "syncpay"
+    elif isinstance(tx_record, dict) and tx_record.get("gateway_provider"):
+        gw_provider = str(tx_record["gateway_provider"]).strip()
 
     if not token or token == REDACTED_SECRET_MASK:
         return {"status": "rejected", "action": "gateway_not_configured", "transaction_id": transaction_id}

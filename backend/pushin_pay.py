@@ -118,6 +118,11 @@ class PushinPayClient:
         if not base:
             host = (os.getenv("VPS_HOST") or os.getenv("HOST") or "").strip()
             if host:
+                if host.startswith("http://"):
+                    host = host[7:]
+                elif host.startswith("https://"):
+                    host = host[8:]
+                host = host.rstrip("/")
                 port = (os.getenv("PORT") or "8000").strip()
                 base = f"http://{host}:{port}" if ":" not in host else f"http://{host}"
         if base:
@@ -343,5 +348,11 @@ class PushinPayClient:
                 headers=self.headers
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            tx_data = data.get("data", data) if isinstance(data, dict) else {}
+            st = str(tx_data.get("status", data.get("status", ""))).lower() if isinstance(data, dict) else ""
+            res = dict(data) if isinstance(data, dict) else {}
+            res["status"] = "paid" if st in ("paid", "completed", "approved", "settled") else st
+            res["raw"] = tx_data
+            return res
 
