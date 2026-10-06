@@ -1,6 +1,9 @@
 """SQLite-only durable connection policy. No transport or handler retries."""
 import os
 import sqlite3
+from dotenv import load_dotenv
+
+load_dotenv()
 from sqlalchemy import event
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine

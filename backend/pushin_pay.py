@@ -1,5 +1,8 @@
 import asyncio
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import time
 import uuid
 import httpx
@@ -109,6 +112,20 @@ class PushinPayClient:
             }
             return access_token
 
+    @staticmethod
+    def _resolve_default_webhook(endpoint: str) -> Optional[str]:
+        base = (os.getenv("WEBHOOK_BASE_URL") or "").strip().rstrip("/")
+        if not base:
+            host = (os.getenv("VPS_HOST") or os.getenv("HOST") or "").strip()
+            if host:
+                port = (os.getenv("PORT") or "8000").strip()
+                base = f"http://{host}:{port}" if ":" not in host else f"http://{host}"
+        if base:
+            if not base.startswith("http://") and not base.startswith("https://"):
+                base = f"https://{base}"
+            return f"{base}{endpoint}"
+        return None
+
     async def create_pix_charge(
         self,
         value_in_cents: int,
@@ -124,18 +141,10 @@ class PushinPayClient:
 
         if self.provider == "syncpay":
             bearer = await self._get_syncpay_bearer()
-            effective_webhook = webhook_url
-            if not effective_webhook:
-                base = (os.getenv("WEBHOOK_BASE_URL") or "").strip().rstrip("/")
-                if not base:
-                    host = (os.getenv("VPS_HOST") or os.getenv("HOST") or "154.64.32.171").strip()
-                    port = (os.getenv("PORT") or "8000").strip()
-                    base = f"http://{host}:{port}"
-                effective_webhook = f"{base}/api/webhook/syncpay"
+            effective_webhook = webhook_url or self._resolve_default_webhook("/api/webhook/syncpay")
             payload = {
                 "amount": amount_float,
                 "description": "Acesso VIP Privado",
-                "webhook_url": effective_webhook,
                 "client": {
                     "name": client_name or "Cliente VIP",
                     "cpf": "11144477735",
@@ -143,6 +152,8 @@ class PushinPayClient:
                     "phone": "11999999999"
                 }
             }
+            if effective_webhook:
+                payload["webhook_url"] = effective_webhook
             resp = await client.post(
                 f"{self.SYNCPAY_BASE_URL}/api/partner/v1/cash-in",
                 json=payload,
@@ -228,11 +239,12 @@ class PushinPayClient:
             }
 
         # Padrão: Pushin Pay
+        effective_webhook = webhook_url or self._resolve_default_webhook("/api/webhook/pushinpay")
         payload_pp: Dict[str, Any] = {
             "value": value_in_cents
         }
-        if webhook_url:
-            payload_pp["webhook_url"] = webhook_url
+        if effective_webhook:
+            payload_pp["webhook_url"] = effective_webhook
 
         response = await client.post(
             f"{self.BASE_URL}/pix/cashIn",
