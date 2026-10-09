@@ -24,8 +24,10 @@ vm.runInContext(extract('async function nbRefreshMetrics()', 'function deleteLea
 (async()=>{
   await context.nbRefreshMetrics();
   assert.equal(el('nb-dash-kpi-sales').textContent,'2');
+  assert.equal(el('nb-dash-kpi-ticket').textContent,'R$ 15,00');
   assert.equal(el('nb-dash-kpi-pending-cnt').textContent,'1 Pix aguardando pagamento');
   assert.equal(el('nb-ana-hour-best').textContent,'10h (2 vendas)');
+  assert.equal(el('nb-ana-hour-conv').textContent,'67%');
   assert.match(el('nb-ana-top-bots').innerHTML,/@a/);
   assert.match(el('nb-ana-top-days').innerHTML,/2026-09-20/);
   assert.match(el('nb-ana-top-tickets').innerHTML,/2 plano\(s\)/);

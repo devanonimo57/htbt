@@ -10768,6 +10768,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
+      setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
       // Taxa de Conversão e Starts por Venda Operacionais
       const convRateStr = startsCount > 0
         ? `${Math.min(100, Math.round((paidSalesCount / startsCount) * 100))}%`
@@ -10861,7 +10862,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-ana-hour-best', bestHrSales ? `${bestHr}h (${bestHrSales} vendas)` : '—');
       setTxt('nb-ana-hour-paid', String(paidSalesCount));
       setTxt('nb-ana-hour-gen', String(pixGenCount));
-      setTxt('nb-ana-hour-conv', '—');
+      setTxt('nb-ana-hour-conv', pixGenCount > 0 ? `${pixApprPct}%` : '—');
 
       const hrChartEl = document.getElementById('nb-ana-hourly-chart');
       if (hrChartEl) {
