@@ -295,7 +295,7 @@ class PushinPayClient:
                 tx_data = data.get("data", data)
                 st = str(tx_data.get("status", "")).lower()
                 return {
-                    "status": "paid" if st in ("completed", "paid", "approved", "settled") else st,
+                    "status": "paid" if st in ("completed", "paid", "approved", "settled", "pago", "aprovado", "concluido", "concluído", "liquidado") else st,
                     "raw": tx_data
                 }
 
@@ -358,7 +358,7 @@ class PushinPayClient:
             tx_data = data.get("data", data) if isinstance(data, dict) else {}
             st = str(tx_data.get("status", data.get("status", ""))).lower() if isinstance(data, dict) else ""
             res = dict(data) if isinstance(data, dict) else {}
-            res["status"] = "paid" if st in ("paid", "completed", "approved", "settled") else st
+            res["status"] = "paid" if st in ("paid", "completed", "approved", "settled", "pago", "aprovado", "concluido", "concluído", "liquidado") else st
             res["raw"] = tx_data
             return res
 

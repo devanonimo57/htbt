@@ -2196,9 +2196,11 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     transaction_id = str(
         data_obj.get("identifier")
         or data_obj.get("reference_id")
+        or data_obj.get("transaction_id")
         or data_obj.get("id")
         or payload.get("identifier")
         or payload.get("reference_id")
+        or payload.get("transaction_id")
         or payload.get("id")
         or ""
     ).strip()
@@ -2207,7 +2209,7 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
         return {"status": "rejected", "action": "invalid_transaction_id", "transaction_id": transaction_id}
 
     status = str(data_obj.get("status") or payload.get("status") or "").lower()
-    if status not in ("paid", "completed", "approved", "settled"):
+    if status not in ("paid", "completed", "approved", "settled", "pago", "aprovado", "concluido", "concluído", "liquidado", "received", "confirmed"):
         return {"status": "received", "action": "ignored_non_paid_status", "transaction_id": transaction_id}
 
     # Cobranças locais canceladas ou inexistentes não devem consultar o gateway
@@ -2256,13 +2258,19 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     if tx_record and isinstance(raw_gw, dict):
         expected_amount = float(tx_record.get("amount") or 0)
         if "amount" in raw_gw and raw_gw["amount"] is not None:
-            paid_amount = float(raw_gw["amount"])
-            if paid_amount + 0.01 < expected_amount:
-                return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+            try:
+                paid_amount = float(str(raw_gw["amount"]).replace(",", "."))
+                if paid_amount + 0.01 < expected_amount:
+                    return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+            except (ValueError, TypeError):
+                pass
         elif "value" in raw_gw and raw_gw["value"] is not None:
-            paid_cents = int(raw_gw["value"])
-            if paid_cents < int(tx_record.get("cents") or round(expected_amount * 100)):
-                return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+            try:
+                paid_cents = int(round(float(str(raw_gw["value"]).replace(",", "."))))
+                if paid_cents < int(tx_record.get("cents") or round(expected_amount * 100)):
+                    return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
+            except (ValueError, TypeError):
+                pass
 
     delivered = await bot_manager.notify_payment_by_tx_id(transaction_id)
     if not delivered:
