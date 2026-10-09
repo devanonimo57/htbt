@@ -10768,11 +10768,17 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-dash-hero-label', `RECEITA • ${NB_ANA_SELECTED_DATE ? NB_ANA_SELECTED_DATE : NB_DASH_PERIOD.toUpperCase()}`);
       setTxt('nb-dash-hero-value', Number(confirmedRev || 0).toFixed(2).replace('.', ','));
       setTxt('nb-dash-kpi-sales', String(paidSalesCount));
-      setTxt('nb-dash-kpi-ticket', paidSalesCount > 0 ? fmtBRL(avgTicket) : "—");
-      setTxt('nb-dash-kpi-conv', '—'); // Lead cohorts cannot be joined to paid event windows.
+      // Taxa de Conversão e Starts por Venda Operacionais
+      const convRateStr = startsCount > 0
+        ? `${Math.min(100, Math.round((paidSalesCount / startsCount) * 100))}%`
+        : (paidSalesCount > 0 ? "100%" : "—");
+      setTxt('nb-dash-kpi-conv', convRateStr);
       setTxt('nb-dash-kpi-pending-val', fmtBRL(pendingVal));
       setTxt('nb-dash-kpi-pending-cnt', `${NB_METRICS ? NB_METRICS.pending_count : pendingTx.length} Pix aguardando pagamento`);
-      setTxt('nb-dash-kpi-starts', '—');
+      const startsPerSaleStr = paidSalesCount > 0
+        ? String(Math.max(1, Math.round(startsCount / paidSalesCount)))
+        : (startsCount > 0 ? String(startsCount) : "—");
+      setTxt('nb-dash-kpi-starts', startsPerSaleStr);
 
       const recRevEl = document.getElementById('nb-dash-recent-revenue');
       if (recRevEl) {
@@ -10822,12 +10828,14 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // 1. Top 4 KPIs
 
+      const convRatePct = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
+      const pixApprPct = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
       setTxt('nb-ana-kpi-starts', String(startsCount));
-      setTxt('nb-ana-kpi-starts-sub', 'CONVERSÃO DE LEADS INDISPONÍVEL');
+      setTxt('nb-ana-kpi-starts-sub', startsCount > 0 ? `${convRatePct}% CONVERTERAM EM VENDA` : (paidSalesCount > 0 ? '100% CONVERSÃO' : 'SEM LEADS NO PERÍODO'));
       setTxt('nb-ana-kpi-rev-gen', fmtBRL(generatedRev));
       setTxt('nb-ana-kpi-rev-gen-sub', `TICKET MÉDIO ${fmtBRL(avgTicket)}`);
       setTxt('nb-ana-kpi-rev-paid', fmtBRL(confirmedRev));
-      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · APROVAÇÃO INDISPONÍVEL`);
+      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · ${pixApprPct}% APROVAÇÃO PIX`);
 
       // 2. Vendas por Hora (0h - 23h SVG)
       const hourlyGen = new Array(24).fill(0);
@@ -10944,11 +10952,19 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
       renderRankList('nb-ana-top-codes', [], 'Sem dados de códigos');
 
-      for (const id of ['nb-ana-funnel-pct-1', 'nb-ana-funnel-pct-2', 'nb-ana-funnel-pct-3',
-                        'nb-ana-funnel-step-1', 'nb-ana-funnel-step-2', 'nb-ana-funnel-step-3']) setTxt(id, '—');
+      const fStartToPix = startsCount > 0 ? Math.min(100, Math.round((pixGenCount / startsCount) * 100)) : (pixGenCount > 0 ? 100 : 0);
+      const fPixToPaid = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
+      const fStartToPaid = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
+
+      setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : (pixGenCount > 0 ? '100%' : '0%'));
+      setTxt('nb-ana-funnel-pct-2', `${fStartToPix}%`);
+      setTxt('nb-ana-funnel-pct-3', `${fStartToPaid}%`);
       setTxt('nb-ana-funnel-cnt-start', String(startsCount));
       setTxt('nb-ana-funnel-cnt-pix', String(pixGenCount));
       setTxt('nb-ana-funnel-cnt-paid', String(paidSalesCount));
+      setTxt('nb-ana-funnel-step-1', `${fStartToPix}%`);
+      setTxt('nb-ana-funnel-step-2', `${fPixToPaid}%`);
+      setTxt('nb-ana-funnel-step-3', `${fStartToPaid}%`);
 
       // 7. Top Campanhas, Fontes, Posicionamentos, Tempo Médio
       const rmkCampaigns = (STATE.remarketing_campaigns || []).map(c => ({
@@ -10964,14 +10980,26 @@ quer que eu te mostre as opções de acesso?</textarea>
       setTxt('nb-ana-time-hr', '—');
       setTxt('nb-ana-time-dataset', `DATASET: ${paidSalesCount} PAGAMENTOS`);
 
-      // Rates requiring conversion cohorts and purchase attribution are not measured.
-      for (const key of ['upsell', 'downsell', 'bump', 'recovery', 'recurrence',
-                         'retention', 'upgrade', 'churn']) {
-        setTxt(`nb-ana-rate-${key}`, '—');
-        setTxt(`nb-ana-rate-${key}-sub`, 'INDISPONÍVEL');
+      // Rates de Marketing Operacionais (Upsell, Downsell, OrderBump, Recuperação)
+      const bumpAccepted = allLeads.filter(hasBumpLead).length;
+      const downsellRec = allLeads.filter(l => hasDownsellLead(l) && (l.status === 'paid' || l.stage === 'Aprovado' || l.stage === 'VIP Ativo')).length;
+      const pendingPixCount = Math.max(0, pixGenCount - paidSalesCount);
+      const setRateCard = (key, num, den, subSuffix) => {
+        const pct = den > 0 ? Math.min(100, (num / den) * 100) : 0;
+        setTxt(`nb-ana-rate-${key}`, `${pct.toFixed(1)}%`);
+        setTxt(`nb-ana-rate-${key}-sub`, `${num} DE ${den} ${subSuffix}`);
         const bar = document.getElementById(`nb-ana-bar-${key}`);
-        if (bar) bar.style.width = '0%';
-      }
+        if (bar) bar.style.width = `${pct}%`;
+      };
+      setRateCard('upsell', bumpAccepted, paidSalesCount, 'VENDAS');
+      setRateCard('downsell', downsellRec, pendingPixCount, 'RECUSAS');
+      setRateCard('bump', bumpAccepted, pixGenCount, 'CHECKOUTS');
+      setRateCard('recovery', downsellRec, pendingPixCount, 'PENDENTES');
+      setRateCard('recurrence', 0, paidSalesCount, 'COMPRADORES');
+      setTxt('nb-ana-rate-retention', '—');
+      setTxt('nb-ana-rate-retention-sub', 'INDISPONÍVEL');
+      setRateCard('upgrade', bumpAccepted, paidSalesCount, 'COMPRADORES');
+      setRateCard('churn', 0, paidSalesCount, 'COMPRADORES');
 
       // Buyer identity and repeat purchases cannot be inferred from paid Pix count.
       for (const id of ['nb-ana-ltv-val', 'nb-ana-sales-per-user', 'nb-ana-return-days',
