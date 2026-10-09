@@ -24,10 +24,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlite_policy import create_application_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, func, case, update, delete
+from sqlalchemy import select, func, case, update, delete, and_
 
 from models import Base, BotConfig, Offer, MediaAsset, DownsellStep, UpsellConfig, Lead, Order, ClientRecord, PixRecord, RemarketingDelivery
-from pushin_pay import PushinPayClient
+from pushin_pay import PushinPayClient, parse_gateway_cents
 from ai_engine import generate_ai_reply
 from telegram_service import bot_manager
 
@@ -764,11 +764,13 @@ def _origin_for_lead(lead: Dict[str, Any], state: Dict[str, Any]) -> str:
 
 
 def _origin_for_tx(rec: Dict[str, Any]) -> str:
-    numeric = str(rec.get("origin_bot_numeric_id") or "").strip()
+    numeric = str(rec.get("origin_bot_id") or rec.get("origin_bot_numeric_id") or "").strip()
     token = str(rec.get("bot_token") or "").split(":", 1)[0]
     if not numeric.isdecimal() and token.isdecimal():
         numeric = token
-    return numeric if numeric.isdecimal() else f"legacy:{rec.get('bot_id') or ''}"
+    if numeric:
+        return numeric
+    return f"legacy:{rec.get('bot_id') or ''}"
 
 
 async def _hydrate_records(session: AsyncSession, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -855,6 +857,135 @@ def _remarketing_claim_key(camp):
     return str(camp.get('id')) + ('::' + str(camp['run_id']) if camp.get('run_id') else '')
 
 
+def _parse_iso_ts(ts_val: str) -> Optional[datetime]:
+    if not ts_val or not isinstance(ts_val, str):
+        return None
+    s = ts_val.strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except Exception:
+        return None
+
+
+async def _compute_remarketing_metrics(session, state: Dict[str, Any]):
+    campaigns = state.get("remarketing_campaigns") or []
+    if not campaigns:
+        return
+
+    # Reset all campaigns first: prevents stale totals when there are no valid conversions
+    for camp in campaigns:
+        if not isinstance(camp, dict):
+            continue
+        camp["conversions"] = 0
+        camp["revenue"] = 0.0
+
+    # Build recipient -> list of (camp, sent_at_str, sent_dt)
+    recipient_campaigns: Dict[str, List[Tuple[Dict[str, Any], str, Optional[datetime]]]] = {}
+    for camp in campaigns:
+        if not isinstance(camp, dict):
+            continue
+        delivs = camp.get("deliveries") or {}
+        ts_map = camp.get("delivery_timestamps") or {}
+        run_map = camp.get("run_delivery_timestamps") or {}
+        run_id = str(camp.get("run_id") or "default")
+
+        for recipient, status in delivs.items():
+            if status != "sent":
+                continue
+            sent_at = ts_map.get(recipient)
+            if not sent_at:
+                sent_at = run_map.get(run_id, {}).get(recipient)
+            if not sent_at:
+                # Fallback to current time if reconciled without explicit timestamp
+                continue
+            sent_dt = _parse_iso_ts(sent_at)
+            recipient_campaigns.setdefault(recipient, []).append((camp, sent_at, sent_dt))
+
+    if not recipient_campaigns:
+        return
+
+    tx_list = []
+    if session is not None:
+        try:
+            stmt = select(
+                PixRecord.origin_bot_id,
+                PixRecord.telegram_id,
+                PixRecord.amount,
+                PixRecord.paid_at,
+                PixRecord.created_at,
+                PixRecord.is_test,
+                PixRecord.tx_id,
+            ).where(PixRecord.status == "paid")
+            rows = (await session.execute(stmt)).all()
+            for r in rows:
+                if getattr(r, "is_test", False):
+                    continue
+                tx_list.append({
+                    "origin_bot_id": str(r.origin_bot_id or ""),
+                    "telegram_id": str(r.telegram_id or ""),
+                    "amount": float(r.amount or 0.0),
+                    "paid_at": str(r.paid_at or r.created_at or ""),
+                    "tx_id": str(r.tx_id or ""),
+                })
+        except Exception:
+            tx_list = []
+
+    if not tx_list and state.get("tx_records"):
+        for tid, rec in state.get("tx_records", {}).items():
+            if not isinstance(rec, dict) or rec.get("status") != "paid" or rec.get("is_test"):
+                continue
+            tx_list.append({
+                "origin_bot_id": _origin_for_tx(rec),
+                "telegram_id": str(rec.get("user_id") or rec.get("telegram_id") or ""),
+                "amount": float(rec.get("amount") or 0.0),
+                "paid_at": str(rec.get("paid_at") or rec.get("created_at") or ""),
+                "tx_id": str(tid),
+            })
+
+    attributed_tx_ids = set()
+    for tx in tx_list:
+        origin = tx["origin_bot_id"]
+        uid = tx["telegram_id"]
+        if not origin or not uid:
+            continue
+        rec_key = f"{origin}:{uid}"
+
+        candidate_camps = recipient_campaigns.get(rec_key)
+        if not candidate_camps:
+            continue
+
+        # Decisão pendente: quando o cliente recebeu múltiplas campanhas, não decidir
+        # arbitrariamente nem atribuir duplicado até haver definição do usuário.
+        if len(candidate_camps) > 1:
+            continue
+
+        target_camp, sent_at_str, sent_dt = candidate_camps[0]
+        paid_at_str = tx["paid_at"]
+        if not paid_at_str:
+            continue
+
+        paid_dt = _parse_iso_ts(paid_at_str)
+        # Compra anterior ao envio não conta; deve ser estritamente posterior
+        if paid_dt and sent_dt:
+            is_after = paid_dt > sent_dt
+        else:
+            is_after = paid_at_str > sent_at_str
+
+        if not is_after:
+            continue
+
+        tx_id = tx["tx_id"]
+        if tx_id in attributed_tx_ids:
+            continue
+        attributed_tx_ids.add(tx_id)
+
+        target_camp["conversions"] += 1
+        target_camp["revenue"] = round(target_camp["revenue"] + tx["amount"], 2)
+
+
 async def _project_remarketing_deliveries(session, state):
     rows = (await session.execute(select(RemarketingDelivery))).scalars().all()
     grouped = {}
@@ -872,6 +1003,7 @@ async def _project_remarketing_deliveries(session, state):
                     camp['status'] = 'Revisão necessária'
             elif camp.get('status') == 'Revisão necessária':
                 camp['status'] = 'Parcial' if len(camp['deliveries']) < int(camp.get('total_targets') or 0) else 'Finalizada'
+    await _compute_remarketing_metrics(session, state)
 
 
 async def _claim_remarketing_recipient(campaign_id, recipient):
@@ -1751,6 +1883,7 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
     if flow not in ('all', 'flow', 'ai'):
         raise HTTPException(status_code=422, detail='Fluxo inválido')
     scope = []
+    matching_origins = []
     if bot_id != 'all' or flow != 'all':
         # Read only configuration; hydrating _read_state_from_db() would SELECT
         # every Pix payload on a cold cache just to resolve bot identities.
@@ -1761,7 +1894,8 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
             raise HTTPException(status_code=404, detail='Bot não encontrado')
         matching = [b for b in bots if (bot_id == 'all' or str(b.get('id')) == bot_id)
                     and (flow == 'all' or ('ai' if b.get('mode') == 'ai' else 'flow') == flow)]
-        scope.append(PixRecord.origin_bot_id.in_([str(b.get('bot_id') or '') for b in matching]))
+        matching_origins = [str(b.get('bot_id') or '') for b in matching]
+        scope.append(PixRecord.origin_bot_id.in_(matching_origins))
     paid = PixRecord.status == 'paid'
     pending = PixRecord.status == 'pending'
     paid_ts = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
@@ -1777,6 +1911,38 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         paid_total = await totals(paid_filters)
         pending_total = await totals(pending_filters)
         total_paid = (await session.execute(select(amount).where(paid))).scalar_one()
+
+        # Agregados da Coorte de Aprovação de Pix (Pix gerados no período e quantos deles estão pagos)
+        pix_cohort_denom = generated[0]
+        pix_cohort_paid_filters = generated_filters + [paid]
+        pix_cohort_num = (await session.execute(select(count).where(*pix_cohort_paid_filters))).scalar_one() or 0
+        pix_approval_rate = round(float(pix_cohort_num) / float(pix_cohort_denom) * 100, 1) if pix_cohort_denom > 0 else None
+
+        # Agregados da Coorte de Conversão de Leads (Leads criados no período e quantos compraram ao menos uma vez)
+        lead_created_ts = func.json_extract(ClientRecord.data_json, '$.created_at')
+        lead_filters = [ClientRecord.archived == False]
+        if matching_origins:
+            lead_filters.append(ClientRecord.origin_bot_id.in_(matching_origins))
+        lead_filters += _metrics_date_filters(period, date, lead_created_ts)
+
+        lead_cohort_denom = (await session.execute(
+            select(func.count(ClientRecord.telegram_id)).where(*lead_filters)
+        )).scalar_one() or 0
+
+        lead_cohort_num = (await session.execute(
+            select(func.count(func.distinct(ClientRecord.telegram_id)))
+            .join(
+                PixRecord,
+                and_(
+                    PixRecord.origin_bot_id == ClientRecord.origin_bot_id,
+                    PixRecord.telegram_id == ClientRecord.telegram_id,
+                    paid
+                )
+            )
+            .where(*lead_filters)
+        )).scalar_one() or 0
+        lead_conversion_rate = round(float(lead_cohort_num) / float(lead_cohort_denom) * 100, 1) if lead_cohort_denom > 0 else None
+
         day = func.date(paid_ts, '-3 hours')
         hour_paid = func.strftime('%H', paid_ts, '-3 hours')
         hour_created = func.strftime('%H', PixRecord.created_at, '-3 hours')
@@ -1802,6 +1968,16 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
                 paid_count=paid_total[0], paid_amount=round(float(paid_total[1]), 2),
                 pending_count=pending_total[0], pending_amount=round(float(pending_total[1]), 2),
                 all_time_paid_amount=round(float(total_paid), 2),
+                pix_approval_cohort=dict(
+                    denominator=pix_cohort_denom,
+                    numerator=pix_cohort_num,
+                    rate=pix_approval_rate
+                ),
+                lead_conversion_cohort=dict(
+                    denominator=lead_cohort_denom,
+                    numerator=lead_cohort_num,
+                    rate=lead_conversion_rate
+                ),
                 by_day=[dict(day=d, paid_count=n, paid_amount=round(float(a), 2)) for d, n, a in day_rows],
                 by_bot=[dict(origin_bot_id=origin, paid_count=n, paid_amount=round(float(a), 2))
                         for origin, n, a in bot_rows],
@@ -2257,20 +2433,27 @@ async def webhook_gateway(payload: Dict[str, Any], request: Request = None):
     raw_gw = (verified or {}).get("raw") if isinstance((verified or {}).get("raw"), dict) else verified
     if tx_record and isinstance(raw_gw, dict):
         expected_amount = float(tx_record.get("amount") or 0)
-        if "amount" in raw_gw and raw_gw["amount"] is not None:
-            try:
-                paid_amount = float(str(raw_gw["amount"]).replace(",", "."))
-                if paid_amount + 0.01 < expected_amount:
-                    return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
-            except (ValueError, TypeError):
-                pass
-        elif "value" in raw_gw and raw_gw["value"] is not None:
-            try:
-                paid_cents = int(round(float(str(raw_gw["value"]).replace(",", "."))))
-                if paid_cents < int(tx_record.get("cents") or round(expected_amount * 100)):
-                    return {"status": "rejected", "action": "amount_mismatch", "transaction_id": transaction_id}
-            except (ValueError, TypeError):
-                pass
+        expected_cents = int(tx_record.get("cents") or round(expected_amount * 100))
+        paid_cents = parse_gateway_cents(raw_gw, provider=gw_provider)
+        if paid_cents == -1:
+            logger.error(f"Erro de interpretação de valor do gateway para tx_id={transaction_id}")
+            return {
+                "status": "error",
+                "action": "invalid_gateway_amount_format",
+                "transaction_id": transaction_id,
+                "detail": "Valor informado pelo gateway não pôde ser interpretado."
+            }
+        elif paid_cents is not None:
+            if paid_cents < expected_cents:
+                logger.warning(
+                    f"Tentativa de pagamento com valor menor: tx_id={transaction_id}, esperado={expected_cents}, recebido={paid_cents}"
+                )
+                return {
+                    "status": "rejected",
+                    "action": "amount_mismatch",
+                    "transaction_id": transaction_id,
+                    "detail": f"Valor pago ({paid_cents} centavos) menor que o esperado ({expected_cents} centavos)."
+                }
 
     delivered = await bot_manager.notify_payment_by_tx_id(transaction_id)
     if not delivered:
@@ -3727,7 +3910,7 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
         # Publish the new identity only after its durable commit succeeds.
         state = copy.deepcopy(state)
         camp = next(c for c in state['remarketing_campaigns'] if str(c.get('id')) == req.campaign_id)
-        camp.update(run_id=req.run_id or uuid.uuid4().hex, deliveries={}, sent_count=0,
+        camp.update(run_id=req.run_id or uuid.uuid4().hex, deliveries={}, delivery_timestamps={}, sent_count=0,
                     status='Em andamento', retry_not_before=0)
         camp.setdefault('run_ids', []).append(camp['run_id'])
     elif req.run_id and req.run_id != camp.get('run_id'):
@@ -3903,6 +4086,9 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
                 continue
             camp = current_campaign()
             camp["deliveries"][recipient] = "sent"
+            sent_now_iso = datetime.utcnow().isoformat()
+            camp.setdefault("delivery_timestamps", {})[recipient] = sent_now_iso
+            camp.setdefault("run_delivery_timestamps", {}).setdefault(str(camp.get("run_id") or "default"), {})[recipient] = sent_now_iso
             await _mark_remarketing_recipient(claim_key, recipient, 'sent')
             camp["sent_count"] = int(camp.get("sent_count") or 0) + 1
             l["from_remarketing"] = True

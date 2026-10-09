@@ -6,6 +6,8 @@ load_dotenv()
 import time
 import uuid
 import httpx
+from decimal import Decimal, InvalidOperation
+import re
 from typing import Optional, Dict, Any
 
 _SYNCPAY_TOKEN_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -361,4 +363,103 @@ class PushinPayClient:
             res["status"] = "paid" if st in ("paid", "completed", "approved", "settled", "pago", "aprovado", "concluido", "concluído", "liquidado") else st
             res["raw"] = tx_data
             return res
+
+
+def parse_gateway_cents(raw_gw: Any, provider: str = "") -> Optional[int]:
+    """
+    Centraliza a interpretação do valor retornado pelo gateway, normalizando
+    para centavos inteiros (int) e utilizando Decimal para valores monetários em Reais.
+    Trata formatos como 'R$ 1,00', '1.250,50', números inteiros e floats.
+    Retorna:
+      - int >= 0: valor em centavos
+      - -1: campo de valor presente mas não pôde ser interpretado (formato inválido/corrompido/negativo)
+      - None: nenhum campo de valor presente no payload
+    """
+    prov = (provider or "").lower().strip()
+
+    def _parse_reais(val: Any) -> Optional[int]:
+        if val is None:
+            return None
+        if isinstance(val, (int, float)):
+            if val < 0:
+                return None
+            try:
+                d = Decimal(str(val))
+                return int((d * Decimal(100)).quantize(Decimal("1")))
+            except (InvalidOperation, ValueError):
+                return None
+        s = str(val).strip()
+        if not s or "-" in s:
+            return None
+        cleaned = re.sub(r"[^\d,\.]", "", s)
+        if not cleaned:
+            return None
+        if "," in cleaned and "." in cleaned:
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+        elif "," in cleaned:
+            cleaned = cleaned.replace(",", ".")
+        try:
+            d = Decimal(cleaned)
+            if d < 0:
+                return None
+            return int((d * Decimal(100)).quantize(Decimal("1")))
+        except (InvalidOperation, ValueError):
+            return None
+
+    def _parse_cents(val: Any) -> Optional[int]:
+        if val is None:
+            return None
+        if isinstance(val, int):
+            return val if val >= 0 else None
+        s = str(val).strip()
+        if not s or "-" in s:
+            return None
+        cleaned = re.sub(r"[^\d]", "", s)
+        if not cleaned:
+            return None
+        try:
+            res = int(cleaned)
+            return res if res >= 0 else None
+        except ValueError:
+            return None
+
+    if not isinstance(raw_gw, dict):
+        if raw_gw is None:
+            return -1
+        c = _parse_reais(raw_gw)
+        return c if c is not None else -1
+
+    # 1. Campo 'amount' (Reais)
+    if "amount" in raw_gw and raw_gw["amount"] is not None:
+        c = _parse_reais(raw_gw["amount"])
+        if c is not None:
+            return c
+        # Se 'amount' foi fornecido mas é inválido, checa se 'value' é alternativa válida documentada
+        if "value" in raw_gw and raw_gw["value"] is not None:
+            if prov in ("pushinpay", "openpix"):
+                v_c = _parse_cents(raw_gw["value"])
+            else:
+                v_c = _parse_reais(raw_gw["value"])
+            if v_c is not None:
+                return v_c
+        return -1
+
+    # 2. Campo 'transaction_amount' (Mercado Pago - Reais)
+    if "transaction_amount" in raw_gw and raw_gw["transaction_amount"] is not None:
+        c = _parse_reais(raw_gw["transaction_amount"])
+        return c if c is not None else -1
+
+    # 3. Campo 'value'
+    if "value" in raw_gw and raw_gw["value"] is not None:
+        if prov in ("pushinpay", "openpix"):
+            c = _parse_cents(raw_gw["value"])
+        else:
+            c = _parse_reais(raw_gw["value"])
+        return c if c is not None else -1
+
+    return None
+
 

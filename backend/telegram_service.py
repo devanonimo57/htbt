@@ -1922,39 +1922,41 @@ class ActiveBotManager:
                 anchors = progress['anchors']
                 sent = progress.setdefault('sent', [])
                 pending = [s for s in sequences if str(s.get('id')) not in sent]
+                eligible_pending = [
+                    s for s in pending
+                    if anchors.get('pix' if s.get('trigger') == 'pix' else 'start') is not None
+                ]
                 looping = False
-                if pending:
+                if eligible_pending:
                     # A newly active initial card resumes the first passage.
-                    # Rest/partial-cycle state belongs to the previous completed
-                    # passage, not the one that is now waiting for its event.
                     progress.pop('rest_until', None)
                     progress.pop('loop_sent', None)
-                    seq = pending[0]
+                    seq = eligible_pending[0]
                     trigger = 'pix' if seq.get('trigger') == 'pix' else 'start'
-                    if anchors.get(trigger) is None:
-                        # An active earlier card owns its place even before its
-                        # event. Recheck in bounded sleeps; later initial cards
-                        # and every loop wait for the actual first passage.
-                        await self.state_saver(state, runtime_only=True)
-                        await asyncio.sleep(60)
-                        wake_floor = now + 60
-                        continue
                     due = anchors[trigger] + max(1, int(seq.get('delay_minutes') or 1)) * 60
                 else:
                     loops = [s for s in sequences if s.get('loop_enabled')
                              and anchors.get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
-                    if not loops:
-                        return
-                    looping = True
-                    loop_sent = progress.setdefault('loop_sent', [])
-                    remaining = [s for s in loops if str(s.get('id')) not in loop_sent]
-                    if not remaining or 'rest_until' not in progress:
-                        progress['loop_sent'] = []
-                        progress['rest_until'] = now + max(1, int(cfg.get('loop_rest_minutes') or 10)) * 60
-                        remaining = loops
+                    if loops:
+                        looping = True
+                        loop_sent = progress.setdefault('loop_sent', [])
+                        remaining = [s for s in loops if str(s.get('id')) not in loop_sent]
+                        if not remaining or 'rest_until' not in progress:
+                            progress['loop_sent'] = []
+                            progress['rest_until'] = now + max(1, int(cfg.get('loop_rest_minutes') or 10)) * 60
+                            remaining = loops
+                            await self.state_saver(state, runtime_only=True)
+                        seq = remaining[0]
+                        due = progress['rest_until']
+                    elif pending:
+                        # Unanchored pending cards wait without blocking other triggers or loops
                         await self.state_saver(state, runtime_only=True)
-                    seq = remaining[0]
-                    due = progress['rest_until']
+                        wait_seconds = 60
+                        await asyncio.sleep(wait_seconds)
+                        wake_floor = now + wait_seconds
+                        continue
+                    else:
+                        return
                 if due > now:
                     # Reload current order/config and payment/deletion at every
                     # wakeup; capped sleeps also allow edits to take effect.

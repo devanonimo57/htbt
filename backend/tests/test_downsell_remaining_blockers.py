@@ -236,53 +236,30 @@ class RemainingDownsell(unittest.IsolatedAsyncioTestCase):
             self.fail('Worker prematurely finished while an active initial card still needs its event; '
                       f'observed sends: {self.messages()}')
 
-    async def test_earlier_pix_card_blocks_later_start_and_loop_until_pix_event(self):
+    async def test_earlier_pix_card_does_not_block_later_start(self):
         pix = self.seq('P'); pix['trigger'] = 'pix'
         await self.config([pix, self.seq('A', loop_enabled=True)])
         await self.start()
         worker = self.manager.downsell_tasks['111:7']
-        await self.waiting_without_send()
-        self.assertEqual(self.messages(), [], 'Pending Pix card is first in the active list')
-        self.assertFalse(worker.done())
-        self.assertNotIn('rest_until', (await self.cold())['memory']['leads'][0]['flow_downsell'])
-        await self.checkout()
-        self.assertIs(self.manager.downsell_tasks['111:7'], worker)
-        await self.gate.wake()
-        await self.until(['P', 'A'])
-        first_completed = self.gate.completed
-        await self.until(['P', 'A', 'A'])
-        self.assertGreaterEqual(sum(self.gate.delays[first_completed:]), 180)
-
-    async def test_later_pix_card_prevents_earlier_start_repetition_before_first_pass_finishes(self):
-        pix = self.seq('P'); pix['trigger'] = 'pix'
-        await self.config([self.seq('A', loop_enabled=True), pix])
-        await self.start()
         await self.until(['A'])
-        await self.waiting_without_send()
-        self.assertEqual(self.messages(), ['A'])
+        self.assertEqual(self.messages(), ['A'], 'Start card must be sent without being blocked by unanchored Pix card')
+        self.assertFalse(worker.done())
         await self.checkout()
-        await self.gate.wake()
-        await self.until(['A', 'P', 'A'])
-
-    async def test_pix_first_does_not_skip_earlier_unanchored_start_card(self):
-        pix = self.seq('P'); pix['trigger'] = 'pix'
-        await self.config([self.seq('A'), pix])
-        await self.checkout()
-        worker = self.manager.downsell_tasks['111:7']
-        await self.waiting_without_send()
-        self.assertEqual(self.messages(), [])
-        await self.start()
         self.assertIs(self.manager.downsell_tasks['111:7'], worker)
         await self.gate.wake()
         await self.until(['A', 'P'])
 
-    async def test_no_loop_restart_keeps_earlier_pending_pix_order(self):
+    async def test_pix_first_does_not_wait_for_unanchored_start_card(self):
         pix = self.seq('P'); pix['trigger'] = 'pix'
-        await self.config([pix, self.seq('A')])
+        await self.config([self.seq('A'), pix])
+        await self.checkout()
+        worker = self.manager.downsell_tasks['111:7']
+        await self.until(['P'])
+        self.assertEqual(self.messages(), ['P'], 'Pix card must be sent without being blocked by unanchored start card')
         await self.start()
-        await self.waiting_without_send()
-        self.assertEqual(self.messages(), [])
-        task = self.manager.downsell_tasks['111:7']
+        self.assertIs(self.manager.downsell_tasks['111:7'], worker)
+        await self.gate.wake()
+        await self.until(['P', 'A'])
         task.cancel(); await asyncio.gather(task, return_exceptions=True)
         self.manager.downsell_tasks.clear()
         saved = await self.cold()
