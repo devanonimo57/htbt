@@ -2008,7 +2008,7 @@ class ActiveBotManager:
                         if anchors_now.get('pix' if s.get('trigger') == 'pix' else 'start') is not None
                     ]
                     if looping:
-                        candidates = [] if pending_now else [s for s in current[4]
+                        candidates = [] if eligible_pending_now else [s for s in current[4]
                             if s.get('loop_enabled') and str(s.get('id')) not in current[2].get('loop_sent', [])
                             and anchors_now.get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
                         selected = candidates[0] if candidates else None

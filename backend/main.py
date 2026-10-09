@@ -1961,6 +1961,20 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         )).scalar_one() or 0
         lead_conversion_rate = round(float(lead_cohort_num) / float(lead_cohort_denom) * 100, 1) if lead_cohort_denom > 0 else None
 
+        # Agregados da Coorte Entrada -> Pix (Leads criados no período e quantos geraram ao menos um Pix)
+        lead_pix_num = (await session.execute(
+            select(func.count(func.distinct(ClientRecord.origin_bot_id + ':' + ClientRecord.telegram_id)))
+            .join(
+                PixRecord,
+                and_(
+                    PixRecord.origin_bot_id == ClientRecord.origin_bot_id,
+                    PixRecord.telegram_id == ClientRecord.telegram_id
+                )
+            )
+            .where(*lead_filters)
+        )).scalar_one() or 0
+        lead_to_pix_rate = round(float(lead_pix_num) / float(lead_cohort_denom) * 100, 1) if lead_cohort_denom > 0 else None
+
         day = func.date(paid_ts, '-3 hours')
         hour_paid = func.strftime('%H', paid_ts, '-3 hours')
         hour_created = func.strftime('%H', PixRecord.created_at, '-3 hours')
@@ -1995,6 +2009,11 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
                     denominator=lead_cohort_denom,
                     numerator=lead_cohort_num,
                     rate=lead_conversion_rate
+                ),
+                lead_to_pix_cohort=dict(
+                    denominator=lead_cohort_denom,
+                    numerator=lead_pix_num,
+                    rate=lead_to_pix_rate
                 ),
                 by_day=[dict(day=d, paid_count=n, paid_amount=round(float(a), 2)) for d, n, a in day_rows],
                 by_bot=[dict(origin_bot_id=origin, paid_count=n, paid_amount=round(float(a), 2))

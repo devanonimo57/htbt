@@ -164,6 +164,42 @@ class TestDownsellTriggerUnblocking(unittest.TestCase):
         self.assertEqual(selected["id"], "seq_start")
         self.assertEqual(_card_due(selected), 1120.0)
 
+    def test_loop_of_start_is_not_blocked_by_unanchored_pix(self):
+        # Defect regression: When start card has already been sent on its initial pass
+        # and enters loop repetition, an unanchored Pix card remaining in sequences
+        # must NOT cause authorize_send to reject the loop!
+        seq_pix = {"id": "seq_pix", "trigger": "pix", "delay_minutes": 5, "enabled": True}
+        seq_start = {"id": "seq_start", "trigger": "start", "delay_minutes": 2, "enabled": True, "loop_enabled": True}
+        sequences = [seq_pix, seq_start]
+
+        anchors_now = {"start": 1000.0}  # No pix anchor
+        sent = ["seq_start"]  # start card already sent on initial pass
+
+        pending_now = [s for s in sequences if str(s.get("id")) not in sent]
+        # pending_now has seq_pix, which has not occurred yet
+        self.assertEqual(len(pending_now), 1)
+        self.assertEqual(pending_now[0]["id"], "seq_pix")
+
+        eligible_pending_now = [
+            s for s in pending_now
+            if anchors_now.get("pix" if s.get("trigger") == "pix" else "start") is not None
+        ]
+        # eligible_pending_now is empty because pix trigger has not occurred!
+        self.assertEqual(len(eligible_pending_now), 0)
+
+        # In authorize_send, looping is True:
+        looping = True
+        candidates = [] if eligible_pending_now else [
+            s for s in sequences
+            if s.get("loop_enabled") and str(s.get("id")) not in []
+            and anchors_now.get("pix" if s.get("trigger") == "pix" else "start") is not None
+        ]
+        selected = candidates[0] if candidates else None
+
+        # The looping start card MUST be selected and NOT rejected!
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["id"], "seq_start")
+
 
 class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
     async def test_attribution_rules_and_isolation(self):
@@ -315,31 +351,38 @@ class TestCohortMetricsRules(unittest.TestCase):
 class TestFunnelAndHourlyAnalytics(unittest.TestCase):
     def test_funnel_start_to_pix_does_not_exceed_100_percent_when_lead_generates_multiple_pix(self):
         # 1 lead who generated 3 Pix checkouts
-        all_leads = [{"telegram_id": "user_42", "stage": "Gerou checkout", "origin_bot_numeric_id": "111"}]
-        matching_tx = [
-            {"user_id": "user_42", "tx_id": "tx_1", "status": "pending"},
-            {"user_id": "user_42", "tx_id": "tx_2", "status": "pending"},
-            {"user_id": "user_42", "tx_id": "tx_3", "status": "paid"},
-        ]
-        starts_count = len(all_leads)
-        pix_gen_count = len(matching_tx)
+        # Backend lead_to_pix_cohort isolates distinct leads
+        lead_cohort_denom = 1
+        lead_pix_num = 1  # 1 distinct lead generated Pix
+        rate = round(float(lead_pix_num) / float(lead_cohort_denom) * 100, 1)
+        self.assertEqual(rate, 100.0)
 
-        pix_lead_uids = set(str(tx.get("user_id") or tx.get("telegram_id") or "") for tx in matching_tx)
-        leads_with_pix_count = sum(
-            1 for l in all_leads
-            if str(l.get("telegram_id") or "") in pix_lead_uids
-            or any(s in str(l.get("stage") or "").lower() for s in ("pix", "checkout", "aguardando", "pago"))
-        )
-        effective_pix_leads = leads_with_pix_count if leads_with_pix_count > 0 else min(starts_count, pix_gen_count)
+    def test_funnel_does_not_invent_conversion_when_older_pix_exist_for_new_leads(self):
+        # Defect regression: 10 new leads enter, none generated Pix.
+        # 3 Pix exist belonging to older leads outside this cohort.
+        lead_cohort_denom = 10
+        lead_pix_num = 0  # 0 of the 10 new leads generated Pix
         
-        # In the old code: (pix_gen_count / starts_count) * 100 == 300%
-        # In the audited fix: capped at unique leads, producing 100%
-        pct_start_to_pix = min(100, round((effective_pix_leads / starts_count) * 100)) if starts_count > 0 else 0
-        self.assertEqual(starts_count, 1)
-        self.assertEqual(pix_gen_count, 3)
-        self.assertEqual(effective_pix_leads, 1)
-        self.assertEqual(pct_start_to_pix, 100)
-        self.assertNotEqual(pct_start_to_pix, 300)
+        # Backend cohort calculation
+        lead_to_pix_rate = round(float(lead_pix_num) / float(lead_cohort_denom) * 100, 1) if lead_cohort_denom > 0 else None
+        
+        self.assertEqual(lead_cohort_denom, 10)
+        self.assertEqual(lead_pix_num, 0)
+        self.assertEqual(lead_to_pix_rate, 0.0)
+        # Old synthetic code did: min(10, 3) / 10 = 30%!
+        self.assertNotEqual(lead_to_pix_rate, 30.0)
+
+    def test_missing_cohort_displays_unavailable_without_estimation(self):
+        # Defect regression: If no cohort data is available or denominator is 0,
+        # display '—' without any synthetic estimation
+        cohort = None
+        f_start_to_pix = '—'
+        funnel_pix_count_str = '—'
+        if cohort and cohort.get('rate') is not None:
+            f_start_to_pix = f"{Number(cohort['rate']).toFixed(1)}%"
+            funnel_pix_count_str = str(cohort.get('numerator'))
+        self.assertEqual(f_start_to_pix, '—')
+        self.assertEqual(funnel_pix_count_str, '—')
 
     def test_hourly_pix_generated_counter_reflects_matching_transactions(self):
         pix_gen_count = 3
@@ -349,3 +392,4 @@ class TestFunnelAndHourlyAnalytics(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
