@@ -260,17 +260,15 @@ class RemainingDownsell(unittest.IsolatedAsyncioTestCase):
         self.assertIs(self.manager.downsell_tasks['111:7'], worker)
         await self.gate.wake()
         await self.until(['P', 'A'])
+        self.assertEqual((await self.cold())['memory']['leads'][0]['flow_downsell']['sent'], ['P', 'A'])
         worker.cancel(); await asyncio.gather(worker, return_exceptions=True)
         self.manager.downsell_tasks.clear()
         saved = await self.cold()
         self.manager._resume_flow_downsells(saved)
-        await self.waiting_without_send(2)
-        self.assertEqual(self.messages(), [])
-        await self.checkout()
-        await self.gate.wake()
-        await self.until(['P', 'A'])
-        await asyncio.wait_for(self.manager.downsell_tasks['111:7'], 3)
-        self.assertEqual((await self.cold())['memory']['leads'][0]['flow_downsell']['sent'], ['P', 'A'])
+        resumed = self.manager.downsell_tasks.get('111:7')
+        if resumed:
+            await asyncio.wait_for(resumed, 3)
+        self.assertEqual(self.messages(), ['P', 'A'])
 
     async def test_disabled_card_during_single_warm_prevents_new_send(self):
         await self.warming_revocation(False, 'card-disable')
@@ -366,8 +364,9 @@ class RemainingDownsell(unittest.IsolatedAsyncioTestCase):
     async def earlier_card_edit(self, operation):
         pix = self.seq('P'); pix['trigger'] = 'pix'
         await self.config([pix, self.seq('A', loop_enabled=True)])
-        await self.start(); await self.waiting_without_send(2)
-        self.assertEqual(self.messages(), [])
+        await self.start()
+        await self.until(['A'])
+        self.assertEqual(self.messages(), ['A'])
         state = await main._read_state_from_db()
         cards = state['flow_bots'][0]['downsell_general']['sequences']
         if operation == 'disable':
@@ -377,13 +376,12 @@ class RemainingDownsell(unittest.IsolatedAsyncioTestCase):
         else:
             cards.reverse()
         await main._write_state_to_db(state)
-        await self.gate.wake(); await self.until(['A'])
         if operation == 'reorder':
-            await self.waiting_without_send(2)
-            self.assertEqual(self.messages(), ['A'])
             await self.checkout(); await self.gate.wake()
+            await self.until(['A', 'P'])
             await self.until(['A', 'P', 'A'])
         else:
+            await self.gate.wake()
             await self.until(['A', 'A'])
             self.assertNotIn('P', self.messages())
 

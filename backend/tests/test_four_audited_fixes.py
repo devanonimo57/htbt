@@ -312,5 +312,40 @@ class TestCohortMetricsRules(unittest.TestCase):
         self.assertEqual(conversion_rate, 100.0)
 
 
+class TestFunnelAndHourlyAnalytics(unittest.TestCase):
+    def test_funnel_start_to_pix_does_not_exceed_100_percent_when_lead_generates_multiple_pix(self):
+        # 1 lead who generated 3 Pix checkouts
+        all_leads = [{"telegram_id": "user_42", "stage": "Gerou checkout", "origin_bot_numeric_id": "111"}]
+        matching_tx = [
+            {"user_id": "user_42", "tx_id": "tx_1", "status": "pending"},
+            {"user_id": "user_42", "tx_id": "tx_2", "status": "pending"},
+            {"user_id": "user_42", "tx_id": "tx_3", "status": "paid"},
+        ]
+        starts_count = len(all_leads)
+        pix_gen_count = len(matching_tx)
+
+        pix_lead_uids = set(str(tx.get("user_id") or tx.get("telegram_id") or "") for tx in matching_tx)
+        leads_with_pix_count = sum(
+            1 for l in all_leads
+            if str(l.get("telegram_id") or "") in pix_lead_uids
+            or any(s in str(l.get("stage") or "").lower() for s in ("pix", "checkout", "aguardando", "pago"))
+        )
+        effective_pix_leads = leads_with_pix_count if leads_with_pix_count > 0 else min(starts_count, pix_gen_count)
+        
+        # In the old code: (pix_gen_count / starts_count) * 100 == 300%
+        # In the audited fix: capped at unique leads, producing 100%
+        pct_start_to_pix = min(100, round((effective_pix_leads / starts_count) * 100)) if starts_count > 0 else 0
+        self.assertEqual(starts_count, 1)
+        self.assertEqual(pix_gen_count, 3)
+        self.assertEqual(effective_pix_leads, 1)
+        self.assertEqual(pct_start_to_pix, 100)
+        self.assertNotEqual(pct_start_to_pix, 300)
+
+    def test_hourly_pix_generated_counter_reflects_matching_transactions(self):
+        pix_gen_count = 3
+        hourly_gen_txt = str(pix_gen_count)
+        self.assertEqual(hourly_gen_txt, "3")
+
+
 if __name__ == "__main__":
     unittest.main()

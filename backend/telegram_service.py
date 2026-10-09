@@ -2000,15 +2000,26 @@ class ActiveBotManager:
                         raise _FlowDownsellSendRevoked()
                     current_card = next((s for s in current[4]
                                          if str(s.get('id')) == str(expected_card.get('id'))), None)
+                    anchors_now = current[2].get('anchors', {})
                     pending_now = [s for s in current[4]
                                    if str(s.get('id')) not in current[2].get('sent', [])]
+                    eligible_pending_now = [
+                        s for s in pending_now
+                        if anchors_now.get('pix' if s.get('trigger') == 'pix' else 'start') is not None
+                    ]
                     if looping:
                         candidates = [] if pending_now else [s for s in current[4]
                             if s.get('loop_enabled') and str(s.get('id')) not in current[2].get('loop_sent', [])
-                            and current[2]['anchors'].get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
+                            and anchors_now.get('pix' if s.get('trigger') == 'pix' else 'start') is not None]
+                        selected = candidates[0] if candidates else None
                     else:
-                        candidates = pending_now
-                    selected = candidates[0] if candidates else None
+                        if eligible_pending_now:
+                            def _cur_due(s):
+                                trig = 'pix' if s.get('trigger') == 'pix' else 'start'
+                                return anchors_now[trig] + max(1, int(s.get('delay_minutes') or 1)) * 60
+                            selected = min(eligible_pending_now, key=lambda s: (_cur_due(s), current[4].index(s)))
+                        else:
+                            selected = None
                     if (current_card != expected_card or selected != expected_card
                             or (current[1].get('plans') or []) != expected_plans):
                         raise _FlowDownsellSendRevoked()

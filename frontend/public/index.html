@@ -10901,6 +10901,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       setTxt('nb-ana-hour-best', bestHrSales ? `${bestHr}h (${bestHrSales} vendas)` : '—');
       setTxt('nb-ana-hour-paid', String(paidSalesCount));
+      setTxt('nb-ana-hour-gen', String(pixGenCount));
       let pixApprVal = '—';
       if (NB_METRICS && NB_METRICS.pix_approval_cohort) {
         const pac = NB_METRICS.pix_approval_cohort;
@@ -11001,28 +11002,55 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
       renderRankList('nb-ana-top-codes', [], 'Sem dados de códigos');
 
+      const pixLeadUids = new Set(
+        matchingTx.map(tx => String(tx.user_id || tx.telegram_id || tx.client_id || '')).filter(Boolean)
+      );
+      const isPixLead = l => {
+        const uid = String(l.telegram_id || l.user_id || l.id || '');
+        if (uid && pixLeadUids.has(uid)) return true;
+        const stg = String(l.stage || '').toLowerCase();
+        return Boolean(
+          l.purchased ||
+          l.has_paid ||
+          l.last_tx_id ||
+          l.chosen_plan ||
+          stg.includes('pix') ||
+          stg.includes('checkout') ||
+          stg.includes('aguardando') ||
+          stg.includes('escolheu') ||
+          stg.includes('aprovad') ||
+          stg.includes('concluíd') ||
+          stg.includes('pago') ||
+          stg.includes('vip')
+        );
+      };
+      const leadsWithPixCount = allLeads.filter(isPixLead).length;
+      const effectivePixLeads = leadsWithPixCount > 0 ? leadsWithPixCount : (startsCount > 0 && pixGenCount > 0 ? Math.min(startsCount, pixGenCount) : 0);
+
       let fStartToPix = '—';
       if (startsCount > 0) {
-        fStartToPix = `${Math.round((pixGenCount / startsCount) * 100)}%`;
+        fStartToPix = `${Math.min(100, Math.round((effectivePixLeads / startsCount) * 100))}%`;
       }
       let fPixToPaid = '—';
       if (NB_METRICS?.pix_approval_cohort?.rate !== null && NB_METRICS?.pix_approval_cohort?.rate !== undefined) {
         fPixToPaid = `${Number(NB_METRICS.pix_approval_cohort.rate).toFixed(1).replace('.', ',')}%`;
+      } else if (effectivePixLeads > 0) {
+        fPixToPaid = `${Math.min(100, Math.round((paidSalesCount / effectivePixLeads) * 100))}%`;
       } else if (pixGenCount > 0) {
-        fPixToPaid = `${Math.round((paidSalesCount / pixGenCount) * 100)}%`;
+        fPixToPaid = `${Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100))}%`;
       }
       let fStartToPaid = '—';
       if (NB_METRICS?.lead_conversion_cohort?.rate !== null && NB_METRICS?.lead_conversion_cohort?.rate !== undefined) {
         fStartToPaid = `${Number(NB_METRICS.lead_conversion_cohort.rate).toFixed(1).replace('.', ',')}%`;
       } else if (startsCount > 0) {
-        fStartToPaid = `${Math.round((paidSalesCount / startsCount) * 100)}%`;
+        fStartToPaid = `${Math.min(100, Math.round((paidSalesCount / startsCount) * 100))}%`;
       }
 
       setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : '—');
       setTxt('nb-ana-funnel-pct-2', fStartToPix);
       setTxt('nb-ana-funnel-pct-3', fStartToPaid);
       setTxt('nb-ana-funnel-cnt-start', String(startsCount));
-      setTxt('nb-ana-funnel-cnt-pix', String(pixGenCount));
+      setTxt('nb-ana-funnel-cnt-pix', String(startsCount > 0 ? effectivePixLeads : pixGenCount));
       setTxt('nb-ana-funnel-cnt-paid', String(paidSalesCount));
       setTxt('nb-ana-funnel-step-1', fStartToPix);
       setTxt('nb-ana-funnel-step-2', fPixToPaid);
