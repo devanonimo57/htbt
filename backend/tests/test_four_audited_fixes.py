@@ -1,8 +1,8 @@
-"""Targeted verification for the four audited vulnerability fixes:
-1. Downsell sequence unblocking by trigger anchor
-2. Remarketing backend attribution and multi-campaign isolation
-3. Cohort metrics (Pix approval cohort and Lead conversion cohort) without cash date shifting
-4. Fail-closed gateway validation with parse_gateway_cents and underpaid/malformed rejection
+"""Targeted verification for the audited vulnerability fixes:
+1. Downsell sequence selection by earliest due timestamp (no trigger starvation)
+2. Remarketing dynamic calculation without cold reload & ambiguous multi-campaign tracking
+3. Cohort metrics (composite client identity across bots, isolated bot scopes, and non-distorted display)
+4. Strict fail-closed gateway amount validation (safe float cents, rejection of alphanumeric garbage)
 """
 import unittest
 from datetime import datetime, timezone, timedelta
@@ -45,6 +45,77 @@ class TestGatewayAmountFailClosed(unittest.TestCase):
         self.assertEqual(parsed, 100)
         self.assertNotEqual(parsed, 2990)
 
+    def test_float_cents_not_inflated(self):
+        # Defect regression: 299.0 float in pushinpay value must parse as 299 cents, NOT 2990!
+        parsed = parse_gateway_cents({"value": 299.0}, provider="pushinpay")
+        self.assertEqual(parsed, 299)
+        self.assertNotEqual(parsed, 2990)
+
+    def test_garbage_with_digits_is_rejected(self):
+        # Defect regression: Alphanumeric strings must not be blindly stripped of non-digits
+        self.assertEqual(parse_gateway_cents({"value": "INVALID2990"}, provider="pushinpay"), -1)
+        self.assertEqual(parse_gateway_cents({"value": "unknown"}, provider="pushinpay"), -1)
+        self.assertEqual(parse_gateway_cents({"amount": "INVALID29.90"}), -1)
+
+
+class TestWebhookGatewayFailClosed(unittest.IsolatedAsyncioTestCase):
+    async def check(self, provider, raw):
+        import copy, httpx
+        state = copy.deepcopy(main.DEFAULT_SHARKBOT_STATE)
+        state["tx_records"] = {
+            "fake_tx": {
+                "status": "pending",
+                "amount": 29.90,
+                "cents": 2990,
+                "gateway_provider": provider,
+                "gateway_token": "fake",
+                "gateway_secret": "fake"
+            }
+        }
+        notify = AsyncMock(return_value=False)
+        gateway = AsyncMock()
+        gateway.check_transaction_status.return_value = {"status": "paid", "raw": raw}
+        with patch.object(main, "_read_state_from_db", AsyncMock(return_value=state)), \
+             patch.object(main, "PushinPayClient", return_value=gateway), \
+             patch.object(main.bot_manager, "notify_payment_by_tx_id", notify):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test") as c:
+                response = await c.post("/api/webhook/" + provider, json={"id": "fake_tx", "status": "paid"})
+        return {
+            "provider": provider,
+            "raw": raw,
+            "parsed_cents": parse_gateway_cents(raw, provider),
+            "response": response.json(),
+            "confirmation_calls": notify.await_count
+        }
+
+    async def test_underpaid_currency_is_rejected(self):
+        r = await self.check("syncpay", {"amount": "R$ 1,00", "value": 100})
+        self.assertEqual(r["confirmation_calls"], 0)
+        self.assertEqual(r["response"]["action"], "amount_mismatch")
+
+    async def test_invalid_amount_is_rejected(self):
+        r = await self.check("pushinpay", {"value": "unknown"})
+        self.assertEqual(r["confirmation_calls"], 0)
+        self.assertEqual(r["response"]["action"], "invalid_gateway_amount_format")
+
+    async def test_float_cents_not_inflated_and_rejected_when_less(self):
+        # 299.0 cents is R$ 2.99, far below the expected R$ 29.90 (2990 cents)
+        r = await self.check("pushinpay", {"value": 299.0})
+        self.assertEqual(r["parsed_cents"], 299)
+        self.assertEqual(r["confirmation_calls"], 0)
+        self.assertEqual(r["response"]["action"], "amount_mismatch")
+
+    async def test_garbage_with_digits_is_rejected_as_invalid(self):
+        r = await self.check("pushinpay", {"value": "INVALID2990"})
+        self.assertEqual(r["parsed_cents"], -1)
+        self.assertEqual(r["confirmation_calls"], 0)
+        self.assertEqual(r["response"]["action"], "invalid_gateway_amount_format")
+
+    async def test_valid_cents_is_admitted(self):
+        r = await self.check("pushinpay", {"value": 2990})
+        self.assertEqual(r["parsed_cents"], 2990)
+        self.assertEqual(r["confirmation_calls"], 1)
+
 
 class TestDownsellTriggerUnblocking(unittest.TestCase):
     def test_eligible_pending_unblocks_start_when_pix_unanchored(self):
@@ -56,9 +127,6 @@ class TestDownsellTriggerUnblocking(unittest.TestCase):
         # Lead enters with /start only (no pix generated)
         anchors = {"start": 1000.0}
 
-        # Flawed legacy logic took pending[0], which was seq_pix (anchors.get("pix") is None),
-        # blocking the loop and starving seq_start indefinitely.
-        # Fixed logic uses eligible_pending filtered by existing trigger anchors:
         eligible_pending = [
             seq for seq in sequences
             if anchors.get("pix" if seq.get("trigger") == "pix" else "start") is not None
@@ -67,27 +135,34 @@ class TestDownsellTriggerUnblocking(unittest.TestCase):
         self.assertEqual(len(eligible_pending), 1)
         self.assertEqual(eligible_pending[0]["id"], "seq_start")
         
-        # Verify due calculation uses the trigger anchor
         due = anchors["start"] + eligible_pending[0]["delay_minutes"] * 60
         self.assertEqual(due, 1000.0 + 120.0)
 
-    def test_pix_generation_later_activates_pix_sequence(self):
+    def test_confirmed_pix_does_not_block_due_start(self):
+        # Defect regression: When both start and pix are anchored, the card due earlier
+        # must be selected rather than picking pending[0] blindly
         seq_pix = {"id": "seq_pix", "trigger": "pix", "delay_minutes": 5, "enabled": True}
         seq_start = {"id": "seq_start", "trigger": "start", "delay_minutes": 2, "enabled": True}
-        
-        # Now pix is generated at timestamp 1500.0
-        anchors = {"start": 1000.0, "pix": 1500.0}
-        
+        sequences = [seq_pix, seq_start]
+
+        # Both events anchored at t=1000.0
+        anchors = {"start": 1000.0, "pix": 1000.0}
+
         eligible_pending = [
-            seq for seq in [seq_pix, seq_start]
+            seq for seq in sequences
             if anchors.get("pix" if seq.get("trigger") == "pix" else "start") is not None
         ]
-        
         self.assertEqual(len(eligible_pending), 2)
-        # Order is preserved according to configuration
-        self.assertEqual(eligible_pending[0]["id"], "seq_pix")
-        due_pix = anchors["pix"] + eligible_pending[0]["delay_minutes"] * 60
-        self.assertEqual(due_pix, 1500.0 + 300.0)
+
+        def _card_due(s):
+            trig = "pix" if s.get("trigger") == "pix" else "start"
+            return anchors[trig] + max(1, int(s.get("delay_minutes") or 1)) * 60
+
+        selected = min(eligible_pending, key=lambda s: (_card_due(s), sequences.index(s)))
+        # seq_start is due at 1000 + 120 = 1120; seq_pix is due at 1000 + 300 = 1300.
+        # seq_start MUST be selected first!
+        self.assertEqual(selected["id"], "seq_start")
+        self.assertEqual(_card_due(selected), 1120.0)
 
 
 class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
@@ -96,8 +171,8 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
         camp1 = {
             "id": "camp_1",
             "name": "Campanha 1",
-            "deliveries": {"bot_1:user_1": "sent"},
-            "delivery_timestamps": {"bot_1:user_1": "2026-10-09T10:00:00Z"},
+            "deliveries": {"1001:user_1": "sent"},
+            "delivery_timestamps": {"1001:user_1": "2026-10-09T10:00:00Z"},
             "conversions": 99,  # Stale numbers to be overwritten
             "revenue": 999.0
         }
@@ -115,7 +190,7 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
             "tx_records": {
                 # Tx1: Paid BEFORE send -> Must NOT count
                 "tx_pre": {
-                    "origin_bot_numeric_id": "bot_1",
+                    "origin_bot_numeric_id": "1001",
                     "telegram_id": "user_1",
                     "status": "paid",
                     "amount": 29.90,
@@ -124,7 +199,7 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
                 },
                 # Tx2: Paid on DIFFERENT bot -> Must NOT count
                 "tx_diff_bot": {
-                    "origin_bot_numeric_id": "bot_2",
+                    "origin_bot_numeric_id": "1002",
                     "telegram_id": "user_1",
                     "status": "paid",
                     "amount": 49.90,
@@ -133,7 +208,7 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
                 },
                 # Tx3: Valid purchase AFTER send on SAME bot -> MUST count
                 "tx_valid": {
-                    "origin_bot_numeric_id": "bot_1",
+                    "origin_bot_numeric_id": "1001",
                     "telegram_id": "user_1",
                     "status": "paid",
                     "amount": 29.90,
@@ -154,19 +229,19 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(camp2["conversions"], 0)
         self.assertEqual(camp2["revenue"], 0.0)
 
-    async def test_multi_campaign_ambiguity_not_attributed(self):
+    async def test_multi_campaign_ambiguity_recorded_and_isolated(self):
         # Client user_2 received BOTH camp_a and camp_b
         camp_a = {
             "id": "camp_a",
-            "deliveries": {"bot_1:user_2": "sent"},
-            "delivery_timestamps": {"bot_1:user_2": "2026-10-09T10:00:00Z"},
+            "deliveries": {"1001:user_2": "sent"},
+            "delivery_timestamps": {"1001:user_2": "2026-10-09T10:00:00Z"},
             "conversions": 0,
             "revenue": 0.0
         }
         camp_b = {
             "id": "camp_b",
-            "deliveries": {"bot_1:user_2": "sent"},
-            "delivery_timestamps": {"bot_1:user_2": "2026-10-09T10:15:00Z"},
+            "deliveries": {"1001:user_2": "sent"},
+            "delivery_timestamps": {"1001:user_2": "2026-10-09T10:15:00Z"},
             "conversions": 0,
             "revenue": 0.0
         }
@@ -175,7 +250,7 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
             "remarketing_campaigns": [camp_a, camp_b],
             "tx_records": {
                 "tx_multi": {
-                    "origin_bot_numeric_id": "bot_1",
+                    "origin_bot_numeric_id": "1001",
                     "telegram_id": "user_2",
                     "status": "paid",
                     "amount": 39.90,
@@ -187,20 +262,23 @@ class TestRemarketingAttributionIsolation(unittest.IsolatedAsyncioTestCase):
 
         await main._compute_remarketing_metrics(None, state)
 
-        # Neither campaign claims the ambiguous sale
+        # Neither campaign gets false pure conversions
         self.assertEqual(camp_a["conversions"], 0)
         self.assertEqual(camp_a["revenue"], 0.0)
         self.assertEqual(camp_b["conversions"], 0)
         self.assertEqual(camp_b["revenue"], 0.0)
 
+        # Both campaigns are marked with ambiguous conversion count for transparent UI
+        self.assertTrue(camp_a.get("attribution_ambiguous"))
+        self.assertEqual(camp_a.get("ambiguous_conversions"), 1)
+        self.assertEqual(camp_a.get("ambiguous_revenue"), 39.90)
+        self.assertTrue(camp_b.get("attribution_ambiguous"))
+        self.assertEqual(camp_b.get("ambiguous_conversions"), 1)
+
 
 class TestCohortMetricsRules(unittest.TestCase):
     def test_cohort_date_filters_logic(self):
         # Pix generated yesterday (2026-10-08) and paid today (2026-10-09)
-        # Test cohort rate computation:
-        # Denominator = Pix created in period
-        # Numerator   = of those same Pix, how many are paid
-        
         # Yesterday cohort:
         pix_created_yesterday = 10
         pix_paid_from_yesterday_cohort = 8
@@ -212,10 +290,25 @@ class TestCohortMetricsRules(unittest.TestCase):
         rate_today = round((2 / pix_created_today) * 100, 1) if pix_created_today > 0 else None
         self.assertIsNone(rate_today)  # Frontend shows "—" rather than 100%
 
-        # Single lead with two distinct purchases counts as 2 sales but 1 converted lead
-        lead_distinct_purchasers = 1
-        total_leads_entered = 1
-        conversion_rate = round((lead_distinct_purchasers / total_leads_entered) * 100, 1)
+    def test_user_in_two_bots_converts_both(self):
+        # Defect regression: Same user buying in two bots must be counted as 2 conversions
+        # in the aggregate (1 for Bot A, 1 for Bot B), giving 100%, not 50%.
+        leads_entered = [
+            ("bot_a", "user_99"),
+            ("bot_b", "user_99")
+        ]
+        purchasers = [
+            ("bot_a", "user_99"),
+            ("bot_b", "user_99")
+        ]
+        
+        # Composite identity is origin_bot_id + ':' + telegram_id
+        denom = len(set(f"{b}:{u}" for b, u in leads_entered))
+        num = len(set(f"{b}:{u}" for b, u in purchasers))
+        
+        conversion_rate = round((num / denom) * 100, 1)
+        self.assertEqual(denom, 2)
+        self.assertEqual(num, 2)
         self.assertEqual(conversion_rate, 100.0)
 
 

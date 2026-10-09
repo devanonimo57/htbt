@@ -260,7 +260,7 @@ class RemainingDownsell(unittest.IsolatedAsyncioTestCase):
         self.assertIs(self.manager.downsell_tasks['111:7'], worker)
         await self.gate.wake()
         await self.until(['P', 'A'])
-        task.cancel(); await asyncio.gather(task, return_exceptions=True)
+        worker.cancel(); await asyncio.gather(worker, return_exceptions=True)
         self.manager.downsell_tasks.clear()
         saved = await self.cold()
         self.manager._resume_flow_downsells(saved)

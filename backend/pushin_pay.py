@@ -391,9 +391,10 @@ def parse_gateway_cents(raw_gw: Any, provider: str = "") -> Optional[int]:
         s = str(val).strip()
         if not s or "-" in s:
             return None
-        cleaned = re.sub(r"[^\d,\.]", "", s)
-        if not cleaned:
+        s_num = re.sub(r"^(?:R\$\s*|BRL\s*)", "", s, flags=re.I).strip()
+        if not re.fullmatch(r"\d{1,3}(?:\.\d{3})*,\d{1,2}|\d+,\d{1,2}|\d{1,3}(?:,\d{3})*\.\d{1,2}|\d+\.\d{1,2}|\d+", s_num):
             return None
+        cleaned = s_num
         if "," in cleaned and "." in cleaned:
             if cleaned.rfind(",") > cleaned.rfind("."):
                 cleaned = cleaned.replace(".", "").replace(",", ".")
@@ -414,17 +415,16 @@ def parse_gateway_cents(raw_gw: Any, provider: str = "") -> Optional[int]:
             return None
         if isinstance(val, int):
             return val if val >= 0 else None
+        if isinstance(val, float):
+            return int(round(val)) if val >= 0 else None
         s = str(val).strip()
         if not s or "-" in s:
             return None
-        cleaned = re.sub(r"[^\d]", "", s)
-        if not cleaned:
-            return None
-        try:
-            res = int(cleaned)
-            return res if res >= 0 else None
-        except ValueError:
-            return None
+        if re.fullmatch(r"\d+", s):
+            return int(s)
+        if re.fullmatch(r"\d+\.0+", s):
+            return int(float(s))
+        return None
 
     if not isinstance(raw_gw, dict):
         if raw_gw is None:

@@ -1931,9 +1931,12 @@ class ActiveBotManager:
                     # A newly active initial card resumes the first passage.
                     progress.pop('rest_until', None)
                     progress.pop('loop_sent', None)
-                    seq = eligible_pending[0]
+                    def _card_due(s):
+                        trig = 'pix' if s.get('trigger') == 'pix' else 'start'
+                        return anchors[trig] + max(1, int(s.get('delay_minutes') or 1)) * 60
+                    seq = min(eligible_pending, key=lambda s: (_card_due(s), sequences.index(s)))
                     trigger = 'pix' if seq.get('trigger') == 'pix' else 'start'
-                    due = anchors[trigger] + max(1, int(seq.get('delay_minutes') or 1)) * 60
+                    due = _card_due(seq)
                 else:
                     loops = [s for s in sequences if s.get('loop_enabled')
                              and anchors.get('pix' if s.get('trigger') == 'pix' else 'start') is not None]

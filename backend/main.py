@@ -881,6 +881,9 @@ async def _compute_remarketing_metrics(session, state: Dict[str, Any]):
             continue
         camp["conversions"] = 0
         camp["revenue"] = 0.0
+        camp["ambiguous_conversions"] = 0
+        camp["ambiguous_revenue"] = 0.0
+        camp["attribution_ambiguous"] = False
 
     # Build recipient -> list of (camp, sent_at_str, sent_dt)
     recipient_campaigns: Dict[str, List[Tuple[Dict[str, Any], str, Optional[datetime]]]] = {}
@@ -959,7 +962,20 @@ async def _compute_remarketing_metrics(session, state: Dict[str, Any]):
 
         # Decisão pendente: quando o cliente recebeu múltiplas campanhas, não decidir
         # arbitrariamente nem atribuir duplicado até haver definição do usuário.
+        # Registramos como conversão ambígua para que a interface distinga de zero vendas.
         if len(candidate_camps) > 1:
+            paid_at_str = tx["paid_at"]
+            paid_dt = _parse_iso_ts(paid_at_str)
+            is_any_after = False
+            for c_camp, s_str, s_dt in candidate_camps:
+                if (paid_dt and s_dt and paid_dt > s_dt) or (paid_at_str > s_str):
+                    is_any_after = True
+                    break
+            if is_any_after:
+                for c_camp, _, _ in candidate_camps:
+                    c_camp["ambiguous_conversions"] = int(c_camp.get("ambiguous_conversions") or 0) + 1
+                    c_camp["ambiguous_revenue"] = round(float(c_camp.get("ambiguous_revenue") or 0.0) + tx["amount"], 2)
+                    c_camp["attribution_ambiguous"] = True
             continue
 
         target_camp, sent_at_str, sent_dt = candidate_camps[0]
@@ -1792,6 +1808,8 @@ def _panel_state(state: Dict[str, Any]) -> Dict[str, Any]:
 async def get_full_state():
     raw_state = await _read_state_from_db()
     reconcile_daily_counters(raw_state)
+    async with async_session() as session:
+        await _compute_remarketing_metrics(session, raw_state)
     return _panel_state(raw_state)
 
 @app.post("/api/state", dependencies=[Depends(verify_admin_auth)])
@@ -1921,7 +1939,7 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         # Agregados da Coorte de Conversão de Leads (Leads criados no período e quantos compraram ao menos uma vez)
         lead_created_ts = func.json_extract(ClientRecord.data_json, '$.created_at')
         lead_filters = [ClientRecord.archived == False]
-        if matching_origins:
+        if bot_id != 'all' or flow != 'all':
             lead_filters.append(ClientRecord.origin_bot_id.in_(matching_origins))
         lead_filters += _metrics_date_filters(period, date, lead_created_ts)
 
@@ -1930,7 +1948,7 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         )).scalar_one() or 0
 
         lead_cohort_num = (await session.execute(
-            select(func.count(func.distinct(ClientRecord.telegram_id)))
+            select(func.count(func.distinct(ClientRecord.origin_bot_id + ':' + ClientRecord.telegram_id)))
             .join(
                 PixRecord,
                 and_(

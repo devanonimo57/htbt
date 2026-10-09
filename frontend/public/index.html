@@ -10328,6 +10328,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const delivPct = totalTargets > 0 ? Math.round((totalSent / totalTargets) * 100) : (totalSent > 0 ? 100 : 0);
       const totalRev = campaigns.reduce((acc, c) => acc + Number(c.revenue || 0), 0);
       const totalConv = campaigns.reduce((acc, c) => acc + Number(c.conversions || 0), 0);
+      const totalAmbiguous = campaigns.reduce((acc, c) => acc + Number(c.ambiguous_conversions || 0), 0);
 
       const setEl = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
       setEl('nb-rmk-kpi-total', String(totalCamp));
@@ -10337,7 +10338,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       setEl('nb-rmk-kpi-sent', String(totalSent));
       setEl('nb-rmk-kpi-sent-sub', `${delivPct}% entregues`);
       setEl('nb-rmk-kpi-revenue', `R$ ${totalRev.toFixed(2).replace('.', ',')}`);
-      setEl('nb-rmk-kpi-revenue-sub', `${totalConv} conversões`);
+      setEl('nb-rmk-kpi-revenue-sub', `${totalConv} conversões` + (totalAmbiguous > 0 ? ` (${totalAmbiguous} em disputa)` : ''));
 
       const q = (document.getElementById('nb-rmk-search')?.value || "").trim().toLowerCase();
       const stFilter = document.getElementById('nb-rmk-filter-status')?.value || "all";
@@ -10409,6 +10410,7 @@ quer que eu te mostre as opções de acesso?</textarea>
               <div class="text-[11px] text-zinc-500 flex items-center gap-4 pt-1">
                 <span><i class="fa-regular fa-paper-plane mr-1 text-zinc-400"></i><b>${Number(c.sent_count || 0)}</b> enviadas</span>
                 <span class="${Number(c.conversions || 0) > 0 ? 'text-emerald-400 font-bold' : 'text-zinc-500'}"><i class="fa-solid fa-dollar-sign mr-1"></i><b>${Number(c.conversions || 0)}</b> vendas (R$ ${Number(c.revenue || 0).toFixed(2).replace('.', ',')})</span>
+                ${Number(c.ambiguous_conversions || 0) > 0 ? `<span class="text-amber-400 font-medium" title="Compras realizadas após o cliente receber mais de uma campanha; aguardando definição da regra de atribuição">(${Number(c.ambiguous_conversions)} em disputa / indefinida)</span>` : ''}
                 ${c.last_sent_at ? `<span>Último disparo: ${escapeHtml(String(c.last_sent_at).replace('T', ' ').slice(0, 16))}</span>` : ''}
               </div>
             </div>
@@ -10845,16 +10847,36 @@ quer que eu te mostre as opções de acesso?</textarea>
         }
       }
 
-      // 1. Top 4 KPIs
-
-      const convRatePct = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
-      const pixApprPct = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
+      // 1. Top 4 KPIs usando Coortes Auditadas
+      let convRateSub = 'SEM LEADS NO PERÍODO';
+      if (NB_METRICS && NB_METRICS.lead_conversion_cohort) {
+        const lc = NB_METRICS.lead_conversion_cohort;
+        if (lc.rate !== null && lc.rate !== undefined) {
+          convRateSub = `${Number(lc.rate).toFixed(1).replace('.', ',')}% CONVERTERAM EM VENDA`;
+        } else {
+          convRateSub = 'SEM BASE (0 LEADS)';
+        }
+      } else if (startsCount > 0) {
+        convRateSub = `${Math.round((paidSalesCount / startsCount) * 100)}% CONVERTERAM EM VENDA`;
+      }
       setTxt('nb-ana-kpi-starts', String(startsCount));
-      setTxt('nb-ana-kpi-starts-sub', startsCount > 0 ? `${convRatePct}% CONVERTERAM EM VENDA` : (paidSalesCount > 0 ? '100% CONVERSÃO' : 'SEM LEADS NO PERÍODO'));
+      setTxt('nb-ana-kpi-starts-sub', convRateSub);
       setTxt('nb-ana-kpi-rev-gen', fmtBRL(generatedRev));
       setTxt('nb-ana-kpi-rev-gen-sub', `TICKET MÉDIO ${fmtBRL(avgTicket)}`);
       setTxt('nb-ana-kpi-rev-paid', fmtBRL(confirmedRev));
-      setTxt('nb-ana-kpi-rev-paid-sub', `${paidSalesCount} VENDAS PAGAS · ${pixApprPct}% APROVAÇÃO PIX`);
+
+      let pixApprSub = `${paidSalesCount} VENDAS PAGAS · SEM BASE (0 PIX GERADOS)`;
+      if (NB_METRICS && NB_METRICS.pix_approval_cohort) {
+        const pac = NB_METRICS.pix_approval_cohort;
+        if (pac.rate !== null && pac.rate !== undefined) {
+          pixApprSub = `${paidSalesCount} VENDAS PAGAS · ${Number(pac.rate).toFixed(1).replace('.', ',')}% APROVAÇÃO PIX`;
+        } else {
+          pixApprSub = `${paidSalesCount} VENDAS PAGAS · SEM BASE (0 PIX GERADOS)`;
+        }
+      } else if (pixGenCount > 0) {
+        pixApprSub = `${paidSalesCount} VENDAS PAGAS · ${Math.round((paidSalesCount / pixGenCount) * 100)}% APROVAÇÃO PIX`;
+      }
+      setTxt('nb-ana-kpi-rev-paid-sub', pixApprSub);
 
       // 2. Vendas por Hora (0h - 23h SVG)
       const hourlyGen = new Array(24).fill(0);
@@ -10879,8 +10901,16 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       setTxt('nb-ana-hour-best', bestHrSales ? `${bestHr}h (${bestHrSales} vendas)` : '—');
       setTxt('nb-ana-hour-paid', String(paidSalesCount));
-      setTxt('nb-ana-hour-gen', String(pixGenCount));
-      setTxt('nb-ana-hour-conv', pixGenCount > 0 ? `${pixApprPct}%` : '—');
+      let pixApprVal = '—';
+      if (NB_METRICS && NB_METRICS.pix_approval_cohort) {
+        const pac = NB_METRICS.pix_approval_cohort;
+        if (pac.rate !== null && pac.rate !== undefined) {
+          pixApprVal = `${Number(pac.rate).toFixed(1).replace('.', ',')}%`;
+        }
+      } else if (pixGenCount > 0) {
+        pixApprVal = `${Math.round((paidSalesCount / pixGenCount) * 100)}%`;
+      }
+      setTxt('nb-ana-hour-conv', pixApprVal);
 
       const hrChartEl = document.getElementById('nb-ana-hourly-chart');
       if (hrChartEl) {
@@ -10971,19 +11001,32 @@ quer que eu te mostre as opções de acesso?</textarea>
       renderRankList('nb-ana-top-tickets', paidSalesCount > 0 ? topTicketItems : []);
       renderRankList('nb-ana-top-codes', [], 'Sem dados de códigos');
 
-      const fStartToPix = startsCount > 0 ? Math.min(100, Math.round((pixGenCount / startsCount) * 100)) : (pixGenCount > 0 ? 100 : 0);
-      const fPixToPaid = pixGenCount > 0 ? Math.min(100, Math.round((paidSalesCount / pixGenCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
-      const fStartToPaid = startsCount > 0 ? Math.min(100, Math.round((paidSalesCount / startsCount) * 100)) : (paidSalesCount > 0 ? 100 : 0);
+      let fStartToPix = '—';
+      if (startsCount > 0) {
+        fStartToPix = `${Math.round((pixGenCount / startsCount) * 100)}%`;
+      }
+      let fPixToPaid = '—';
+      if (NB_METRICS?.pix_approval_cohort?.rate !== null && NB_METRICS?.pix_approval_cohort?.rate !== undefined) {
+        fPixToPaid = `${Number(NB_METRICS.pix_approval_cohort.rate).toFixed(1).replace('.', ',')}%`;
+      } else if (pixGenCount > 0) {
+        fPixToPaid = `${Math.round((paidSalesCount / pixGenCount) * 100)}%`;
+      }
+      let fStartToPaid = '—';
+      if (NB_METRICS?.lead_conversion_cohort?.rate !== null && NB_METRICS?.lead_conversion_cohort?.rate !== undefined) {
+        fStartToPaid = `${Number(NB_METRICS.lead_conversion_cohort.rate).toFixed(1).replace('.', ',')}%`;
+      } else if (startsCount > 0) {
+        fStartToPaid = `${Math.round((paidSalesCount / startsCount) * 100)}%`;
+      }
 
-      setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : (pixGenCount > 0 ? '100%' : '0%'));
-      setTxt('nb-ana-funnel-pct-2', `${fStartToPix}%`);
-      setTxt('nb-ana-funnel-pct-3', `${fStartToPaid}%`);
+      setTxt('nb-ana-funnel-pct-1', startsCount > 0 ? '100%' : '—');
+      setTxt('nb-ana-funnel-pct-2', fStartToPix);
+      setTxt('nb-ana-funnel-pct-3', fStartToPaid);
       setTxt('nb-ana-funnel-cnt-start', String(startsCount));
       setTxt('nb-ana-funnel-cnt-pix', String(pixGenCount));
       setTxt('nb-ana-funnel-cnt-paid', String(paidSalesCount));
-      setTxt('nb-ana-funnel-step-1', `${fStartToPix}%`);
-      setTxt('nb-ana-funnel-step-2', `${fPixToPaid}%`);
-      setTxt('nb-ana-funnel-step-3', `${fStartToPaid}%`);
+      setTxt('nb-ana-funnel-step-1', fStartToPix);
+      setTxt('nb-ana-funnel-step-2', fPixToPaid);
+      setTxt('nb-ana-funnel-step-3', fStartToPaid);
 
       // 7. Top Campanhas, Fontes, Posicionamentos, Tempo Médio
       const rmkCampaigns = (STATE.remarketing_campaigns || []).map(c => ({
