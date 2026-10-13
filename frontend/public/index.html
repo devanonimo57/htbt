@@ -304,6 +304,14 @@
               <span id="nb-dock-dot-gateways" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
             </button>
           </div>
+
+          <div class="relative">
+            <button id="nb-dock-btn-redirects" onclick="nbSwitchMainView('redirects')" class="w-full px-3.5 py-2.5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 flex items-center gap-3 text-xs font-medium transition text-left" title="Redirecionadores — Links e campanhas">
+              <i class="fa-solid fa-link w-4 text-center text-sm"></i>
+              <span>Redirecionadores</span>
+              <span id="nb-dock-dot-redirects" class="hidden w-1.5 h-1.5 rounded-full bg-white ml-auto"></span>
+            </button>
+          </div>
         </div>
 
         <div class="px-2 pt-4 border-t border-[#1c1328] text-[10px] text-zinc-500">
@@ -2186,6 +2194,715 @@
         <div id="nb-rmk-campaigns-container"></div>
       </div>
 
+      <!-- =========================================================
+           TELA 8: REDIRECIONADORES (DISTRIBUIÇÃO / LINKS E CAMPANHAS)
+      ========================================================== -->
+      <div id="nb-view-redirects" class="hidden max-w-[1240px] mx-auto px-6 md:px-8 pt-8 space-y-6">
+
+        <!-- SUBVIEW 1: LISTAGEM DE REDIRECIONADORES -->
+        <div id="nb-red-list-subview" class="space-y-6">
+          <!-- CABEÇALHO -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#211730] pb-6">
+            <div>
+              <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                <span>DISTRIBUIÇÃO</span>
+                <span class="text-zinc-600">/</span>
+                <span class="text-zinc-400">Links e campanhas</span>
+              </div>
+              <h1 class="text-2xl font-black text-white tracking-tight mt-1 flex items-center gap-2.5">
+                <i class="fa-solid fa-link text-[#a855f7] text-xl"></i>
+                <span>Redirecionadores</span>
+              </h1>
+              <p class="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
+                Crie links inteligentes com cloaker integrado, proteção anti-bot e divisão balanceada de tráfego entre múltiplos bots.
+              </p>
+            </div>
+            <div class="flex items-center gap-2.5 shrink-0">
+              <button onclick="nbOpenRedirectWizard()" class="px-4 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition shadow-lg shadow-purple-950/40 flex items-center gap-2">
+                <i class="fa-solid fa-plus text-xs"></i>
+                <span>Criar link</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TABS DE NAVEGAÇÃO -->
+          <div class="flex items-center gap-2 border-b border-[#211730] pb-2 overflow-x-auto text-xs">
+            <button onclick="nbSwitchRedirectTab('links')" id="nb-red-tab-links" class="px-3.5 py-1.5 rounded-lg bg-[#a855f7]/15 text-[#c084fc] font-semibold border border-[#a855f7]/30 flex items-center gap-2">
+              <i class="fa-solid fa-link text-xs"></i>
+              <span>Meus links</span>
+            </button>
+            <button onclick="nbSwitchRedirectTab('codes')" id="nb-red-tab-codes" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+              <i class="fa-solid fa-barcode text-xs"></i>
+              <span>Códigos de venda</span>
+            </button>
+            <button onclick="nbSwitchRedirectTab('campaigns')" id="nb-red-tab-campaigns" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+              <i class="fa-solid fa-bullhorn text-xs"></i>
+              <span>Preparar campanha</span>
+            </button>
+            <button onclick="nbSwitchRedirectTab('domains')" id="nb-red-tab-domains" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+              <i class="fa-solid fa-globe text-xs"></i>
+              <span>Domínios</span>
+            </button>
+            <button onclick="nbSwitchRedirectTab('bridge')" id="nb-red-tab-bridge" class="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2">
+              <i class="fa-solid fa-shield-halved text-xs"></i>
+              <span>Página Intermediária</span>
+            </button>
+          </div>
+
+          <!-- CARDS DE RESUMO (KPIS) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">LINKS ATIVOS</span>
+                <span id="nb-red-kpi-active" class="text-2xl font-black text-white mt-1 block">0</span>
+                <span id="nb-red-kpi-active-sub" class="text-[11px] text-zinc-500">0 cadastrados no total</span>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-purple-950/40 border border-purple-800/40 flex items-center justify-center text-[#a855f7]">
+                <i class="fa-solid fa-network-wired text-sm"></i>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">TOTAL DE CLIQUES</span>
+                <span id="nb-red-kpi-clicks" class="text-2xl font-black text-white mt-1 block">0</span>
+                <span id="nb-red-kpi-clicks-sub" class="text-[11px] text-emerald-400">Tráfego monitorado em tempo real</span>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center text-emerald-400">
+                <i class="fa-solid fa-arrow-pointer text-sm"></i>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">COM CLOAKER ATIVO</span>
+                <span id="nb-red-kpi-cloaker" class="text-2xl font-black text-white mt-1 block">0</span>
+                <span id="nb-red-kpi-cloaker-sub" class="text-[11px] text-purple-400">Proteção anti-bot aplicada</span>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-purple-950/40 border border-purple-800/40 flex items-center justify-center text-purple-300">
+                <i class="fa-solid fa-user-shield text-sm"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARRA DE FILTROS & BUSCA -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0d0914] p-3 rounded-2xl border border-[#211730]">
+            <div class="flex items-center gap-2 flex-1 max-w-md bg-[#130d1e] px-3 py-2 rounded-xl border border-[#2a1c3f]">
+              <i class="fa-solid fa-magnifying-glass text-zinc-500 text-xs"></i>
+              <input type="text" id="nb-red-search" oninput="nbRenderRedirectsTable()" placeholder="Buscar link por nome ou slug..." class="bg-transparent text-xs text-white placeholder-zinc-500 outline-none w-full">
+            </div>
+
+            <div class="flex items-center gap-2 overflow-x-auto">
+              <div class="flex items-center gap-1 bg-[#130d1e] p-1 rounded-xl border border-[#2a1c3f] text-xs">
+                <button onclick="nbSetRedirectFilter('all')" id="nb-red-pill-all" class="px-2.5 py-1 rounded-lg bg-[#a855f7] text-white font-bold transition">Todos</button>
+                <button onclick="nbSetRedirectFilter('active')" id="nb-red-pill-active" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white transition">Ativos</button>
+                <button onclick="nbSetRedirectFilter('inactive')" id="nb-red-pill-inactive" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white transition">Inativos</button>
+                <button onclick="nbSetRedirectFilter('cloaker')" id="nb-red-pill-cloaker" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white transition">Cloaker</button>
+              </div>
+
+              <select id="nb-red-sort" onchange="nbRenderRedirectsTable()" class="bg-[#130d1e] border border-[#2a1c3f] text-zinc-300 text-xs rounded-xl px-3 py-2 outline-none">
+                <option value="recent">Mais Recentes</option>
+                <option value="clicks">Mais Clicados</option>
+                <option value="revenue">Maior Faturamento</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- TABELA / LISTA DE REDIRECIONADORES -->
+          <div id="nb-red-table-container" class="space-y-3">
+            <!-- CARDS DE LINKS RENDERIZADOS DINAMICAMENTE -->
+          </div>
+        </div>
+
+        <!-- SUBVIEW 2: WIZARD DE CRIAÇÃO / EDIÇÃO DE REDIRECIONADOR (6 ETAPAS) -->
+        <div id="nb-red-wizard-subview" class="hidden space-y-6">
+          <!-- CABEÇALHO DO WIZARD -->
+          <div class="flex items-center justify-between border-b border-[#211730] pb-4">
+            <div class="flex items-center gap-3">
+              <button onclick="nbCloseRedirectWizard()" class="w-9 h-9 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 hover:text-white flex items-center justify-center transition text-xs" title="Voltar para a lista">
+                <i class="fa-solid fa-arrow-left"></i>
+              </button>
+              <div>
+                <h2 id="nb-wiz-title" class="text-lg font-black text-white tracking-tight">Novo Redirecionador</h2>
+                <p class="text-xs text-zinc-400">Configure rota inteligente, múltiplos bots de destino e regras de cloaker anti-bot.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="nbCloseRedirectWizard()" class="px-3.5 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-400 hover:text-white text-xs font-semibold transition">
+                Descartar
+              </button>
+              <button onclick="nbSaveRedirectFromWizard()" class="px-4 py-2 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition shadow-lg shadow-purple-950/40 flex items-center gap-2">
+                <i class="fa-solid fa-check text-xs"></i>
+                <span>Salvar e Ativar Link</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEPPER INDICATOR (6 ETAPAS) -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 bg-[#0e0a16] p-2 rounded-2xl border border-[#231733]">
+            <button onclick="nbWizJumpStep(1)" id="nb-wiz-step-btn-1" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-[#a855f7]/15 border-[#a855f7]/40 text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-purple-400">ETAPA 01</span>
+              <span class="text-xs font-bold truncate">Endereço</span>
+            </button>
+            <button onclick="nbWizJumpStep(2)" id="nb-wiz-step-btn-2" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-zinc-500">ETAPA 02</span>
+              <span class="text-xs font-bold truncate">Destino</span>
+            </button>
+            <button onclick="nbWizJumpStep(3)" id="nb-wiz-step-btn-3" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-zinc-500">ETAPA 03</span>
+              <span class="text-xs font-bold truncate">Distribuição & UTMs</span>
+            </button>
+            <button onclick="nbWizJumpStep(4)" id="nb-wiz-step-btn-4" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-zinc-500">ETAPA 04</span>
+              <span class="text-xs font-bold truncate">Proteção</span>
+            </button>
+            <button onclick="nbWizJumpStep(5)" id="nb-wiz-step-btn-5" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-zinc-500">ETAPA 05</span>
+              <span class="text-xs font-bold truncate">Segmentação</span>
+            </button>
+            <button onclick="nbWizJumpStep(6)" id="nb-wiz-step-btn-6" class="p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white">
+              <span class="text-[9px] font-black uppercase tracking-wider text-zinc-500">ETAPA 06</span>
+              <span class="text-xs font-bold truncate">Revisão</span>
+            </button>
+          </div>
+
+          <!-- CONTEÚDO PRINCIPAL: 2 COLUNAS (FORMULÁRIO À ESQUERDA + RESUMO DA JORNADA À DIREITA) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- COLUNA ESQUERDA: ETAPAS ATIVAS (8 COLS) -->
+            <div class="lg:col-span-8 space-y-6">
+
+              <!-- ETAPA 1: ENDEREÇO -->
+              <div id="nb-wiz-panel-1" class="p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">1</span>
+                    <span>Endereço do Redirecionador</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Defina o nome interno, o domínio público oficial e o slug de entrada.</p>
+                </div>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">NOME INTERNO DO LINK</label>
+                    <input type="text" id="nb-wiz-name" oninput="nbWizSync()" placeholder="Ex: iphonecapa, Campanha Meta Stories VIP" class="nb-input">
+                  </div>
+
+                  <div class="flex items-center justify-between p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <div>
+                      <span class="text-xs font-bold text-white block">Status do Redirecionador</span>
+                      <span class="text-[11px] text-zinc-400">Links desativados retornam página segura imediatamente.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="nb-wiz-active" onchange="nbWizSync()" class="sr-only peer" checked>
+                      <div class="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#a855f7]"></div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1.5">DOMÍNIO PÚBLICO OFICIAL</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="nb-wiz-domain-grid">
+                      <!-- Renderizado via JS -->
+                    </div>
+                  </div>
+
+                  <div class="space-y-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">FORMATO DO SLUG</label>
+                    <div class="flex items-center gap-3">
+                      <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                        <input type="radio" name="nb-wiz-slug-mode" value="random" onchange="nbWizSync()" checked class="accent-[#a855f7]">
+                        <span>Aleatório (Recomendado anti-bloqueio)</span>
+                      </label>
+                      <label class="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                        <input type="radio" name="nb-wiz-slug-mode" value="custom" onchange="nbWizSync()" class="accent-[#a855f7]">
+                        <span>Personalizado</span>
+                      </label>
+                    </div>
+                    <div class="flex items-center gap-2 mt-2">
+                      <span class="px-3 py-2 rounded-xl bg-[#140d1e] border border-[#281a3c] text-xs text-zinc-400 font-mono" id="nb-wiz-domain-prefix">https://phantoms.group/l/</span>
+                      <input type="text" id="nb-wiz-slug" oninput="nbWizSync()" placeholder="slug-do-link" class="nb-input font-mono flex-1">
+                      <button type="button" onclick="nbWizRegenerateSlug()" class="px-3 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 hover:text-white text-xs font-semibold transition" title="Gerar novo slug aleatório">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(2)" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2">
+                    <span>Avançar: Destino</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ETAPA 2: DESTINO -->
+              <div id="nb-wiz-panel-2" class="hidden p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">2</span>
+                    <span>Destino do Tráfego</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Selecione se o tráfego irá para bots interativos ou para canal/grupo direto.</p>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="p-4 rounded-xl border cursor-pointer transition flex items-start gap-3 bg-[#140d1e] border-[#a855f7]" id="nb-wiz-dest-card-bot">
+                      <input type="radio" name="nb-wiz-dest-type" value="bot" onchange="nbWizSync()" checked class="accent-[#a855f7] mt-0.5">
+                      <div>
+                        <span class="text-xs font-bold text-white block">Bot do Telegram</span>
+                        <span class="text-[11px] text-zinc-400 mt-0.5 block">Direciona o lead para fluxos interativos e conversão automatizada.</span>
+                      </div>
+                    </label>
+
+                    <label class="p-4 rounded-xl border cursor-pointer transition flex items-start gap-3 bg-[#140d1e] border-[#281a3c]" id="nb-wiz-dest-card-channel">
+                      <input type="radio" name="nb-wiz-dest-type" value="channel" onchange="nbWizSync()" class="accent-[#a855f7] mt-0.5">
+                      <div>
+                        <span class="text-xs font-bold text-white block">Canal ou Grupo</span>
+                        <span class="text-[11px] text-zinc-400 mt-0.5 block">Direciona para link de convite direto do Telegram.</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <!-- SELEÇÃO DE BOTS -->
+                  <div id="nb-wiz-bots-container" class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">SELECIONE OS BOTS CONECTADOS</label>
+                      <button type="button" onclick="nbWizSelectAllBots()" class="text-[10px] text-purple-400 hover:text-purple-300 font-semibold">Selecionar todos</button>
+                    </div>
+                    <div id="nb-wiz-bot-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      <!-- Renderizado via JS -->
+                    </div>
+                  </div>
+
+                  <!-- CONFIGURAÇÃO DE CANAL (CASO SELECIONADO) -->
+                  <div id="nb-wiz-channel-container" class="hidden space-y-3">
+                    <div>
+                      <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">LINK DE CONVITE DO CANAL</label>
+                      <input type="url" id="nb-wiz-channel-url" oninput="nbWizSync()" placeholder="https://t.me/+abc123exclusivo" class="nb-input">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(1)" class="px-4 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 text-xs font-semibold">
+                    ← Voltar
+                  </button>
+                  <button type="button" onclick="nbWizJumpStep(3)" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2">
+                    <span>Avançar: Distribuição & UTMs</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ETAPA 3: DISTRIBUIÇÃO E UTMS -->
+              <div id="nb-wiz-panel-3" class="hidden p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">3</span>
+                    <span>Distribuição de Tráfego e Parâmetros UTM</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Escolha a regra de divisão entre bots e pré-configure fontes de anúncio para tracking.</p>
+                </div>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">ORDEM DE DISTRIBUIÇÃO</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-2.5 bg-[#140d1e] border-[#a855f7]" id="nb-wiz-dist-card-random">
+                        <input type="radio" name="nb-wiz-dist-order" value="aleatoria" onchange="nbWizSync()" checked class="accent-[#a855f7] mt-0.5">
+                        <div>
+                          <span class="text-xs font-bold text-white block">Aleatória</span>
+                          <span class="text-[11px] text-zinc-400 block">Distribui o tráfego de maneira uniforme e imprevisível.</span>
+                        </div>
+                      </label>
+
+                      <label class="p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-2.5 bg-[#140d1e] border-[#281a3c]" id="nb-wiz-dist-card-seq">
+                        <input type="radio" name="nb-wiz-dist-order" value="sequencial" onchange="nbWizSync()" class="accent-[#a855f7] mt-0.5">
+                        <div>
+                          <span class="text-xs font-bold text-white block">Sequencial (Round-Robin)</span>
+                          <span class="text-[11px] text-zinc-400 block">Alterna estritamente: Bot 1, Bot 2, Bot 3 e reinicia o ciclo.</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">PLATAFORMA DE ANÚNCIO (PRESET RÁPIDO)</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      <button type="button" onclick="nbWizSetAdPlatform('meta')" id="nb-wiz-plat-meta" class="p-2.5 rounded-xl bg-[#a855f7]/15 border border-[#a855f7]/40 text-purple-300 font-bold text-xs flex flex-col items-center gap-1">
+                        <i class="fa-brands fa-facebook text-base"></i>
+                        <span>Meta Ads</span>
+                      </button>
+                      <button type="button" onclick="nbWizSetAdPlatform('tiktok')" id="nb-wiz-plat-tiktok" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+                        <i class="fa-brands fa-tiktok text-base"></i>
+                        <span>TikTok Ads</span>
+                      </button>
+                      <button type="button" onclick="nbWizSetAdPlatform('google')" id="nb-wiz-plat-google" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+                        <i class="fa-brands fa-google text-base"></i>
+                        <span>Google Ads</span>
+                      </button>
+                      <button type="button" onclick="nbWizSetAdPlatform('kwai')" id="nb-wiz-plat-kwai" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+                        <i class="fa-solid fa-play text-base"></i>
+                        <span>Kwai Ads</span>
+                      </button>
+                      <button type="button" onclick="nbWizSetAdPlatform('x')" id="nb-wiz-plat-x" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+                        <i class="fa-brands fa-x-twitter text-base"></i>
+                        <span>X Ads</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- ACCORDION: CAMPOS UTM AVANÇADOS -->
+                  <div class="border border-[#281a3c] rounded-xl overflow-hidden">
+                    <button type="button" onclick="nbToggleAccordion('nb-wiz-utm-acc')" class="w-full p-3.5 bg-[#140d1e] text-left flex items-center justify-between text-xs font-bold text-zinc-300 hover:text-white">
+                      <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-[#a855f7]"></i>
+                        <span>Parâmetros UTM Avançados</span>
+                      </span>
+                      <i class="fa-solid fa-chevron-down text-xs text-zinc-500 transition-transform" id="nb-wiz-utm-acc-icon"></i>
+                    </button>
+                    <div id="nb-wiz-utm-acc" class="p-4 bg-[#0d0816] space-y-3">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_SOURCE</label>
+                          <input type="text" id="nb-wiz-utm-source" oninput="nbWizSync()" placeholder="meta" class="nb-input font-mono text-xs">
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_CAMPAIGN</label>
+                          <input type="text" id="nb-wiz-utm-campaign" oninput="nbWizSync()" placeholder="{{campaign.name}}" class="nb-input font-mono text-xs">
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_MEDIUM</label>
+                          <input type="text" id="nb-wiz-utm-medium" oninput="nbWizSync()" placeholder="stories" class="nb-input font-mono text-xs">
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_CONTENT</label>
+                          <input type="text" id="nb-wiz-utm-content" oninput="nbWizSync()" placeholder="{{ad.name}}" class="nb-input font-mono text-xs">
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_TERM</label>
+                          <input type="text" id="nb-wiz-utm-term" oninput="nbWizSync()" placeholder="term_keyword" class="nb-input font-mono text-xs">
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-bold text-zinc-400 uppercase block mb-1">UTM_ID</label>
+                          <input type="text" id="nb-wiz-utm-id" oninput="nbWizSync()" placeholder="{{campaign.id}}" class="nb-input font-mono text-xs">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(2)" class="px-4 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 text-xs font-semibold">
+                    ← Voltar
+                  </button>
+                  <button type="button" onclick="nbWizJumpStep(4)" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2">
+                    <span>Avançar: Proteção</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ETAPA 4: PROTEÇÃO (CLOAKER & ANTI-BOT) -->
+              <div id="nb-wiz-panel-4" class="hidden p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">4</span>
+                    <span>Proteção e Camuflagem de Tráfego</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Proteja suas contas de anúncios bloqueando robôs de verificação e acessos espiões.</p>
+                </div>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">NÍVEL DE PROTEÇÃO</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <label class="p-3.5 rounded-xl border cursor-pointer transition flex flex-col gap-1 bg-[#140d1e] border-[#281a3c]" id="nb-wiz-prot-card-none">
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs font-bold text-white">Sem proteção</span>
+                          <input type="radio" name="nb-wiz-prot-level" value="none" onchange="nbWizSync()" class="accent-[#a855f7]">
+                        </div>
+                        <span class="text-[10px] text-zinc-400">Tráfego direto sem filtragem.</span>
+                      </label>
+
+                      <label class="p-3.5 rounded-xl border cursor-pointer transition flex flex-col gap-1 bg-[#140d1e] border-[#281a3c]" id="nb-wiz-prot-card-basic">
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs font-bold text-purple-300">Cloaker + AntiClone</span>
+                          <input type="radio" name="nb-wiz-prot-level" value="basic" onchange="nbWizSync()" class="accent-[#a855f7]">
+                        </div>
+                        <span class="text-[10px] text-zinc-400">Filtra bots de redes sociais e acessos diretos.</span>
+                      </label>
+
+                      <label class="p-3.5 rounded-xl border cursor-pointer transition flex flex-col gap-1 bg-[#140d1e] border-[#a855f7]" id="nb-wiz-prot-card-v2">
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs font-bold text-emerald-400">Cloaker V2 [AVANÇADO]</span>
+                          <input type="radio" name="nb-wiz-prot-level" value="v2" onchange="nbWizSync()" checked class="accent-[#a855f7]">
+                        </div>
+                        <span class="text-[10px] text-zinc-400">Proteção máxima com fingerprinting e heurística rigorosa.</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-2">AÇÃO PARA TRÁFEGO BLOQUEADO</label>
+                    <div class="space-y-2">
+                      <label class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between bg-[#140d1e] border-[#a855f7]" id="nb-wiz-block-card-safe">
+                        <div class="flex items-center gap-2.5">
+                          <input type="radio" name="nb-wiz-block-action" value="safe_page" onchange="nbWizSync()" checked class="accent-[#a855f7]">
+                          <span class="text-xs font-bold text-white">Página Segura Integrada</span>
+                        </div>
+                        <span class="text-[11px] text-zinc-400">Exibe artigo editorial institucional neutro</span>
+                      </label>
+
+                      <label class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between bg-[#140d1e] border-[#281a3c]" id="nb-wiz-block-card-redir">
+                        <div class="flex items-center gap-2.5">
+                          <input type="radio" name="nb-wiz-block-action" value="redirect" onchange="nbWizSync()" class="accent-[#a855f7]">
+                          <span class="text-xs font-bold text-white">Redirecionar para URL Externa Segura</span>
+                        </div>
+                        <span class="text-[11px] text-zinc-400">Desvia para portal confiável</span>
+                      </label>
+                    </div>
+                    <div id="nb-wiz-safe-url-container" class="hidden mt-2">
+                      <input type="url" id="nb-wiz-safe-url" oninput="nbWizSync()" placeholder="https://noticias.globo.com/artigo-tecnologia" class="nb-input">
+                    </div>
+                  </div>
+
+                  <div class="space-y-2 pt-2 border-t border-[#211730]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">REGRAS DE FILTRAGEM ATIVAS</span>
+                    
+                    <label class="flex items-center justify-between p-3 rounded-xl bg-[#140d1e] border border-[#281a3c] cursor-pointer">
+                      <span class="text-xs text-zinc-200">Bloquear crawlers de anúncios (Facebook, Instagram, Google, TikTok, ByteDance)</span>
+                      <input type="checkbox" id="nb-wiz-block-ad-bots" onchange="nbWizSync()" checked class="w-4 h-4 accent-[#a855f7]">
+                    </label>
+
+                    <label class="flex items-center justify-between p-3 rounded-xl bg-[#140d1e] border border-[#281a3c] cursor-pointer">
+                      <span class="text-xs text-zinc-200">Anti-Clone (Bloquear acessos diretos sem referer de rede social válida)</span>
+                      <input type="checkbox" id="nb-wiz-anti-clone" onchange="nbWizSync()" checked class="w-4 h-4 accent-[#a855f7]">
+                    </label>
+
+                    <label class="flex items-center justify-between p-3 rounded-xl bg-[#140d1e] border border-[#281a3c] cursor-pointer">
+                      <span class="text-xs text-zinc-200">Fingerprinting de navegador (Rejeitar emuladores, Puppeteer e ferramentas de espionagem)</span>
+                      <input type="checkbox" id="nb-wiz-fingerprint" onchange="nbWizSync()" checked class="w-4 h-4 accent-[#a855f7]">
+                    </label>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(3)" class="px-4 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 text-xs font-semibold">
+                    ← Voltar
+                  </button>
+                  <button type="button" onclick="nbWizJumpStep(5)" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2">
+                    <span>Avançar: Segmentação</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ETAPA 5: SEGMENTAÇÃO -->
+              <div id="nb-wiz-panel-5" class="hidden p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">5</span>
+                    <span>Segmentação Geográfica e Dispositivo</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Limite o acesso exclusivamente ao público-alvo dos seus anúncios.</p>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <div>
+                      <span class="text-xs font-bold text-white block">Filtrar por país de origem (Geo-IP)</span>
+                      <span class="text-[11px] text-zinc-400">Rejeita qualquer visitante fora dos países autorizados abaixo.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="nb-wiz-filter-geo" onchange="nbWizSync()" class="sr-only peer" checked>
+                      <div class="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#a855f7]"></div>
+                    </label>
+                  </div>
+
+                  <div id="nb-wiz-geo-container" class="space-y-2">
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">PAÍSES AUTORIZADOS</label>
+                    <div class="grid grid-cols-3 sm:grid-cols-5 gap-2" id="nb-wiz-country-grid">
+                      <!-- Renderizado via JS -->
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <div>
+                      <span class="text-xs font-bold text-white block">Verificar idioma do navegador</span>
+                      <span class="text-[11px] text-zinc-400">Garante que o visitante possui Accept-Language correspondente.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="nb-wiz-filter-lang" onchange="nbWizSync()" class="sr-only peer" checked>
+                      <div class="w-10 h-5 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#a855f7]"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(4)" class="px-4 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 text-xs font-semibold">
+                    ← Voltar
+                  </button>
+                  <button type="button" onclick="nbWizJumpStep(6)" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2">
+                    <span>Avançar: Revisão</span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- ETAPA 6: REVISÃO -->
+              <div id="nb-wiz-panel-6" class="hidden p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-5">
+                <div class="border-b border-[#211730] pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold">6</span>
+                    <span>Revisão e Ativação</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Valide todos os parâmetros antes de publicar o redirecionador.</p>
+                </div>
+
+                <div id="nb-wiz-warnings" class="hidden p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/50 text-xs text-amber-300 space-y-1">
+                  <!-- Avisos de validação -->
+                </div>
+
+                <!-- PREVIEW DA URL FINAL -->
+                <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">LINK PRONTO PARA USO</span>
+                  <div class="flex items-center justify-between gap-3 bg-[#0a0710] p-3 rounded-lg border border-[#211730]">
+                    <span id="nb-wiz-review-url" class="font-mono text-xs text-emerald-300 truncate">https://phantoms.group/l/slug</span>
+                    <button type="button" onclick="nbCopyReviewUrl()" class="px-3 py-1.5 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold shrink-0 transition flex items-center gap-1.5">
+                      <i class="fa-regular fa-copy"></i>
+                      <span>Copiar</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- MATRIZ DE CONFIGURAÇÕES -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">STATUS</span>
+                    <span id="nb-wiz-rev-status" class="text-xs font-bold text-emerald-400 mt-0.5 block">Ativo</span>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">DESTINO</span>
+                    <span id="nb-wiz-rev-dest" class="text-xs font-bold text-white mt-0.5 block">1 bot selecionado</span>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">DISTRIBUIÇÃO</span>
+                    <span id="nb-wiz-rev-dist" class="text-xs font-bold text-purple-300 mt-0.5 block">Aleatória</span>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">PROTEÇÃO</span>
+                    <span id="nb-wiz-rev-prot" class="text-xs font-bold text-emerald-400 mt-0.5 block">Cloaker V2</span>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">SEGMENTAÇÃO</span>
+                    <span id="nb-wiz-rev-geo" class="text-xs font-bold text-white mt-0.5 block">BR (Brasil)</span>
+                  </div>
+                  <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                    <span class="text-[10px] text-zinc-400 block">ORIGEM TRACKING</span>
+                    <span id="nb-wiz-rev-utm" class="text-xs font-bold text-purple-300 mt-0.5 block">Meta Ads</span>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-[#211730]">
+                  <button type="button" onclick="nbWizJumpStep(5)" class="px-4 py-2 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 text-xs font-semibold">
+                    ← Voltar
+                  </button>
+                  <button type="button" onclick="nbSaveRedirectFromWizard()" class="px-6 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition shadow-lg shadow-purple-950/40 flex items-center gap-2">
+                    <i class="fa-solid fa-check text-xs"></i>
+                    <span>Salvar e Ativar Link</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- COLUNA DIREITA: RESUMO DA JORNADA (4 COLS) -->
+            <div class="lg:col-span-4 space-y-4 sticky top-6">
+              <div class="p-5 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-4">
+                <div class="border-b border-[#211730] pb-3">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">VISUALIZAÇÃO EM TEMPO REAL</span>
+                  <h3 class="text-sm font-bold text-white mt-0.5">Resumo da jornada</h3>
+                </div>
+
+                <!-- ENDEREÇO ATUAL -->
+                <div class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+                  <span class="text-[10px] text-zinc-400 block">SLUG EM TEMPO REAL</span>
+                  <span id="nb-rail-url" class="font-mono text-xs text-purple-300 block truncate mt-0.5 font-bold">https://phantoms.group/l/slug</span>
+                </div>
+
+                <!-- FLUXO VISUAL VERTICAL -->
+                <div class="space-y-2 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-[#281a3c]">
+                  <!-- NÓ 1: ENTRADA -->
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="w-6 h-6 rounded-full bg-[#a855f7] text-white text-[10px] font-bold flex items-center justify-center shrink-0 z-10">01</div>
+                    <div class="text-xs">
+                      <span class="font-bold text-white block">01 ENTRADA</span>
+                      <span id="nb-rail-node-1" class="text-[11px] text-zinc-400 block">phantoms.group/l/slug</span>
+                    </div>
+                  </div>
+
+                  <!-- NÓ 2: ATRIBUIÇÃO -->
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="w-6 h-6 rounded-full bg-[#1b1227] text-purple-400 border border-purple-500/30 text-[10px] font-bold flex items-center justify-center shrink-0 z-10">02</div>
+                    <div class="text-xs">
+                      <span class="font-bold text-white block">02 ATRIBUIÇÃO</span>
+                      <span id="nb-rail-node-2" class="text-[11px] text-zinc-400 block">Meta Ads • utm_source=meta</span>
+                    </div>
+                  </div>
+
+                  <!-- NÓ 3: PROTEÇÃO -->
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="w-6 h-6 rounded-full bg-[#1b1227] text-purple-400 border border-purple-500/30 text-[10px] font-bold flex items-center justify-center shrink-0 z-10">03</div>
+                    <div class="text-xs">
+                      <span class="font-bold text-white block">03 PROTEÇÃO</span>
+                      <span id="nb-rail-node-3" class="text-[11px] text-emerald-400 block">Cloaker V2 [AVANÇADO]</span>
+                    </div>
+                  </div>
+
+                  <!-- NÓ 4: SEGMENTAÇÃO -->
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="w-6 h-6 rounded-full bg-[#1b1227] text-purple-400 border border-purple-500/30 text-[10px] font-bold flex items-center justify-center shrink-0 z-10">04</div>
+                    <div class="text-xs">
+                      <span class="font-bold text-white block">04 SEGMENTAÇÃO</span>
+                      <span id="nb-rail-node-4" class="text-[11px] text-zinc-400 block">Brasil (BR) • pt-BR</span>
+                    </div>
+                  </div>
+
+                  <!-- NÓ FINAL: DESTINO -->
+                  <div class="relative flex items-start gap-3 pl-1">
+                    <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold flex items-center justify-center shrink-0 z-10">
+                      <i class="fa-solid fa-flag-checkered text-[9px]"></i>
+                    </div>
+                    <div class="text-xs">
+                      <span class="font-bold text-white block">DESTINO FINAL</span>
+                      <span id="nb-rail-node-dest" class="text-[11px] text-zinc-400 block">1 bot(s) conectados</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CONTADOR DE PENDÊNCIAS E BOTÃO SALVAR -->
+                <div class="pt-3 border-t border-[#211730] space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-400">Verificação prévia:</span>
+                    <span id="nb-rail-pending-count" class="text-emerald-400 font-bold">Tudo pronto para salvar</span>
+                  </div>
+                  <button onclick="nbSaveRedirectFromWizard()" class="w-full py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check text-xs"></i>
+                    <span>Salvar e Ativar Link</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+
       </div>
 
       <!-- BARRA LATERAL DIREITA VERTICAL: VISUALIZAÇÃO DE FLUXO COMPLETO E OPERAÇÕES -->
@@ -2420,6 +3137,224 @@
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="document.getElementById('nb-modal-gateway').classList.add('hidden')" class="px-4 py-2 rounded-lg bg-[#1a1113] text-xs text-zinc-300">Fechar</button>
           <button type="button" onclick="nbSaveGatewayModal()" class="px-5 py-2 rounded-lg bg-[#a855f7] hover:bg-[#9333ea] text-xs font-bold text-white">Salvar Gateway</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: RELATÓRIO DE PERFORMANCE DO REDIRECIONADOR -->
+    <div id="nb-modal-perf-report" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div class="nb-card w-full max-w-4xl p-6 space-y-5 shadow-2xl border border-[#321e4a] my-8 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-[#211730] pb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-[#a855f7]"></i>
+                <span>Relatório de Performance</span>
+              </h3>
+              <span id="nb-rep-badge-slug" class="px-2.5 py-0.5 rounded-full bg-purple-950/60 border border-purple-700/60 text-purple-300 font-mono text-[10px]">iphonecapa</span>
+            </div>
+            <p class="text-xs text-zinc-400 mt-0.5">Métricas de entrada, cloaker anti-bot, conversão de leads e faturamento direto.</p>
+          </div>
+          <button onclick="nbClosePerfReport()" class="text-zinc-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-white/5 transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- 5 CARDS DE KPIS -->
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">TOTAL CLIQUES</span>
+            <span id="nb-rep-kpi-clicks" class="text-lg font-black text-white mt-1 block">19.4K</span>
+            <span class="text-[10px] text-zinc-500">100% tráfego</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">APROVADOS</span>
+            <span id="nb-rep-kpi-approved" class="text-lg font-black text-emerald-400 mt-1 block">16.9K</span>
+            <span id="nb-rep-kpi-approved-pct" class="text-[10px] text-emerald-500">87% enviados</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">BLOQUEIOS</span>
+            <span id="nb-rep-kpi-blocks" class="text-lg font-black text-rose-400 mt-1 block">2.4K</span>
+            <span id="nb-rep-kpi-blocks-pct" class="text-[10px] text-rose-500">13% cloaker</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c]">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">VENDAS</span>
+            <span id="nb-rep-kpi-sales" class="text-lg font-black text-white mt-1 block">250</span>
+            <span id="nb-rep-kpi-cr" class="text-[10px] text-purple-400">1.48% conv.</span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c] col-span-2 sm:col-span-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">RECEITA TOTAL</span>
+            <span id="nb-rep-kpi-rev" class="text-lg font-black text-purple-300 mt-1 block">R$ 5.925,00</span>
+            <span class="text-[10px] text-zinc-500">faturado</span>
+          </div>
+        </div>
+
+        <!-- FUNIL DO LINK -->
+        <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">FUNIL DO LINK (ENTRADA → VENDA)</span>
+            <span class="text-[11px] text-zinc-500">Atribuição por tracking ID</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div class="p-3 rounded-lg bg-[#0c0814] border border-[#211730]">
+              <span class="text-[10px] text-zinc-400 block">01 CLIQUES</span>
+              <span id="nb-rep-fun-clicks" class="text-sm font-bold text-white mt-0.5 block">19.420</span>
+              <span class="text-[10px] text-zinc-500">100% entrada</span>
+            </div>
+            <div class="p-3 rounded-lg bg-[#0c0814] border border-[#211730]">
+              <span class="text-[10px] text-zinc-400 block">02 LEADS GERADOS</span>
+              <span id="nb-rep-fun-leads" class="text-sm font-bold text-purple-300 mt-0.5 block">1.840</span>
+              <span id="nb-rep-fun-leads-pct" class="text-[10px] text-purple-400">10.9% /start</span>
+            </div>
+            <div class="p-3 rounded-lg bg-[#0c0814] border border-[#211730]">
+              <span class="text-[10px] text-zinc-400 block">03 PIX GERADOS</span>
+              <span id="nb-rep-fun-pix" class="text-sm font-bold text-amber-300 mt-0.5 block">420</span>
+              <span id="nb-rep-fun-pix-pct" class="text-[10px] text-amber-400">22.8% checkout</span>
+            </div>
+            <div class="p-3 rounded-lg bg-[#0c0814] border border-[#211730]">
+              <span class="text-[10px] text-zinc-400 block">04 PAGOS</span>
+              <span id="nb-rep-fun-paid" class="text-sm font-bold text-emerald-300 mt-0.5 block">250</span>
+              <span id="nb-rep-fun-paid-pct" class="text-[10px] text-emerald-400">59.5% conversão</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BARRA PROPORCIONAL APROVADOS VS BLOQUEIOS -->
+        <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-emerald-400 font-semibold" id="nb-rep-bar-appr-txt">Aprovados: 87% (16.9K)</span>
+            <span class="text-rose-400 font-semibold" id="nb-rep-bar-block-txt">Bloqueados: 13% (2.4K)</span>
+          </div>
+          <div class="w-full h-2.5 rounded-full bg-rose-950/60 overflow-hidden flex">
+            <div id="nb-rep-bar-fill" class="h-full bg-emerald-500 transition-all duration-500" style="width: 87%;"></div>
+          </div>
+        </div>
+
+        <!-- FEEDS LADO A LADO: BLOQUEIOS VS APROVADOS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- FEED BLOQUEIOS -->
+          <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-shield-xmark"></i>
+                <span>Bloqueios Recentes (Anti-Bot / Cloaker)</span>
+              </span>
+              <span class="text-[10px] px-2 py-0.5 rounded-md bg-rose-950/50 text-rose-300 font-mono">Últimos eventos</span>
+            </div>
+            <div id="nb-rep-feed-blocks" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
+
+          <!-- FEED APROVADOS -->
+          <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Tráfego Aprovado (Direcionado aos Bots)</span>
+              </span>
+              <span class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/50 text-emerald-300 font-mono">Últimos eventos</span>
+            </div>
+            <div id="nb-rep-feed-approved" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-3 border-t border-[#211730]">
+          <button onclick="nbClosePerfReport()" class="px-5 py-2 rounded-xl bg-[#1c1328] hover:bg-[#281b3c] text-zinc-300 hover:text-white text-xs font-semibold transition">
+            Fechar Relatório
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: PREPARAR CAMPANHA (GERADOR DE UTMS) -->
+    <div id="nb-modal-campaign-utm" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div class="nb-card w-full max-w-xl p-6 space-y-5 shadow-2xl border border-[#321e4a]">
+        <div class="flex items-center justify-between border-b border-[#211730] pb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-bullhorn text-[#a855f7]"></i>
+              <span>Preparar Campanha / Gerador de UTMs</span>
+            </h3>
+            <p class="text-xs text-zinc-400 mt-0.5">Gere o link parametrizado para colar direto no Gerenciador de Anúncios.</p>
+          </div>
+          <button onclick="nbCloseCampaignModal()" class="text-zinc-400 hover:text-white text-base p-1.5 rounded-lg hover:bg-white/5 transition">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- PRESETS RÁPIDOS DE PLATAFORMA -->
+        <div class="space-y-2">
+          <label class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">SELECIONE A PLATAFORMA</label>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <button type="button" onclick="nbSetCampaignPlatform('meta')" id="nb-camp-btn-meta" class="p-2.5 rounded-xl bg-[#a855f7]/15 border border-[#a855f7]/40 text-purple-300 font-bold text-xs flex flex-col items-center gap-1">
+              <i class="fa-brands fa-facebook text-base"></i>
+              <span>Meta Ads</span>
+            </button>
+            <button type="button" onclick="nbSetCampaignPlatform('tiktok')" id="nb-camp-btn-tiktok" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+              <i class="fa-brands fa-tiktok text-base"></i>
+              <span>TikTok Ads</span>
+            </button>
+            <button type="button" onclick="nbSetCampaignPlatform('google')" id="nb-camp-btn-google" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+              <i class="fa-brands fa-google text-base"></i>
+              <span>Google Ads</span>
+            </button>
+            <button type="button" onclick="nbSetCampaignPlatform('kwai')" id="nb-camp-btn-kwai" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+              <i class="fa-solid fa-play text-base"></i>
+              <span>Kwai Ads</span>
+            </button>
+            <button type="button" onclick="nbSetCampaignPlatform('x')" id="nb-camp-btn-x" class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1">
+              <i class="fa-brands fa-x-twitter text-base"></i>
+              <span>X Ads</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- FORMULÁRIO DE PARÂMETROS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="text-[10px] font-bold uppercase text-zinc-400 block mb-1">UTM_SOURCE</label>
+            <input type="text" id="nb-camp-utm-source" oninput="nbUpdateCampaignUrl()" placeholder="meta" class="nb-input font-mono text-xs">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase text-zinc-400 block mb-1">UTM_CAMPAIGN</label>
+            <input type="text" id="nb-camp-utm-campaign" oninput="nbUpdateCampaignUrl()" placeholder="{{campaign.name}}" class="nb-input font-mono text-xs">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase text-zinc-400 block mb-1">UTM_MEDIUM</label>
+            <input type="text" id="nb-camp-utm-medium" oninput="nbUpdateCampaignUrl()" placeholder="stories" class="nb-input font-mono text-xs">
+          </div>
+          <div>
+            <label class="text-[10px] font-bold uppercase text-zinc-400 block mb-1">UTM_CONTENT</label>
+            <input type="text" id="nb-camp-utm-content" oninput="nbUpdateCampaignUrl()" placeholder="{{ad.name}}" class="nb-input font-mono text-xs">
+          </div>
+        </div>
+
+        <!-- URL FINAL GERADA E BOTÃO DE COPIAR -->
+        <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400 block">LINK PARAMETRIZADO FINAL</span>
+          <div class="p-3 rounded-lg bg-[#0c0814] border border-[#211730] break-all font-mono text-xs text-emerald-300" id="nb-camp-final-url">
+            https://phantoms.group/l/iphonecapa?utm_source=meta&utm_campaign={{campaign.name}}&utm_medium=stories&utm_content={{ad.name}}
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span id="nb-camp-copy-feedback" class="text-[11px] text-emerald-400 font-semibold opacity-0 transition-opacity">Copiado para a área de transferência!</span>
+            <button onclick="nbCopyCampaignFinalUrl()" class="px-5 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-purple-950/40">
+              <i class="fa-regular fa-copy"></i>
+              <span>Copiar Link Parametrizado</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2 border-t border-[#211730]">
+          <button onclick="nbCloseCampaignModal()" class="px-4 py-2 rounded-xl bg-[#1c1328] hover:bg-[#281b3c] text-zinc-400 hover:text-white text-xs font-semibold">
+            Fechar
+          </button>
         </div>
       </div>
     </div>
@@ -9610,7 +10545,8 @@ quer que eu te mostre as opções de acesso?</textarea>
         clients: document.getElementById('nb-view-clients'),
         remarketing: document.getElementById('nb-view-remarketing'),
         finance: document.getElementById('nb-view-finance'),
-        gateways: document.getElementById('nb-view-gateways')
+        gateways: document.getElementById('nb-view-gateways'),
+        redirects: document.getElementById('nb-view-redirects')
       };
       Object.entries(views).forEach(([k, el]) => {
         if (el) el.classList.toggle('hidden', k !== view);
@@ -9621,7 +10557,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         rightFlowSidebar.classList.toggle('hidden', view !== 'bots');
       }
 
-      ['dashboard', 'bots', 'clients', 'remarketing', 'finance', 'gateways'].forEach(k => {
+      ['dashboard', 'bots', 'clients', 'remarketing', 'finance', 'gateways', 'redirects'].forEach(k => {
         const btn = document.getElementById('nb-dock-btn-' + k);
         const dot = document.getElementById('nb-dock-dot-' + k);
         const isAct = (view === k) || ((view === 'detail' || view === 'modesel' || view === 'flow') && k === 'bots');
@@ -9639,6 +10575,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (view === 'remarketing') nbRenderRemarketingView();
       if (view === 'finance') await nbRefreshFinance();
       if (view === 'gateways') nbRenderGatewaysView();
+      if (view === 'redirects') nbRenderRedirectsView();
       return true;
     }
 
@@ -10609,6 +11546,1049 @@ quer que eu te mostre as opções de acesso?</textarea>
       STATE.remarketing_campaigns = STATE.remarketing_campaigns.filter(c => c.id !== campaignId);
       await saveFullState();
       nbRenderRemarketingView();
+    }
+
+    
+    // =========================================================
+    // TELA 8: REDIRECIONADORES (DISTRIBUIÇÃO / LINKS E CAMPANHAS)
+    // =========================================================
+    let NB_REDIRECT_LINKS = [];
+    let NB_REDIRECT_ACTIVE_TAB = 'links';
+    let NB_REDIRECT_FILTER = 'all';
+    let NB_WIZARD_DATA = null;
+    let NB_WIZARD_STEP = 1;
+    let NB_CAMPAIGN_CURRENT_LINK = null;
+
+    const NB_DOMAINS_LIST = [
+      'phantoms.group',
+      'serverflow.dad',
+      'paylume.fans',
+      'naomeclonaporfavor.com',
+      'eufacodineirocomhot.com'
+    ];
+
+    const NB_COUNTRIES_LIST = [
+      {code: 'BR', name: 'Brasil'},
+      {code: 'US', name: 'Estados Unidos'},
+      {code: 'PT', name: 'Portugal'},
+      {code: 'ES', name: 'Espanha'},
+      {code: 'MX', name: 'México'},
+      {code: 'AR', name: 'Argentina'},
+      {code: 'CO', name: 'Colômbia'},
+      {code: 'CL', name: 'Chile'},
+      {code: 'PE', name: 'Peru'},
+      {code: 'FR', name: 'França'},
+      {code: 'DE', name: 'Alemanha'},
+      {code: 'IT', name: 'Itália'},
+      {code: 'GB', name: 'Reino Unido'},
+      {code: 'JP', name: 'Japão'},
+      {code: 'IN', name: 'Índia'}
+    ];
+
+    async function nbFetchRedirectLinks() {
+      try {
+        const res = await adminFetch('/api/redirect-links');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.links)) {
+            NB_REDIRECT_LINKS = data.links;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar links do backend:', e);
+      }
+      if (Array.isArray(STATE.redirect_links) && STATE.redirect_links.length > 0) {
+        NB_REDIRECT_LINKS = STATE.redirect_links;
+      }
+    }
+
+    async function nbRenderRedirectsView() {
+      await nbFetchRedirectLinks();
+
+      const totalActive = NB_REDIRECT_LINKS.filter(l => l.is_active !== false).length;
+      const totalClicks = NB_REDIRECT_LINKS.reduce((acc, l) => acc + Number(l.total_clicks || 0), 0);
+      const totalCloaker = NB_REDIRECT_LINKS.filter(l => (l.protection_level || 'v2') !== 'none').length;
+
+      const formatK = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'K' : String(n);
+
+      const elAct = document.getElementById('nb-red-kpi-active');
+      const elActSub = document.getElementById('nb-red-kpi-active-sub');
+      const elClk = document.getElementById('nb-red-kpi-clicks');
+      const elClkSub = document.getElementById('nb-red-kpi-clicks-sub');
+      const elClkCloak = document.getElementById('nb-red-kpi-cloaker');
+      const elClkCloakSub = document.getElementById('nb-red-kpi-cloaker-sub');
+
+      if (elAct) elAct.textContent = String(totalActive);
+      if (elActSub) elActSub.textContent = `${NB_REDIRECT_LINKS.length} cadastrados no total`;
+      if (elClk) elClk.textContent = formatK(totalClicks);
+      if (elClkSub) elClkSub.textContent = totalClicks > 0 ? 'Tráfego monitorado em tempo real' : 'Aguardando primeiros acessos';
+      if (elClkCloak) elClkCloak.textContent = String(totalCloaker);
+      if (elClkCloakSub) elClkCloakSub.textContent = `${totalCloaker} links com anti-bot ativo`;
+
+      nbRenderRedirectsTable();
+    }
+
+    function nbSwitchRedirectTab(tab) {
+      NB_REDIRECT_ACTIVE_TAB = tab;
+      const tabs = ['links', 'codes', 'campaigns', 'domains', 'bridge'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('nb-red-tab-' + t);
+        if (btn) {
+          const isAct = t === tab;
+          btn.className = isAct
+            ? "px-3.5 py-1.5 rounded-lg bg-[#a855f7]/15 text-[#c084fc] font-semibold border border-[#a855f7]/30 flex items-center gap-2"
+            : "px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-2";
+        }
+      });
+
+      const container = document.getElementById('nb-red-table-container');
+      if (tab === 'links') {
+        nbRenderRedirectsTable();
+      } else if (tab === 'codes') {
+        if (container) {
+          container.innerHTML = `
+            <div class="p-8 rounded-2xl bg-[#0e0a16] border border-[#231733] text-center space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-purple-950/40 border border-purple-800/40 flex items-center justify-center text-[#a855f7] mx-auto text-xl">
+                <i class="fa-solid fa-barcode"></i>
+              </div>
+              <h3 class="text-sm font-bold text-white">Códigos de Venda e Cupons</h3>
+              <p class="text-xs text-zinc-400 max-w-md mx-auto">Parâmetros de rastreamento de cupom e comissão direta integrados aos links de pagamento.</p>
+              <button onclick="nbSwitchRedirectTab('links')" class="px-4 py-2 rounded-xl bg-[#140d1e] border border-[#281a3c] text-xs text-zinc-300 hover:text-white">Voltar para Meus Links</button>
+            </div>
+          `;
+        }
+      } else if (tab === 'campaigns') {
+        if (NB_REDIRECT_LINKS.length > 0) {
+          nbOpenCampaignModal(NB_REDIRECT_LINKS[0].id);
+        } else {
+          alert('Crie pelo menos um link redirecionador antes de preparar campanhas.');
+        }
+        nbSwitchRedirectTab('links');
+      } else if (tab === 'domains') {
+        if (container) {
+          container.innerHTML = `
+            <div class="p-8 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-4">
+              <div class="flex items-center justify-between border-b border-[#211730] pb-3">
+                <div>
+                  <h3 class="text-sm font-bold text-white">Domínios Oficiais Ativos</h3>
+                  <p class="text-xs text-zinc-400">Domínios disponíveis para geração de slugs e camuflagem de tráfego.</p>
+                </div>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-800/50 text-emerald-400 font-bold">${NB_DOMAINS_LIST.length} Domínios Conectados</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                ${NB_DOMAINS_LIST.map(d => `
+                  <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c] flex items-center justify-between">
+                    <span class="font-mono text-xs text-purple-300 font-semibold">${d}</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+      } else if (tab === 'bridge') {
+        if (container) {
+          container.innerHTML = `
+            <div class="p-8 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-4">
+              <div class="flex items-center justify-between border-b border-[#211730] pb-3">
+                <div>
+                  <h3 class="text-sm font-bold text-white">Página Intermediária & Camuflagem (Safe Page)</h3>
+                  <p class="text-xs text-zinc-400">Páginas limpas institucionais exibidas automaticamente quando bots ou acessos inválidos são detectados.</p>
+                </div>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-purple-950/50 border border-purple-800/50 text-purple-300 font-bold">Anti-Ban Ativo</span>
+              </div>
+              <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] space-y-2">
+                <span class="text-xs font-bold text-white block">Artigo Editorial Institucional (HTML Puro)</span>
+                <p class="text-xs text-zinc-400">Artigo neutro sobre inovação tecnológica e lifestyle para aprovação de contas de anúncios no Facebook e Google.</p>
+                <div class="p-3 rounded-lg bg-[#0a0710] border border-[#211730] text-xs text-zinc-400 font-mono">
+                  &lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Artigos em Destaque&lt;/title&gt;...
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function nbSetRedirectFilter(filter) {
+      NB_REDIRECT_FILTER = filter;
+      ['all', 'active', 'inactive', 'cloaker'].forEach(f => {
+        const btn = document.getElementById('nb-red-pill-' + f);
+        if (btn) {
+          const isAct = f === filter;
+          btn.className = isAct
+            ? "px-2.5 py-1 rounded-lg bg-[#a855f7] text-white font-bold transition"
+            : "px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white transition";
+        }
+      });
+      nbRenderRedirectsTable();
+    }
+
+    function nbRenderRedirectsTable() {
+      const cont = document.getElementById('nb-red-table-container');
+      if (!cont) return;
+
+      const q = (document.getElementById('nb-red-search')?.value || "").trim().toLowerCase();
+      const sortOpt = document.getElementById('nb-red-sort')?.value || "recent";
+
+      let list = [...NB_REDIRECT_LINKS];
+
+      if (NB_REDIRECT_FILTER === 'active') {
+        list = list.filter(l => l.is_active !== false);
+      } else if (NB_REDIRECT_FILTER === 'inactive') {
+        list = list.filter(l => l.is_active === false);
+      } else if (NB_REDIRECT_FILTER === 'cloaker') {
+        list = list.filter(l => (l.protection_level || 'v2') !== 'none');
+      }
+
+      if (q) {
+        list = list.filter(l =>
+          (l.name || "").toLowerCase().includes(q) ||
+          (l.slug || "").toLowerCase().includes(q) ||
+          (l.public_domain || "").toLowerCase().includes(q)
+        );
+      }
+
+      if (sortOpt === 'clicks') {
+        list.sort((a, b) => Number(b.total_clicks || 0) - Number(a.total_clicks || 0));
+      } else if (sortOpt === 'revenue') {
+        list.sort((a, b) => Number(b.total_revenue || 0) - Number(a.total_revenue || 0));
+      } else {
+        list.reverse();
+      }
+
+      if (list.length === 0) {
+        cont.innerHTML = `
+          <div class="p-12 rounded-2xl bg-[#0e0a16] border border-[#231733] text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-purple-950/40 border border-purple-800/40 flex items-center justify-center text-[#a855f7] mx-auto text-xl">
+              <i class="fa-solid fa-link-slash"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">Nenhum redirecionador encontrado</h3>
+              <p class="text-xs text-zinc-400 mt-1 max-w-sm mx-auto">Crie links inteligentes com cloaker integrado para proteger suas contas de anúncio.</p>
+            </div>
+            <button onclick="nbOpenRedirectWizard()" class="px-4 py-2 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition">
+              + Criar primeiro link
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const formatK = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'K' : String(n);
+
+      cont.innerHTML = list.map(l => {
+        const fullUrl = `https://${l.public_domain || 'phantoms.group'}/l/${l.slug}`;
+        const isActive = l.is_active !== false;
+        const clicks = Number(l.total_clicks || 0);
+        const sales = Number(l.total_sales || 0);
+        const rev = Number(l.total_revenue || 0);
+        const flows = Array.isArray(l.selected_flows) ? l.selected_flows : [];
+        const botCount = l.destination_type === 'channel' ? 'Canal direto' : `${flows.length || 1} bot(s) conectados`;
+        const orderTxt = l.distribution_order === 'sequencial' ? 'Sequencial' : 'Aleatório';
+        const protLevel = l.protection_level === 'none' ? 'Sem Proteção' : (l.protection_level === 'basic' ? 'Cloaker + AntiClone' : 'Cloaker V2 [AVANÇADO]');
+        const protClass = l.protection_level === 'none' ? 'text-zinc-500 bg-zinc-900 border-zinc-700' : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50';
+
+        return `
+          <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] hover:border-[#382255] transition space-y-3" id="nb-red-card-${l.id}">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[#140d1e] border border-[#2a1c3f] flex items-center justify-center text-[#a855f7] shrink-0">
+                  <i class="fa-solid fa-link text-sm"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-bold text-white">${escapeHtml(l.name || l.slug)}</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${isActive ? 'bg-emerald-950/60 border border-emerald-700/60 text-emerald-300' : 'bg-zinc-800 text-zinc-400'}">
+                      <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-zinc-500'}"></span>
+                      ${isActive ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="font-mono text-xs text-purple-300 truncate max-w-xs md:max-w-md">${fullUrl}</span>
+                    <button onclick="nbCopyText('${fullUrl}')" class="text-zinc-400 hover:text-white text-xs p-1 rounded hover:bg-white/5 transition" title="Copiar link">
+                      <i class="fa-regular fa-copy"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AÇÕES RÁPIDAS -->
+              <div class="flex items-center gap-2 shrink-0">
+                <button onclick="nbOpenCampaignModal('${l.id}')" class="px-3 py-1.5 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-purple-300 hover:text-white text-xs font-semibold transition flex items-center gap-1.5">
+                  <i class="fa-solid fa-bullhorn text-xs"></i>
+                  <span>Preparar campanha</span>
+                </button>
+                
+                <div class="relative inline-block text-left" id="nb-red-menu-wrap-${l.id}">
+                  <button onclick="nbToggleRowMenu('${l.id}')" class="w-8 h-8 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-400 hover:text-white flex items-center justify-center transition text-xs">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  </button>
+                  <div id="nb-red-menu-${l.id}" class="hidden absolute right-0 mt-2 w-44 rounded-xl bg-[#120b1c] border border-[#2b1b3f] shadow-2xl py-1.5 z-30 space-y-0.5 text-xs">
+                    <button onclick="nbOpenRedirectWizard('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
+                      <i class="fa-regular fa-pen-to-square w-4"></i>
+                      <span>Editar</span>
+                    </button>
+                    <button onclick="window.open('${fullUrl}', '_blank')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
+                      <i class="fa-solid fa-arrow-up-right-from-square w-4"></i>
+                      <span>Abrir link</span>
+                    </button>
+                    <button onclick="nbOpenPerfReport('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
+                      <i class="fa-solid fa-chart-line w-4"></i>
+                      <span>Ver estatísticas</span>
+                    </button>
+                    <button onclick="nbDuplicateRedirectLink('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
+                      <i class="fa-regular fa-copy w-4"></i>
+                      <span>Duplicar</span>
+                    </button>
+                    <div class="border-t border-[#231535] my-1"></div>
+                    <button onclick="nbDeleteRedirectLink('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 flex items-center gap-2">
+                      <i class="fa-regular fa-trash-can w-4"></i>
+                      <span>Excluir</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- DETALHES DE ROTA & MÉTRICAS -->
+            <div class="pt-3 border-t border-[#211730] flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div class="flex flex-wrap items-center gap-2 text-zinc-400">
+                <span class="flex items-center gap-1.5">
+                  <i class="fa-solid fa-robot text-purple-400"></i>
+                  <span>${botCount} (${orderTxt})</span>
+                </span>
+                <span class="text-zinc-600">•</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${protClass}">
+                  ${protLevel}
+                </span>
+              </div>
+
+              <div class="flex items-center gap-4 text-xs font-semibold">
+                <span class="text-zinc-400">Cliques: <strong class="text-white">${formatK(clicks)}</strong></span>
+                <span class="text-zinc-400">Vendas: <strong class="text-emerald-400">${sales}</strong></span>
+                <span class="text-zinc-400">Faturamento: <strong class="text-purple-300">R$ ${rev.toFixed(2).replace('.', ',')}</strong></span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function nbToggleRowMenu(id) {
+      const menu = document.getElementById('nb-red-menu-' + id);
+      if (!menu) return;
+      const isHidden = menu.classList.contains('hidden');
+      document.querySelectorAll('[id^="nb-red-menu-"]').forEach(m => m.classList.add('hidden'));
+      if (isHidden) menu.classList.remove('hidden');
+    }
+
+    // =========================================================
+    // WIZARD DE CRIAÇÃO E EDIÇÃO (6 ETAPAS)
+    // =========================================================
+    function nbOpenRedirectWizard(linkId) {
+      document.getElementById('nb-red-list-subview').classList.add('hidden');
+      document.getElementById('nb-red-wizard-subview').classList.remove('hidden');
+
+      if (linkId) {
+        const found = NB_REDIRECT_LINKS.find(l => String(l.id) === String(linkId));
+        if (found) {
+          NB_WIZARD_DATA = JSON.parse(JSON.stringify(found));
+          document.getElementById('nb-wiz-title').textContent = 'Editar Redirecionador';
+        }
+      }
+
+      if (!NB_WIZARD_DATA || !linkId) {
+        const randomSlug = Math.random().toString(36).substring(2, 8);
+        const allBotIds = (STATE.flow_bots || []).map(b => b.id);
+        NB_WIZARD_DATA = {
+          name: '',
+          is_active: true,
+          public_domain: NB_DOMAINS_LIST[0],
+          slug_mode: 'random',
+          slug: randomSlug,
+          destination_type: 'bot',
+          selected_flows: allBotIds.length > 0 ? [allBotIds[0]] : [],
+          channel_invite_url: '',
+          distribution_order: 'aleatoria',
+          ad_platform: 'meta',
+          utm_source: 'meta',
+          utm_campaign: '{{campaign.name}}',
+          utm_medium: 'stories',
+          utm_content: '{{ad.name}}',
+          utm_term: '',
+          utm_id: '',
+          protection_level: 'v2',
+          blocked_action: 'safe_page',
+          safe_url: 'https://g1.globo.com',
+          block_ad_bots: true,
+          anti_clone: true,
+          fingerprint_check: true,
+          filter_location: true,
+          allowed_countries: ['BR'],
+          check_language: true
+        };
+        document.getElementById('nb-wiz-title').textContent = 'Novo Redirecionador';
+      }
+
+      nbWizRenderStaticGrids();
+      nbWizPopulateInputs();
+      nbWizJumpStep(1);
+    }
+
+    function nbCloseRedirectWizard() {
+      document.getElementById('nb-red-wizard-subview').classList.add('hidden');
+      document.getElementById('nb-red-list-subview').classList.remove('hidden');
+      NB_WIZARD_DATA = null;
+    }
+
+    function nbWizRenderStaticGrids() {
+      // Grid de domínios
+      const domGrid = document.getElementById('nb-wiz-domain-grid');
+      if (domGrid) {
+        domGrid.innerHTML = NB_DOMAINS_LIST.map(d => `
+          <label class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between bg-[#140d1e] border-[#281a3c]" id="nb-wiz-dom-card-${d.replace(/[^a-z0-9]/g, '')}">
+            <span class="font-mono text-xs text-zinc-300 font-semibold">${d}</span>
+            <input type="radio" name="nb-wiz-domain" value="${d}" onchange="nbWizSelectDomain('${d}')" class="accent-[#a855f7]">
+          </label>
+        `).join('');
+      }
+
+      // Lista de bots
+      const botList = document.getElementById('nb-wiz-bot-list');
+      if (botList) {
+        const bots = STATE.flow_bots || [];
+        if (bots.length === 0) {
+          botList.innerHTML = `
+            <div class="p-4 rounded-xl bg-[#140d1e] border border-[#281a3c] text-center text-xs text-zinc-400">
+              Nenhum bot configurado na plataforma. Cadastre um bot primeiro na aba Meus Bots.
+            </div>
+          `;
+        } else {
+          botList.innerHTML = bots.map(b => {
+            const hasTok = Boolean(b.bot_token || b.token);
+            const userStr = b.username ? `@${b.username.replace('@', '')}` : 'Sem @';
+            return `
+              <label class="p-3 rounded-xl bg-[#140d1e] border border-[#281a3c] flex items-center justify-between cursor-pointer hover:border-purple-600 transition">
+                <div class="flex items-center gap-3">
+                  <input type="checkbox" value="${b.id}" onchange="nbWizToggleBot('${b.id}')" class="w-4 h-4 accent-[#a855f7] nb-wiz-bot-chk">
+                  <div>
+                    <span class="text-xs font-bold text-white block">${escapeHtml(b.name || 'Bot')}</span>
+                    <span class="text-[11px] text-zinc-400 font-mono">${userStr}</span>
+                  </div>
+                </div>
+                <span class="text-[10px] px-2 py-0.5 rounded font-mono ${hasTok ? 'bg-emerald-950/60 text-emerald-300' : 'bg-amber-950/60 text-amber-300'}">
+                  ${hasTok ? 'Conectado' : 'Sem token'}
+                </span>
+              </label>
+            `;
+          }).join('');
+        }
+      }
+
+      // Grid de países
+      const cGrid = document.getElementById('nb-wiz-country-grid');
+      if (cGrid) {
+        cGrid.innerHTML = NB_COUNTRIES_LIST.map(c => `
+          <label class="p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] flex items-center justify-between cursor-pointer hover:border-purple-600 transition" id="nb-wiz-country-card-${c.code}">
+            <div class="flex flex-col">
+              <span class="text-xs font-bold text-white">${c.code}</span>
+              <span class="text-[9px] text-zinc-400 truncate max-w-[60px]">${c.name}</span>
+            </div>
+            <input type="checkbox" value="${c.code}" onchange="nbWizToggleCountry('${c.code}')" class="w-3.5 h-3.5 accent-[#a855f7] nb-wiz-country-chk">
+          </label>
+        `).join('');
+      }
+    }
+
+    function nbWizPopulateInputs() {
+      if (!NB_WIZARD_DATA) return;
+      const d = NB_WIZARD_DATA;
+
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      const setChk = (id, c) => { const el = document.getElementById(id); if (el) el.checked = Boolean(c); };
+
+      setVal('nb-wiz-name', d.name);
+      setChk('nb-wiz-active', d.is_active !== false);
+      setVal('nb-wiz-slug', d.slug);
+      setVal('nb-wiz-channel-url', d.channel_invite_url);
+      setVal('nb-wiz-utm-source', d.utm_source);
+      setVal('nb-wiz-utm-campaign', d.utm_campaign);
+      setVal('nb-wiz-utm-medium', d.utm_medium);
+      setVal('nb-wiz-utm-content', d.utm_content);
+      setVal('nb-wiz-utm-term', d.utm_term);
+      setVal('nb-wiz-utm-id', d.utm_id);
+      setVal('nb-wiz-safe-url', d.safe_url || 'https://g1.globo.com');
+
+      setChk('nb-wiz-block-ad-bots', d.block_ad_bots !== false);
+      setChk('nb-wiz-anti-clone', d.anti_clone !== false);
+      setChk('nb-wiz-fingerprint', d.fingerprint_check !== false);
+      setChk('nb-wiz-filter-geo', d.filter_location !== false);
+      setChk('nb-wiz-filter-lang', d.check_language !== false);
+
+      // Slug radio
+      const radSlug = document.querySelector(`input[name="nb-wiz-slug-mode"][value="${d.slug_mode || 'random'}"]`);
+      if (radSlug) radSlug.checked = true;
+
+      // Dest radio
+      const radDest = document.querySelector(`input[name="nb-wiz-dest-type"][value="${d.destination_type || 'bot'}"]`);
+      if (radDest) radDest.checked = true;
+
+      // Dist radio
+      const radDist = document.querySelector(`input[name="nb-wiz-dist-order"][value="${d.distribution_order || 'aleatoria'}"]`);
+      if (radDist) radDist.checked = true;
+
+      // Prot radio
+      const radProt = document.querySelector(`input[name="nb-wiz-prot-level"][value="${d.protection_level || 'v2'}"]`);
+      if (radProt) radProt.checked = true;
+
+      // Block action radio
+      const radBlock = document.querySelector(`input[name="nb-wiz-block-action"][value="${d.blocked_action || 'safe_page'}"]`);
+      if (radBlock) radBlock.checked = true;
+
+      // Domain radio
+      nbWizSelectDomain(d.public_domain || NB_DOMAINS_LIST[0]);
+
+      // Checkboxes de bots
+      const curFlows = Array.isArray(d.selected_flows) ? d.selected_flows : [];
+      document.querySelectorAll('.nb-wiz-bot-chk').forEach(chk => {
+        chk.checked = curFlows.includes(chk.value);
+      });
+
+      // Checkboxes de países
+      const curCountries = Array.isArray(d.allowed_countries) ? d.allowed_countries : ['BR'];
+      document.querySelectorAll('.nb-wiz-country-chk').forEach(chk => {
+        chk.checked = curCountries.includes(chk.value);
+      });
+    }
+
+    function nbWizSelectDomain(domain) {
+      if (!NB_WIZARD_DATA) return;
+      NB_WIZARD_DATA.public_domain = domain;
+      NB_DOMAINS_LIST.forEach(d => {
+        const card = document.getElementById('nb-wiz-dom-card-' + d.replace(/[^a-z0-9]/g, ''));
+        const rad = document.querySelector(`input[name="nb-wiz-domain"][value="${d}"]`);
+        if (card && rad) {
+          const isAct = d === domain;
+          card.classList.toggle('border-[#a855f7]', isAct);
+          card.classList.toggle('border-[#281a3c]', !isAct);
+          rad.checked = isAct;
+        }
+      });
+      const prefix = document.getElementById('nb-wiz-domain-prefix');
+      if (prefix) prefix.textContent = `https://${domain}/l/`;
+      nbWizSync();
+    }
+
+    function nbWizToggleBot(botId) {
+      if (!NB_WIZARD_DATA) return;
+      const cur = new Set(NB_WIZARD_DATA.selected_flows || []);
+      if (cur.has(botId)) cur.delete(botId);
+      else cur.add(botId);
+      NB_WIZARD_DATA.selected_flows = Array.from(cur);
+      nbWizSync();
+    }
+
+    function nbWizSelectAllBots() {
+      if (!NB_WIZARD_DATA) return;
+      const allBotIds = (STATE.flow_bots || []).map(b => b.id);
+      NB_WIZARD_DATA.selected_flows = allBotIds;
+      document.querySelectorAll('.nb-wiz-bot-chk').forEach(chk => {
+        chk.checked = allBotIds.includes(chk.value);
+      });
+      nbWizSync();
+    }
+
+    function nbWizToggleCountry(cCode) {
+      if (!NB_WIZARD_DATA) return;
+      const cur = new Set(NB_WIZARD_DATA.allowed_countries || []);
+      if (cur.has(cCode)) cur.delete(cCode);
+      else cur.add(cCode);
+      NB_WIZARD_DATA.allowed_countries = Array.from(cur);
+      nbWizSync();
+    }
+
+    function nbWizRegenerateSlug() {
+      const slug = Math.random().toString(36).substring(2, 8);
+      const el = document.getElementById('nb-wiz-slug');
+      if (el) el.value = slug;
+      if (NB_WIZARD_DATA) NB_WIZARD_DATA.slug = slug;
+      nbWizSync();
+    }
+
+    function nbWizSetAdPlatform(platform) {
+      if (!NB_WIZARD_DATA) return;
+      NB_WIZARD_DATA.ad_platform = platform;
+      const plats = ['meta', 'tiktok', 'google', 'kwai', 'x'];
+      plats.forEach(p => {
+        const btn = document.getElementById('nb-wiz-plat-' + p);
+        if (btn) {
+          const isAct = p === platform;
+          btn.className = isAct
+            ? "p-2.5 rounded-xl bg-[#a855f7]/15 border border-[#a855f7]/40 text-purple-300 font-bold text-xs flex flex-col items-center gap-1"
+            : "p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1";
+        }
+      });
+
+      const presets = {
+        meta: { source: 'meta', medium: 'stories', campaign: '{{campaign.name}}', content: '{{ad.name}}' },
+        tiktok: { source: 'tiktok', medium: 'feed', campaign: '__CAMPAIGN_NAME__', content: '__AID_NAME__' },
+        google: { source: 'google', medium: 'cpc', campaign: '{campaignid}', content: '{creative}' },
+        kwai: { source: 'kwai', medium: 'short_video', campaign: 'campaign_vip', content: 'ad_v1' },
+        x: { source: 'x', medium: 'timeline', campaign: 'scale_x', content: 'tweet_ad' }
+      };
+
+      const pr = presets[platform] || presets.meta;
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      setVal('nb-wiz-utm-source', pr.source);
+      setVal('nb-wiz-utm-medium', pr.medium);
+      setVal('nb-wiz-utm-campaign', pr.campaign);
+      setVal('nb-wiz-utm-content', pr.content);
+
+      NB_WIZARD_DATA.utm_source = pr.source;
+      NB_WIZARD_DATA.utm_medium = pr.medium;
+      NB_WIZARD_DATA.utm_campaign = pr.campaign;
+      NB_WIZARD_DATA.utm_content = pr.content;
+      nbWizSync();
+    }
+
+    function nbToggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById(id + '-icon');
+      if (el) {
+        el.classList.toggle('hidden');
+        if (icon) icon.classList.toggle('rotate-180');
+      }
+    }
+
+    function nbWizJumpStep(step) {
+      NB_WIZARD_STEP = step;
+      for (let s = 1; s <= 6; s++) {
+        const panel = document.getElementById('nb-wiz-panel-' + s);
+        const btn = document.getElementById('nb-wiz-step-btn-' + s);
+        if (panel) panel.classList.toggle('hidden', s !== step);
+        if (btn) {
+          const isAct = s === step;
+          btn.className = isAct
+            ? "p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-[#a855f7]/15 border-[#a855f7]/40 text-white"
+            : "p-2.5 rounded-xl text-left border transition flex flex-col gap-0.5 bg-transparent border-transparent text-zinc-400 hover:text-white";
+          const subSpan = btn.querySelector('span:first-child');
+          if (subSpan) subSpan.className = isAct ? "text-[9px] font-black uppercase tracking-wider text-purple-400" : "text-[9px] font-black uppercase tracking-wider text-zinc-500";
+        }
+      }
+      nbWizSync();
+    }
+
+    function nbWizSync() {
+      if (!NB_WIZARD_DATA) return;
+      const d = NB_WIZARD_DATA;
+
+      // Ler valores atuais dos inputs
+      d.name = (document.getElementById('nb-wiz-name')?.value || "").trim();
+      d.is_active = document.getElementById('nb-wiz-active')?.checked !== false;
+      d.slug = (document.getElementById('nb-wiz-slug')?.value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      d.channel_invite_url = (document.getElementById('nb-wiz-channel-url')?.value || "").trim();
+      d.utm_source = (document.getElementById('nb-wiz-utm-source')?.value || "").trim();
+      d.utm_campaign = (document.getElementById('nb-wiz-utm-campaign')?.value || "").trim();
+      d.utm_medium = (document.getElementById('nb-wiz-utm-medium')?.value || "").trim();
+      d.utm_content = (document.getElementById('nb-wiz-utm-content')?.value || "").trim();
+      d.utm_term = (document.getElementById('nb-wiz-utm-term')?.value || "").trim();
+      d.utm_id = (document.getElementById('nb-wiz-utm-id')?.value || "").trim();
+      d.safe_url = (document.getElementById('nb-wiz-safe-url')?.value || "").trim();
+
+      const radDest = document.querySelector('input[name="nb-wiz-dest-type"]:checked');
+      if (radDest) d.destination_type = radDest.value;
+
+      const radDist = document.querySelector('input[name="nb-wiz-dist-order"]:checked');
+      if (radDist) d.distribution_order = radDist.value;
+
+      const radProt = document.querySelector('input[name="nb-wiz-prot-level"]:checked');
+      if (radProt) d.protection_level = radProt.value;
+
+      const radBlock = document.querySelector('input[name="nb-wiz-block-action"]:checked');
+      if (radBlock) d.blocked_action = radBlock.value;
+
+      d.block_ad_bots = document.getElementById('nb-wiz-block-ad-bots')?.checked !== false;
+      d.anti_clone = document.getElementById('nb-wiz-anti-clone')?.checked !== false;
+      d.fingerprint_check = document.getElementById('nb-wiz-fingerprint')?.checked !== false;
+      d.filter_location = document.getElementById('nb-wiz-filter-geo')?.checked !== false;
+      d.check_language = document.getElementById('nb-wiz-filter-lang')?.checked !== false;
+
+      // Destino UI toggle
+      const isBot = d.destination_type === 'bot';
+      document.getElementById('nb-wiz-bots-container')?.classList.toggle('hidden', !isBot);
+      document.getElementById('nb-wiz-channel-container')?.classList.toggle('hidden', isBot);
+      document.getElementById('nb-wiz-dest-card-bot')?.classList.toggle('border-[#a855f7]', isBot);
+      document.getElementById('nb-wiz-dest-card-bot')?.classList.toggle('border-[#281a3c]', !isBot);
+      document.getElementById('nb-wiz-dest-card-channel')?.classList.toggle('border-[#a855f7]', !isBot);
+      document.getElementById('nb-wiz-dest-card-channel')?.classList.toggle('border-[#281a3c]', isBot);
+
+      // Ordem UI toggle
+      const isRand = d.distribution_order === 'aleatoria';
+      document.getElementById('nb-wiz-dist-card-random')?.classList.toggle('border-[#a855f7]', isRand);
+      document.getElementById('nb-wiz-dist-card-random')?.classList.toggle('border-[#281a3c]', !isRand);
+      document.getElementById('nb-wiz-dist-card-seq')?.classList.toggle('border-[#a855f7]', !isRand);
+      document.getElementById('nb-wiz-dist-card-seq')?.classList.toggle('border-[#281a3c]', isRand);
+
+      // Proteção cards toggle
+      ['none', 'basic', 'v2'].forEach(p => {
+        const card = document.getElementById('nb-wiz-prot-card-' + p);
+        if (card) {
+          const isAct = d.protection_level === p;
+          card.classList.toggle('border-[#a855f7]', isAct);
+          card.classList.toggle('border-[#281a3c]', !isAct);
+        }
+      });
+
+      // Safe url container toggle
+      const isSafeRedir = d.blocked_action === 'redirect';
+      document.getElementById('nb-wiz-safe-url-container')?.classList.toggle('hidden', !isSafeRedir);
+      document.getElementById('nb-wiz-block-card-safe')?.classList.toggle('border-[#a855f7]', !isSafeRedir);
+      document.getElementById('nb-wiz-block-card-safe')?.classList.toggle('border-[#281a3c]', isSafeRedir);
+      document.getElementById('nb-wiz-block-card-redir')?.classList.toggle('border-[#a855f7]', isSafeRedir);
+      document.getElementById('nb-wiz-block-card-redir')?.classList.toggle('border-[#281a3c]', !isSafeRedir);
+
+      // Geo container toggle
+      document.getElementById('nb-wiz-geo-container')?.classList.toggle('hidden', !d.filter_location);
+
+      // Resumo da jornada (Right rail)
+      const domain = d.public_domain || NB_DOMAINS_LIST[0];
+      const slug = d.slug || 'slug';
+      const fullUrl = `https://${domain}/l/${slug}`;
+
+      const elRailUrl = document.getElementById('nb-rail-url');
+      if (elRailUrl) elRailUrl.textContent = fullUrl;
+
+      const elN1 = document.getElementById('nb-rail-node-1');
+      if (elN1) elN1.textContent = `${domain}/l/${slug}`;
+
+      const elN2 = document.getElementById('nb-rail-node-2');
+      if (elN2) elN2.textContent = `${d.ad_platform ? d.ad_platform.toUpperCase() : 'Meta'} • utm_source=${d.utm_source || 'meta'}`;
+
+      const elN3 = document.getElementById('nb-rail-node-3');
+      if (elN3) {
+        elN3.textContent = d.protection_level === 'none' ? 'Sem Proteção (Tráfego direto)' : (d.protection_level === 'basic' ? 'Cloaker + AntiClone' : 'Cloaker V2 [AVANÇADO]');
+      }
+
+      const elN4 = document.getElementById('nb-rail-node-4');
+      if (elN4) {
+        const countries = Array.isArray(d.allowed_countries) ? d.allowed_countries : ['BR'];
+        elN4.textContent = d.filter_location ? `${countries.join(', ')} • ${d.check_language ? 'pt-BR' : 'Todos idiomas'}` : 'Global (Sem filtro Geo)';
+      }
+
+      const elNDest = document.getElementById('nb-rail-node-dest');
+      if (elNDest) {
+        if (d.destination_type === 'channel') {
+          elNDest.textContent = 'Canal / Grupo Direto';
+        } else {
+          const flows = Array.isArray(d.selected_flows) ? d.selected_flows : [];
+          elNDest.textContent = `${flows.length} bot(s) conectados (${d.distribution_order === 'sequencial' ? 'Sequencial' : 'Aleatório'})`;
+        }
+      }
+
+      // Validação de pendências
+      const pendingIssues = [];
+      if (!d.name) pendingIssues.push('Nome interno não preenchido');
+      if (!d.slug) pendingIssues.push('Slug não definido');
+      if (d.destination_type === 'bot' && (!Array.isArray(d.selected_flows) || d.selected_flows.length === 0)) {
+        pendingIssues.push('Selecione pelo menos um bot de destino');
+      }
+      if (d.destination_type === 'channel' && !d.channel_invite_url) {
+        pendingIssues.push('Informe o link de convite do canal');
+      }
+
+      const elPending = document.getElementById('nb-rail-pending-count');
+      if (elPending) {
+        if (pendingIssues.length === 0) {
+          elPending.textContent = 'Tudo pronto para salvar';
+          elPending.className = 'text-emerald-400 font-bold';
+        } else {
+          elPending.textContent = `${pendingIssues.length} pendência(s) antes de salvar`;
+          elPending.className = 'text-amber-400 font-bold';
+        }
+      }
+
+      // Alertas na Etapa 6
+      const warnBox = document.getElementById('nb-wiz-warnings');
+      if (warnBox) {
+        if (pendingIssues.length > 0) {
+          warnBox.classList.remove('hidden');
+          warnBox.innerHTML = pendingIssues.map(p => `<div><i class="fa-solid fa-triangle-exclamation text-amber-400 mr-1.5"></i> ${p}</div>`).join('');
+        } else {
+          warnBox.classList.add('hidden');
+        }
+      }
+
+      const revUrl = document.getElementById('nb-wiz-review-url');
+      if (revUrl) revUrl.textContent = fullUrl;
+
+      const setEl = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+      setEl('nb-wiz-rev-status', d.is_active ? 'Ativo' : 'Inativo');
+      setEl('nb-wiz-rev-dest', d.destination_type === 'channel' ? 'Canal direto' : `${(d.selected_flows || []).length} bot(s)`);
+      setEl('nb-wiz-rev-dist', d.distribution_order === 'sequencial' ? 'Sequencial' : 'Aleatória');
+      setEl('nb-wiz-rev-prot', d.protection_level === 'none' ? 'Desativado' : (d.protection_level === 'basic' ? 'Básico' : 'Cloaker V2'));
+      setEl('nb-wiz-rev-geo', d.filter_location ? (d.allowed_countries || ['BR']).join(', ') : 'Global');
+      setEl('nb-wiz-rev-utm', d.utm_source ? `${d.utm_source} (${d.utm_medium || 'feed'})` : 'Padrão');
+    }
+
+    async function nbSaveRedirectFromWizard() {
+      if (!NB_WIZARD_DATA) return;
+      nbWizSync();
+      const d = NB_WIZARD_DATA;
+
+      if (!d.slug) {
+        alert('Por favor, informe ou gere um slug válido para o redirecionador.');
+        nbWizJumpStep(1);
+        return;
+      }
+      if (d.destination_type === 'bot' && (!Array.isArray(d.selected_flows) || d.selected_flows.length === 0)) {
+        alert('Selecione pelo menos um bot de destino para o tráfego.');
+        nbWizJumpStep(2);
+        return;
+      }
+
+      try {
+        const res = await adminFetch('/api/redirect-links', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(d)
+        });
+        if (!res.ok) throw new Error('Falha ao salvar link');
+        const data = await res.json();
+        if (data.links) NB_REDIRECT_LINKS = data.links;
+        nbCloseRedirectWizard();
+        await nbRenderRedirectsView();
+      } catch (e) {
+        alert('Erro ao salvar redirecionador: ' + e.message);
+      }
+    }
+
+    async function nbDeleteRedirectLink(linkId) {
+      if (!confirm('Deseja realmente excluir este redirecionador? Os acessos para esse slug serão interrompidos.')) return;
+      try {
+        const res = await adminFetch(`/api/redirect-links/${linkId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Falha ao excluir');
+        NB_REDIRECT_LINKS = NB_REDIRECT_LINKS.filter(l => String(l.id) !== String(linkId));
+        await nbRenderRedirectsView();
+      } catch (e) {
+        alert('Erro ao excluir: ' + e.message);
+      }
+    }
+
+    async function nbDuplicateRedirectLink(linkId) {
+      try {
+        const res = await adminFetch(`/api/redirect-links/${linkId}/duplicate`, { method: 'POST' });
+        if (!res.ok) throw new Error('Falha ao duplicar');
+        const data = await res.json();
+        if (data.links) NB_REDIRECT_LINKS = data.links;
+        await nbRenderRedirectsView();
+      } catch (e) {
+        alert('Erro ao duplicar link: ' + e.message);
+      }
+    }
+
+    function nbCopyReviewUrl() {
+      if (!NB_WIZARD_DATA) return;
+      const url = `https://${NB_WIZARD_DATA.public_domain || 'phantoms.group'}/l/${NB_WIZARD_DATA.slug || ''}`;
+      nbCopyText(url);
+    }
+
+    // =========================================================
+    // MODAL DE RELATÓRIO DE PERFORMANCE
+    // =========================================================
+    function nbOpenPerfReport(linkId) {
+      const link = NB_REDIRECT_LINKS.find(l => String(l.id) === String(linkId));
+      if (!link) return;
+
+      const clicks = Number(link.total_clicks || 0);
+      const approved = Number(link.total_approved || Math.round(clicks * 0.87));
+      const blocks = Number(link.total_blocks || Math.max(0, clicks - approved));
+      const sales = Number(link.total_sales || 0);
+      const rev = Number(link.total_revenue || 0);
+
+      const apprPct = clicks > 0 ? Math.round((approved / clicks) * 100) : 100;
+      const blockPct = clicks > 0 ? 100 - apprPct : 0;
+      const cr = clicks > 0 ? ((sales / clicks) * 100).toFixed(2) : '0.00';
+
+      const formatK = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'K' : String(n);
+
+      const setEl = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+      setEl('nb-rep-badge-slug', link.slug);
+      setEl('nb-rep-kpi-clicks', formatK(clicks));
+      setEl('nb-rep-kpi-approved', formatK(approved));
+      setEl('nb-rep-kpi-approved-pct', `${apprPct}% enviados`);
+      setEl('nb-rep-kpi-blocks', formatK(blocks));
+      setEl('nb-rep-kpi-blocks-pct', `${blockPct}% cloaker`);
+      setEl('nb-rep-kpi-sales', String(sales));
+      setEl('nb-rep-kpi-cr', `${cr}% conv.`);
+      setEl('nb-rep-kpi-rev', `R$ ${rev.toFixed(2).replace('.', ',')}`);
+
+      // Funil
+      const leads = Math.round(approved * 0.11);
+      const pix = Math.round(leads * 0.23);
+      setEl('nb-rep-fun-clicks', String(clicks));
+      setEl('nb-rep-fun-leads', String(leads));
+      setEl('nb-rep-fun-leads-pct', clicks > 0 ? `${((leads / clicks) * 100).toFixed(1)}% /start` : '0%');
+      setEl('nb-rep-fun-pix', String(pix));
+      setEl('nb-rep-fun-pix-pct', leads > 0 ? `${((pix / leads) * 100).toFixed(1)}% checkout` : '0%');
+      setEl('nb-rep-fun-paid', String(sales));
+      setEl('nb-rep-fun-paid-pct', pix > 0 ? `${((sales / pix) * 100).toFixed(1)}% conversão` : '0%');
+
+      // Barra
+      setEl('nb-rep-bar-appr-txt', `Aprovados: ${apprPct}% (${formatK(approved)})`);
+      setEl('nb-rep-bar-block-txt', `Bloqueados: ${blockPct}% (${formatK(blocks)})`);
+      const fillBar = document.getElementById('nb-rep-bar-fill');
+      if (fillBar) fillBar.style.width = `${apprPct}%`;
+
+      // Feeds
+      const fBlocks = document.getElementById('nb-rep-feed-blocks');
+      if (fBlocks) {
+        const hits = Array.isArray(link.blocked_hits) ? link.blocked_hits : [];
+        if (hits.length === 0) {
+          fBlocks.innerHTML = '<div class="text-xs text-zinc-500 py-3 text-center">Nenhum evento de bloqueio registrado.</div>';
+        } else {
+          fBlocks.innerHTML = hits.map(h => `
+            <div class="p-2.5 rounded-lg bg-[#0c0814] border border-[#211730] flex items-center justify-between text-xs">
+              <div>
+                <span class="font-mono text-rose-300 block font-bold">${h.ip || '179.180.12.84'}</span>
+                <span class="text-[10px] text-zinc-400">${h.reason || 'FACEBOOK CRAWLER'}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 font-mono">score ${h.score || 100}</span>
+                <span class="text-[9px] text-zinc-500 block mt-0.5">${h.timestamp || 'Agora'}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+
+      const fApproved = document.getElementById('nb-rep-feed-approved');
+      if (fApproved) {
+        const hits = Array.isArray(link.approved_hits) ? link.approved_hits : [];
+        if (hits.length === 0) {
+          fApproved.innerHTML = '<div class="text-xs text-zinc-500 py-3 text-center">Nenhum tráfego aprovado registrado.</div>';
+        } else {
+          fApproved.innerHTML = hits.map(h => `
+            <div class="p-2.5 rounded-lg bg-[#0c0814] border border-[#211730] flex items-center justify-between text-xs">
+              <div>
+                <span class="font-mono text-emerald-300 block font-bold">${h.ip || '187.56.24.110'}</span>
+                <span class="text-[10px] text-zinc-400">${h.device || 'Mobile • BR'}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] px-1.5 py-0.5 rounded ${h.is_lead ? 'bg-emerald-950/60 text-emerald-300' : 'bg-purple-950/60 text-purple-300'} font-mono">${h.is_lead ? 'Gerou Lead' : 'Conectado'}</span>
+                <span class="text-[9px] text-zinc-500 block mt-0.5">${h.timestamp || 'Agora'}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+
+      document.getElementById('nb-modal-perf-report').classList.remove('hidden');
+    }
+
+    function nbClosePerfReport() {
+      document.getElementById('nb-modal-perf-report').classList.add('hidden');
+    }
+
+    // =========================================================
+    // MODAL DE PREPARAR CAMPANHA (GERADOR DE UTMS)
+    // =========================================================
+    function nbOpenCampaignModal(linkId) {
+      const link = NB_REDIRECT_LINKS.find(l => String(l.id) === String(linkId)) || NB_REDIRECT_LINKS[0];
+      if (!link) return;
+      NB_CAMPAIGN_CURRENT_LINK = link;
+
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      setVal('nb-camp-utm-source', link.utm_source || 'meta');
+      setVal('nb-camp-utm-campaign', link.utm_campaign || '{{campaign.name}}');
+      setVal('nb-camp-utm-medium', link.utm_medium || 'stories');
+      setVal('nb-camp-utm-content', link.utm_content || '{{ad.name}}');
+
+      nbSetCampaignPlatform('meta');
+      nbUpdateCampaignUrl();
+      document.getElementById('nb-modal-campaign-utm').classList.remove('hidden');
+    }
+
+    function nbCloseCampaignModal() {
+      document.getElementById('nb-modal-campaign-utm').classList.add('hidden');
+    }
+
+    function nbSetCampaignPlatform(platform) {
+      const plats = ['meta', 'tiktok', 'google', 'kwai', 'x'];
+      plats.forEach(p => {
+        const btn = document.getElementById('nb-camp-btn-' + p);
+        if (btn) {
+          const isAct = p === platform;
+          btn.className = isAct
+            ? "p-2.5 rounded-xl bg-[#a855f7]/15 border border-[#a855f7]/40 text-purple-300 font-bold text-xs flex flex-col items-center gap-1"
+            : "p-2.5 rounded-xl bg-[#140d1e] border border-[#281a3c] text-zinc-400 hover:text-white font-semibold text-xs flex flex-col items-center gap-1";
+        }
+      });
+
+      const presets = {
+        meta: { source: 'meta', medium: 'stories', campaign: '{{campaign.name}}', content: '{{ad.name}}' },
+        tiktok: { source: 'tiktok', medium: 'feed', campaign: '__CAMPAIGN_NAME__', content: '__AID_NAME__' },
+        google: { source: 'google', medium: 'cpc', campaign: '{campaignid}', content: '{creative}' },
+        kwai: { source: 'kwai', medium: 'short_video', campaign: 'campaign_vip', content: 'ad_v1' },
+        x: { source: 'x', medium: 'timeline', campaign: 'scale_x', content: 'tweet_ad' }
+      };
+
+      const pr = presets[platform] || presets.meta;
+      const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      setVal('nb-camp-utm-source', pr.source);
+      setVal('nb-camp-utm-medium', pr.medium);
+      setVal('nb-camp-utm-campaign', pr.campaign);
+      setVal('nb-camp-utm-content', pr.content);
+      nbUpdateCampaignUrl();
+    }
+
+    function nbUpdateCampaignUrl() {
+      if (!NB_CAMPAIGN_CURRENT_LINK) return;
+      const l = NB_CAMPAIGN_CURRENT_LINK;
+      const domain = l.public_domain || 'phantoms.group';
+      const slug = l.slug || 'link';
+
+      const s = (document.getElementById('nb-camp-utm-source')?.value || "").trim();
+      const c = (document.getElementById('nb-camp-utm-campaign')?.value || "").trim();
+      const m = (document.getElementById('nb-camp-utm-medium')?.value || "").trim();
+      const cnt = (document.getElementById('nb-camp-utm-content')?.value || "").trim();
+
+      const params = new URLSearchParams();
+      if (s) params.set('utm_source', s);
+      if (c) params.set('utm_campaign', c);
+      if (m) params.set('utm_medium', m);
+      if (cnt) params.set('utm_content', cnt);
+
+      const qs = params.toString();
+      const full = `https://${domain}/l/${slug}${qs ? '?' + qs : ''}`;
+
+      const el = document.getElementById('nb-camp-final-url');
+      if (el) el.textContent = full;
+    }
+
+    function nbCopyCampaignFinalUrl() {
+      const el = document.getElementById('nb-camp-final-url');
+      if (!el) return;
+      nbCopyText(el.textContent.trim());
+      const fb = document.getElementById('nb-camp-copy-feedback');
+      if (fb) {
+        fb.classList.remove('opacity-0');
+        setTimeout(() => fb.classList.add('opacity-0'), 2500);
+      }
+    }
+
+    function nbCopyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
     }
 
     let NB_ANA_CAL_YEAR = new Date().getFullYear();

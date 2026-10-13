@@ -19,7 +19,7 @@ logger = logging.getLogger("SharkBotAPI")
 from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlite_policy import create_application_engine
@@ -52,6 +52,139 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Admin-Token"],
 )
+
+DEFAULT_REDIRECT_LINKS: List[Dict[str, Any]] = [
+    {
+        "id": "link_1",
+        "name": "iphonecapa",
+        "active": True,
+        "domain": "paylume.fans",
+        "slug_type": "aleatorio",
+        "slug": "b1424ef8",
+        "destination_type": "bot",
+        "selected_flows": [],
+        "responsible_flow": "",
+        "channel_id": "",
+        "channel_invite_url": "",
+        "distribution_order": "aleatoria",
+        "campaign_model": "meta_ads",
+        "utm_source": "facebook",
+        "utm_campaign": "{{campaign.name}}",
+        "utm_medium": "{{adset.name}}",
+        "utm_content": "{{ad.name}}",
+        "utm_term": "{{placement}}",
+        "utm_id": "{{campaign.id}}",
+        "protection_level": "cloaker",
+        "blocked_action": "safe_page",
+        "safe_url": "",
+        "block_ad_bots": True,
+        "anti_clone": True,
+        "browser_fingerprint": False,
+        "filter_location": True,
+        "allowed_countries": ["BR"],
+        "check_language": True,
+        "total_clicks": 3447,
+        "total_sales": 83,
+        "total_revenue": 1048.09,
+        "total_approved": 6598,
+        "total_blocks": 284,
+        "tracking_id": "shk=pj6cjcec",
+        "created_at": "2026-10-12T10:00:00",
+        "bot_display_name": "Pablo Gari",
+        "approved_hits": [
+            {"ip": "177.131.159.146", "device": "Desktop • BR", "is_lead": False, "timestamp": "12/10, 22:08"},
+            {"ip": "178.244.255.34", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 15:11"},
+            {"ip": "189.126.75.238", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 14:11"},
+            {"ip": "189.126.75.238", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 13:55"},
+        ],
+        "blocked_hits": [
+            {"ip": "2a03:2880:10ff:5e::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:48"},
+            {"ip": "2a03:2880:91f:62::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
+            {"ip": "2a03:2880:10ff:49::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
+            {"ip": "2a03:2880:10ff:57::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
+        ]
+    },
+    {
+        "id": "link_2",
+        "name": "IPHONE XR",
+        "active": True,
+        "domain": "paylume.fans",
+        "slug_type": "personalizado",
+        "slug": "21274a16",
+        "destination_type": "bot",
+        "selected_flows": [],
+        "responsible_flow": "",
+        "channel_id": "",
+        "channel_invite_url": "",
+        "distribution_order": "sequencial",
+        "campaign_model": "meta_ads",
+        "utm_source": "facebook",
+        "utm_campaign": "{{campaign.name}}",
+        "utm_medium": "{{adset.name}}",
+        "utm_content": "{{ad.name}}",
+        "utm_term": "{{placement}}",
+        "utm_id": "{{campaign.id}}",
+        "protection_level": "cloaker",
+        "blocked_action": "safe_page",
+        "safe_url": "",
+        "block_ad_bots": True,
+        "anti_clone": True,
+        "browser_fingerprint": False,
+        "filter_location": True,
+        "allowed_countries": ["BR"],
+        "check_language": True,
+        "total_clicks": 45,
+        "total_sales": 0,
+        "total_revenue": 0.0,
+        "total_approved": 56,
+        "total_blocks": 34,
+        "tracking_id": "shk=sm6*asb7",
+        "created_at": "2026-10-12T11:00:00",
+        "bot_display_name": "Pablo Gari",
+        "approved_hits": [],
+        "blocked_hits": []
+    },
+    {
+        "id": "link_3",
+        "name": "IPSEMCAPA",
+        "active": True,
+        "domain": "paylume.fans",
+        "slug_type": "aleatorio",
+        "slug": "c880afbb",
+        "destination_type": "bot",
+        "selected_flows": [],
+        "responsible_flow": "",
+        "channel_id": "",
+        "channel_invite_url": "",
+        "distribution_order": "aleatoria",
+        "campaign_model": "meta_ads",
+        "utm_source": "facebook",
+        "utm_campaign": "{{campaign.name}}",
+        "utm_medium": "{{adset.name}}",
+        "utm_content": "{{ad.name}}",
+        "utm_term": "{{placement}}",
+        "utm_id": "{{campaign.id}}",
+        "protection_level": "cloaker",
+        "blocked_action": "safe_page",
+        "safe_url": "",
+        "block_ad_bots": True,
+        "anti_clone": True,
+        "browser_fingerprint": False,
+        "filter_location": True,
+        "allowed_countries": ["BR"],
+        "check_language": True,
+        "total_clicks": 19,
+        "total_sales": 0,
+        "total_revenue": 0.0,
+        "total_approved": 27,
+        "total_blocks": 9,
+        "tracking_id": "shk=jctahg5v",
+        "created_at": "2026-10-12T12:00:00",
+        "bot_display_name": "Pablo Gari",
+        "approved_hits": [],
+        "blocked_hits": []
+    }
+]
 
 DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "flow_name": "bot",
@@ -170,7 +303,8 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         "selected_recharge": 100.00,
         "ai_provider": os.getenv("AI_PROVIDER", "deepseek"),
         "ai_api_key": os.getenv("AI_API_KEY", "")
-    }
+    },
+    "redirect_links": copy.deepcopy(DEFAULT_REDIRECT_LINKS)
 }
 
 REDACTED_SECRET_MASK = "***configured***"
@@ -4217,6 +4351,217 @@ async def _send_remarketing_campaign_locked(req: RemarketingSendRequest):
         "run_id": camp.get('run_id'),
         "state": _panel_state(state)
     }
+
+
+# =========================================================
+# MÓDULO DE REDIRECIONADORES (LINKS E CAMPANHAS)
+# =========================================================
+
+@app.get("/l/{slug}")
+@app.get("/r/{slug}")
+async def handle_redirect_link(slug: str, request: Request):
+    import random
+    clean_slug = str(slug or "").strip()
+    if not clean_slug:
+        raise HTTPException(status_code=404, detail="Link não encontrado.")
+
+    state = await _read_state_from_db()
+    links = state.get("redirect_links", [])
+    link = next((l for l in links if str(l.get("slug") or "").strip().lower() == clean_slug.lower() or str(l.get("name") or "").strip().lower() == clean_slug.lower()), None)
+    if not link:
+        raise HTTPException(status_code=404, detail="Link de redirecionamento não encontrado.")
+    
+    is_active = bool(link.get("is_active", link.get("active", True)))
+    if not is_active:
+        return HTMLResponse("<h2 style='font-family:sans-serif;text-align:center;margin-top:50px;color:#71717a;'>Este link está temporariamente desativado.</h2>", status_code=403)
+
+    link["total_clicks"] = int(link.get("total_clicks") or 0) + 1
+
+    user_agent = str(request.headers.get("user-agent") or "").lower()
+    client_ip = (
+        request.headers.get("cf-connecting-ip")
+        or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "127.0.0.1")
+    )
+
+    prot_level = str(link.get("protection_level") or "v2").lower()
+    is_blocked = False
+    block_reason = ""
+
+    if prot_level in ("cloaker", "cloaker_v2", "v2", "basic"):
+        bot_signatures = [
+            "facebookexternalhit", "facebot", "facebookcatalog", "googlebot",
+            "adsbot-google", "mediapartners-google", "tiktokbot", "bytedance",
+            "bytespider", "twitterbot", "whatsapp", "telegrambot", "curl", "wget",
+            "python", "headlesschrome", "crawler", "spider", "preview"
+        ]
+        if bool(link.get("block_ad_bots", True)) and any(sig in user_agent for sig in bot_signatures):
+            is_blocked = True
+            block_reason = "FACEBOOK CRAWLER" if "facebook" in user_agent or "facebot" in user_agent else ("GOOGLE CRAWLER" if "google" in user_agent else "BOT DE ANÚNCIO")
+
+        if not is_blocked and bool(link.get("anti_clone", False)):
+            ref = str(request.headers.get("referer") or "").lower()
+            if not ref or not any(p in ref for p in ["facebook", "instagram", "tiktok", "google", "kwai"]):
+                is_blocked = True
+                block_reason = "ACESSO DIRETO OU COMPARTILHADO"
+
+        if not is_blocked and bool(link.get("filter_location", True)):
+            allowed_countries = [str(c).upper() for c in (link.get("allowed_countries") or ["BR"])]
+            client_country = str(request.headers.get("cf-ipcountry") or "BR").upper()
+            if client_country not in allowed_countries:
+                is_blocked = True
+                block_reason = f"PAÍS NÃO PERMITIDO ({client_country})"
+
+        if not is_blocked and bool(link.get("check_language", True)):
+            lang_header = str(request.headers.get("accept-language") or "").lower()
+            if "pt" not in lang_header and "BR" in (link.get("allowed_countries") or ["BR"]):
+                is_blocked = True
+                block_reason = "IDIOMA INCOMPATÍVEL"
+
+    brt_now = datetime.now(timezone(timedelta(hours=-3))).strftime("%d/%m, %H:%M")
+
+    if is_blocked:
+        link["total_blocks"] = int(link.get("total_blocks") or 0) + 1
+        blocked_list = link.setdefault("blocked_hits", [])
+        blocked_list.insert(0, {
+            "ip": client_ip,
+            "reason": block_reason,
+            "score": 100,
+            "timestamp": brt_now
+        })
+        link["blocked_hits"] = blocked_list[:50]
+        await _write_state_to_db(state, runtime_only=True)
+
+        if link.get("blocked_action") == "redirect" and link.get("safe_url"):
+            return RedirectResponse(url=link.get("safe_url"), status_code=307)
+        return HTMLResponse(
+            "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='utf-8'><title>Página Segura</title><meta name='viewport' content='width=device-width, initial-scale=1.0'><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:40px 20px;max-width:760px;margin:auto;color:#18181b;line-height:1.6}h1{color:#09090b;font-size:24px}p{font-size:15px;color:#3f3f46}</style></head><body><h1>Artigos em Destaque</h1><p>Conteúdo em atualização. Volte em instantes para acessar nossas novidades e publicações recomendadas.</p></body></html>",
+            status_code=200
+        )
+
+    link["total_approved"] = int(link.get("total_approved") or 0) + 1
+    device_type = "Mobile" if any(m in user_agent for m in ["mobile", "android", "iphone"]) else "Desktop"
+    appr_list = link.setdefault("approved_hits", [])
+    appr_list.insert(0, {
+        "ip": client_ip,
+        "device": f"{device_type} • BR",
+        "is_lead": False,
+        "timestamp": brt_now
+    })
+    link["approved_hits"] = appr_list[:50]
+
+    dest_type = link.get("destination_type", "bot")
+    target_url = ""
+
+    if dest_type == "channel":
+        target_url = link.get("channel_invite_url") or "https://t.me/+exclusivo"
+    else:
+        selected_flows = [str(f) for f in (link.get("selected_flows") or []) if str(f)]
+        bots_list = state.get("flow_bots", [])
+        chosen_bot = None
+
+        if selected_flows:
+            if link.get("distribution_order") == "sequencial" and len(selected_flows) > 1:
+                cur_idx = int(link.get("next_flow_index") or 0) % len(selected_flows)
+                link["next_flow_index"] = cur_idx + 1
+                chosen_flow_id = selected_flows[cur_idx]
+            else:
+                chosen_flow_id = random.choice(selected_flows)
+            chosen_bot = next((b for b in bots_list if str(b.get("id")) == str(chosen_flow_id)), None)
+
+        if not chosen_bot:
+            chosen_bot = bot_manager._get_active_flow_bot(state) or (bots_list[0] if bots_list else None)
+
+        username = ""
+        if chosen_bot:
+            username = str(chosen_bot.get("username") or "").replace("@", "").strip()
+        if not username:
+            pub_user = str(state.get("publish", {}).get("bot_username") or "").replace("@", "").strip()
+            username = pub_user or "SharkBot"
+
+        tracking_param = link.get("tracking_id") or f"shk_{clean_slug}"
+        if "=" in tracking_param:
+            tracking_param = tracking_param.split("=")[-1]
+        target_url = f"https://t.me/{username}?start={tracking_param}"
+
+    await _write_state_to_db(state, runtime_only=True)
+    return RedirectResponse(url=target_url, status_code=307)
+
+
+@app.get("/api/redirect-links", dependencies=[Depends(verify_admin_auth)])
+async def get_redirect_links():
+    state = await _read_state_from_db()
+    links = state.get("redirect_links")
+    if links is None:
+        links = copy.deepcopy(DEFAULT_REDIRECT_LINKS)
+        state["redirect_links"] = links
+        await _write_state_to_db(state, runtime_only=True)
+    return {"status": "ok", "links": links}
+
+
+@app.post("/api/redirect-links", dependencies=[Depends(verify_admin_auth)])
+async def save_redirect_link(payload: Dict[str, Any]):
+    import uuid
+    state = await _read_state_from_db()
+    links = state.setdefault("redirect_links", [])
+    link_id = payload.get("id")
+    if not link_id:
+        link_id = f"link_{uuid.uuid4().hex[:8]}"
+        payload["id"] = link_id
+        payload.setdefault("created_at", datetime.utcnow().isoformat())
+        payload.setdefault("total_clicks", 0)
+        payload.setdefault("total_sales", 0)
+        payload.setdefault("total_revenue", 0.0)
+        payload.setdefault("total_approved", 0)
+        payload.setdefault("total_blocks", 0)
+        payload.setdefault("approved_hits", [])
+        payload.setdefault("blocked_hits", [])
+        if not payload.get("tracking_id"):
+            payload["tracking_id"] = f"shk={uuid.uuid4().hex[:8]}"
+        links.insert(0, payload)
+    else:
+        existing = next((l for l in links if str(l.get("id")) == str(link_id)), None)
+        if existing:
+            existing.update(payload)
+        else:
+            links.append(payload)
+    await _write_state_to_db(state)
+    return {"status": "ok", "link": payload, "links": links}
+
+
+@app.delete("/api/redirect-links/{link_id}", dependencies=[Depends(verify_admin_auth)])
+async def delete_redirect_link(link_id: str):
+    state = await _read_state_from_db()
+    links = state.get("redirect_links", [])
+    state["redirect_links"] = [l for l in links if str(l.get("id")) != str(link_id)]
+    await _write_state_to_db(state)
+    return {"status": "ok", "deleted_id": link_id}
+
+
+@app.post("/api/redirect-links/{link_id}/duplicate", dependencies=[Depends(verify_admin_auth)])
+async def duplicate_redirect_link(link_id: str):
+    import uuid
+    state = await _read_state_from_db()
+    links = state.setdefault("redirect_links", [])
+    src = next((l for l in links if str(l.get("id")) == str(link_id)), None)
+    if not src:
+        raise HTTPException(status_code=404, detail="Link não encontrado.")
+    dup = copy.deepcopy(src)
+    dup["id"] = f"link_{uuid.uuid4().hex[:8]}"
+    dup["name"] = f"{src.get('name', 'Link')} (Cópia)"
+    dup["slug"] = uuid.uuid4().hex[:8]
+    dup["total_clicks"] = 0
+    dup["total_sales"] = 0
+    dup["total_revenue"] = 0.0
+    dup["total_approved"] = 0
+    dup["total_blocks"] = 0
+    dup["approved_hits"] = []
+    dup["blocked_hits"] = []
+    dup["tracking_id"] = f"shk={uuid.uuid4().hex[:8]}"
+    dup["created_at"] = datetime.utcnow().isoformat()
+    links.insert(0, dup)
+    await _write_state_to_db(state)
+    return {"status": "ok", "link": dup, "links": links}
 
 
 if __name__ == "__main__":
