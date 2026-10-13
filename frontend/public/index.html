@@ -2218,6 +2218,10 @@
               </p>
             </div>
             <div class="flex items-center gap-2.5 shrink-0">
+              <button onclick="nbDeleteAllRedirectLinks()" id="nb-red-btn-clear-all" class="hidden px-3.5 py-2.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 hover:text-white text-xs font-semibold transition flex items-center gap-2" title="Excluir todos os links">
+                <i class="fa-regular fa-trash-can text-xs"></i>
+                <span>Excluir todos</span>
+              </button>
               <button onclick="nbOpenRedirectWizard()" class="px-4 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition shadow-lg shadow-purple-950/40 flex items-center gap-2">
                 <i class="fa-solid fa-plus text-xs"></i>
                 <span>Criar link</span>
@@ -11591,15 +11595,20 @@ quer que eu te mostre as opções de acesso?</textarea>
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.links)) {
-            NB_REDIRECT_LINKS = data.links;
+            NB_REDIRECT_LINKS = data.links.filter(l => !['link_1', 'link_2', 'link_3'].includes(String(l.id)));
+            if (Array.isArray(STATE.redirect_links)) {
+              STATE.redirect_links = NB_REDIRECT_LINKS;
+            }
             return;
           }
         }
       } catch (e) {
         console.warn('Erro ao carregar links do backend:', e);
       }
-      if (Array.isArray(STATE.redirect_links) && STATE.redirect_links.length > 0) {
-        NB_REDIRECT_LINKS = STATE.redirect_links;
+      if (Array.isArray(STATE.redirect_links)) {
+        NB_REDIRECT_LINKS = STATE.redirect_links.filter(l => !['link_1', 'link_2', 'link_3'].includes(String(l.id)));
+      } else {
+        NB_REDIRECT_LINKS = [];
       }
     }
 
@@ -11625,6 +11634,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (elClkSub) elClkSub.textContent = totalClicks > 0 ? 'Tráfego monitorado em tempo real' : 'Aguardando primeiros acessos';
       if (elClkCloak) elClkCloak.textContent = String(totalCloaker);
       if (elClkCloakSub) elClkCloakSub.textContent = `${totalCloaker} links com anti-bot ativo`;
+
+      const btnClearAll = document.getElementById('nb-red-btn-clear-all');
+      if (btnClearAll) {
+        btnClearAll.classList.toggle('hidden', NB_REDIRECT_LINKS.length === 0);
+      }
 
       nbRenderRedirectsTable();
     }
@@ -11791,7 +11805,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         const protClass = l.protection_level === 'none' ? 'text-zinc-500 bg-zinc-900 border-zinc-700' : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50';
 
         return `
-          <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] hover:border-[#382255] transition space-y-3" id="nb-red-card-${l.id}">
+          <div class="p-4 rounded-2xl bg-[#0e0a16] border border-[#231733] hover:border-[#382255] transition space-y-3 relative" id="nb-red-card-${l.id}">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-[#140d1e] border border-[#2a1c3f] flex items-center justify-center text-[#a855f7] shrink-0">
@@ -11816,39 +11830,48 @@ quer que eu te mostre as opções de acesso?</textarea>
 
               <!-- AÇÕES RÁPIDAS -->
               <div class="flex items-center gap-2 shrink-0">
-                <button onclick="nbOpenCampaignModal('${l.id}')" class="px-3 py-1.5 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-purple-300 hover:text-white text-xs font-semibold transition flex items-center gap-1.5">
+                <button type="button" onclick="nbCopyText('${fullUrl}')" class="px-3 py-1.5 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 hover:text-white text-xs font-semibold transition flex items-center gap-1.5" title="Copiar link direto">
+                  <i class="fa-regular fa-copy text-xs"></i>
+                  <span>Copiar</span>
+                </button>
+
+                <button type="button" onclick="nbOpenCampaignModal('${l.id}')" class="px-3 py-1.5 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-purple-300 hover:text-white text-xs font-semibold transition flex items-center gap-1.5">
                   <i class="fa-solid fa-bullhorn text-xs"></i>
                   <span>Preparar campanha</span>
                 </button>
                 
                 <div class="relative inline-block text-left" id="nb-red-menu-wrap-${l.id}">
-                  <button onclick="nbToggleRowMenu('${l.id}')" class="w-8 h-8 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-400 hover:text-white flex items-center justify-center transition text-xs">
-                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  <button type="button" onclick="nbToggleRowMenu(event, '${l.id}')" class="w-8 h-8 rounded-xl bg-[#140d1e] hover:bg-[#1f1530] border border-[#2a1b3d] text-zinc-300 hover:text-white flex items-center justify-center transition text-xs" title="Mais opções (Editar, Duplicar, Estatísticas, Excluir)">
+                    <i class="fa-solid fa-ellipsis"></i>
                   </button>
-                  <div id="nb-red-menu-${l.id}" class="hidden absolute right-0 mt-2 w-44 rounded-xl bg-[#120b1c] border border-[#2b1b3f] shadow-2xl py-1.5 z-30 space-y-0.5 text-xs">
-                    <button onclick="nbOpenRedirectWizard('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
-                      <i class="fa-regular fa-pen-to-square w-4"></i>
+                  <div id="nb-red-menu-${l.id}" class="hidden absolute right-0 mt-2 w-48 rounded-xl bg-[#120b1c] border border-[#382255] shadow-2xl py-1.5 z-50 space-y-0.5 text-xs">
+                    <button type="button" onclick="event.stopPropagation(); nbOpenRedirectWizard('${l.id}')" class="w-full px-3.5 py-2 text-left text-zinc-300 hover:text-white hover:bg-purple-900/30 flex items-center gap-2.5 transition">
+                      <i class="fa-regular fa-pen-to-square w-4 text-purple-400"></i>
                       <span>Editar</span>
                     </button>
-                    <button onclick="window.open('${fullUrl}', '_blank')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
-                      <i class="fa-solid fa-arrow-up-right-from-square w-4"></i>
+                    <button type="button" onclick="event.stopPropagation(); window.open('${fullUrl}', '_blank')" class="w-full px-3.5 py-2 text-left text-zinc-300 hover:text-white hover:bg-purple-900/30 flex items-center gap-2.5 transition">
+                      <i class="fa-solid fa-arrow-up-right-from-square w-4 text-purple-400"></i>
                       <span>Abrir link</span>
                     </button>
-                    <button onclick="nbOpenPerfReport('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
-                      <i class="fa-solid fa-chart-line w-4"></i>
+                    <button type="button" onclick="event.stopPropagation(); nbOpenPerfReport('${l.id}')" class="w-full px-3.5 py-2 text-left text-zinc-300 hover:text-white hover:bg-purple-900/30 flex items-center gap-2.5 transition">
+                      <i class="fa-solid fa-chart-line w-4 text-purple-400"></i>
                       <span>Ver estatísticas</span>
                     </button>
-                    <button onclick="nbDuplicateRedirectLink('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-zinc-300 hover:text-white hover:bg-white/5 flex items-center gap-2">
-                      <i class="fa-regular fa-copy w-4"></i>
+                    <button type="button" onclick="event.stopPropagation(); nbDuplicateRedirectLink('${l.id}')" class="w-full px-3.5 py-2 text-left text-zinc-300 hover:text-white hover:bg-purple-900/30 flex items-center gap-2.5 transition">
+                      <i class="fa-regular fa-copy w-4 text-purple-400"></i>
                       <span>Duplicar</span>
                     </button>
                     <div class="border-t border-[#231535] my-1"></div>
-                    <button onclick="nbDeleteRedirectLink('${l.id}')" class="w-full px-3.5 py-1.5 text-left text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 flex items-center gap-2">
-                      <i class="fa-regular fa-trash-can w-4"></i>
-                      <span>Excluir</span>
+                    <button type="button" onclick="event.stopPropagation(); nbDeleteRedirectLink('${l.id}')" class="w-full px-3.5 py-2 text-left text-rose-400 hover:text-rose-200 hover:bg-rose-950/40 flex items-center gap-2.5 transition font-semibold">
+                      <i class="fa-regular fa-trash-can w-4 text-rose-400"></i>
+                      <span>Excluir link</span>
                     </button>
                   </div>
                 </div>
+
+                <button type="button" onclick="nbDeleteRedirectLink('${l.id}')" class="w-8 h-8 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 border border-rose-800/40 text-rose-400 hover:text-rose-200 flex items-center justify-center transition text-xs" title="Excluir este redirecionador">
+                  <i class="fa-regular fa-trash-can"></i>
+                </button>
               </div>
             </div>
 
@@ -11876,12 +11899,27 @@ quer que eu te mostre as opções de acesso?</textarea>
       }).join('');
     }
 
-    function nbToggleRowMenu(id) {
+    function nbToggleRowMenu(event, id) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
       const menu = document.getElementById('nb-red-menu-' + id);
+      const card = document.getElementById('nb-red-card-' + id);
       if (!menu) return;
       const isHidden = menu.classList.contains('hidden');
       document.querySelectorAll('[id^="nb-red-menu-"]').forEach(m => m.classList.add('hidden'));
-      if (isHidden) menu.classList.remove('hidden');
+      document.querySelectorAll('[id^="nb-red-card-"]').forEach(c => {
+        c.style.zIndex = '';
+        c.classList.remove('z-50');
+      });
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        if (card) {
+          card.style.zIndex = '50';
+          card.classList.add('z-50');
+        }
+      }
     }
 
     // =========================================================
@@ -12365,14 +12403,30 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbDeleteRedirectLink(linkId) {
-      if (!confirm('Deseja realmente excluir este redirecionador? Os acessos para esse slug serão interrompidos.')) return;
+      if (!confirm('Deseja realmente excluir este redirecionador permanentemente?')) return;
       try {
-        const res = await adminFetch(`/api/redirect-links/${linkId}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Falha ao excluir');
-        NB_REDIRECT_LINKS = NB_REDIRECT_LINKS.filter(l => String(l.id) !== String(linkId));
+        const res = await adminFetch(`/api/redirect-links/${encodeURIComponent(linkId)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Falha ao excluir no servidor');
+        NB_REDIRECT_LINKS = NB_REDIRECT_LINKS.filter(l => String(l.id) !== String(linkId) && String(l.slug) !== String(linkId) && String(l.name) !== String(linkId));
+        if (Array.isArray(STATE.redirect_links)) {
+          STATE.redirect_links = STATE.redirect_links.filter(l => String(l.id) !== String(linkId) && String(l.slug) !== String(linkId) && String(l.name) !== String(linkId));
+        }
         await nbRenderRedirectsView();
       } catch (e) {
         alert('Erro ao excluir: ' + e.message);
+      }
+    }
+
+    async function nbDeleteAllRedirectLinks() {
+      if (!confirm('Tem certeza de que deseja excluir TODOS os redirecionadores cadastrados? Esta ação não pode ser desfeita.')) return;
+      try {
+        const res = await adminFetch('/api/redirect-links', { method: 'DELETE' });
+        if (!res.ok) throw new Error('Falha ao excluir todos');
+        NB_REDIRECT_LINKS = [];
+        if (Array.isArray(STATE.redirect_links)) STATE.redirect_links = [];
+        await nbRenderRedirectsView();
+      } catch (e) {
+        alert('Erro ao excluir todos os links: ' + e.message);
       }
     }
 
@@ -13516,7 +13570,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       return saved;
     }
 
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (e) => {
       if (OPEN_OBJECTIVE_MENU_IDX !== null) {
         OPEN_OBJECTIVE_MENU_IDX = null;
         renderMedias();
@@ -13525,6 +13579,13 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (upMenu) upMenu.classList.add('hidden');
       const delMenu = document.getElementById('menu-delivery-type');
       if (delMenu) delMenu.classList.add('hidden');
+      if (!e.target.closest('[id^="nb-red-menu-wrap-"]')) {
+        document.querySelectorAll('[id^="nb-red-menu-"]').forEach(m => m.classList.add('hidden'));
+        document.querySelectorAll('[id^="nb-red-card-"]').forEach(c => {
+          c.style.zIndex = '';
+          c.classList.remove('z-50');
+        });
+      }
     });
 
     window.addEventListener('DOMContentLoaded', loadInitialState);

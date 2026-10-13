@@ -53,138 +53,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Admin-Token"],
 )
 
-DEFAULT_REDIRECT_LINKS: List[Dict[str, Any]] = [
-    {
-        "id": "link_1",
-        "name": "iphonecapa",
-        "active": True,
-        "domain": "paylume.fans",
-        "slug_type": "aleatorio",
-        "slug": "b1424ef8",
-        "destination_type": "bot",
-        "selected_flows": [],
-        "responsible_flow": "",
-        "channel_id": "",
-        "channel_invite_url": "",
-        "distribution_order": "aleatoria",
-        "campaign_model": "meta_ads",
-        "utm_source": "facebook",
-        "utm_campaign": "{{campaign.name}}",
-        "utm_medium": "{{adset.name}}",
-        "utm_content": "{{ad.name}}",
-        "utm_term": "{{placement}}",
-        "utm_id": "{{campaign.id}}",
-        "protection_level": "cloaker",
-        "blocked_action": "safe_page",
-        "safe_url": "",
-        "block_ad_bots": True,
-        "anti_clone": True,
-        "browser_fingerprint": False,
-        "filter_location": True,
-        "allowed_countries": ["BR"],
-        "check_language": True,
-        "total_clicks": 3447,
-        "total_sales": 83,
-        "total_revenue": 1048.09,
-        "total_approved": 6598,
-        "total_blocks": 284,
-        "tracking_id": "shk=pj6cjcec",
-        "created_at": "2026-10-12T10:00:00",
-        "bot_display_name": "Pablo Gari",
-        "approved_hits": [
-            {"ip": "177.131.159.146", "device": "Desktop • BR", "is_lead": False, "timestamp": "12/10, 22:08"},
-            {"ip": "178.244.255.34", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 15:11"},
-            {"ip": "189.126.75.238", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 14:11"},
-            {"ip": "189.126.75.238", "device": "Mobile • BR", "is_lead": True, "timestamp": "12/10, 13:55"},
-        ],
-        "blocked_hits": [
-            {"ip": "2a03:2880:10ff:5e::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:48"},
-            {"ip": "2a03:2880:91f:62::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
-            {"ip": "2a03:2880:10ff:49::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
-            {"ip": "2a03:2880:10ff:57::", "reason": "FACEBOOK CRAWLER", "score": 100, "timestamp": "12/10, 12:46"},
-        ]
-    },
-    {
-        "id": "link_2",
-        "name": "IPHONE XR",
-        "active": True,
-        "domain": "paylume.fans",
-        "slug_type": "personalizado",
-        "slug": "21274a16",
-        "destination_type": "bot",
-        "selected_flows": [],
-        "responsible_flow": "",
-        "channel_id": "",
-        "channel_invite_url": "",
-        "distribution_order": "sequencial",
-        "campaign_model": "meta_ads",
-        "utm_source": "facebook",
-        "utm_campaign": "{{campaign.name}}",
-        "utm_medium": "{{adset.name}}",
-        "utm_content": "{{ad.name}}",
-        "utm_term": "{{placement}}",
-        "utm_id": "{{campaign.id}}",
-        "protection_level": "cloaker",
-        "blocked_action": "safe_page",
-        "safe_url": "",
-        "block_ad_bots": True,
-        "anti_clone": True,
-        "browser_fingerprint": False,
-        "filter_location": True,
-        "allowed_countries": ["BR"],
-        "check_language": True,
-        "total_clicks": 45,
-        "total_sales": 0,
-        "total_revenue": 0.0,
-        "total_approved": 56,
-        "total_blocks": 34,
-        "tracking_id": "shk=sm6*asb7",
-        "created_at": "2026-10-12T11:00:00",
-        "bot_display_name": "Pablo Gari",
-        "approved_hits": [],
-        "blocked_hits": []
-    },
-    {
-        "id": "link_3",
-        "name": "IPSEMCAPA",
-        "active": True,
-        "domain": "paylume.fans",
-        "slug_type": "aleatorio",
-        "slug": "c880afbb",
-        "destination_type": "bot",
-        "selected_flows": [],
-        "responsible_flow": "",
-        "channel_id": "",
-        "channel_invite_url": "",
-        "distribution_order": "aleatoria",
-        "campaign_model": "meta_ads",
-        "utm_source": "facebook",
-        "utm_campaign": "{{campaign.name}}",
-        "utm_medium": "{{adset.name}}",
-        "utm_content": "{{ad.name}}",
-        "utm_term": "{{placement}}",
-        "utm_id": "{{campaign.id}}",
-        "protection_level": "cloaker",
-        "blocked_action": "safe_page",
-        "safe_url": "",
-        "block_ad_bots": True,
-        "anti_clone": True,
-        "browser_fingerprint": False,
-        "filter_location": True,
-        "allowed_countries": ["BR"],
-        "check_language": True,
-        "total_clicks": 19,
-        "total_sales": 0,
-        "total_revenue": 0.0,
-        "total_approved": 27,
-        "total_blocks": 9,
-        "tracking_id": "shk=jctahg5v",
-        "created_at": "2026-10-12T12:00:00",
-        "bot_display_name": "Pablo Gari",
-        "approved_hits": [],
-        "blocked_hits": []
-    }
-]
+DEFAULT_REDIRECT_LINKS: List[Dict[str, Any]] = []
 
 DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
     "flow_name": "bot",
@@ -4493,9 +4362,15 @@ async def get_redirect_links():
     state = await _read_state_from_db()
     links = state.get("redirect_links")
     if links is None:
-        links = copy.deepcopy(DEFAULT_REDIRECT_LINKS)
+        links = []
         state["redirect_links"] = links
         await _write_state_to_db(state, runtime_only=True)
+    # Remove automaticamente links de demonstração legados
+    cleaned = [l for l in links if str(l.get("id")) not in ("link_1", "link_2", "link_3")]
+    if len(cleaned) != len(links):
+        state["redirect_links"] = cleaned
+        await _write_state_to_db(state, runtime_only=True)
+        links = cleaned
     return {"status": "ok", "links": links}
 
 
@@ -4529,13 +4404,27 @@ async def save_redirect_link(payload: Dict[str, Any]):
     return {"status": "ok", "link": payload, "links": links}
 
 
+@app.delete("/api/redirect-links", dependencies=[Depends(verify_admin_auth)])
+async def delete_all_redirect_links():
+    state = await _read_state_from_db()
+    state["redirect_links"] = []
+    await _write_state_to_db(state)
+    return {"status": "ok", "message": "Todos os links foram excluídos.", "links": []}
+
+
 @app.delete("/api/redirect-links/{link_id}", dependencies=[Depends(verify_admin_auth)])
 async def delete_redirect_link(link_id: str):
+    clean_id = str(link_id or "").strip().lower()
     state = await _read_state_from_db()
     links = state.get("redirect_links", [])
-    state["redirect_links"] = [l for l in links if str(l.get("id")) != str(link_id)]
+    state["redirect_links"] = [
+        l for l in links
+        if str(l.get("id", "")).strip().lower() != clean_id
+        and str(l.get("slug", "")).strip().lower() != clean_id
+        and str(l.get("name", "")).strip().lower() != clean_id
+    ]
     await _write_state_to_db(state)
-    return {"status": "ok", "deleted_id": link_id}
+    return {"status": "ok", "deleted_id": link_id, "links": state["redirect_links"]}
 
 
 @app.post("/api/redirect-links/{link_id}/duplicate", dependencies=[Depends(verify_admin_auth)])
