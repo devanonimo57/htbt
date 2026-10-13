@@ -620,6 +620,9 @@ class ActiveBotManager:
         target_idx = self.STAGE_ORDER.index(target_stage) if target_stage in self.STAGE_ORDER else 0
         if target_idx >= curr_idx:
             lead["stage"] = target_stage
+        if target_stage in ("Pagamento aprovado", "Comprou upsell"):
+            lead["purchased"] = True
+            lead["has_paid"] = True
         if target_stage not in hist:
             hist.append(target_stage)
 
@@ -1933,7 +1936,11 @@ class ActiveBotManager:
                     progress.pop('loop_sent', None)
                     def _card_due(s):
                         trig = 'pix' if s.get('trigger') == 'pix' else 'start'
-                        return anchors[trig] + max(1, int(s.get('delay_minutes') or 1)) * 60
+                        try:
+                            mins = max(1, int(float(s.get('delay_minutes') or 1)))
+                        except (TypeError, ValueError):
+                            mins = 1
+                        return anchors[trig] + mins * 60
                     seq = min(eligible_pending, key=lambda s: (_card_due(s), sequences.index(s)))
                     trigger = 'pix' if seq.get('trigger') == 'pix' else 'start'
                     due = _card_due(seq)
@@ -1946,7 +1953,11 @@ class ActiveBotManager:
                         remaining = [s for s in loops if str(s.get('id')) not in loop_sent]
                         if not remaining or 'rest_until' not in progress:
                             progress['loop_sent'] = []
-                            progress['rest_until'] = now + max(1, int(cfg.get('loop_rest_minutes') or 10)) * 60
+                            try:
+                                rest_m = max(1, int(float(cfg.get('loop_rest_minutes') or 10)))
+                            except (TypeError, ValueError):
+                                rest_m = 10
+                            progress['rest_until'] = now + rest_m * 60
                             remaining = loops
                             await self.state_saver(state, runtime_only=True)
                         seq = remaining[0]
@@ -2016,7 +2027,11 @@ class ActiveBotManager:
                         if eligible_pending_now:
                             def _cur_due(s):
                                 trig = 'pix' if s.get('trigger') == 'pix' else 'start'
-                                return anchors_now[trig] + max(1, int(s.get('delay_minutes') or 1)) * 60
+                                try:
+                                    mins = max(1, int(float(s.get('delay_minutes') or 1)))
+                                except (TypeError, ValueError):
+                                    mins = 1
+                                return anchors_now[trig] + mins * 60
                             selected = min(eligible_pending_now, key=lambda s: (_cur_due(s), current[4].index(s)))
                         else:
                             selected = None
@@ -2830,6 +2845,7 @@ class ActiveBotManager:
             state.setdefault("tx_records", {})[tx_id] = tx_record
 
             lead["last_tx_id"] = tx_id
+            lead["last_plan_name"] = chosen_offer_name
             lead["last_tx_is_upsell"] = is_upsell
             self.active_tx_map[tx_id] = callback.from_user.id
             price_fmt = f"{price:.2f}".replace(".", ",")
@@ -3187,6 +3203,7 @@ class ActiveBotManager:
         state.setdefault("tx_records", {})[tx_id] = tx_record
 
         lead["last_tx_id"] = tx_id
+        lead["last_plan_name"] = full_plan_label
         lead["last_tx_is_upsell"] = False
         valor_str = f"R$ {total_price:.2f}".replace(".", ",")
         checkout_history = {
@@ -3578,6 +3595,11 @@ class ActiveBotManager:
                     tx_record["status"] = "paid"
                     tx_record["sales_counted"] = True
                     tx_record.setdefault("paid_at", datetime.utcnow().isoformat())
+                    lead["purchased"] = True
+                    lead["has_paid"] = True
+                    lead["last_tx_id"] = tx_id
+                    lead["last_plan_name"] = tx_record.get("offer_name") or lead.get("chosen_plan") or "Plano VIP"
+                    lead["last_tx_amount"] = paid_val
 
                     if is_upsell_payment:
                         learning = state.setdefault("learning", {})
@@ -3890,7 +3912,7 @@ class ActiveBotManager:
                         [InlineKeyboardButton(text="🔥 ENTRAR NO MEU VIP AGORA", url=invite_url)]
                     ])
 
-                    await target_bot.send_message(
+                    await (target_bot or self.bot).send_message(
                         chat_id=user_id,
                         text="💜 <b>Pagamento confirmado!</b>\n\nAqui está o seu acesso exclusivo ao meu VIP privado:",
                         parse_mode="HTML",

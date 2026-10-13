@@ -1839,7 +1839,12 @@ async def _pix_filters(period: str, bot_id: str, date: str = ''):
         bot = next((b for b in state.get('flow_bots', []) if str(b.get('id')) == bot_id), None)
         if not bot:
             raise HTTPException(status_code=404, detail='Bot não encontrado')
-        filters.append(PixRecord.origin_bot_id == str(bot.get('bot_id') or ''))
+        origin = str(bot.get('bot_id') or '').strip()
+        if not origin or not origin.isdecimal():
+            token = str(bot.get('token') or '').strip()
+            if ':' in token and token.split(':', 1)[0].isdecimal():
+                origin = token.split(':', 1)[0]
+        filters.append(PixRecord.origin_bot_id == origin)
     if date:
         try:
             parsed = datetime.strptime(date, '%Y-%m-%d').date()
@@ -1912,14 +1917,23 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
             raise HTTPException(status_code=404, detail='Bot não encontrado')
         matching = [b for b in bots if (bot_id == 'all' or str(b.get('id')) == bot_id)
                     and (flow == 'all' or ('ai' if b.get('mode') == 'ai' else 'flow') == flow)]
-        matching_origins = [str(b.get('bot_id') or '') for b in matching]
+        matching_origins = []
+        for b in matching:
+            origin = str(b.get('bot_id') or '').strip()
+            if not origin or not origin.isdecimal():
+                token = str(b.get('token') or '').strip()
+                if ':' in token and token.split(':', 1)[0].isdecimal():
+                    origin = token.split(':', 1)[0]
+            if origin:
+                matching_origins.append(origin)
         scope.append(PixRecord.origin_bot_id.in_(matching_origins))
     paid = PixRecord.status == 'paid'
     pending = PixRecord.status == 'pending'
+    not_test = PixRecord.is_test == False
     paid_ts = func.coalesce(func.nullif(PixRecord.paid_at, ''), PixRecord.created_at)
-    generated_filters = scope + _metrics_date_filters(period, date, PixRecord.created_at)
-    paid_filters = scope + [paid] + _metrics_date_filters(period, date, paid_ts)
-    pending_filters = generated_filters + [pending]
+    generated_filters = scope + [not_test] + _metrics_date_filters(period, date, PixRecord.created_at)
+    paid_filters = scope + [not_test, paid] + _metrics_date_filters(period, date, paid_ts)
+    pending_filters = scope + [not_test, pending] + _metrics_date_filters(period, date, PixRecord.created_at)
     count = func.count(PixRecord.tx_id)
     amount = func.coalesce(func.sum(PixRecord.amount), 0)
     async with async_session() as session:
@@ -1928,7 +1942,7 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
         generated = await totals(generated_filters)
         paid_total = await totals(paid_filters)
         pending_total = await totals(pending_filters)
-        total_paid = (await session.execute(select(amount).where(paid))).scalar_one()
+        total_paid = (await session.execute(select(amount).where(paid, not_test))).scalar_one()
 
         # Agregados da Coorte de Aprovação de Pix (Pix gerados no período e quantos deles estão pagos)
         pix_cohort_denom = generated[0]
@@ -1954,6 +1968,7 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
                 and_(
                     PixRecord.origin_bot_id == ClientRecord.origin_bot_id,
                     PixRecord.telegram_id == ClientRecord.telegram_id,
+                    PixRecord.is_test == False,
                     paid
                 )
             )
@@ -1968,7 +1983,8 @@ async def get_panel_metrics(period: str = 'Total', bot_id: str = 'all', date: st
                 PixRecord,
                 and_(
                     PixRecord.origin_bot_id == ClientRecord.origin_bot_id,
-                    PixRecord.telegram_id == ClientRecord.telegram_id
+                    PixRecord.telegram_id == ClientRecord.telegram_id,
+                    PixRecord.is_test == False
                 )
             )
             .where(*lead_filters)
@@ -2059,7 +2075,12 @@ async def get_flow_metrics(bot_id: str = "all"):
             bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
             if not bot:
                 raise HTTPException(status_code=404, detail="Bot não encontrado.")
-            query = query.where(PixRecord.origin_bot_id == str(bot.get("bot_id")))
+            origin = str(bot.get('bot_id') or '').strip()
+            if not origin or not origin.isdecimal():
+                token = str(bot.get('token') or '').strip()
+                if ':' in token and token.split(':', 1)[0].isdecimal():
+                    origin = token.split(':', 1)[0]
+            query = query.where(PixRecord.origin_bot_id == origin)
         paid_count, paid_amount = (await session.execute(query)).one()
         return {"paid_count": paid_count, "paid_amount": round(float(paid_amount), 2)}
 
@@ -2079,7 +2100,17 @@ def _matches_lead_scope(lead: Dict[str, Any], uid: str, bot_id: str, state: Dict
     if not bot_id or bot_id == "all":
         return True
     bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
-    return bool(bot and _origin_for_lead(lead, state) == str(bot.get("bot_id")))
+    if not bot:
+        return False
+    lead_orig = _origin_for_lead(lead, state)
+    bot_numeric = str(bot.get("bot_id") or "").strip()
+    if not bot_numeric or not bot_numeric.isdecimal():
+        token = str(bot.get("token") or "").strip()
+        if ":" in token and token.split(":", 1)[0].isdecimal():
+            bot_numeric = token.split(":", 1)[0]
+    allowed = {bot_numeric, str(bot.get("bot_id") or "").strip(), f"legacy:{bot_id}"}
+    allowed.discard("")
+    return lead_orig in allowed
 
 
 def _matches_tx_scope(rec: Dict[str, Any], uid: str, bot_id: str, state: Dict[str, Any]) -> bool:
@@ -2088,7 +2119,17 @@ def _matches_tx_scope(rec: Dict[str, Any], uid: str, bot_id: str, state: Dict[st
     if not bot_id or bot_id == "all":
         return True
     bot = next((b for b in state.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
-    return bool(bot and _origin_for_tx(rec) == str(bot.get("bot_id")))
+    if not bot:
+        return False
+    tx_orig = _origin_for_tx(rec)
+    bot_numeric = str(bot.get("bot_id") or "").strip()
+    if not bot_numeric or not bot_numeric.isdecimal():
+        token = str(bot.get("token") or "").strip()
+        if ":" in token and token.split(":", 1)[0].isdecimal():
+            bot_numeric = token.split(":", 1)[0]
+    allowed = {bot_numeric, str(bot.get("bot_id") or "").strip(), f"legacy:{bot_id}"}
+    allowed.discard("")
+    return tx_orig in allowed
 
 
 def _archive_lead(archived: List[Dict[str, Any]], lead: Dict[str, Any]) -> None:
@@ -2327,8 +2368,13 @@ async def reset_lead_conversation(telegram_id: str, bot_id: str = "all"):
         else:
             bot = next((b for b in staged.get("flow_bots", []) if str(b.get("id")) == bot_id), None)
             if bot:
-                bot_manager._cancel_downsell(clean_uid, str(bot.get("bot_id")))
-                bot_manager._cancel_upsell(clean_uid, str(bot.get("bot_id")))
+                b_orig = str(bot.get("bot_id") or "").strip()
+                if not b_orig or not b_orig.isdecimal():
+                    tok = str(bot.get("token") or "").strip()
+                    if ":" in tok and tok.split(":", 1)[0].isdecimal():
+                        b_orig = tok.split(":", 1)[0]
+                bot_manager._cancel_downsell(clean_uid, b_orig or str(bot.get("bot_id") or ""))
+                bot_manager._cancel_upsell(clean_uid, b_orig or str(bot.get("bot_id") or ""))
         return {"status": "success", "state": _panel_state(saved)}
 
 async def clear_all_leads():

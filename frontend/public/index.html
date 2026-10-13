@@ -9553,9 +9553,12 @@ quer que eu te mostre as opções de acesso?</textarea>
 
     function nbUpdateHeaderRevenueWidget() {
       const txMap = STATE.tx_records || {};
-      const totalRev = NB_METRICS ? Number(NB_METRICS.all_time_paid_amount || 0) : nbDistinctTransactions(txMap)
-        .filter(tx => tx && (tx.status === "paid" || tx.delivered))
-        .reduce((acc, tx) => acc + Number(tx.amount || 0), 0);
+      const totalRev = (NB_METRICS && NB_METRICS.all_time_paid_amount !== undefined && NB_METRICS.all_time_paid_amount !== null)
+        ? Number(NB_METRICS.all_time_paid_amount || 0)
+        : (nbDistinctTransactions(txMap)
+            .filter(tx => tx && (tx.status === "paid" || tx.delivered))
+            .reduce((acc, tx) => acc + Number(tx.amount || 0), 0) || Number(window._NB_LAST_TOTAL_REV || 0));
+      if (totalRev > 0) window._NB_LAST_TOTAL_REV = totalRev;
 
       const milestones = [
         { max: 10000, label: "/ 10k" },
@@ -9689,7 +9692,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (lead.blocked || (lead.stage || "").toLowerCase().includes("bloqueado")) return "Bloqueado";
       const userTxs = txList.filter(tx => nbTransactionMatchesLead(tx, lead));
       const stg = (lead.stage || "").toLowerCase();
-      const hasPaid = Boolean(lead.purchased) || stg.includes("aprovad") || stg.includes("concluíd") || userTxs.some(tx => tx.status === "paid" || tx.delivered);
+      const hasPaid = Boolean(lead.purchased) || Boolean(lead.has_paid) || stg.includes("aprovad") || stg.includes("concluíd") || stg.includes("pago") || userTxs.some(tx => tx.status === "paid" || tx.delivered);
       if (hasPaid) return "Pago";
       const hasPend = userTxs.length > 0 || stg.includes("pix") || stg.includes("checkout") || stg.includes("aguardando") || stg.includes("escolheu");
       if (hasPend) return "Pendente";
@@ -9767,9 +9770,9 @@ quer que eu te mostre as opções de acesso?</textarea>
         const botUsername = l.bot_username || (botObj ? botObj.username : "Origem desconhecida");
         const flowMode = l.bot_mode || (botObj ? botObj.mode : "desconhecido");
         const status = nbClassifyLeadStatus(l, allTxList);
-        const planName = (latestTx && latestTx.offer_name) || l.selected_plan || "—";
-        const txCode = latestTx ? String(latestTx.tx_id || "").slice(0, 14) : "—";
-        const dateIso = (latestTx && (latestTx.paid_at || latestTx.created_at)) || l.created_at || "";
+        const planName = (latestTx && latestTx.offer_name) || l.last_plan_name || l.selected_plan || l.chosen_plan || "—";
+        const txCode = (latestTx && latestTx.tx_id) ? String(latestTx.tx_id).slice(0, 14) : (l.last_tx_id ? String(l.last_tx_id).slice(0, 14) : "—");
+        const dateIso = (latestTx && (latestTx.paid_at || latestTx.created_at)) || l.last_interaction_iso || l.created_at || "";
         const dateDisplay = l.last_interaction || (dateIso ? dateIso.replace("T", " ").slice(0, 16) : "Recente");
         return {
           raw: l,
@@ -10735,6 +10738,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       const hasBumpLead = l => Boolean(l.has_order_bump || l.accepted_bump_deliverable || (Array.isArray(l.accepted_bump_indices) && l.accepted_bump_indices.length > 0) || String(l.chosen_plan || '').includes('(+'));
       const hasDownsellLead = l => Boolean(l.from_downsell || (Array.isArray(l.sent_downsell_steps) && l.sent_downsell_steps.length > 0) || (Array.isArray(l.authorized_flow_discounts) && l.authorized_flow_discounts.length > 0));
+      const isLeadPaid = l => Boolean(l && (l.purchased || l.has_paid || l.status === 'paid' || (l.stage && (l.stage.toLowerCase().includes('aprovad') || l.stage.toLowerCase().includes('comprou') || l.stage.toLowerCase().includes('vip') || l.stage.toLowerCase().includes('pago')))));
 
       const allLeads = (STATE.memory?.leads || []).filter(l => !l.archived).filter(l => {
         if (filterBot !== 'all' && l.bot_id !== filterBot && l.bot_username !== (bots.find(x => x.id === filterBot)?.username)) return false;
@@ -11055,7 +11059,7 @@ quer que eu te mostre as opções de acesso?</textarea>
 
       // Rates de Marketing Operacionais (Upsell, Downsell, OrderBump, Recuperação)
       const bumpAccepted = allLeads.filter(hasBumpLead).length;
-      const downsellRec = allLeads.filter(l => hasDownsellLead(l) && (l.status === 'paid' || l.stage === 'Aprovado' || l.stage === 'VIP Ativo')).length;
+      const downsellRec = allLeads.filter(l => hasDownsellLead(l) && isLeadPaid(l)).length;
       const pendingPixCount = Math.max(0, pixGenCount - paidSalesCount);
       const setRateCard = (key, num, den, subSuffix) => {
         if (!den || den <= 0) {
