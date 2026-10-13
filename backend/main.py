@@ -173,7 +173,8 @@ DEFAULT_SHARKBOT_STATE: Dict[str, Any] = {
         "ai_provider": os.getenv("AI_PROVIDER", "deepseek"),
         "ai_api_key": os.getenv("AI_API_KEY", "")
     },
-    "redirect_links": copy.deepcopy(DEFAULT_REDIRECT_LINKS)
+    "redirect_links": copy.deepcopy(DEFAULT_REDIRECT_LINKS),
+    "custom_domains": []
 }
 
 REDACTED_SECRET_MASK = "***configured***"
@@ -4451,6 +4452,38 @@ async def duplicate_redirect_link(link_id: str):
     links.insert(0, dup)
     await _write_state_to_db(state)
     return {"status": "ok", "link": dup, "links": links}
+
+
+@app.get("/api/custom-domains", dependencies=[Depends(verify_admin_auth)])
+async def get_custom_domains():
+    state = await _read_state_from_db()
+    domains = state.get("custom_domains", [])
+    return {"status": "ok", "domains": domains}
+
+
+@app.post("/api/custom-domains", dependencies=[Depends(verify_admin_auth)])
+async def add_custom_domain(payload: Dict[str, Any]):
+    import re
+    raw_dom = str(payload.get("domain") or "").strip().lower()
+    clean_dom = re.sub(r"^https?://", "", raw_dom).split("/")[0].split(":")[0].strip()
+    if not clean_dom:
+        raise HTTPException(status_code=400, detail="Domínio inválido.")
+    state = await _read_state_from_db()
+    domains = state.setdefault("custom_domains", [])
+    if clean_dom not in domains:
+        domains.append(clean_dom)
+    await _write_state_to_db(state)
+    return {"status": "ok", "domains": domains, "domain": clean_dom}
+
+
+@app.delete("/api/custom-domains/{domain}", dependencies=[Depends(verify_admin_auth)])
+async def delete_custom_domain(domain: str):
+    clean_dom = str(domain or "").strip().lower()
+    state = await _read_state_from_db()
+    domains = state.get("custom_domains", [])
+    state["custom_domains"] = [d for d in domains if d.lower() != clean_dom]
+    await _write_state_to_db(state)
+    return {"status": "ok", "domains": state["custom_domains"]}
 
 
 if __name__ == "__main__":

@@ -11563,13 +11563,42 @@ quer que eu te mostre as opções de acesso?</textarea>
     let NB_WIZARD_STEP = 1;
     let NB_CAMPAIGN_CURRENT_LINK = null;
 
-    const NB_DOMAINS_LIST = [
-      'phantoms.group',
-      'serverflow.dad',
-      'paylume.fans',
-      'naomeclonaporfavor.com',
-      'eufacodineirocomhot.com'
-    ];
+    let NB_CUSTOM_DOMAINS = [];
+
+    async function nbFetchCustomDomains() {
+      try {
+        const res = await adminFetch('/api/custom-domains');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.domains)) {
+            NB_CUSTOM_DOMAINS = data.domains;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar domínios próprios:', e);
+      }
+      if (Array.isArray(STATE.custom_domains)) {
+        NB_CUSTOM_DOMAINS = STATE.custom_domains;
+      }
+    }
+
+    function nbGetAvailableDomains() {
+      const currentHost = window.location.host || 'localhost:8000';
+      const list = [currentHost];
+      (NB_CUSTOM_DOMAINS || []).forEach(d => {
+        if (d && !list.includes(d)) list.push(d);
+      });
+      return list;
+    }
+
+    function nbFormatDomainUrl(domain, slug) {
+      const s = slug || '';
+      const d = domain || window.location.host || 'localhost:8000';
+      const isIpOrPort = d.includes(':') || /^\d+\.\d+\.\d+\.\d+/.test(d) || d.includes('localhost');
+      const proto = isIpOrPort ? (window.location.protocol || 'http:') : 'https:';
+      return `${proto}//${d}/l/${s}`;
+    }
 
     const NB_COUNTRIES_LIST = [
       {code: 'BR', name: 'Brasil'},
@@ -11613,7 +11642,7 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     async function nbRenderRedirectsView() {
-      await nbFetchRedirectLinks();
+      await Promise.all([nbFetchRedirectLinks(), nbFetchCustomDomains()]);
 
       const totalActive = NB_REDIRECT_LINKS.filter(l => l.is_active !== false).length;
       const totalClicks = NB_REDIRECT_LINKS.reduce((acc, l) => acc + Number(l.total_clicks || 0), 0);
@@ -11681,22 +11710,79 @@ quer que eu te mostre as opções de acesso?</textarea>
         nbSwitchRedirectTab('links');
       } else if (tab === 'domains') {
         if (container) {
+          const avail = nbGetAvailableDomains();
+          const curHost = window.location.host;
+          const curIp = window.location.hostname;
           container.innerHTML = `
-            <div class="p-8 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-4">
-              <div class="flex items-center justify-between border-b border-[#211730] pb-3">
+            <div class="p-6 rounded-2xl bg-[#0e0a16] border border-[#231733] space-y-6">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#211730] pb-4">
                 <div>
-                  <h3 class="text-sm font-bold text-white">Domínios Oficiais Ativos</h3>
-                  <p class="text-xs text-zinc-400">Domínios disponíveis para geração de slugs e camuflagem de tráfego.</p>
+                  <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-globe text-[#a855f7]"></i>
+                    <span>Domínios Conectados e Instruções de DNS</span>
+                  </h3>
+                  <p class="text-xs text-zinc-400 mt-1">Conecte seus próprios domínios ou utilize o IP/host padrão da sua VPS diretamente.</p>
                 </div>
-                <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-950/50 border border-emerald-800/50 text-emerald-400 font-bold">${NB_DOMAINS_LIST.length} Domínios Conectados</span>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 font-bold flex items-center gap-1.5 shrink-0">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>${avail.length} Conectado(s)</span>
+                </span>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                ${NB_DOMAINS_LIST.map(d => `
-                  <div class="p-3.5 rounded-xl bg-[#140d1e] border border-[#281a3c] flex items-center justify-between">
-                    <span class="font-mono text-xs text-purple-300 font-semibold">${d}</span>
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+
+              <!-- CARD 1: HOST PADRÃO DA VPS -->
+              <div class="p-4 rounded-xl bg-[#140d1e] border border-purple-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs font-bold text-emerald-400">${curHost}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-[10px] font-bold">Padrão da VPS (Ativo)</span>
                   </div>
-                `).join('')}
+                  <span class="text-[10px] text-zinc-400">Pronto para uso imediato</span>
+                </div>
+                <p class="text-xs text-zinc-400">Este é o endereço atual da sua máquina. Qualquer redirecionador criado com este host já funciona na hora sem precisar configurar nenhum DNS externo.</p>
+              </div>
+
+              <!-- CARD 2: FORMULÁRIO PARA ADICIONAR DOMÍNIO PRÓPRIO -->
+              <div class="p-5 rounded-xl bg-[#120b1c] border border-[#2d1c44] space-y-4">
+                <div>
+                  <h4 class="text-xs font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-plus text-[#a855f7]"></i>
+                    <span>Conectar Seu Domínio Próprio (ex: link.meusite.com)</span>
+                  </h4>
+                  <p class="text-xs text-zinc-400 mt-1">
+                    Para usar seu próprio domínio, crie um registro <strong>Tipo A</strong> na sua registradora (Cloudflare, Hostinger, Registro.br, etc.) apontando para o IP da sua VPS: <code class="px-1.5 py-0.5 rounded bg-zinc-800 text-purple-300 font-mono">${curIp}</code>
+                  </p>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <input type="text" id="nb-new-custom-domain" placeholder="Ex: link.meusite.com ou vip.com.br" class="nb-input font-mono flex-1 text-xs">
+                  <button type="button" onclick="nbAddCustomDomain()" class="px-4 py-2.5 rounded-xl bg-[#a855f7] hover:bg-[#9333ea] text-white text-xs font-bold transition flex items-center justify-center gap-2 shrink-0">
+                    <i class="fa-solid fa-link text-xs"></i>
+                    <span>Conectar Domínio</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- CARD 3: LISTA DE DOMÍNIOS CONECTADOS -->
+              <div class="space-y-3">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">SEUS DOMÍNIOS CONFIGURADOS</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  ${avail.map(d => {
+                    const isDefault = d === curHost;
+                    return `
+                      <div class="p-3.5 rounded-xl bg-[#140d1e] border ${isDefault ? 'border-purple-500/40' : 'border-[#281a3c]'} flex items-center justify-between gap-2">
+                        <div class="truncate">
+                          <span class="font-mono text-xs font-bold text-purple-300 block truncate">${d}</span>
+                          <span class="text-[10px] text-zinc-500">${isDefault ? 'Host Padrão VPS' : 'Domínio Próprio'}</span>
+                        </div>
+                        ${isDefault ? '<span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>' : `
+                          <button type="button" onclick="nbDeleteCustomDomain('${d}')" class="text-zinc-500 hover:text-rose-400 text-xs p-1.5 rounded transition shrink-0" title="Remover domínio">
+                            <i class="fa-regular fa-trash-can"></i>
+                          </button>
+                        `}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
               </div>
             </div>
           `;
@@ -11793,7 +11879,7 @@ quer que eu te mostre as opções de acesso?</textarea>
       const formatK = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace('.0', '') + 'K' : String(n);
 
       cont.innerHTML = list.map(l => {
-        const fullUrl = `https://${l.public_domain || 'phantoms.group'}/l/${l.slug}`;
+        const fullUrl = nbFormatDomainUrl(l.public_domain, l.slug);
         const isActive = l.is_active !== false;
         const clicks = Number(l.total_clicks || 0);
         const sales = Number(l.total_sales || 0);
@@ -11940,10 +12026,11 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!NB_WIZARD_DATA || !linkId) {
         const randomSlug = Math.random().toString(36).substring(2, 8);
         const allBotIds = (STATE.flow_bots || []).map(b => b.id);
+        const defaultDom = nbGetAvailableDomains()[0];
         NB_WIZARD_DATA = {
           name: '',
           is_active: true,
-          public_domain: NB_DOMAINS_LIST[0],
+          public_domain: defaultDom,
           slug_mode: 'random',
           slug: randomSlug,
           destination_type: 'bot',
@@ -11982,15 +12069,30 @@ quer que eu te mostre as opções de acesso?</textarea>
     }
 
     function nbWizRenderStaticGrids() {
-      // Grid de domínios
+      // Grid de domínios (Dinâmico: Host da VPS + Domínios Próprios)
       const domGrid = document.getElementById('nb-wiz-domain-grid');
       if (domGrid) {
-        domGrid.innerHTML = NB_DOMAINS_LIST.map(d => `
-          <label class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between bg-[#140d1e] border-[#281a3c]" id="nb-wiz-dom-card-${d.replace(/[^a-z0-9]/g, '')}">
-            <span class="font-mono text-xs text-zinc-300 font-semibold">${d}</span>
-            <input type="radio" name="nb-wiz-domain" value="${d}" onchange="nbWizSelectDomain('${d}')" class="accent-[#a855f7]">
-          </label>
-        `).join('');
+        const avail = nbGetAvailableDomains();
+        domGrid.innerHTML = avail.map(d => {
+          const isVps = d === (window.location.host || 'localhost:8000');
+          const cleanId = d.replace(/[^a-z0-9]/g, '');
+          return `
+            <label class="p-3 rounded-xl border cursor-pointer transition flex items-center justify-between bg-[#140d1e] border-[#281a3c] hover:border-purple-600" id="nb-wiz-dom-card-${cleanId}">
+              <div>
+                <span class="font-mono text-xs text-zinc-200 font-bold block">${d}</span>
+                <span class="text-[10px] text-zinc-500">${isVps ? 'Host Padrão da VPS' : 'Domínio Próprio'}</span>
+              </div>
+              <input type="radio" name="nb-wiz-domain" value="${d}" onchange="nbWizSelectDomain('${d}')" class="accent-[#a855f7]">
+            </label>
+          `;
+        }).join('') + `
+          <div class="p-2 sm:col-span-2 flex justify-end">
+            <button type="button" onclick="nbPromptAddDomainInWizard()" class="text-xs text-purple-400 hover:text-purple-300 font-semibold flex items-center gap-1.5">
+              <i class="fa-solid fa-plus text-[10px]"></i>
+              <span>Conectar outro domínio próprio</span>
+            </button>
+          </div>
+        `;
       }
 
       // Lista de bots
@@ -12104,7 +12206,8 @@ quer que eu te mostre as opções de acesso?</textarea>
     function nbWizSelectDomain(domain) {
       if (!NB_WIZARD_DATA) return;
       NB_WIZARD_DATA.public_domain = domain;
-      NB_DOMAINS_LIST.forEach(d => {
+      const avail = nbGetAvailableDomains();
+      avail.forEach(d => {
         const card = document.getElementById('nb-wiz-dom-card-' + d.replace(/[^a-z0-9]/g, ''));
         const rad = document.querySelector(`input[name="nb-wiz-domain"][value="${d}"]`);
         if (card && rad) {
@@ -12115,7 +12218,7 @@ quer que eu te mostre as opções de acesso?</textarea>
         }
       });
       const prefix = document.getElementById('nb-wiz-domain-prefix');
-      if (prefix) prefix.textContent = `https://${domain}/l/`;
+      if (prefix) prefix.textContent = nbFormatDomainUrl(domain, '');
       nbWizSync();
     }
 
@@ -12291,9 +12394,9 @@ quer que eu te mostre as opções de acesso?</textarea>
       document.getElementById('nb-wiz-geo-container')?.classList.toggle('hidden', !d.filter_location);
 
       // Resumo da jornada (Right rail)
-      const domain = d.public_domain || NB_DOMAINS_LIST[0];
+      const domain = d.public_domain || nbGetAvailableDomains()[0];
       const slug = d.slug || 'slug';
-      const fullUrl = `https://${domain}/l/${slug}`;
+      const fullUrl = nbFormatDomainUrl(domain, slug);
 
       const elRailUrl = document.getElementById('nb-rail-url');
       if (elRailUrl) elRailUrl.textContent = fullUrl;
@@ -12446,6 +12549,66 @@ quer que eu te mostre as opções de acesso?</textarea>
       if (!NB_WIZARD_DATA) return;
       const url = `https://${NB_WIZARD_DATA.public_domain || 'phantoms.group'}/l/${NB_WIZARD_DATA.slug || ''}`;
       nbCopyText(url);
+    }
+
+
+    async function nbAddCustomDomain() {
+      const input = document.getElementById('nb-new-custom-domain');
+      if (!input) return;
+      const val = input.value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!val) {
+        alert('Por favor, informe um domínio ou subdomínio válido (Ex: link.meusite.com).');
+        return;
+      }
+      try {
+        const res = await adminFetch('/api/custom-domains', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: val })
+        });
+        if (!res.ok) throw new Error('Falha ao adicionar domínio');
+        const data = await res.json();
+        if (Array.isArray(data.domains)) NB_CUSTOM_DOMAINS = data.domains;
+        input.value = '';
+        nbSwitchRedirectTab('domains');
+      } catch (e) {
+        alert('Erro ao conectar domínio: ' + e.message);
+      }
+    }
+
+    async function nbDeleteCustomDomain(dom) {
+      if (!confirm(`Deseja remover o domínio ${dom}?`)) return;
+      try {
+        const res = await adminFetch(`/api/custom-domains/${encodeURIComponent(dom)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Falha ao remover domínio');
+        const data = await res.json();
+        if (Array.isArray(data.domains)) NB_CUSTOM_DOMAINS = data.domains;
+        nbSwitchRedirectTab('domains');
+      } catch (e) {
+        alert('Erro ao remover domínio: ' + e.message);
+      }
+    }
+
+    async function nbPromptAddDomainInWizard() {
+      const curIp = window.location.hostname;
+      const dom = prompt(`Informe o seu domínio ou subdomínio (Ex: link.meusite.com):\n\nImportante: Certifique-se de apontar o Registro A para o IP da sua VPS: ${curIp}`);
+      if (!dom) return;
+      const clean = dom.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!clean) return;
+      try {
+        const res = await adminFetch('/api/custom-domains', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain: clean })
+        });
+        if (!res.ok) throw new Error('Falha ao registrar domínio');
+        const data = await res.json();
+        if (Array.isArray(data.domains)) NB_CUSTOM_DOMAINS = data.domains;
+        nbWizRenderStaticGrids();
+        nbWizSelectDomain(clean);
+      } catch (e) {
+        alert('Erro ao adicionar domínio: ' + e.message);
+      }
     }
 
     // =========================================================

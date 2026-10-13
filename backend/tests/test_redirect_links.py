@@ -108,6 +108,23 @@ class RedirectLinksTest(unittest.IsolatedAsyncioTestCase):
             # Limpar
             await client.delete("/api/redirect-links/approved-test-slug")
 
+    async def test_custom_domains_crud(self):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test") as client:
+            # Listar
+            resp = await client.get("/api/custom-domains")
+            self.assertEqual(resp.status_code, 200)
+
+            # Adicionar
+            resp_add = await client.post("/api/custom-domains", json={"domain": "https://link.meusite.com/extra"})
+            self.assertEqual(resp_add.status_code, 200)
+            self.assertEqual(resp_add.json()["domain"], "link.meusite.com")
+            self.assertIn("link.meusite.com", resp_add.json()["domains"])
+
+            # Remover
+            resp_del = await client.delete("/api/custom-domains/link.meusite.com")
+            self.assertEqual(resp_del.status_code, 200)
+            self.assertNotIn("link.meusite.com", resp_del.json()["domains"])
+
 
 if __name__ == "__main__":
     unittest.main()
